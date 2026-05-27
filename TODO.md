@@ -134,4 +134,4 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] File and image attachments
 - [ ] Keyboard shortcuts
 - [ ] Conversation export
-- [ ] Docker Compose setup
+- [x] Docker Compose setup

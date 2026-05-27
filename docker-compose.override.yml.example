@@ -1,0 +1,17 @@
+# Copy this file to docker-compose.override.yml and edit to suit your setup.
+# Docker Compose automatically merges it with docker-compose.yml.
+
+services:
+  lemon-chat:
+    # Override the port — set server.port in lemon.toml to match
+    ports:
+      - "8169:8169"
+
+    # Bind-mount ./data so lemon.toml and lemon.db are easy to edit on the host
+    volumes:
+      - ./data:/data
+
+    # Allow the container to reach an Ollama instance running on the host.
+    # host.docker.internal is built-in on Docker Desktop; on Linux it needs this.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

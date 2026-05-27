@@ -6,10 +6,23 @@ Talks to locally-running models via HTTP API (tested with [Ollama](https://ollam
 
 ## Requirements
 
-- Go 1.22+
+- Go 1.22+ **or** Docker
 - A running Ollama instance (or any OpenAI-compatible API)
 
 ## Quick start
+
+### With Docker
+
+```sh
+mkdir -p data
+cp lemon.toml.example data/lemon.toml
+# edit data/lemon.toml — set your model API endpoint and credentials
+cp docker-compose.override.yml.example docker-compose.override.yml
+# edit docker-compose.override.yml as needed
+docker compose up
+```
+
+### Without Docker
 
 ```sh
 cp lemon.toml.example lemon.toml
@@ -18,6 +31,12 @@ go run ./cmd/lemon-chat
 ```
 
 Then open `http://localhost:8080` and log in with the admin credentials from your config.
+
+## Docker details
+
+The container expects a `lemon.toml` config file at `/data/lemon.toml` and writes the SQLite database to `/data/lemon.db`. Mount a directory or named volume at `/data` to persist both.
+
+`docker-compose.override.yml.example` documents common customisations — bind-mounting the data directory for easy config editing, restricting the port to localhost, and pointing at an Ollama instance running on the host machine.
 
 ## Configuration
 
