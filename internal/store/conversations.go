@@ -6,12 +6,12 @@ import (
 )
 
 type Conversation struct {
-	ID        int64
-	UserID    int64
-	PersonaID *int64
-	Title     string
-	CreatedAt string
-	UpdatedAt string
+	ID        int64   `json:"id"`
+	UserID    int64   `json:"user_id"`
+	PersonaID *int64  `json:"persona_id"`
+	Title     string  `json:"title"`
+	CreatedAt string  `json:"created_at"`
+	UpdatedAt string  `json:"updated_at"`
 }
 
 func (s *Store) ListConversations(userID int64) ([]Conversation, error) {

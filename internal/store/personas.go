@@ -6,14 +6,14 @@ import (
 )
 
 type Persona struct {
-	ID           int64
-	Name         string
-	Description  *string
-	SystemPrompt string
-	CreatedBy    *int64
-	IsGlobal     bool
-	CreatedAt    string
-	UpdatedAt    string
+	ID           int64   `json:"id"`
+	Name         string  `json:"name"`
+	Description  *string `json:"description"`
+	SystemPrompt string  `json:"system_prompt"`
+	CreatedBy    *int64  `json:"created_by"`
+	IsGlobal     bool    `json:"is_global"`
+	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
 }
 
 func (s *Store) ListPersonas(userID int64) ([]Persona, error) {

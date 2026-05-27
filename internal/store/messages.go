@@ -1,11 +1,11 @@
 package store
 
 type Message struct {
-	ID             int64
-	ConversationID int64
-	Role           string
-	Content        string
-	CreatedAt      string
+	ID             int64  `json:"id"`
+	ConversationID int64  `json:"conversation_id"`
+	Role           string `json:"role"`
+	Content        string `json:"content"`
+	CreatedAt      string `json:"created_at"`
 }
 
 func (s *Store) ListMessages(conversationID int64) ([]Message, error) {
