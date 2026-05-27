@@ -63,6 +63,9 @@ function render() {
     </div>
     <div class="sidebar-footer">
       <span class="sidebar-user">${escapeHtml(state.username)}</span>
+      <button class="btn btn-ghost btn-sm btn-icon" id="settings-btn" title="Settings">
+        ${iconSettings()}
+      </button>
       <button class="btn btn-ghost btn-sm btn-icon" id="logout-btn" title="Sign out">
         ${iconLogOut()}
       </button>
@@ -70,6 +73,7 @@ function render() {
   `;
 
   document.getElementById('new-chat-btn').addEventListener('click', () => state.onNew?.());
+  document.getElementById('settings-btn').addEventListener('click', () => { window.location.href = '/settings.html'; });
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
 
   sidebarEl.querySelectorAll('.sidebar-item').forEach(el => {
@@ -116,6 +120,10 @@ function iconPlus() {
 
 function iconTrash() {
   return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
+}
+
+function iconSettings() {
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.76 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
 }
 
 function iconLogOut() {

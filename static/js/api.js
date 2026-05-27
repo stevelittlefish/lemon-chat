@@ -18,6 +18,8 @@ export const auth = {
   login: (username, password) => request('POST', '/api/auth/login', { username, password }),
   logout: () => request('POST', '/api/auth/logout'),
   me: () => request('GET', '/api/auth/me'),
+  changePassword: (currentPassword, newPassword) =>
+    request('PATCH', '/api/auth/password', { current_password: currentPassword, new_password: newPassword }),
 };
 
 // Models

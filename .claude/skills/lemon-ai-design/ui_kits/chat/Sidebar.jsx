@@ -72,7 +72,7 @@ function Sidebar({ chats, activeId, onSelect, onNew, onDelete, onRename }) {
       </div>
 
       <div className="sidebar-foot">
-        <a><Icon name="settings" size={15} /> Settings</a>
+        <a href="../settings/index.html"><Icon name="settings" size={15} /> Settings</a>
       </div>
     </aside>
   );

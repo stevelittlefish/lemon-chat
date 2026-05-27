@@ -18,6 +18,22 @@ body { overflow: hidden; }
   flex-direction: column;
   padding: 18px 12px;
 }
+.snav-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  text-decoration: none;
+  padding: 4px 8px 10px;
+  font-family: var(--font-sans);
+  align-self: flex-start;
+  border-radius: 4px;
+  transition: color var(--dur-fast) var(--ease);
+}
+.snav-back:hover { color: var(--ink-900); }
+.snav-back svg { transition: transform var(--dur-fast) var(--ease); }
+.snav-back:hover svg { transform: translateX(-2px); }
 .snav-head {
   display: flex;
   align-items: center;
@@ -354,3 +370,193 @@ textarea.prompt:focus { outline: none; border-color: var(--lemon-500); box-shado
 .smain::-webkit-scrollbar { width: 10px; }
 .smain::-webkit-scrollbar-thumb { background: var(--ink-200); border-radius: 999px; border: 3px solid var(--bg); }
 .smain::-webkit-scrollbar-thumb:hover { background: var(--ink-300); }
+
+/* ---------- Sidebar group labels ---------- */
+.snav-group-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  padding: 14px 10px 6px;
+}
+.snav-group-label:first-of-type { padding-top: 4px; }
+
+/* ---------- Account panel ---------- */
+.profile-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 28px;
+  align-items: flex-start;
+  padding: 14px 0;
+}
+.avatar-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.avatar-lg {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--lemon-300);
+  border: 1.5px solid var(--ink-900);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 30px;
+  color: var(--ink-900);
+  box-shadow: var(--shadow-sm);
+  letter-spacing: -0.01em;
+}
+.profile-fields {
+  display: flex;
+  flex-direction: column;
+}
+.profile-fields .field { padding: 10px 0; }
+.profile-fields .field:first-child { border-top: none; padding-top: 0; }
+
+.input-prefix {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--paper-0);
+  overflow: hidden;
+}
+.input-prefix:focus-within { border-color: var(--lemon-500); box-shadow: var(--ring-accent); }
+.input-prefix .prefix {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--fg-muted);
+  padding: 6px 10px;
+  background: var(--paper-100);
+  border-right: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+}
+.input-prefix .input {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding-left: 8px;
+}
+.input-prefix .input:focus { box-shadow: none; border: none; }
+
+/* ---------- Password form ---------- */
+.pwd-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 18px 16px;
+  background: var(--paper-100);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin: 10px 0 4px;
+}
+.pwd-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  align-items: center;
+  gap: 16px;
+}
+.pwd-row label {
+  font-size: 13px;
+  color: var(--ink-700);
+}
+.pwd-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.pwd-input-wrap .input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding-right: 32px;
+}
+.pwd-toggle {
+  position: absolute;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+}
+.pwd-toggle:hover { color: var(--ink-900); background: var(--paper-200); }
+.pwd-strength {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+.strength-bar {
+  flex: 0 0 120px;
+  height: 4px;
+  background: var(--paper-200);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.strength-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width var(--dur-fast) var(--ease);
+}
+.strength-fill.weak   { width: 30%; background: var(--danger); }
+.strength-fill.medium { width: 60%; background: var(--lemon-500); }
+.strength-fill.strong { width: 100%; background: var(--olive); }
+.strength-label {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.pwd-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-soft);
+  margin-top: 4px;
+}
+
+/* ---------- Danger rows ---------- */
+.danger-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 16px;
+  background: var(--bg-lifted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-top: 10px;
+}
+.danger-row .meta { display: flex; flex-direction: column; gap: 2px; }
+.danger-row .lbl { font-size: 14px; font-weight: 500; color: var(--ink-900); }
+.danger-row .desc { font-size: 13px; color: var(--fg-muted); }
+
+/* ---------- Time range (Notifications quiet hours) ---------- */
+.time-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.time-range .input {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 6px 10px;
+}
+.time-range .dash {
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+}
+.input.input-sm { padding: 6px 10px; font-size: 13px; }

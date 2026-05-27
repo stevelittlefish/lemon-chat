@@ -77,10 +77,48 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, userResponse(currentUser(r)))
 }
 
+func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if len(req.NewPassword) < 6 {
+		writeError(w, http.StatusBadRequest, "password must be at least 6 characters")
+		return
+	}
+
+	user := currentUser(r)
+
+	if user.PasswordHash != nil {
+		if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.CurrentPassword)); err != nil {
+			writeError(w, http.StatusUnauthorized, "current password is incorrect")
+			return
+		}
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	hashStr := string(hash)
+	if err := s.store.UpdateUser(user.ID, user.Username, &hashStr, user.IsAdmin); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func userResponse(u *store.User) map[string]any {
 	return map[string]any{
-		"id":       u.ID,
-		"username": u.Username,
-		"is_admin": u.IsAdmin,
+		"id":           u.ID,
+		"username":     u.Username,
+		"is_admin":     u.IsAdmin,
+		"has_password": u.PasswordHash != nil,
 	}
 }

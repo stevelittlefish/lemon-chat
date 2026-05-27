@@ -180,4 +180,197 @@ function AboutPanel() {
   );
 }
 
-Object.assign(window, { ModelsPanel, AppearancePanel, PrivacyPanel, AdvancedPanel, AboutPanel });
+function AccountPanel({ s, set }) {
+  const [showPwd, setShowPwd] = React.useState(false);
+  const [pwdMode, setPwdMode] = React.useState(false); // expand the password panel
+
+  const initials = (s.name || "?")
+    .split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
+
+  return (
+    <>
+      <Section title="Profile" lead="How you show up in chats and shared conversations.">
+        <div className="profile-row">
+          <div className="avatar-block">
+            <div className="avatar-lg" style={{ background: s.avatarColor }}>
+              {initials}
+            </div>
+            <button className="btn btn-secondary btn-sm">
+              <Icon name="camera" size={14} />
+              Change
+            </button>
+          </div>
+          <div className="profile-fields">
+            <Field label="Display name" desc="Shown above your messages.">
+              <input
+                className="input"
+                style={{ width: 220 }}
+                value={s.name}
+                onChange={(e) => set("name", e.target.value)}
+              />
+            </Field>
+            <Field label="Email" desc="For password reset only. We don't email you.">
+              <input
+                className="input"
+                style={{ width: 220, fontFamily: "var(--font-mono)", fontSize: 13 }}
+                type="email"
+                value={s.email}
+                onChange={(e) => set("email", e.target.value)}
+              />
+            </Field>
+            <Field label="Username" desc="Used in shared chat URLs.">
+              <div className="input-prefix">
+                <span className="prefix">lemon.ai/@</span>
+                <input
+                  className="input"
+                  style={{ width: 140, fontFamily: "var(--font-mono)", fontSize: 13 }}
+                  value={s.username}
+                  onChange={(e) => set("username", e.target.value)}
+                />
+              </div>
+            </Field>
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Password" lead="Used when syncing across devices. Stays on this machine otherwise.">
+        {!pwdMode ? (
+          <Field label="Password" desc={`Last changed ${s.passwordChanged}.`}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setPwdMode(true)}>
+              <Icon name="lock" size={14} />
+              Change password
+            </button>
+          </Field>
+        ) : (
+          <div className="pwd-form">
+            <div className="pwd-row">
+              <label>Current password</label>
+              <div className="pwd-input-wrap">
+                <input
+                  type={showPwd ? "text" : "password"}
+                  className="input"
+                  placeholder="••••••••"
+                />
+                <button
+                  className="pwd-toggle"
+                  onClick={() => setShowPwd(!showPwd)}
+                  title={showPwd ? "Hide" : "Show"}
+                >
+                  <Icon name="eye" size={14} />
+                </button>
+              </div>
+            </div>
+            <div className="pwd-row">
+              <label>New password</label>
+              <div className="pwd-input-wrap">
+                <input
+                  type={showPwd ? "text" : "password"}
+                  className="input"
+                  placeholder="at least 12 characters"
+                />
+              </div>
+            </div>
+            <div className="pwd-row">
+              <label>Confirm new password</label>
+              <div className="pwd-input-wrap">
+                <input
+                  type={showPwd ? "text" : "password"}
+                  className="input"
+                  placeholder="type it again"
+                />
+              </div>
+            </div>
+            <div className="pwd-strength">
+              <span className="strength-bar"><span className="strength-fill medium"></span></span>
+              <span className="strength-label">Decent. A long passphrase is better than a clever short one.</span>
+            </div>
+            <div className="pwd-actions">
+              <button className="btn btn-ghost btn-sm" onClick={() => setPwdMode(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm">Update password</button>
+            </div>
+          </div>
+        )}
+        <Field label="Two-factor auth" desc="Authenticator app or hardware key. Strongly recommended.">
+          <Toggle value={s.twoFactor} onChange={(v) => set("twoFactor", v)} />
+        </Field>
+        <Field label="Active sessions" desc="3 devices signed in.">
+          <button className="btn btn-secondary btn-sm">Review</button>
+        </Field>
+      </Section>
+
+      <Section title="Danger zone" lead="">
+        <div className="danger-row">
+          <div className="meta">
+            <span className="lbl">Sign out everywhere</span>
+            <span className="desc">Ends every session except this one.</span>
+          </div>
+          <button className="btn btn-secondary btn-sm">Sign out all</button>
+        </div>
+        <div className="danger-row">
+          <div className="meta">
+            <span className="lbl">Delete account</span>
+            <span className="desc">Erases your profile and synced chats. Local files stay on this machine.</span>
+          </div>
+          <button className="btn btn-danger btn-sm">Delete…</button>
+        </div>
+      </Section>
+    </>
+  );
+}
+
+function NotificationsPanel({ s, set }) {
+  return (
+    <>
+      <Section title="Desktop" lead="Quiet by default. Lemon AI doesn't bug you while you're thinking.">
+        <Field label="Show notifications" desc="When the app is in the background.">
+          <Toggle value={s.notifyDesktop} onChange={(v) => set("notifyDesktop", v)} />
+        </Field>
+        <Field label="Play a sound" desc="A soft chime when a long response finishes.">
+          <Toggle value={s.notifySound} onChange={(v) => set("notifySound", v)} />
+        </Field>
+        <Field label="Notify after" desc="Only ping if a generation takes longer than this.">
+          <Select
+            value={s.notifyThreshold}
+            onChange={(v) => set("notifyThreshold", v)}
+            options={[
+              { value: "5",   label: "5 seconds" },
+              { value: "15",  label: "15 seconds" },
+              { value: "30",  label: "30 seconds" },
+              { value: "60",  label: "1 minute" },
+              { value: "off", label: "Never" },
+            ]}
+          />
+        </Field>
+      </Section>
+
+      <Section title="Email" lead="Only the things we think you'd actually want.">
+        <Field label="Security alerts" desc="New sign-ins, password changes. Always on.">
+          <Toggle value={true} onChange={() => {}} />
+        </Field>
+        <Field label="Product updates" desc="A short note when we ship something good. Roughly monthly.">
+          <Toggle value={s.emailUpdates} onChange={(v) => set("emailUpdates", v)} />
+        </Field>
+        <Field label="Community digest" desc="Cool things people built with Lemon AI. Weekly.">
+          <Toggle value={s.emailDigest} onChange={(v) => set("emailDigest", v)} />
+        </Field>
+      </Section>
+
+      <Section title="Quiet hours" lead="">
+        <Field label="Mute notifications" desc="No desktop alerts during these hours.">
+          <Toggle value={s.quietHours} onChange={(v) => set("quietHours", v)} />
+        </Field>
+        {s.quietHours && (
+          <Field label="Hours" desc="Local time.">
+            <div className="time-range">
+              <input className="input input-sm" type="time" value={s.quietFrom} onChange={(e) => set("quietFrom", e.target.value)} />
+              <span className="dash">→</span>
+              <input className="input input-sm" type="time" value={s.quietTo} onChange={(e) => set("quietTo", e.target.value)} />
+            </div>
+          </Field>
+        )}
+      </Section>
+    </>
+  );
+}
+
+Object.assign(window, { ModelsPanel, AppearancePanel, PrivacyPanel, AdvancedPanel, AboutPanel, AccountPanel, NotificationsPanel });
