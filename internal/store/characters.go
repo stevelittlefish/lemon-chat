@@ -20,7 +20,7 @@ type Character struct {
 func (s *Store) ListCharacters() ([]Character, error) {
 	rows, err := s.db.Query(
 		`SELECT id, name, model, system_prompt, first_message, created_by, allow_editing, created_at, updated_at
-		 FROM characters
+		 FROM character
 		 ORDER BY name`,
 	)
 	if err != nil {
@@ -45,7 +45,7 @@ func (s *Store) GetCharacter(id int64) (*Character, error) {
 	var allowEditing int
 	err := s.db.QueryRow(
 		`SELECT id, name, model, system_prompt, first_message, created_by, allow_editing, created_at, updated_at
-		 FROM characters WHERE id = ?`, id,
+		 FROM character WHERE id = ?`, id,
 	).Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.CreatedBy, &allowEditing, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -60,7 +60,7 @@ func (s *Store) GetCharacter(id int64) (*Character, error) {
 func (s *Store) CreateCharacter(name, model string, systemPrompt, firstMessage *string, createdBy int64, allowEditing bool) (*Character, error) {
 	t := now()
 	res, err := s.db.Exec(
-		`INSERT INTO characters (name, model, system_prompt, first_message, created_by, allow_editing, created_at, updated_at)
+		`INSERT INTO character (name, model, system_prompt, first_message, created_by, allow_editing, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		name, model, systemPrompt, firstMessage, createdBy, boolToInt(allowEditing), t, t,
 	)
@@ -76,7 +76,7 @@ func (s *Store) CreateCharacter(name, model string, systemPrompt, firstMessage *
 
 func (s *Store) UpdateCharacter(id int64, name, model string, systemPrompt, firstMessage *string, allowEditing bool) error {
 	_, err := s.db.Exec(
-		`UPDATE characters SET name = ?, model = ?, system_prompt = ?, first_message = ?, allow_editing = ?, updated_at = ?
+		`UPDATE character SET name = ?, model = ?, system_prompt = ?, first_message = ?, allow_editing = ?, updated_at = ?
 		 WHERE id = ?`,
 		name, model, systemPrompt, firstMessage, boolToInt(allowEditing), now(), id,
 	)
@@ -84,6 +84,6 @@ func (s *Store) UpdateCharacter(id int64, name, model string, systemPrompt, firs
 }
 
 func (s *Store) DeleteCharacter(id int64) error {
-	_, err := s.db.Exec(`DELETE FROM characters WHERE id = ?`, id)
+	_, err := s.db.Exec(`DELETE FROM character WHERE id = ?`, id)
 	return err
 }

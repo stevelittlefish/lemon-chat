@@ -19,7 +19,7 @@ func (s *Store) CreateSession(userID int64) (string, error) {
 	t := now()
 	expires := time.Now().UTC().Add(sessionTTL).Format(time.RFC3339)
 	_, err := s.db.Exec(
-		`INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)`,
+		`INSERT INTO session (id, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)`,
 		id, userID, t, expires,
 	)
 	return id, err
@@ -29,7 +29,7 @@ func (s *Store) SessionUserID(sessionID string) (int64, error) {
 	var userID int64
 	var expiresAt string
 	err := s.db.QueryRow(
-		`SELECT user_id, expires_at FROM sessions WHERE id = ?`, sessionID,
+		`SELECT user_id, expires_at FROM session WHERE id = ?`, sessionID,
 	).Scan(&userID, &expiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, ErrNotFound
@@ -46,6 +46,6 @@ func (s *Store) SessionUserID(sessionID string) (int64, error) {
 }
 
 func (s *Store) DeleteSession(sessionID string) error {
-	_, err := s.db.Exec(`DELETE FROM sessions WHERE id = ?`, sessionID)
+	_, err := s.db.Exec(`DELETE FROM session WHERE id = ?`, sessionID)
 	return err
 }

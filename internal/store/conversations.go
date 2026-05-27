@@ -18,7 +18,7 @@ type Conversation struct {
 func (s *Store) ListConversations(userID int64) ([]Conversation, error) {
 	rows, err := s.db.Query(
 		`SELECT id, user_id, persona_id, title, created_at, updated_at
-		 FROM conversations WHERE user_id = ? ORDER BY updated_at DESC`,
+		 FROM conversation WHERE user_id = ? ORDER BY updated_at DESC`,
 		userID,
 	)
 	if err != nil {
@@ -40,7 +40,7 @@ func (s *Store) GetConversation(id, userID int64) (*Conversation, error) {
 	c := &Conversation{}
 	err := s.db.QueryRow(
 		`SELECT id, user_id, persona_id, title, created_at, updated_at
-		 FROM conversations WHERE id = ? AND user_id = ?`,
+		 FROM conversation WHERE id = ? AND user_id = ?`,
 		id, userID,
 	).Scan(&c.ID, &c.UserID, &c.PersonaID, &c.Title, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -52,7 +52,7 @@ func (s *Store) GetConversation(id, userID int64) (*Conversation, error) {
 func (s *Store) CreateConversation(userID int64, title *string, personaID *int64) (*Conversation, error) {
 	t := now()
 	res, err := s.db.Exec(
-		`INSERT INTO conversations (user_id, persona_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		`INSERT INTO conversation (user_id, persona_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
 		userID, personaID, title, t, t,
 	)
 	if err != nil {
@@ -63,18 +63,18 @@ func (s *Store) CreateConversation(userID int64, title *string, personaID *int64
 }
 
 func (s *Store) DeleteConversation(id, userID int64) error {
-	_, err := s.db.Exec(`DELETE FROM conversations WHERE id = ? AND user_id = ?`, id, userID)
+	_, err := s.db.Exec(`DELETE FROM conversation WHERE id = ? AND user_id = ?`, id, userID)
 	return err
 }
 
 func (s *Store) TouchConversation(id int64) error {
-	_, err := s.db.Exec(`UPDATE conversations SET updated_at = ? WHERE id = ?`, now(), id)
+	_, err := s.db.Exec(`UPDATE conversation SET updated_at = ? WHERE id = ?`, now(), id)
 	return err
 }
 
 func (s *Store) UpdateConversationTitle(id int64, title string) error {
 	// Deliberately does not touch updated_at so sidebar sort order is unaffected.
-	_, err := s.db.Exec(`UPDATE conversations SET title = ? WHERE id = ?`, title, id)
+	_, err := s.db.Exec(`UPDATE conversation SET title = ? WHERE id = ?`, title, id)
 	return err
 }
 
@@ -82,11 +82,11 @@ func (s *Store) ListUntitledEligible() ([]int64, error) {
 	oneMinAgo := time.Now().UTC().Add(-1 * time.Minute).Format(time.RFC3339)
 	fiveMinAgo := time.Now().UTC().Add(-5 * time.Minute).Format(time.RFC3339)
 	rows, err := s.db.Query(`
-		SELECT id FROM conversations
+		SELECT id FROM conversation
 		WHERE title IS NULL AND (
-			(created_at < ? AND (SELECT COUNT(*) FROM messages WHERE conversation_id = conversations.id) >= 6)
+			(created_at < ? AND (SELECT COUNT(*) FROM message WHERE conversation_id = conversation.id) >= 6)
 			OR
-			(created_at < ? AND (SELECT COUNT(*) FROM messages WHERE conversation_id = conversations.id) >= 2)
+			(created_at < ? AND (SELECT COUNT(*) FROM message WHERE conversation_id = conversation.id) >= 2)
 		)
 	`, oneMinAgo, fiveMinAgo)
 	if err != nil {

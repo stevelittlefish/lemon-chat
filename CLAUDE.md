@@ -16,6 +16,7 @@ These apply to every change. Don't add packages, build steps, or abstractions wi
 - **JS framework:** vanilla JS with native ES modules (`<script type="module">`) — no React, no Vue, no Svelte
 - **Model/server config:** TOML files only, not the UI
 - **Database:** SQLite via `modernc.org/sqlite` (pure Go, no CGo required)
+- **Database table names:** singular (`user`, `message`, `conversation` — not `users`, `messages`, etc.)
 - **TOML parsing:** `github.com/BurntSushi/toml`
 
 ## Frontend conventions

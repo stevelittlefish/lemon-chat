@@ -11,7 +11,7 @@ type Message struct {
 func (s *Store) ListMessages(conversationID int64) ([]Message, error) {
 	rows, err := s.db.Query(
 		`SELECT id, conversation_id, role, content, created_at
-		 FROM messages WHERE conversation_id = ? ORDER BY created_at ASC`,
+		 FROM message WHERE conversation_id = ? ORDER BY created_at ASC`,
 		conversationID,
 	)
 	if err != nil {
@@ -32,7 +32,7 @@ func (s *Store) ListMessages(conversationID int64) ([]Message, error) {
 func (s *Store) CreateMessage(conversationID int64, role, content string) (*Message, error) {
 	t := now()
 	res, err := s.db.Exec(
-		`INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)`,
+		`INSERT INTO message (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)`,
 		conversationID, role, content, t,
 	)
 	if err != nil {
