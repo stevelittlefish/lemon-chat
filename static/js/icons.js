@@ -1,0 +1,20 @@
+const _cache = new Map();
+
+const ICONS = [
+  'plus', 'trash', 'settings', 'log-out', 'send',
+  'cpu', 'chevron-down', 'arrow-left', 'user', 'users',
+  'lock', 'eye', 'pencil',
+];
+
+export async function preload() {
+  await Promise.all(ICONS.map(async name => {
+    const r = await fetch(`/assets/icons/${name}.svg`);
+    _cache.set(name, (await r.text()).trim());
+  }));
+}
+
+export function icon(name, size) {
+  let svg = _cache.get(name) ?? '';
+  if (size) svg = svg.replace('<svg ', `<svg width="${size}" height="${size}" `);
+  return svg;
+}

@@ -3,6 +3,7 @@ import * as sidebar from './sidebar.js';
 import * as thread from './thread.js';
 import * as composer from './composer.js';
 import * as ws from './ws.js';
+import { preload as preloadIcons } from './icons.js';
 
 const loginScreen = document.getElementById('login-screen');
 const appEl = document.getElementById('app');
@@ -38,6 +39,7 @@ async function initApp() {
   const [modelList] = await Promise.all([
     modelApi.list(),
     sidebar.load(),
+    preloadIcons(),
   ]);
 
   sidebar.init({

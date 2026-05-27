@@ -1,3 +1,5 @@
+import { icon } from './icons.js';
+
 const composerContainer = document.getElementById('composer-container');
 
 let state = {
@@ -48,9 +50,9 @@ function render() {
   composerContainer.innerHTML = `
     <div class="composer-meta">
       <button class="model-picker" id="model-picker">
-        ${iconCpu()}
+        ${icon('cpu', 12)}
         <span id="model-label">${escapeHtml(selectedDisplayName())}</span>
-        ${iconChevronDown()}
+        ${icon('chevron-down', 10)}
       </button>
     </div>
     <div class="composer">
@@ -61,7 +63,7 @@ function render() {
         rows="1"
       ></textarea>
       <button class="composer-send" id="composer-send" disabled title="Send">
-        ${iconSend()}
+        ${icon('send')}
       </button>
     </div>
   `;
@@ -148,14 +150,3 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function iconSend() {
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
-}
-
-function iconCpu() {
-  return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`;
-}
-
-function iconChevronDown() {
-  return `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
-}

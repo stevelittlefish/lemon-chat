@@ -1,4 +1,5 @@
 import { conversations as api } from './api.js';
+import { icon } from './icons.js';
 
 const sidebarEl = document.getElementById('sidebar');
 
@@ -55,7 +56,7 @@ function render() {
     <div class="sidebar-header">
       <img src="/assets/logo-wordmark.svg" alt="lemon chat" class="sidebar-logo">
       <button class="btn btn-ghost btn-sm btn-icon" id="new-chat-btn" title="New conversation">
-        ${iconPlus()}
+        ${icon('plus', 18)}
       </button>
     </div>
     <div class="sidebar-list" id="sidebar-list">
@@ -64,10 +65,10 @@ function render() {
     <div class="sidebar-footer">
       <span class="sidebar-user">${escapeHtml(state.username)}</span>
       <button class="btn btn-ghost btn-sm btn-icon" id="settings-btn" title="Settings">
-        ${iconSettings()}
+        ${icon('settings', 16)}
       </button>
       <button class="btn btn-ghost btn-sm btn-icon" id="logout-btn" title="Sign out">
-        ${iconLogOut()}
+        ${icon('log-out', 16)}
       </button>
     </div>
   `;
@@ -99,7 +100,7 @@ function convItem(conv) {
   return `
     <div class="sidebar-item${active}" data-id="${conv.id}">
       ${titleHtml}
-      <button class="sidebar-item-delete" title="Delete">${iconTrash()}</button>
+      <button class="sidebar-item-delete" title="Delete">${icon('trash', 14)}</button>
     </div>
   `;
 }
@@ -114,18 +115,3 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function iconPlus() {
-  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
-}
-
-function iconTrash() {
-  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>`;
-}
-
-function iconSettings() {
-  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.76 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
-}
-
-function iconLogOut() {
-  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`;
-}
