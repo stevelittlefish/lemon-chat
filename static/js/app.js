@@ -2,6 +2,7 @@ import { auth, conversations as convApi, messages as msgApi, models as modelApi 
 import * as sidebar from './sidebar.js';
 import * as thread from './thread.js';
 import * as composer from './composer.js';
+import * as ws from './ws.js';
 
 const loginScreen = document.getElementById('login-screen');
 const appEl = document.getElementById('app');
@@ -28,6 +29,8 @@ function showLogin() {
 function showApp() {
   loginScreen.classList.add('hidden');
   appEl.classList.remove('hidden');
+  ws.on('conversation_titled', ({ id, title }) => sidebar.updateTitle(id, title));
+  ws.connect();
   initApp();
 }
 

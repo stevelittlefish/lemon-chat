@@ -39,6 +39,17 @@ export function removeConversation(id) {
   render();
 }
 
+export function updateTitle(id, title) {
+  const idx = state.items.findIndex(c => c.id === id);
+  if (idx === -1) return;
+  state.items[idx] = { ...state.items[idx], title };
+  const el = sidebarEl.querySelector(`.sidebar-item[data-id="${id}"] .sidebar-item-title`);
+  if (el) {
+    el.textContent = title;
+    el.classList.remove('sidebar-item-title--empty');
+  }
+}
+
 function render() {
   sidebarEl.innerHTML = `
     <div class="sidebar-header">

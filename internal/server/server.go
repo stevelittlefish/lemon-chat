@@ -11,10 +11,11 @@ import (
 type Server struct {
 	cfg   *config.Config
 	store *store.Store
+	hub   *Hub
 }
 
-func New(cfg *config.Config, st *store.Store) *Server {
-	return &Server{cfg: cfg, store: st}
+func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
+	return &Server{cfg: cfg, store: st, hub: hub}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -48,6 +49,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/admin/users", s.requireAdmin(s.handleAdminCreateUser))
 	mux.HandleFunc("PATCH /api/admin/users/{id}", s.requireAdmin(s.handleAdminUpdateUser))
 	mux.HandleFunc("DELETE /api/admin/users/{id}", s.requireAdmin(s.handleAdminDeleteUser))
+
+	// WebSocket
+	mux.HandleFunc("GET /ws", s.handleWS)
 
 	// Static files
 	mux.Handle("/", http.FileServer(http.Dir("static")))

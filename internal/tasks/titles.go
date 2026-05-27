@@ -15,18 +15,18 @@ import (
 
 const titleInterval = 30 * time.Second
 
-func StartTitleWorker(st *store.Store, cfg *config.Config) {
+func StartTitleWorker(st *store.Store, cfg *config.Config, onTitled func(int64, string)) {
 	go func() {
-		generateTitles(st, cfg)
+		generateTitles(st, cfg, onTitled)
 		ticker := time.NewTicker(titleInterval)
 		defer ticker.Stop()
 		for range ticker.C {
-			generateTitles(st, cfg)
+			generateTitles(st, cfg, onTitled)
 		}
 	}()
 }
 
-func generateTitles(st *store.Store, cfg *config.Config) {
+func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, string)) {
 	modelName := cfg.ModelServer.Default
 	if modelName == "" {
 		return
@@ -49,6 +49,9 @@ func generateTitles(st *store.Store, cfg *config.Config) {
 			log.Printf("title worker: update %d: %v", id, err)
 		} else {
 			log.Printf("title worker: titled conversation %d: %q", id, title)
+			if onTitled != nil {
+				onTitled(id, title)
+			}
 		}
 	}
 }

@@ -114,6 +114,16 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ---
 
+## WebSocket
+
+- [x] `internal/server/ws.go` — Hub, upgrade handler, broadcast, frame I/O (no new packages)
+- [x] `/ws` route — auth-gated WebSocket endpoint
+- [x] Title worker callback — `onTitled` wired to `hub.BroadcastTitleUpdate`
+- [x] `static/js/ws.js` — connect, dispatch events, auto-reconnect
+- [x] `sidebar.updateTitle()` — targeted DOM update on `conversation_titled` event
+
+---
+
 ## Post-MVP (parked, not forgotten)
 
 - [ ] User profiles — login screen, profile switcher
