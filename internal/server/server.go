@@ -45,6 +45,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/personas/{id}", s.requireAuth(s.handleUpdatePersona))
 	mux.HandleFunc("DELETE /api/personas/{id}", s.requireAuth(s.handleDeletePersona))
 
+	// Characters
+	mux.HandleFunc("GET /api/characters", s.requireAuth(s.handleListCharacters))
+	mux.HandleFunc("POST /api/characters", s.requireAuth(s.handleCreateCharacter))
+	mux.HandleFunc("PATCH /api/characters/{id}", s.requireAuth(s.handleUpdateCharacter))
+	mux.HandleFunc("DELETE /api/characters/{id}", s.requireAuth(s.handleDeleteCharacter))
+
 	// Admin
 	mux.HandleFunc("GET /api/admin/users", s.requireAdmin(s.handleAdminListUsers))
 	mux.HandleFunc("POST /api/admin/users", s.requireAdmin(s.handleAdminCreateUser))

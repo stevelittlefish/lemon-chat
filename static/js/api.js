@@ -83,6 +83,14 @@ export const personas = {
   delete: (id) => request('DELETE', `/api/personas/${id}`),
 };
 
+// Characters
+export const characters = {
+  list:   ()         => request('GET',    '/api/characters'),
+  create: (data)     => request('POST',   '/api/characters', data),
+  update: (id, data) => request('PATCH',  `/api/characters/${id}`, data),
+  delete: (id)       => request('DELETE', `/api/characters/${id}`),
+};
+
 // Admin
 export const admin = {
   users: {

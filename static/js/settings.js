@@ -1,4 +1,4 @@
-import { auth, admin } from './api.js';
+import { auth, admin, characters as charactersApi, models as modelsApi } from './api.js';
 import { preload as preloadIcons, icon } from './icons.js';
 
 let user = null;
@@ -17,6 +17,7 @@ async function init() {
   svgArrowLeft = icon('arrow-left', 14);
   svgUser      = icon('user', 16);
   svgUsers     = icon('users', 16);
+  svgCpu       = icon('cpu', 16);
   svgLock      = icon('lock', 14);
   svgEye       = icon('eye', 14);
   svgPlus      = icon('plus', 14);
@@ -51,6 +52,10 @@ function renderNav() {
       ${svgUser}
       Account
     </div>
+    <div class="snav-item ${currentPanel === 'characters' ? 'active' : ''}" data-panel="characters">
+      ${svgCpu}
+      Characters
+    </div>
     ${adminSection}
   `;
 
@@ -63,6 +68,7 @@ function navigate(panel) {
   currentPanel = panel;
   renderNav();
   if (panel === 'account') showAccountPanel();
+  else if (panel === 'characters') showCharactersPanel();
   else if (panel === 'users') showUsersPanel();
 }
 
@@ -223,6 +229,304 @@ function showPwdForm() {
   function showError(msg) {
     errorEl.hidden = false;
     errorEl.textContent = msg;
+  }
+}
+
+// ── Characters panel ──────────────────────────────────────────────────
+
+let charactersData = [];
+let modelsData     = [];
+let editingCharId  = null;
+let showingCharAddForm = false;
+
+async function showCharactersPanel() {
+  editingCharId     = null;
+  showingCharAddForm = false;
+
+  document.getElementById('smain').innerHTML = `
+    <div class="smain-head">
+      <h1>Characters</h1>
+      <p>Reusable AI personas with a model, system prompt, and optional opening message.</p>
+    </div>
+    <div class="section">
+      <div class="section-toolbar">
+        <div>
+          <h2>My characters</h2>
+          <p class="lead">Characters you created.</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="add-char-btn">
+          ${svgPlus}
+          Add character
+        </button>
+      </div>
+      <div id="my-chars-list"><div class="users-status">Loading…</div></div>
+    </div>
+    <div class="section" id="other-chars-section">
+      <h2>Other characters</h2>
+      <p class="lead">Characters created by other users.</p>
+      <div id="other-chars-list"><div class="users-status">Loading…</div></div>
+    </div>
+  `;
+
+  document.getElementById('add-char-btn').addEventListener('click', () => {
+    showingCharAddForm = true;
+    editingCharId = null;
+    renderCharacterLists();
+  });
+
+  try {
+    [charactersData, modelsData] = await Promise.all([
+      charactersApi.list(),
+      modelsApi.list(),
+    ]);
+  } catch {
+    const err = `<div class="field-msg field-msg--error" style="padding:14px 0">Could not load data.</div>`;
+    document.getElementById('my-chars-list').innerHTML = err;
+    document.getElementById('other-chars-list').innerHTML = err;
+    return;
+  }
+  renderCharacterLists();
+}
+
+function canEditChar(c) {
+  return c.created_by === user.id || user.is_admin || c.allow_editing;
+}
+
+function canDeleteChar(c) {
+  return c.created_by === user.id || user.is_admin;
+}
+
+function renderCharacterLists() {
+  const myList    = document.getElementById('my-chars-list');
+  const otherList = document.getElementById('other-chars-list');
+  const otherSection = document.getElementById('other-chars-section');
+  if (!myList) return;
+
+  const mine  = charactersData.filter(c => c.created_by === user.id);
+  const other = charactersData.filter(c => c.created_by !== user.id);
+
+  myList.innerHTML    = renderCharRows(mine, true);
+  otherList.innerHTML = renderCharRows(other, false);
+  if (otherSection) otherSection.hidden = other.length === 0;
+
+  attachCharEvents(myList);
+  attachCharEvents(otherList);
+
+  if (showingCharAddForm) {
+    const input = document.getElementById('char-add-name');
+    if (input) {
+      input.focus();
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { showingCharAddForm = false; renderCharacterLists(); }
+      });
+    }
+  }
+
+  if (editingCharId !== null) {
+    const input = document.getElementById(`char-edit-name-${editingCharId}`);
+    if (input) {
+      input.focus();
+      input.select();
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { editingCharId = null; renderCharacterLists(); }
+      });
+    }
+  }
+}
+
+function modelOptions(selected) {
+  return modelsData.map(m =>
+    `<option value="${escapeHtml(m.name)}" ${m.name === selected ? 'selected' : ''}>${escapeHtml(m.display_name || m.name)}</option>`
+  ).join('');
+}
+
+function charFormHtml(idPrefix, c) {
+  const name         = c ? escapeHtml(c.name)                   : '';
+  const model        = c ? c.model                               : (modelsData[0]?.name ?? '');
+  const systemPrompt = c ? (c.system_prompt ?? '')               : '';
+  const firstMessage = c ? (c.first_message ?? '')               : '';
+  const allowEditing = c ? c.allow_editing                       : false;
+  const isOwnerOrAdmin = !c || c.created_by === user.id || user.is_admin;
+
+  return `
+    <div class="character-row character-row--form" id="${idPrefix}-form">
+      <div class="character-form-fields">
+        <div class="character-form-row">
+          <label class="character-form-lbl" for="${idPrefix}-name">Name</label>
+          <input id="${idPrefix}-name" class="input" value="${name}" placeholder="Character name" autocomplete="off">
+        </div>
+        <div class="character-form-row">
+          <label class="character-form-lbl" for="${idPrefix}-model">Model</label>
+          <select id="${idPrefix}-model" class="input">${modelOptions(model)}</select>
+        </div>
+        <div class="character-form-row">
+          <label class="character-form-lbl" for="${idPrefix}-system-prompt">System prompt</label>
+          <textarea id="${idPrefix}-system-prompt" class="input" rows="4" placeholder="Optional system prompt…">${escapeHtml(systemPrompt)}</textarea>
+        </div>
+        <div class="character-form-row">
+          <label class="character-form-lbl" for="${idPrefix}-first-message">First message</label>
+          <textarea id="${idPrefix}-first-message" class="input" rows="3" placeholder="Optional opening message…">${escapeHtml(firstMessage)}</textarea>
+        </div>
+        ${isOwnerOrAdmin ? `
+        <div class="character-form-row character-form-check">
+          <label>
+            <input type="checkbox" id="${idPrefix}-allow-editing" ${allowEditing ? 'checked' : ''}>
+            Let others edit this character
+          </label>
+        </div>` : ''}
+      </div>
+      <div class="field-msg field-msg--error" id="${idPrefix}-err" hidden></div>
+      <div class="user-row-actions">
+        <button class="btn btn-ghost btn-sm" data-action="${c ? 'cancel-edit' : 'cancel-add'}" ${c ? `data-id="${c.id}"` : ''}>Cancel</button>
+        <button class="btn btn-primary btn-sm" data-action="${c ? 'save-edit' : 'save-add'}" ${c ? `data-id="${c.id}"` : ''}>${c ? 'Save' : 'Add character'}</button>
+      </div>
+    </div>
+    <div class="user-form-err field-msg field-msg--error" id="${idPrefix}-form-err" hidden></div>`;
+}
+
+function renderCharRows(list, isMine) {
+  let html = '';
+
+  if (isMine && showingCharAddForm) {
+    html += charFormHtml('char-add', null);
+  }
+
+  if (!list.length && !(isMine && showingCharAddForm)) {
+    html += `<div class="users-status">${isMine ? 'You have no characters yet.' : 'No characters from other users.'}</div>`;
+  }
+
+  for (const c of list) {
+    if (editingCharId === c.id) {
+      html += charFormHtml(`char-edit-${c.id}`, c);
+    } else {
+      const editBtn   = canEditChar(c)   ? `<button class="btn btn-ghost btn-sm" data-action="edit" data-id="${c.id}">${svgPencil} Edit</button>` : '';
+      const deleteBtn = canDeleteChar(c) ? `<button class="btn btn-ghost btn-sm" data-action="delete" data-id="${c.id}">${svgTrash} Delete</button>` : '';
+      html += `
+        <div class="character-row" data-id="${c.id}">
+          <div class="character-name">${escapeHtml(c.name)}</div>
+          <span class="chip">${escapeHtml(c.model)}</span>
+          <div class="user-row-actions">${editBtn}${deleteBtn}</div>
+        </div>`;
+    }
+  }
+
+  return html;
+}
+
+function attachCharEvents(container) {
+  container.querySelectorAll('[data-action]').forEach(btn => {
+    const action = btn.dataset.action;
+    const id     = Number(btn.dataset.id);
+    switch (action) {
+      case 'edit':
+        btn.addEventListener('click', () => { editingCharId = id; showingCharAddForm = false; renderCharacterLists(); });
+        break;
+      case 'cancel-edit':
+        btn.addEventListener('click', () => { editingCharId = null; renderCharacterLists(); });
+        break;
+      case 'save-edit':
+        btn.addEventListener('click', () => saveEditChar(id));
+        break;
+      case 'cancel-add':
+        btn.addEventListener('click', () => { showingCharAddForm = false; renderCharacterLists(); });
+        break;
+      case 'save-add':
+        btn.addEventListener('click', () => createChar());
+        break;
+      case 'delete':
+        btn.addEventListener('click', () => deleteChar(id));
+        break;
+    }
+  });
+}
+
+function readCharForm(prefix) {
+  const isOwnerOrAdmin = prefix === 'char-add' || (() => {
+    const id = Number(prefix.replace('char-edit-', ''));
+    const c  = charactersData.find(c => c.id === id);
+    return c && (c.created_by === user.id || user.is_admin);
+  })();
+  return {
+    name:          document.getElementById(`${prefix}-name`)?.value.trim()     ?? '',
+    model:         document.getElementById(`${prefix}-model`)?.value           ?? '',
+    system_prompt: document.getElementById(`${prefix}-system-prompt`)?.value.trim() || null,
+    first_message: document.getElementById(`${prefix}-first-message`)?.value.trim() || null,
+    allow_editing: isOwnerOrAdmin ? (document.getElementById(`${prefix}-allow-editing`)?.checked ?? false) : undefined,
+  };
+}
+
+async function createChar() {
+  const prefix  = 'char-add';
+  const data    = readCharForm(prefix);
+  const errorEl = document.getElementById(`${prefix}-err`);
+  const saveBtn = document.querySelector(`[data-action="save-add"]`);
+
+  errorEl.hidden = true;
+  if (!data.name) { errorEl.hidden = false; errorEl.textContent = 'Name is required.'; return; }
+  if (!data.model) { errorEl.hidden = false; errorEl.textContent = 'Model is required.'; return; }
+
+  saveBtn.disabled    = true;
+  saveBtn.textContent = 'Adding…';
+
+  try {
+    const created = await charactersApi.create(data);
+    charactersData.push(created);
+    charactersData.sort((a, b) => a.name.localeCompare(b.name));
+    showingCharAddForm = false;
+    renderCharacterLists();
+  } catch (err) {
+    saveBtn.disabled    = false;
+    saveBtn.textContent = 'Add character';
+    errorEl.hidden      = false;
+    errorEl.textContent = err.message;
+  }
+}
+
+async function saveEditChar(id) {
+  const prefix  = `char-edit-${id}`;
+  const data    = readCharForm(prefix);
+  const errorEl = document.getElementById(`${prefix}-err`);
+  const saveBtn = document.querySelector(`[data-action="save-edit"][data-id="${id}"]`);
+
+  errorEl.hidden = true;
+  if (!data.name)  { errorEl.hidden = false; errorEl.textContent = 'Name is required.';  return; }
+  if (!data.model) { errorEl.hidden = false; errorEl.textContent = 'Model is required.'; return; }
+
+  saveBtn.disabled    = true;
+  saveBtn.textContent = 'Saving…';
+
+  try {
+    await charactersApi.update(id, data);
+    const c = charactersData.find(c => c.id === id);
+    if (c) {
+      c.name          = data.name;
+      c.model         = data.model;
+      c.system_prompt = data.system_prompt;
+      c.first_message = data.first_message;
+      if (data.allow_editing !== undefined) c.allow_editing = data.allow_editing;
+    }
+    charactersData.sort((a, b) => a.name.localeCompare(b.name));
+    editingCharId = null;
+    renderCharacterLists();
+  } catch (err) {
+    saveBtn.disabled    = false;
+    saveBtn.textContent = 'Save';
+    errorEl.hidden      = false;
+    errorEl.textContent = err.message;
+  }
+}
+
+async function deleteChar(id) {
+  const c = charactersData.find(c => c.id === id);
+  if (!confirm(`Delete character "${c?.name}"? This cannot be undone.`)) return;
+
+  try {
+    await charactersApi.delete(id);
+    charactersData = charactersData.filter(c => c.id !== id);
+    if (editingCharId === id) editingCharId = null;
+    renderCharacterLists();
+  } catch (err) {
+    alert(`Could not delete character: ${err.message}`);
   }
 }
 
@@ -474,6 +778,6 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-let svgArrowLeft, svgUser, svgUsers, svgLock, svgEye, svgPlus, svgPencil, svgTrash;
+let svgArrowLeft, svgUser, svgUsers, svgCpu, svgLock, svgEye, svgPlus, svgPencil, svgTrash;
 
 init();

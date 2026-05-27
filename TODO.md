@@ -77,6 +77,12 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] `PATCH  /api/personas/:id`
 - [x] `DELETE /api/personas/:id`
 
+### Character handlers
+- [x] `GET    /api/characters`
+- [x] `POST   /api/characters`
+- [x] `PATCH  /api/characters/:id`
+- [x] `DELETE /api/characters/:id`
+
 ### Admin handlers
 - [x] `GET    /api/admin/users`
 - [x] `POST   /api/admin/users`
@@ -126,6 +132,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Post-MVP (parked, not forgotten)
 
+- [x] Characters — create/edit/delete in settings UI (no chat integration yet)
 - [ ] User profiles — login screen, profile switcher
 - [ ] Personas — create/edit/delete in UI, apply to conversation
 - [x] Admin panel — user management (add, edit username/admin flag, delete)

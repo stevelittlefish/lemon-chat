@@ -364,6 +364,70 @@ html, body {
   font-size: 13px;
 }
 
+/* ── Characters ─────────────────────────────────────────── */
+
+.character-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.character-row:last-child {
+  border-bottom: none;
+}
+
+.character-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--fg-strong);
+}
+
+.character-row--form {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: 14px 0 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.character-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.character-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.character-form-lbl {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.character-form-check {
+  flex-direction: row;
+  align-items: center;
+}
+
+.character-form-check label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--fg);
+  cursor: pointer;
+  user-select: none;
+}
+
 /* ── Scrollbar ──────────────────────────────────────────── */
 
 .smain::-webkit-scrollbar { width: 10px; }
