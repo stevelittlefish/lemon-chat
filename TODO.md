@@ -128,7 +128,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 - [ ] User profiles — login screen, profile switcher
 - [ ] Personas — create/edit/delete in UI, apply to conversation
-- [ ] Admin panel — user management, global persona management
+- [x] Admin panel — user management (add, edit username/admin flag, delete)
 - [ ] Conversation search
 - [ ] Per-conversation title editing
 - [ ] File and image attachments

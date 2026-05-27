@@ -5,10 +5,15 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"golang.org/x/crypto/bcrypt"
 )
+
+func isDuplicateUsername(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: users.username")
+}
 
 func (s *Server) handleAdminListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := s.store.ListUsers()
@@ -48,6 +53,10 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		hash = &s
 	}
 	user, err := s.store.CreateUser(req.Username, hash, req.IsAdmin)
+	if isDuplicateUsername(err) {
+		writeError(w, http.StatusConflict, "username already taken")
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -104,7 +113,10 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := s.store.UpdateUser(id, username, passwordHash, isAdmin); err != nil {
+	if err := s.store.UpdateUser(id, username, passwordHash, isAdmin); isDuplicateUsername(err) {
+		writeError(w, http.StatusConflict, "username already taken")
+		return
+	} else if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
@@ -115,6 +127,10 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if id == currentUser(r).ID {
+		writeError(w, http.StatusForbidden, "cannot delete your own account")
 		return
 	}
 	if err := s.store.DeleteUser(id); errors.Is(err, store.ErrNotFound) {

@@ -82,3 +82,13 @@ export const personas = {
   update: (id, data) => request('PATCH', `/api/personas/${id}`, data),
   delete: (id) => request('DELETE', `/api/personas/${id}`),
 };
+
+// Admin
+export const admin = {
+  users: {
+    list: () => request('GET', '/api/admin/users'),
+    create: (data) => request('POST', '/api/admin/users', data),
+    update: (id, data) => request('PATCH', `/api/admin/users/${id}`, data),
+    delete: (id) => request('DELETE', `/api/admin/users/${id}`),
+  },
+};
