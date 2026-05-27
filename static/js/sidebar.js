@@ -78,9 +78,12 @@ function render() {
 
 function convItem(conv) {
   const active = conv.id === state.activeId ? ' active' : '';
+  const titleHtml = conv.title
+    ? `<span class="sidebar-item-title">${escapeHtml(conv.title)}</span>`
+    : `<span class="sidebar-item-title sidebar-item-title--empty">(new conversation)</span>`;
   return `
     <div class="sidebar-item${active}" data-id="${conv.id}">
-      <span class="sidebar-item-title">${escapeHtml(conv.title)}</span>
+      ${titleHtml}
       <button class="sidebar-item-delete" title="Delete">${iconTrash()}</button>
     </div>
   `;

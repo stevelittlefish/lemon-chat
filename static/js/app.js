@@ -65,7 +65,7 @@ async function loadConversation(id) {
 }
 
 async function newConversation() {
-  const conv = await convApi.create('New conversation');
+  const conv = await convApi.create(null);
   sidebar.addConversation(conv);
   activeConversationId = conv.id;
   thread.showEmpty();
@@ -73,7 +73,7 @@ async function newConversation() {
 
 async function sendMessage(content, model) {
   if (!activeConversationId) {
-    const conv = await convApi.create(content.slice(0, 60));
+    const conv = await convApi.create(null);
     sidebar.addConversation(conv);
     activeConversationId = conv.id;
   }

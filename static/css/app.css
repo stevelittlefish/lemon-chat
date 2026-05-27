@@ -119,6 +119,11 @@ html, body {
   white-space: nowrap;
 }
 
+.sidebar-item-title--empty {
+  color: var(--fg-faint);
+  font-style: italic;
+}
+
 .sidebar-item-delete {
   opacity: 0;
   background: none;

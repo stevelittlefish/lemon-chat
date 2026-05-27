@@ -57,7 +57,7 @@ func (s *Store) migrate() error {
 			id         INTEGER PRIMARY KEY,
 			user_id    INTEGER NOT NULL REFERENCES users(id),
 			persona_id INTEGER REFERENCES personas(id),
-			title      TEXT    NOT NULL DEFAULT 'New conversation',
+			title      TEXT,
 			created_at TEXT    NOT NULL,
 			updated_at TEXT    NOT NULL
 		);

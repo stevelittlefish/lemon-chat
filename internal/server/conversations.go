@@ -25,15 +25,12 @@ func (s *Server) handleListConversations(w http.ResponseWriter, r *http.Request)
 func (s *Server) handleCreateConversation(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	var req struct {
-		Title     string  `json:"title"`
+		Title     *string `json:"title"`
 		PersonaID *int64  `json:"persona_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
-	}
-	if req.Title == "" {
-		req.Title = "New conversation"
 	}
 	conv, err := s.store.CreateConversation(user.ID, req.Title, req.PersonaID)
 	if err != nil {

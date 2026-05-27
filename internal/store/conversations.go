@@ -3,13 +3,14 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"time"
 )
 
 type Conversation struct {
 	ID        int64   `json:"id"`
 	UserID    int64   `json:"user_id"`
 	PersonaID *int64  `json:"persona_id"`
-	Title     string  `json:"title"`
+	Title     *string `json:"title"`
 	CreatedAt string  `json:"created_at"`
 	UpdatedAt string  `json:"updated_at"`
 }
@@ -48,7 +49,7 @@ func (s *Store) GetConversation(id, userID int64) (*Conversation, error) {
 	return c, err
 }
 
-func (s *Store) CreateConversation(userID int64, title string, personaID *int64) (*Conversation, error) {
+func (s *Store) CreateConversation(userID int64, title *string, personaID *int64) (*Conversation, error) {
 	t := now()
 	res, err := s.db.Exec(
 		`INSERT INTO conversations (user_id, persona_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
@@ -69,4 +70,36 @@ func (s *Store) DeleteConversation(id, userID int64) error {
 func (s *Store) TouchConversation(id int64) error {
 	_, err := s.db.Exec(`UPDATE conversations SET updated_at = ? WHERE id = ?`, now(), id)
 	return err
+}
+
+func (s *Store) UpdateConversationTitle(id int64, title string) error {
+	// Deliberately does not touch updated_at so sidebar sort order is unaffected.
+	_, err := s.db.Exec(`UPDATE conversations SET title = ? WHERE id = ?`, title, id)
+	return err
+}
+
+func (s *Store) ListUntitledEligible() ([]int64, error) {
+	oneMinAgo := time.Now().UTC().Add(-1 * time.Minute).Format(time.RFC3339)
+	fiveMinAgo := time.Now().UTC().Add(-5 * time.Minute).Format(time.RFC3339)
+	rows, err := s.db.Query(`
+		SELECT id FROM conversations
+		WHERE title IS NULL AND (
+			(created_at < ? AND (SELECT COUNT(*) FROM messages WHERE conversation_id = conversations.id) >= 6)
+			OR
+			(created_at < ? AND (SELECT COUNT(*) FROM messages WHERE conversation_id = conversations.id) >= 2)
+		)
+	`, oneMinAgo, fiveMinAgo)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
