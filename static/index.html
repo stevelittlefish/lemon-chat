@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>lemon chat</title>
+  <link rel="stylesheet" href="/css/colors_and_type.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<!-- Login screen -->
+<div id="login-screen" class="login-screen hidden">
+  <div class="login-card">
+    <img src="/assets/logo-wordmark.svg" alt="lemon chat" class="login-logo">
+    <form id="login-form" class="login-form">
+      <div class="field-group">
+        <label class="body-sm" for="username">username</label>
+        <input id="username" name="username" type="text" class="input" autocomplete="username" required>
+      </div>
+      <div class="field-group">
+        <label class="body-sm" for="password">password <span class="fg-muted">(optional)</span></label>
+        <input id="password" name="password" type="password" class="input" autocomplete="current-password">
+      </div>
+      <div id="login-error" class="login-error hidden"></div>
+      <button type="submit" class="btn btn-primary">sign in</button>
+    </form>
+  </div>
+</div>
+
+<!-- App shell -->
+<div id="app" class="app hidden">
+  <aside id="sidebar" class="sidebar"></aside>
+  <main id="main" class="main">
+    <div id="thread-container" class="thread-container">
+      <div id="thread" class="thread"></div>
+    </div>
+    <div id="composer-container" class="composer-container"></div>
+  </main>
+</div>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+[server]
+port    = 8080
+db_path = "lemon.db"
+
+# Bootstrap: runs once on first start when the DB has no users.
+# Ignored once any user exists in the database.
+# Override with env vars: LEMON_ADMIN_USERNAME, LEMON_ADMIN_PASSWORD
+[bootstrap]
+admin_username = "admin"
+admin_password = ""        # empty = no password required to log in
+
+[model_server]
+api_base = "http://localhost:8000/v1"
+default  = "meta-llama/Llama-3.2-8B-Instruct"
+
+[[model]]
+name         = "meta-llama/Llama-3.2-8B-Instruct"
+display_name = "Llama 3.2 8B"
+
+[[model]]
+name         = "mistralai/Mistral-7B-Instruct-v0.3"
+display_name = "Mistral 7B"

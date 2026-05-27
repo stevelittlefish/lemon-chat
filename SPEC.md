@@ -42,7 +42,7 @@ Browser  ←→  Go HTTP server  ←→  Local model API (Ollama etc.)
 - REST API under `/api/`
 - Streaming AI responses delivered via SSE (`text/event-stream`)
 - SQLite database at configurable path (default `lemon.db`)
-- Model API calls proxied server-side (browser never talks to Ollama directly)
+- Model API calls proxied server-side via OpenAI-compatible `/v1/chat/completions` (browser never talks to vLLM directly)
 
 ---
 

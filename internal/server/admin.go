@@ -1,0 +1,128 @@
+package server
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+
+	"github.com/stevelittlefish/lemon-chat/internal/store"
+	"golang.org/x/crypto/bcrypt"
+)
+
+func (s *Server) handleAdminListUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := s.store.ListUsers()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	out := make([]map[string]any, len(users))
+	for i, u := range users {
+		out[i] = userResponse(&u)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string  `json:"username"`
+		Password *string `json:"password"`
+		IsAdmin  bool    `json:"is_admin"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if req.Username == "" {
+		writeError(w, http.StatusBadRequest, "username required")
+		return
+	}
+	var hash *string
+	if req.Password != nil && *req.Password != "" {
+		h, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		s := string(h)
+		hash = &s
+	}
+	user, err := s.store.CreateUser(req.Username, hash, req.IsAdmin)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	writeJSON(w, http.StatusCreated, userResponse(user))
+}
+
+func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	existing, err := s.store.UserByID(id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+
+	var req struct {
+		Username *string `json:"username"`
+		Password *string `json:"password"`
+		IsAdmin  *bool   `json:"is_admin"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	username := existing.Username
+	if req.Username != nil {
+		username = *req.Username
+	}
+	isAdmin := existing.IsAdmin
+	if req.IsAdmin != nil {
+		isAdmin = *req.IsAdmin
+	}
+	passwordHash := existing.PasswordHash
+	if req.Password != nil {
+		if *req.Password == "" {
+			passwordHash = nil
+		} else {
+			h, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "internal error")
+				return
+			}
+			s := string(h)
+			passwordHash = &s
+		}
+	}
+
+	if err := s.store.UpdateUser(id, username, passwordHash, isAdmin); err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := s.store.DeleteUser(id); errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	} else if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
