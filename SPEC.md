@@ -37,7 +37,7 @@ Browser  ←→  Go HTTP server  ←→  Local model API (Ollama etc.)
                 SQLite DB
 ```
 
-- Go server listens on configurable port (default `8080`)
+- Go 1.22+ server listens on configurable port (default `8080`)
 - Serves `static/` at `/`
 - REST API under `/api/`
 - Streaming AI responses delivered via SSE (`text/event-stream`)

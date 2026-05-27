@@ -86,3 +86,7 @@ The following are in `SPEC.md` but not in the MVP build. Stub them out rather th
 - Conversation search
 
 When something is stubbed, return a `501 Not Implemented` from the API endpoint and leave a `// TODO` comment. Don't build placeholder UI for features that don't exist yet.
+
+## Keeping TODO.md current
+
+Update `TODO.md` as work progresses — mark items `[~]` when started and `[x]` when done. When adding new work that isn't already listed, add it to the relevant section before starting. Don't leave TODO.md stale.
