@@ -405,6 +405,7 @@ function renderCharRows(list, isMine) {
         <div class="character-row" data-id="${c.id}">
           <div class="character-name">${escapeHtml(c.name)}</div>
           <span class="chip">${escapeHtml(c.model)}</span>
+          ${c.allow_editing ? '<span class="chip character-chip--editable">editable</span>' : ''}
           <div class="user-row-actions">${editBtn}${deleteBtn}</div>
         </div>`;
     }

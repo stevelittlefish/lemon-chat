@@ -418,6 +418,12 @@ html, body {
   align-items: center;
 }
 
+.character-chip--editable {
+  background: var(--leaf-100);
+  border-color: #C2D1A4;
+  color: var(--leaf-700);
+}
+
 .character-form-check label {
   display: flex;
   align-items: center;
