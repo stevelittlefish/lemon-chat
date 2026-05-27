@@ -1,0 +1,29 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="_preview.css">
+<style>
+  body { padding: 28px 32px; display:flex; gap:48px; align-items:flex-start; }
+  .group { display:flex; flex-direction:column; gap:10px; }
+  .ctrl { display:flex; align-items:center; gap:10px; font-size:14px; color:var(--ink-900); height: 22px; }
+  .lab { font-family:var(--font-mono); font-size:10px; color:var(--fg-faint); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom:4px; }
+</style>
+</head>
+<body>
+  <div class="group">
+    <div class="lab">TOGGLE</div>
+    <div class="ctrl"><div class="toggle on"></div> Save chats locally</div>
+    <div class="ctrl"><div class="toggle"></div> Send telemetry</div>
+  </div>
+  <div class="group">
+    <div class="lab">CHECKBOX</div>
+    <div class="ctrl"><div class="checkbox on"></div> Show token usage</div>
+    <div class="ctrl"><div class="checkbox"></div> Stream responses</div>
+  </div>
+  <div class="group">
+    <div class="lab">RADIO</div>
+    <div class="ctrl"><div class="radio on"></div> Light</div>
+    <div class="ctrl"><div class="radio"></div> Match system</div>
+  </div>
+</body></html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="_preview.css">
+<style>
+  body { padding: 24px 32px; display:flex; align-items:center; gap: 36px; }
+  .specimen { display: flex; flex-direction: column; gap: 14px; flex: 1; }
+  .serif { font-family: var(--font-display); font-size: 64px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink-900); line-height: 1; }
+  .sans  { font-family: var(--font-sans);    font-size: 64px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink-900); line-height: 1; }
+  .info { display: flex; flex-direction: column; gap: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--fg-muted); }
+  .info b { color: var(--fg-strong); font-weight: 500; }
+  .info .lbl { font-size: 10px; color: var(--fg-faint); text-transform: uppercase; letter-spacing: 0.08em; }
+</style>
+</head>
+<body>
+  <div style="display:flex; flex-direction:column; gap:8px;">
+    <span class="serif">Aa</span>
+    <div class="info">
+      <span class="lbl">DISPLAY</span>
+      <b>Source Serif 4</b>
+      <span>headings, quotes</span>
+    </div>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:8px;">
+    <span class="sans">Aa</span>
+    <div class="info">
+      <span class="lbl">BODY</span>
+      <b>Source Sans 3</b>
+      <span>UI, body, labels</span>
+    </div>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:8px;">
+    <span style="font-family: var(--font-mono); font-size: 56px; font-weight:500; color:var(--ink-900); line-height:1;">Aa</span>
+    <div class="info">
+      <span class="lbl">MONO</span>
+      <b>JetBrains Mono</b>
+      <span>code, model IDs</span>
+    </div>
+  </div>
+  <div style="margin-left:auto; font-family: var(--font-mono); font-size:10px; color:var(--fg-faint); text-align:right; line-height:1.6;">
+    all three<br>via Google Fonts<br>open source
+  </div>
+</body></html>

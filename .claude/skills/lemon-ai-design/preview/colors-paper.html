@@ -1,0 +1,19 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="_preview.css">
+<style>
+  body { padding: 24px 32px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .cell .swatch { width: 100%; height: 64px; }
+  .cell { display: flex; flex-direction: column; gap: 6px; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="cell"><div class="swatch" style="background:#FFFCF4"></div><div class="lbl">paper 0 — lifted</div><div class="sub">#FFFCF4</div></div>
+    <div class="cell"><div class="swatch" style="background:#FBF7EC"></div><div class="lbl">paper 50 — page</div><div class="sub">#FBF7EC</div></div>
+    <div class="cell"><div class="swatch" style="background:#F6EFDD"></div><div class="lbl">paper 100 — sunken</div><div class="sub">#F6EFDD</div></div>
+    <div class="cell"><div class="swatch" style="background:#ECE3CB"></div><div class="lbl">paper 200 — divider</div><div class="sub">#ECE3CB</div></div>
+  </div>
+</body></html>

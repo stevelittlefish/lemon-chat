@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 80" fill="none">
+  
+  <g transform="scale(0.92)">
+    <path d="m 50.508 18.806 c 6 -10 20 -10 24 -2 -6 10 -18 10 -24 6 z" fill="#5C7A3E" stroke="#1B1814" stroke-width="2.6" stroke-linejoin="round"></path>
+    <path d="m 50.508 22.806 -3 6" stroke="#1B1814" stroke-width="2.6" stroke-linecap="round" fill="none"></path>
+    <ellipse cx="-3.996" cy="54.513" rx="26" ry="20" fill="#F5C518" stroke="#1B1814" stroke-width="2.6" transform="rotate(-38.221747)"></ellipse>
+    <path d="M 10.26 48.58 Q 12.83 38.92, 20.36 35.54" stroke="#FFF8D6" stroke-width="3.2" stroke-linecap="round" fill="none" opacity="0.9"></path>
+    <path d="M 32.63 64.06 Q 46.44 55.73, 49.35 43.26" stroke="#C8951A" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.7"></path>
+  </g>
+  
+  <text x="84" y="54" font-family="Source Serif 4, ui-serif, Georgia, serif" font-weight="600" font-size="40" fill="#1B1814" letter-spacing="-0.02em">lemon ai</text>
+</svg>

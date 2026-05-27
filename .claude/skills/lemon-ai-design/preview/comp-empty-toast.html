@@ -1,0 +1,45 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="../components.css">
+<link rel="stylesheet" href="_preview.css">
+<style>
+  body { padding: 20px 24px; display:flex; gap:20px; align-items:center; justify-content:center; }
+  .empty {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 18px; max-width: 360px; text-align: center;
+  }
+  .empty h4 { margin: 0; font-size: 17px; font-weight: 600; }
+  .empty p { margin: 0; font-size: 13px; color: var(--fg-muted); line-height: 1.5; }
+  .toast {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--ink-900); color: var(--paper-0);
+    padding: 10px 14px;
+    border-radius: 999px;
+    box-shadow: var(--shadow-md);
+    font-size: 13px;
+  }
+  .toast .dot { width:8px;height:8px;border-radius:50%;background:var(--lemon-500); }
+  .err {
+    display: flex; gap: 10px; padding: 12px 14px;
+    background: var(--brick-100); border: 1px solid #E8C3B3;
+    border-radius: var(--radius-md); color: var(--brick-700);
+    font-size: 13px; max-width: 320px;
+  }
+  .err strong { color: var(--brick-700); }
+</style>
+</head>
+<body>
+  <div class="empty">
+    <img src="../assets/lemon-slice.svg" width="56" height="56" alt="">
+    <h4>Nothing here yet</h4>
+    <p>Start a chat to see it show up in the sidebar.</p>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:10px;">
+    <div class="toast"><span class="dot"></span> Model loaded · ready</div>
+    <div class="err">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div><strong>Couldn't reach the model.</strong><br>Is the server running on port 11434?</div>
+    </div>
+  </div>
+</body></html>
