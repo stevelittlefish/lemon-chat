@@ -52,8 +52,9 @@ cmd/lemon-chat/
   main.go              # entry point, config loading, server start
 internal/
   config/              # TOML struct definitions and loading
-  server/              # HTTP handlers and routing
+  server/              # HTTP handlers, routing, WebSocket hub (ws.go)
   store/               # SQLite schema and queries
+  tasks/               # background workers (title generation)
 static/
   index.html           # app shell
   js/
@@ -63,6 +64,9 @@ static/
     thread.js          # message display, SSE streaming
     composer.js        # text input, send logic
     markdown.js        # lightweight message rendering
+    ws.js              # WebSocket client, auto-reconnect, event dispatch
+    vendor/
+      marked.esm.js    # marked.js (vendored, no build step)
   css/
     colors_and_type.css   # copied from design system
     components.css        # copied from design system

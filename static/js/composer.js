@@ -5,7 +5,10 @@ let state = {
   selectedModel: null,
   onSend: null,
   streaming: false,
+  userBlurred: false,
 };
+
+let blurWatcher = null;
 
 export function init({ models, onSend }) {
   state.models = models;
@@ -19,7 +22,22 @@ export function setStreaming(active) {
   const btn = composerContainer.querySelector('.composer-send');
   const textarea = composerContainer.querySelector('.composer-textarea');
   if (btn) btn.disabled = active;
-  if (textarea) textarea.disabled = active;
+  if (textarea) {
+    textarea.disabled = active;
+    if (active) {
+      blurWatcher = (e) => {
+        if (!composerContainer.contains(e.target)) state.userBlurred = true;
+      };
+      document.addEventListener('pointerdown', blurWatcher);
+    } else {
+      if (blurWatcher) {
+        document.removeEventListener('pointerdown', blurWatcher);
+        blurWatcher = null;
+      }
+      if (!state.userBlurred) textarea.focus();
+      state.userBlurred = false;
+    }
+  }
 }
 
 export function getSelectedModel() {
@@ -72,8 +90,10 @@ function doSend() {
   const textarea = document.getElementById('composer-textarea');
   const content = textarea.value.trim();
   if (!content || state.streaming) return;
+  state.userBlurred = false;
   textarea.value = '';
   autoResize(textarea);
+  textarea.focus();
   document.getElementById('composer-send').disabled = true;
   state.onSend?.(content, state.selectedModel);
 }
