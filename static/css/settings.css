@@ -82,6 +82,7 @@ html, body {
   font-family: var(--font-sans);
   user-select: none;
 }
+a.snav-item { text-decoration: none; }
 .snav-item:hover { background: var(--paper-0); color: var(--ink-900); }
 .snav-item.active {
   background: var(--lemon-50);

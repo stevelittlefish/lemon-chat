@@ -56,6 +56,17 @@ func (s *Server) Handler() http.Handler {
 	// WebSocket
 	mux.HandleFunc("GET /ws", s.handleWS)
 
+	// Settings pages
+	mux.HandleFunc("GET /settings", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/settings/account", http.StatusFound)
+	})
+	mux.HandleFunc("GET /settings.html", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/settings/account", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("GET /settings/account", serveFile("static/settings/account.html"))
+	mux.HandleFunc("GET /settings/characters", serveFile("static/settings/characters.html"))
+	mux.HandleFunc("GET /settings/users", serveFile("static/settings/users.html"))
+
 	// Static files
 	mux.Handle("/", http.FileServer(http.Dir("static")))
 
@@ -75,4 +86,10 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 func internalError(w http.ResponseWriter, err error) {
 	log.Printf("error: %v", err)
 	writeError(w, http.StatusInternalServerError, "internal error")
+}
+
+func serveFile(path string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, path)
+	}
 }

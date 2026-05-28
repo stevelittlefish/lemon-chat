@@ -83,7 +83,7 @@ function render() {
   `;
 
   document.getElementById('new-chat-btn').addEventListener('click', () => state.onNew?.());
-  document.getElementById('settings-btn').addEventListener('click', () => { window.location.href = '/settings.html'; });
+  document.getElementById('settings-btn').addEventListener('click', () => { window.location.href = '/settings/account'; });
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
 
   sidebarEl.querySelectorAll('.sidebar-item').forEach(el => {
