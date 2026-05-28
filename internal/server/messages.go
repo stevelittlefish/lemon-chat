@@ -49,7 +49,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Content string `json:"content"`
+		Content     string  `json:"content"`
+		Model       *string `json:"model"`
+		CharacterID *int64  `json:"character_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -59,6 +61,10 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "content required")
 		return
 	}
+	if req.Model != nil && req.CharacterID != nil {
+		writeError(w, http.StatusBadRequest, "at most one of model or character_id may be specified")
+		return
+	}
 
 	type chatMsg struct {
 		Role    string `json:"role"`
@@ -66,20 +72,41 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	var chatMsgs []chatMsg
 
-	// Derive model from conversation; prepend system prompt if using a character.
+	// Resolve which model/character to use: request override takes precedence over conversation.
 	var modelName, assistantName string
-	if conv.CharacterID != nil {
+	var usedModel *string
+	var usedCharacterID *int64
+
+	if req.CharacterID != nil {
+		char, err := s.store.GetCharacter(*req.CharacterID)
+		if err != nil {
+			internalError(w, err)
+			return
+		}
+		usedCharacterID = req.CharacterID
+		modelName = char.Model
+		assistantName = char.Name
+		if char.SystemPrompt != nil {
+			chatMsgs = append(chatMsgs, chatMsg{Role: "system", Content: *char.SystemPrompt})
+		}
+	} else if req.Model != nil {
+		usedModel = req.Model
+		modelName = *req.Model
+		assistantName = modelName
+	} else if conv.CharacterID != nil {
 		char, err := s.store.GetCharacter(*conv.CharacterID)
 		if err != nil {
 			internalError(w, err)
 			return
 		}
+		usedCharacterID = conv.CharacterID
 		modelName = char.Model
 		assistantName = char.Name
 		if char.SystemPrompt != nil {
 			chatMsgs = append(chatMsgs, chatMsg{Role: "system", Content: *char.SystemPrompt})
 		}
 	} else {
+		usedModel = conv.Model
 		modelName = *conv.Model
 		assistantName = modelName
 	}
@@ -174,10 +201,10 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "data: [DONE]\n\n")
 	flusher.Flush()
 
-	// Persist completed assistant message.
+	// Persist completed assistant message and update conversation model/character.
 	if fullContent != "" {
 		_, _ = s.store.CreateMessage(convID, "assistant", fullContent, &assistantName)
-		_ = s.store.TouchConversation(convID)
+		_ = s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID)
 	}
 }
 

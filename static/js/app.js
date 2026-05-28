@@ -1,4 +1,4 @@
-import { auth, conversations as convApi, messages as msgApi, models as modelApi } from './api.js';
+import { auth, conversations as convApi, messages as msgApi, models as modelApi, characters as characterApi } from './api.js';
 import * as sidebar from './sidebar.js';
 import * as thread from './thread.js';
 import * as composer from './composer.js';
@@ -40,8 +40,9 @@ function showApp() {
 }
 
 async function initApp() {
-  const [modelList] = await Promise.all([
+  const [modelList, characterList] = await Promise.all([
     modelApi.list(),
+    characterApi.list(),
     sidebar.load(),
     preloadIcons(),
   ]);
@@ -52,7 +53,7 @@ async function initApp() {
     onNew: newConversation,
   });
 
-  header.init({ models: modelList });
+  header.init({ models: modelList, characters: characterList });
 
   composer.init({
     onSend: sendMessage,
@@ -74,11 +75,15 @@ async function loadConversation(id) {
   const msgs = await msgApi.list(id);
   const conv = sidebar.getConversation(id);
   header.setConversation(id, conv?.title ?? null);
+  if (conv) header.setSelection(conv);
   thread.renderMessages(msgs);
 }
 
 async function newConversation() {
-  const conv = await convApi.create(null, header.getSelectedModel(), null);
+  const sel = header.getSelection();
+  const model = sel?.type === 'model' ? sel.name : null;
+  const charId = sel?.type === 'character' ? sel.id : null;
+  const conv = await convApi.create(null, model, charId);
   sidebar.addConversation(conv);
   activeConversationId = conv.id;
   header.setConversation(conv.id, conv.title ?? null);
@@ -86,24 +91,32 @@ async function newConversation() {
 }
 
 async function sendMessage(content) {
-  const model = header.getSelectedModel();
+  const sel = header.getSelection();
   if (!activeConversationId) {
-    const conv = await convApi.create(null, model, null);
+    const model = sel?.type === 'model' ? sel.name : null;
+    const charId = sel?.type === 'character' ? sel.id : null;
+    const conv = await convApi.create(null, model, charId);
     sidebar.addConversation(conv);
     activeConversationId = conv.id;
     header.setConversation(conv.id, conv.title ?? null);
   }
 
+  const convId = activeConversationId;
   thread.appendMessage('user', content);
   const stream = thread.startStreaming();
   composer.setStreaming(true);
 
-  msgApi.send(activeConversationId, content, {
+  msgApi.send(convId, content, sel, {
     onName: (name) => stream.setName(name),
     onDelta: (delta) => stream.append(delta),
     onDone: () => {
       stream.finish();
       composer.setStreaming(false);
+      // Keep sidebar cache in sync with the model/character actually used.
+      sidebar.updateConversation(convId, {
+        model: sel?.type === 'model' ? sel.name : null,
+        character_id: sel?.type === 'character' ? sel.id : null,
+      });
     },
     onError: (err) => {
       stream.error('something went wrong — ' + err.message);

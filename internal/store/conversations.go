@@ -73,6 +73,16 @@ func (s *Store) TouchConversation(id int64) error {
 	return err
 }
 
+// UpdateConversationAfterMessage updates the conversation's model/character and touches updated_at.
+// Exactly one of model or characterID must be non-nil (enforced by DB constraint).
+func (s *Store) UpdateConversationAfterMessage(id int64, model *string, characterID *int64) error {
+	_, err := s.db.Exec(
+		`UPDATE conversation SET model = ?, character_id = ?, updated_at = ? WHERE id = ?`,
+		model, characterID, now(), id,
+	)
+	return err
+}
+
 func (s *Store) UpdateConversationTitle(id int64, title string) error {
 	// Deliberately does not touch updated_at so sidebar sort order is unaffected.
 	_, err := s.db.Exec(`UPDATE conversation SET title = ? WHERE id = ?`, title, id)

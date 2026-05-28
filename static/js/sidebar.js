@@ -44,6 +44,11 @@ export function getConversation(id) {
   return state.items.find(c => c.id === id) ?? null;
 }
 
+export function updateConversation(id, updates) {
+  const idx = state.items.findIndex(c => c.id === id);
+  if (idx !== -1) state.items[idx] = { ...state.items[idx], ...updates };
+}
+
 export function updateTitle(id, title) {
   const idx = state.items.findIndex(c => c.id === id);
   if (idx === -1) return;

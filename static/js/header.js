@@ -6,12 +6,16 @@ let state = {
   conversationId: null,
   title: null,
   models: [],
-  selectedModel: null,
+  characters: [],
+  // { type: 'model', name: string } | { type: 'character', id: number }
+  selection: null,
 };
 
-export function init({ models }) {
+export function init({ models, characters }) {
   state.models = models;
-  state.selectedModel = models.find(m => m.default)?.name ?? models[0]?.name ?? null;
+  state.characters = characters;
+  const def = models.find(m => m.default) ?? models[0];
+  state.selection = def ? { type: 'model', name: def.name } : null;
   render();
 }
 
@@ -27,8 +31,21 @@ export function updateTitle(title) {
   if (el) el.textContent = title || '';
 }
 
-export function getSelectedModel() {
-  return state.selectedModel;
+// Sync picker to the loaded conversation's model/character.
+export function setSelection(conv) {
+  if (!conv) return;
+  if (conv.character_id != null) {
+    state.selection = { type: 'character', id: conv.character_id };
+  } else if (conv.model != null) {
+    state.selection = { type: 'model', name: conv.model };
+  }
+  const label = document.getElementById('model-label');
+  if (label) label.textContent = selectedDisplayName();
+}
+
+// Returns { type: 'model', name } or { type: 'character', id }.
+export function getSelection() {
+  return state.selection;
 }
 
 function render() {
@@ -64,19 +81,41 @@ function toggleDropdown() {
   dropdown.id = 'model-picker-dropdown';
   dropdown.className = 'model-picker-dropdown';
 
-  dropdown.innerHTML = `
-    <div class="model-picker-dropdown-label">model</div>
-    ${state.models.map(m => `
-      <div class="model-picker-option${m.name === state.selectedModel ? ' selected' : ''}" data-name="${escapeHtml(m.name)}">
-        <span class="model-picker-option-check">${m.name === state.selectedModel ? icon('check', 13) : ''}</span>
+  const isMSel = state.selection?.type === 'model';
+  const isCSel = state.selection?.type === 'character';
+
+  let html = `<div class="model-picker-dropdown-label">model</div>`;
+  html += state.models.map(m => {
+    const sel = isMSel && m.name === state.selection.name;
+    return `
+      <div class="model-picker-option${sel ? ' selected' : ''}" data-type="model" data-name="${escapeHtml(m.name)}">
+        <span class="model-picker-option-check">${sel ? icon('check', 13) : ''}</span>
         <span class="model-picker-option-name">${escapeHtml(m.display_name)}</span>
-      </div>
-    `).join('')}
-  `;
+      </div>`;
+  }).join('');
+
+  if (state.characters.length) {
+    html += `<div class="model-picker-divider"></div>`;
+    html += `<div class="model-picker-dropdown-label">character</div>`;
+    html += state.characters.map(c => {
+      const sel = isCSel && c.id === state.selection.id;
+      return `
+        <div class="model-picker-option${sel ? ' selected' : ''}" data-type="character" data-id="${c.id}">
+          <span class="model-picker-option-check">${sel ? icon('check', 13) : ''}</span>
+          <span class="model-picker-option-name">${escapeHtml(c.name)}</span>
+        </div>`;
+    }).join('');
+  }
+
+  dropdown.innerHTML = html;
 
   dropdown.querySelectorAll('.model-picker-option').forEach(opt => {
     opt.addEventListener('click', () => {
-      state.selectedModel = opt.dataset.name;
+      if (opt.dataset.type === 'model') {
+        state.selection = { type: 'model', name: opt.dataset.name };
+      } else {
+        state.selection = { type: 'character', id: Number(opt.dataset.id) };
+      }
       const label = document.getElementById('model-label');
       if (label) label.textContent = selectedDisplayName();
       dropdown.remove();
@@ -93,7 +132,11 @@ function toggleDropdown() {
 }
 
 function selectedDisplayName() {
-  return state.models.find(m => m.name === state.selectedModel)?.display_name ?? state.selectedModel ?? 'no model';
+  if (!state.selection) return 'no model';
+  if (state.selection.type === 'model') {
+    return state.models.find(m => m.name === state.selection.name)?.display_name ?? state.selection.name;
+  }
+  return state.characters.find(c => c.id === state.selection.id)?.name ?? 'character';
 }
 
 function escapeHtml(str) {

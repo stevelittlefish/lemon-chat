@@ -37,13 +37,16 @@ export const conversations = {
 // Messages
 export const messages = {
   list: (conversationId) => request('GET', `/api/conversations/${conversationId}/messages`),
-  // Returns an EventSource-like object. Calls onDelta(text) for each chunk, onDone() when finished.
-  send: (conversationId, content, { onName, onDelta, onDone, onError }) => {
+  // selection: { type: 'model', name } | { type: 'character', id } | null
+  send: (conversationId, content, selection, { onName, onDelta, onDone, onError }) => {
     const url = `/api/conversations/${conversationId}/messages`;
+    const body = { content };
+    if (selection?.type === 'model') body.model = selection.name;
+    if (selection?.type === 'character') body.character_id = selection.id;
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(body),
     }).then(async (res) => {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

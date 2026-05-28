@@ -494,3 +494,9 @@ html, body {
   font-size: var(--fs-13);
   color: var(--ink-900);
 }
+
+.model-picker-divider {
+  height: 1px;
+  background: var(--border-soft);
+  margin: var(--space-1) 0;
+}
