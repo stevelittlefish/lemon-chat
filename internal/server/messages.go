@@ -50,7 +50,6 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		Content string `json:"content"`
-		Model   string `json:"model"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -61,11 +60,28 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate requested model is in config.
-	modelName := req.Model
-	if modelName == "" {
-		modelName = s.cfg.ModelServer.Default
+	type chatMsg struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
 	}
+	var chatMsgs []chatMsg
+
+	// Derive model from conversation; prepend system prompt if using a character.
+	var modelName string
+	if conv.CharacterID != nil {
+		char, err := s.store.GetCharacter(*conv.CharacterID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		modelName = char.Model
+		if char.SystemPrompt != nil {
+			chatMsgs = append(chatMsgs, chatMsg{Role: "system", Content: *char.SystemPrompt})
+		}
+	} else {
+		modelName = *conv.Model
+	}
+
 	known := false
 	for _, m := range s.cfg.Models {
 		if m.Name == modelName {
@@ -90,19 +106,6 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
-	}
-
-	type chatMsg struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}
-	var chatMsgs []chatMsg
-
-	// Prepend system prompt if conversation has a persona.
-	if conv.PersonaID != nil {
-		if persona, err := s.store.GetPersona(*conv.PersonaID); err == nil {
-			chatMsgs = append(chatMsgs, chatMsg{Role: "system", Content: persona.SystemPrompt})
-		}
 	}
 
 	for _, m := range history {

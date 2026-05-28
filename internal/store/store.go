@@ -42,24 +42,15 @@ func (s *Store) migrate() error {
 			created_at    TEXT    NOT NULL
 		);
 
-		CREATE TABLE IF NOT EXISTS persona (
-			id            INTEGER PRIMARY KEY,
-			name          TEXT    NOT NULL,
-			description   TEXT,
-			system_prompt TEXT    NOT NULL,
-			created_by    INTEGER REFERENCES user(id),
-			is_global     INTEGER NOT NULL DEFAULT 0,
-			created_at    TEXT    NOT NULL,
-			updated_at    TEXT    NOT NULL
-		);
-
 		CREATE TABLE IF NOT EXISTS conversation (
-			id         INTEGER PRIMARY KEY,
-			user_id    INTEGER NOT NULL REFERENCES user(id),
-			persona_id INTEGER REFERENCES persona(id),
-			title      TEXT,
-			created_at TEXT    NOT NULL,
-			updated_at TEXT    NOT NULL
+			id           INTEGER PRIMARY KEY,
+			user_id      INTEGER NOT NULL REFERENCES user(id),
+			model        TEXT,
+			character_id INTEGER REFERENCES character(id),
+			title        TEXT,
+			created_at   TEXT    NOT NULL,
+			updated_at   TEXT    NOT NULL,
+			CHECK ((model IS NOT NULL) != (character_id IS NOT NULL))
 		);
 
 		CREATE TABLE IF NOT EXISTS message (
@@ -88,6 +79,13 @@ func (s *Store) migrate() error {
 			created_at    TEXT    NOT NULL,
 			updated_at    TEXT    NOT NULL
 		);
+
+		CREATE TABLE IF NOT EXISTS schema_version (
+			version INTEGER NOT NULL
+		);
+
+		INSERT INTO schema_version (version)
+		SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM schema_version);
 	`)
 	return err
 }

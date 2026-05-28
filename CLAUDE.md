@@ -92,6 +92,14 @@ The following are in `SPEC.md` but not in the MVP build. Stub them out rather th
 
 When something is stubbed, return a `501 Not Implemented` from the API endpoint and leave a `// TODO` comment. Don't build placeholder UI for features that don't exist yet.
 
+## Database schema changes
+
+Before implementing any change that modifies the schema (new table, new column, altered column, dropped column), ask the user:
+
+> This requires a schema change. Are you going to delete and recreate the database, or do we need a migration?
+
+If they say delete/recreate, just update `migrate()` in `internal/store/store.go`. If they say migration, stop and agree on an approach before touching any code — the project has no migration system yet.
+
 ## Keeping TODO.md current
 
 Update `TODO.md` as work progresses — mark items `[~]` when started and `[x]` when done. When adding new work that isn't already listed, add it to the relevant section before starting. Don't leave TODO.md stale.

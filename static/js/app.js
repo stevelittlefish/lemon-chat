@@ -2,6 +2,7 @@ import { auth, conversations as convApi, messages as msgApi, models as modelApi 
 import * as sidebar from './sidebar.js';
 import * as thread from './thread.js';
 import * as composer from './composer.js';
+import * as header from './header.js';
 import * as ws from './ws.js';
 import { preload as preloadIcons } from './icons.js';
 
@@ -30,7 +31,10 @@ function showLogin() {
 function showApp() {
   loginScreen.classList.add('hidden');
   appEl.classList.remove('hidden');
-  ws.on('conversation_titled', ({ id, title }) => sidebar.updateTitle(id, title));
+  ws.on('conversation_titled', ({ id, title }) => {
+    sidebar.updateTitle(id, title);
+    if (id === activeConversationId) header.updateTitle(title);
+  });
   ws.connect();
   initApp();
 }
@@ -48,8 +52,9 @@ async function initApp() {
     onNew: newConversation,
   });
 
+  header.init({ models: modelList });
+
   composer.init({
-    models: modelList,
     onSend: sendMessage,
   });
 
@@ -59,6 +64,7 @@ async function initApp() {
 async function loadConversation(id) {
   if (!id) {
     activeConversationId = null;
+    header.setConversation(null, null);
     thread.showEmpty();
     sidebar.setActive(null);
     return;
@@ -66,28 +72,33 @@ async function loadConversation(id) {
   activeConversationId = id;
   sidebar.setActive(id);
   const msgs = await msgApi.list(id);
+  const conv = sidebar.getConversation(id);
+  header.setConversation(id, conv?.title ?? null);
   thread.renderMessages(msgs);
 }
 
 async function newConversation() {
-  const conv = await convApi.create(null);
+  const conv = await convApi.create(null, header.getSelectedModel(), null);
   sidebar.addConversation(conv);
   activeConversationId = conv.id;
+  header.setConversation(conv.id, conv.title ?? null);
   thread.showEmpty();
 }
 
-async function sendMessage(content, model) {
+async function sendMessage(content) {
+  const model = header.getSelectedModel();
   if (!activeConversationId) {
-    const conv = await convApi.create(null);
+    const conv = await convApi.create(null, model, null);
     sidebar.addConversation(conv);
     activeConversationId = conv.id;
+    header.setConversation(conv.id, conv.title ?? null);
   }
 
   thread.appendMessage('user', content);
   const stream = thread.startStreaming();
   composer.setStreaming(true);
 
-  msgApi.send(activeConversationId, content, model, {
+  msgApi.send(activeConversationId, content, {
     onDelta: (delta) => stream.append(delta),
     onDone: () => {
       stream.finish();

@@ -25,19 +25,56 @@ func (s *Server) handleListConversations(w http.ResponseWriter, r *http.Request)
 func (s *Server) handleCreateConversation(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	var req struct {
-		Title     *string `json:"title"`
-		PersonaID *int64  `json:"persona_id"`
+		Title       *string `json:"title"`
+		Model       *string `json:"model"`
+		CharacterID *int64  `json:"character_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	conv, err := s.store.CreateConversation(user.ID, req.Title, req.PersonaID)
+	if (req.Model == nil) == (req.CharacterID == nil) {
+		writeError(w, http.StatusBadRequest, "exactly one of model or character_id is required")
+		return
+	}
+	conv, err := s.store.CreateConversation(user.ID, req.Title, req.Model, req.CharacterID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	writeJSON(w, http.StatusCreated, conv)
+}
+
+func (s *Server) handleUpdateConversation(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var req struct {
+		Title *string `json:"title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	conv, err := s.store.GetConversation(id, user.ID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	} else if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if req.Title != nil {
+		if err := s.store.UpdateConversationTitle(id, *req.Title); err != nil {
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		conv.Title = req.Title
+	}
+	writeJSON(w, http.StatusOK, conv)
 }
 
 func (s *Server) handleDeleteConversation(w http.ResponseWriter, r *http.Request) {

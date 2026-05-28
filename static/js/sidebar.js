@@ -40,6 +40,10 @@ export function removeConversation(id) {
   render();
 }
 
+export function getConversation(id) {
+  return state.items.find(c => c.id === id) ?? null;
+}
+
 export function updateTitle(id, title) {
   const idx = state.items.findIndex(c => c.id === id);
   if (idx === -1) return;

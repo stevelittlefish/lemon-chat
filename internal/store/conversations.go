@@ -7,17 +7,18 @@ import (
 )
 
 type Conversation struct {
-	ID        int64   `json:"id"`
-	UserID    int64   `json:"user_id"`
-	PersonaID *int64  `json:"persona_id"`
-	Title     *string `json:"title"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	ID          int64   `json:"id"`
+	UserID      int64   `json:"user_id"`
+	Model       *string `json:"model"`
+	CharacterID *int64  `json:"character_id"`
+	Title       *string `json:"title"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
 }
 
 func (s *Store) ListConversations(userID int64) ([]Conversation, error) {
 	rows, err := s.db.Query(
-		`SELECT id, user_id, persona_id, title, created_at, updated_at
+		`SELECT id, user_id, model, character_id, title, created_at, updated_at
 		 FROM conversation WHERE user_id = ? ORDER BY updated_at DESC`,
 		userID,
 	)
@@ -28,7 +29,7 @@ func (s *Store) ListConversations(userID int64) ([]Conversation, error) {
 	var convs []Conversation
 	for rows.Next() {
 		var c Conversation
-		if err := rows.Scan(&c.ID, &c.UserID, &c.PersonaID, &c.Title, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Model, &c.CharacterID, &c.Title, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		convs = append(convs, c)
@@ -39,27 +40,27 @@ func (s *Store) ListConversations(userID int64) ([]Conversation, error) {
 func (s *Store) GetConversation(id, userID int64) (*Conversation, error) {
 	c := &Conversation{}
 	err := s.db.QueryRow(
-		`SELECT id, user_id, persona_id, title, created_at, updated_at
+		`SELECT id, user_id, model, character_id, title, created_at, updated_at
 		 FROM conversation WHERE id = ? AND user_id = ?`,
 		id, userID,
-	).Scan(&c.ID, &c.UserID, &c.PersonaID, &c.Title, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.UserID, &c.Model, &c.CharacterID, &c.Title, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	return c, err
 }
 
-func (s *Store) CreateConversation(userID int64, title *string, personaID *int64) (*Conversation, error) {
+func (s *Store) CreateConversation(userID int64, title *string, model *string, characterID *int64) (*Conversation, error) {
 	t := now()
 	res, err := s.db.Exec(
-		`INSERT INTO conversation (user_id, persona_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-		userID, personaID, title, t, t,
+		`INSERT INTO conversation (user_id, model, character_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		userID, model, characterID, title, t, t,
 	)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	return &Conversation{ID: id, UserID: userID, PersonaID: personaID, Title: title, CreatedAt: t, UpdatedAt: t}, nil
+	return &Conversation{ID: id, UserID: userID, Model: model, CharacterID: characterID, Title: title, CreatedAt: t, UpdatedAt: t}, nil
 }
 
 func (s *Store) DeleteConversation(id, userID int64) error {

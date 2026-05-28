@@ -30,7 +30,8 @@ export const models = {
 // Conversations
 export const conversations = {
   list: () => request('GET', '/api/conversations'),
-  create: (title, personaId) => request('POST', '/api/conversations', { title, persona_id: personaId }),
+  create: (title, model, characterId) => request('POST', '/api/conversations', { title, model, character_id: characterId }),
+  update: (id, data) => request('PATCH', `/api/conversations/${id}`, data),
   delete: (id) => request('DELETE', `/api/conversations/${id}`),
 };
 
@@ -38,12 +39,12 @@ export const conversations = {
 export const messages = {
   list: (conversationId) => request('GET', `/api/conversations/${conversationId}/messages`),
   // Returns an EventSource-like object. Calls onDelta(text) for each chunk, onDone() when finished.
-  send: (conversationId, content, model, { onDelta, onDone, onError }) => {
+  send: (conversationId, content, { onDelta, onDone, onError }) => {
     const url = `/api/conversations/${conversationId}/messages`;
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, model }),
+      body: JSON.stringify({ content }),
     }).then(async (res) => {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -73,14 +74,6 @@ export const messages = {
       onDone?.();
     }).catch((err) => onError?.(err));
   },
-};
-
-// Personas
-export const personas = {
-  list: () => request('GET', '/api/personas'),
-  create: (data) => request('POST', '/api/personas', data),
-  update: (id, data) => request('PATCH', `/api/personas/${id}`, data),
-  delete: (id) => request('DELETE', `/api/personas/${id}`),
 };
 
 // Characters
