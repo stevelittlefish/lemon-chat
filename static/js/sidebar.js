@@ -63,7 +63,10 @@ export function updateTitle(id, title) {
 function render() {
   sidebarEl.innerHTML = `
     <div class="sidebar-header">
-      <img src="/assets/logo-wordmark.svg" alt="lemon chat" class="sidebar-logo">
+      <div class="sidebar-brand">
+        <img src="/assets/logo-mark.svg" alt="" class="sidebar-logo">
+        <span class="sidebar-brand-name">lemon chat</span>
+      </div>
       <button class="btn btn-ghost btn-sm btn-icon" id="new-chat-btn" title="New conversation">
         ${icon('plus', 18)}
       </button>
