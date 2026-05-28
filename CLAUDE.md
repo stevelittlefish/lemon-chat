@@ -52,12 +52,30 @@ Non-negotiable design rules:
 cmd/lemon-chat/
   main.go              # entry point, config loading, server start
 internal/
-  config/              # TOML struct definitions and loading
-  server/              # HTTP handlers, routing, WebSocket hub (ws.go)
-  store/               # SQLite schema and queries
-  tasks/               # background workers (title generation)
+  config/
+    config.go          # TOML struct definitions and loading
+  server/
+    server.go          # router setup, static serving
+    auth.go            # login / logout / me handlers
+    conversations.go   # conversation CRUD handlers
+    messages.go        # message list + SSE streaming handler
+    models.go          # model list handler
+    characters.go      # character CRUD handlers
+    admin.go           # admin user-management handlers
+    middleware.go      # session, auth, admin middleware
+    ws.go              # WebSocket hub, upgrade handler, broadcast
+  store/
+    store.go           # open DB, run migrations, bootstrap
+    users.go           # user queries
+    sessions.go        # session queries
+    conversations.go   # conversation queries
+    messages.go        # message queries
+    characters.go      # character queries
+  tasks/
+    titles.go          # background title-generation worker
 static/
-  index.html           # app shell
+  index.html           # main app shell
+  settings.html        # settings page shell
   js/
     app.js             # entry, wires modules together
     api.js             # fetch wrappers for the REST API
@@ -65,6 +83,9 @@ static/
     thread.js          # message display, SSE streaming
     composer.js        # text input, send logic
     markdown.js        # lightweight message rendering
+    header.js          # chat header: title display + model/character picker
+    icons.js           # SVG icon loader/cache (fetches from /assets/icons/)
+    settings.js        # settings page: account, characters, admin panels
     ws.js              # WebSocket client, auto-reconnect, event dispatch
     vendor/
       marked.esm.js    # marked.js (vendored, no build step)
@@ -72,21 +93,32 @@ static/
     colors_and_type.css   # copied from design system
     components.css        # copied from design system
     app.css               # layout and app-specific overrides
-  assets/              # SVGs copied from design system
+    settings.css          # settings page layout and overrides
+  assets/
+    icons/             # Lucide SVGs served individually (fetched by icons.js)
+    *.svg              # brand SVGs copied from design system
+data/
+  lemon.toml           # config for Docker volume mount
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml.example
+run.sh                 # shortcut: go run ./cmd/lemon-chat
 lemon.toml.example     # documented config template (committed)
 lemon.toml             # live config (gitignored)
+README.md
+LICENSE
 SPEC.md
 CLAUDE.md
 ```
 
-## What to stub for MVP
+## Not yet implemented
 
-The following are in `SPEC.md` but not in the MVP build. Stub them out rather than building them:
+The following are in `SPEC.md` but not built. Stub them out rather than building them:
 
-- Auth and user profiles — single anonymous user for now
-- Personas — listed in spec, not yet implemented
+- User profiles / profile switcher — auth is done; only one active user at a time, no switcher UI
+- Personas — API endpoints stubbed (`501 Not Implemented`), no UI
 - File attachments
-- Model management UI — config file only
+- Model management UI — config file only, no settings panel for it
 - Message editing and regeneration
 - Conversation search
 

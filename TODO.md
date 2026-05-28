@@ -115,6 +115,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] `static/js/app.js` — entry point, initialises modules, manages top-level state
 - [x] `static/js/sidebar.js` — conversation list, new chat, delete
 - [x] `static/js/thread.js` — message list render, SSE stream handling, scroll behaviour
+- [ ] Pause auto-scroll during streaming if the user scrolls up via mousewheel or scrollbar
 - [x] `static/js/composer.js` — textarea, send on Enter, Shift+Enter newline, disable during stream
 - [x] `static/js/markdown.js` — render paragraphs, `**bold**`, `` `inline code` ``, fenced code blocks
 
