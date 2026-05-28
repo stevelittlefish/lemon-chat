@@ -1,4 +1,5 @@
 import { render as renderMarkdown } from './markdown.js';
+import { icon } from './icons.js';
 
 const threadEl = document.getElementById('thread');
 const container = document.getElementById('thread-container');
@@ -33,14 +34,14 @@ export function renderMessages(msgs) {
     return;
   }
   for (const msg of msgs) {
-    threadEl.appendChild(buildMessage(msg.role, msg.content, msg.name));
+    threadEl.appendChild(buildMessage(msg));
   }
   scrollToBottom();
 }
 
 export function appendMessage(role, content, assistantName) {
   removeEmpty();
-  const el = buildMessage(role, content, assistantName);
+  const el = buildMessage({ role, content, name: assistantName });
   threadEl.appendChild(el);
   scrollToBottom();
   return el;
@@ -94,22 +95,128 @@ export function startStreaming() {
   };
 }
 
-function buildMessage(role, content, assistantName) {
+function buildMessage(msg) {
   const wrapper = document.createElement('div');
-  wrapper.className = `message ${role}`;
+  wrapper.className = `message ${msg.role}`;
 
-  if (role !== 'user') {
+  if (msg.role !== 'user') {
     const roleEl = document.createElement('div');
     roleEl.className = 'message-role';
-    roleEl.textContent = assistantName || role;
+    roleEl.textContent = msg.name || msg.role;
     wrapper.appendChild(roleEl);
   }
 
   const contentEl = document.createElement('div');
   contentEl.className = 'message-content';
-  contentEl.innerHTML = renderMarkdown(content);
+  contentEl.innerHTML = renderMarkdown(msg.content);
   wrapper.appendChild(contentEl);
+
+  if (msg.role === 'assistant' && hasStats(msg)) {
+    wrapper.appendChild(buildFooter(msg));
+  }
+
   return wrapper;
+}
+
+function hasStats(msg) {
+  return msg.prompt_tokens != null || msg.completion_tokens != null || msg.total_time_ms != null;
+}
+
+function buildFooter(msg) {
+  const footer = document.createElement('div');
+  footer.className = 'message-footer';
+
+  const infoWrap = document.createElement('div');
+  infoWrap.className = 'info-wrap';
+
+  const btn = document.createElement('button');
+  btn.className = 'foot-btn';
+  btn.title = 'Token usage';
+  btn.setAttribute('aria-label', 'Token usage');
+  btn.innerHTML = icon('info', 14);
+
+  btn.addEventListener('click', () => {
+    const existing = infoWrap.querySelector('.info-pop');
+    if (existing) {
+      existing.remove();
+      btn.classList.remove('active');
+    } else {
+      btn.classList.add('active');
+      const openUp = btn.closest('.message') === threadEl.lastElementChild;
+      const pop = buildInfoPop(msg, () => {
+        pop.remove();
+        btn.classList.remove('active');
+      }, openUp);
+      infoWrap.appendChild(pop);
+    }
+  });
+
+  infoWrap.appendChild(btn);
+  footer.appendChild(infoWrap);
+  return footer;
+}
+
+function buildInfoPop(msg, onClose, openUp = false) {
+  const pop = document.createElement('div');
+  pop.className = openUp ? 'info-pop up' : 'info-pop';
+  pop.setAttribute('role', 'dialog');
+  pop.setAttribute('aria-label', 'Token usage');
+
+  const fmtMs = (ms) => ms >= 1000 ? (ms / 1000).toFixed(2) + ' s' : ms + ' ms';
+  const tokensPerSec = (msg.total_time_ms && msg.completion_tokens)
+    ? Math.round(msg.completion_tokens / (msg.total_time_ms / 1000))
+    : null;
+
+  const head = document.createElement('div');
+  head.className = 'info-pop-head';
+  const eyebrow = document.createElement('span');
+  eyebrow.className = 'info-pop-eyebrow';
+  eyebrow.textContent = 'Token usage';
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'info-pop-x';
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.innerHTML = icon('x', 12);
+  closeBtn.addEventListener('click', onClose);
+  head.appendChild(eyebrow);
+  head.appendChild(closeBtn);
+
+  const stats = document.createElement('dl');
+  stats.className = 'info-pop-stats';
+
+  const addStat = (label, value, unit) => {
+    const div = document.createElement('div');
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    if (unit) {
+      const span = document.createElement('span');
+      span.textContent = unit;
+      dd.appendChild(span);
+    }
+    div.appendChild(dt);
+    div.appendChild(dd);
+    stats.appendChild(div);
+  };
+
+  if (msg.prompt_tokens != null) addStat('Prompt', msg.prompt_tokens.toLocaleString(), 'tok');
+  if (msg.completion_tokens != null) addStat('Response', msg.completion_tokens.toLocaleString(), 'tok');
+  if (msg.total_time_ms != null) addStat('Total time', fmtMs(msg.total_time_ms));
+  if (tokensPerSec != null) addStat('Throughput', tokensPerSec, 'tok/s');
+
+  pop.appendChild(head);
+  pop.appendChild(stats);
+
+  // Close on outside click (deferred so the opening click doesn't immediately close it)
+  setTimeout(() => {
+    const onDoc = (e) => {
+      if (!pop.isConnected) { document.removeEventListener('mousedown', onDoc); return; }
+      if (!pop.contains(e.target)) { onClose(); document.removeEventListener('mousedown', onDoc); }
+    };
+    document.addEventListener('mousedown', onDoc);
+  }, 0);
+
+  return pop;
 }
 
 function removeEmpty() {

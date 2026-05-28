@@ -3,7 +3,7 @@ const _cache = new Map();
 const ICONS = [
   'plus', 'trash', 'settings', 'log-out', 'send',
   'cpu', 'drama', 'chevron-down', 'arrow-left', 'user', 'users',
-  'lock', 'eye', 'pencil', 'check',
+  'lock', 'eye', 'pencil', 'check', 'info', 'x',
 ];
 
 export async function preload() {
