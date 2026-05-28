@@ -201,6 +201,7 @@ function buildInfoPop(msg, onClose, openUp = false) {
 
   if (msg.prompt_tokens != null) addStat('Prompt', msg.prompt_tokens.toLocaleString(), 'tok');
   if (msg.completion_tokens != null) addStat('Response', msg.completion_tokens.toLocaleString(), 'tok');
+  if (msg.prompt_tokens != null && msg.completion_tokens != null) addStat('Total', (msg.prompt_tokens + msg.completion_tokens).toLocaleString(), 'tok');
   if (msg.total_time_ms != null) addStat('Total time', fmtMs(msg.total_time_ms));
   if (tokensPerSec != null) addStat('Throughput', tokensPerSec, 'tok/s');
 
