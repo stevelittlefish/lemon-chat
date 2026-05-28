@@ -171,6 +171,9 @@ function renderForm(character, modelsData) {
   renderHiddenMessages();
   document.getElementById('hidden-msg-add-btn').addEventListener('click', addHiddenMessage);
 
+  wireAutoExpand('char-system-prompt');
+  wireAutoExpand('char-first-message');
+
   document.getElementById('char-name').focus();
   document.getElementById('char-save-btn').addEventListener('click', () => {
     if (isNew) createChar();
@@ -205,8 +208,10 @@ function renderHiddenMessages() {
     });
   });
   container.querySelectorAll('.hidden-msg-content').forEach(ta => {
+    autoExpand(ta);
     ta.addEventListener('input', e => {
       hiddenMessages[Number(e.target.dataset.index)].content = e.target.value;
+      autoExpand(e.target);
     });
   });
   container.querySelectorAll('.hidden-msg-delete').forEach(btn => {
@@ -334,6 +339,20 @@ async function saveChar(character) {
     errorEl.hidden      = false;
     errorEl.textContent = err.message;
   }
+}
+
+function autoExpand(el) {
+  el.style.overflow = 'hidden';
+  el.style.resize   = 'none';
+  el.style.height   = 'auto';
+  el.style.height   = el.scrollHeight + 'px';
+}
+
+function wireAutoExpand(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  autoExpand(el);
+  el.addEventListener('input', () => autoExpand(el));
 }
 
 function escapeHtml(str) {
