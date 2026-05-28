@@ -126,9 +126,36 @@ When something is stubbed, return a `501 Not Implemented` from the API endpoint 
 
 ## Database schema changes
 
-If you need to add new tables, just do it.
+All migrations live in `internal/store/store.go` in the `migrate()` function. The current schema version is **2**.
 
-If you need to make changes to existing tables, ask the user how to handle the migration.
+### Adding a new table
+
+Add it to the v0→v1 block (the initial schema). New tables don't need their own migration version — they'll be created on first run for fresh databases, and existing databases already have the full schema.
+
+### Modifying an existing table or any other schema change
+
+Add a new numbered migration block after the last one. The pattern:
+
+```go
+if version < N {
+    log.Println("store: migrating vN-1 → vN (short description)")
+    // ALTER TABLE ..., CREATE INDEX ..., etc.
+    if _, err := s.db.Exec(`...`); err != nil {
+        return err
+    }
+    // If you need a timestamp or other Go value, use a second Exec with ? params.
+    if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (N, ?)`, now()); err != nil {
+        return err
+    }
+    version = N
+    log.Println("store: migration vN-1 → vN complete")
+}
+```
+
+- Increment the version number (next is **3**)
+- Always insert a row into `schema_version` with the new version and `now()` as the timestamp
+- Update the "current schema version" note above when done
+- Ask the user before doing anything destructive (dropping columns, dropping tables, data transforms)
 
 ## Keeping TODO.md current
 
