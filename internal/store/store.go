@@ -58,6 +58,7 @@ func (s *Store) migrate() error {
 			conversation_id INTEGER NOT NULL REFERENCES conversation(id),
 			role            TEXT    NOT NULL,
 			content         TEXT    NOT NULL,
+			name            TEXT,
 			created_at      TEXT    NOT NULL
 		);
 

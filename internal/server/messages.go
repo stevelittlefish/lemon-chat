@@ -67,7 +67,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	var chatMsgs []chatMsg
 
 	// Derive model from conversation; prepend system prompt if using a character.
-	var modelName string
+	var modelName, assistantName string
 	if conv.CharacterID != nil {
 		char, err := s.store.GetCharacter(*conv.CharacterID)
 		if err != nil {
@@ -75,11 +75,13 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		modelName = char.Model
+		assistantName = char.Name
 		if char.SystemPrompt != nil {
 			chatMsgs = append(chatMsgs, chatMsg{Role: "system", Content: *char.SystemPrompt})
 		}
 	} else {
 		modelName = *conv.Model
+		assistantName = modelName
 	}
 
 	known := false
@@ -96,7 +98,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	chatURL := strings.TrimRight(s.cfg.ModelServer.APIBase, "/") + "/chat/completions"
 
 	// Persist user message.
-	if _, err := s.store.CreateMessage(convID, "user", req.Content); err != nil {
+	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
@@ -130,6 +132,10 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("X-Accel-Buffering", "no")
 	flusher := w.(http.Flusher)
+
+	nameJSON, _ := json.Marshal(map[string]string{"name": assistantName})
+	fmt.Fprintf(w, "data: %s\n\n", nameJSON)
+	flusher.Flush()
 
 	// OpenAI-compatible streaming: each line is "data: <json>" or "data: [DONE]"
 	var fullContent string
@@ -170,7 +176,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Persist completed assistant message.
 	if fullContent != "" {
-		_, _ = s.store.CreateMessage(convID, "assistant", fullContent)
+		_, _ = s.store.CreateMessage(convID, "assistant", fullContent, &assistantName)
 		_ = s.store.TouchConversation(convID)
 	}
 }

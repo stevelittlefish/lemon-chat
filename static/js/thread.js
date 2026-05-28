@@ -19,14 +19,14 @@ export function renderMessages(msgs) {
     return;
   }
   for (const msg of msgs) {
-    threadEl.appendChild(buildMessage(msg.role, msg.content));
+    threadEl.appendChild(buildMessage(msg.role, msg.content, msg.name));
   }
   scrollToBottom();
 }
 
-export function appendMessage(role, content) {
+export function appendMessage(role, content, assistantName) {
   removeEmpty();
-  const el = buildMessage(role, content);
+  const el = buildMessage(role, content, assistantName);
   threadEl.appendChild(el);
   scrollToBottom();
   return el;
@@ -40,7 +40,7 @@ export function startStreaming() {
 
   const roleEl = document.createElement('div');
   roleEl.className = 'message-role';
-  roleEl.textContent = 'assistant';
+  roleEl.textContent = '';
 
   const contentEl = document.createElement('div');
   contentEl.className = 'message-content';
@@ -54,6 +54,9 @@ export function startStreaming() {
   let accumulated = '';
 
   return {
+    setName(name) {
+      roleEl.textContent = name;
+    },
     append(delta) {
       accumulated += delta;
       contentEl.innerHTML = renderMarkdown(accumulated) || typingIndicatorHTML();
@@ -73,14 +76,14 @@ export function startStreaming() {
   };
 }
 
-function buildMessage(role, content) {
+function buildMessage(role, content, assistantName) {
   const wrapper = document.createElement('div');
   wrapper.className = `message ${role}`;
 
   if (role !== 'user') {
     const roleEl = document.createElement('div');
     roleEl.className = 'message-role';
-    roleEl.textContent = role;
+    roleEl.textContent = assistantName || role;
     wrapper.appendChild(roleEl);
   }
 

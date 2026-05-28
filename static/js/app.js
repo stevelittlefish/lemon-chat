@@ -99,6 +99,7 @@ async function sendMessage(content) {
   composer.setStreaming(true);
 
   msgApi.send(activeConversationId, content, {
+    onName: (name) => stream.setName(name),
     onDelta: (delta) => stream.append(delta),
     onDone: () => {
       stream.finish();

@@ -31,7 +31,6 @@ export const models = {
 export const conversations = {
   list: () => request('GET', '/api/conversations'),
   create: (title, model, characterId) => request('POST', '/api/conversations', { title, model, character_id: characterId }),
-  update: (id, data) => request('PATCH', `/api/conversations/${id}`, data),
   delete: (id) => request('DELETE', `/api/conversations/${id}`),
 };
 
@@ -39,7 +38,7 @@ export const conversations = {
 export const messages = {
   list: (conversationId) => request('GET', `/api/conversations/${conversationId}/messages`),
   // Returns an EventSource-like object. Calls onDelta(text) for each chunk, onDone() when finished.
-  send: (conversationId, content, { onDelta, onDone, onError }) => {
+  send: (conversationId, content, { onName, onDelta, onDone, onError }) => {
     const url = `/api/conversations/${conversationId}/messages`;
     fetch(url, {
       method: 'POST',
@@ -65,8 +64,9 @@ export const messages = {
           const payload = line.slice(6);
           if (payload === '[DONE]') { onDone?.(); return; }
           try {
-            const { delta, error } = JSON.parse(payload);
+            const { delta, error, name } = JSON.parse(payload);
             if (error) { onError?.(new Error(error)); return; }
+            if (name) onName?.(name);
             if (delta) onDelta?.(delta);
           } catch { /* malformed chunk, skip */ }
         }

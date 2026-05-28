@@ -1,4 +1,3 @@
-import { conversations as convApi } from './api.js';
 import { icon } from './icons.js';
 
 const headerEl = document.getElementById('chat-header');
@@ -25,9 +24,7 @@ export function setConversation(id, title) {
 export function updateTitle(title) {
   state.title = title;
   const el = headerEl.querySelector('.chat-header-title');
-  if (el && el !== document.activeElement) {
-    el.value = title || '';
-  }
+  if (el) el.textContent = title || '';
 }
 
 export function getSelectedModel() {
@@ -39,7 +36,7 @@ function render() {
   headerEl.innerHTML = `
     <div class="chat-header-title-wrap">
       ${hasConv
-        ? `<input class="chat-header-title" id="header-title" type="text" value="${escapeAttr(state.title || '')}" placeholder="untitled" spellcheck="false">`
+        ? `<span class="chat-header-title">${escapeHtml(state.title || '')}</span>`
         : `<span class="chat-header-title chat-header-title--wordmark">lemon chat</span>`
       }
     </div>
@@ -51,23 +48,6 @@ function render() {
       </button>
     </div>
   `;
-
-  if (hasConv) {
-    const titleEl = document.getElementById('header-title');
-    let savedTitle = state.title || '';
-    titleEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); }
-      if (e.key === 'Escape') { titleEl.value = savedTitle; titleEl.blur(); }
-    });
-    titleEl.addEventListener('blur', async () => {
-      const newTitle = titleEl.value.trim();
-      if (newTitle === savedTitle) return;
-      if (!newTitle) { titleEl.value = savedTitle; return; }
-      savedTitle = newTitle;
-      state.title = newTitle;
-      await convApi.update(state.conversationId, { title: newTitle });
-    });
-  }
 
   document.getElementById('model-picker-trigger').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -87,7 +67,7 @@ function toggleDropdown() {
   dropdown.innerHTML = `
     <div class="model-picker-dropdown-label">model</div>
     ${state.models.map(m => `
-      <div class="model-picker-option${m.name === state.selectedModel ? ' selected' : ''}" data-name="${escapeAttr(m.name)}">
+      <div class="model-picker-option${m.name === state.selectedModel ? ' selected' : ''}" data-name="${escapeHtml(m.name)}">
         <span class="model-picker-option-check">${m.name === state.selectedModel ? icon('check', 13) : ''}</span>
         <span class="model-picker-option-name">${escapeHtml(m.display_name)}</span>
       </div>
@@ -118,8 +98,4 @@ function selectedDisplayName() {
 
 function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function escapeAttr(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
