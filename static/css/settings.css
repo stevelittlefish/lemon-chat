@@ -501,7 +501,7 @@ a.snav-item { text-decoration: none; }
 
 .hidden-msg-row {
   display: grid;
-  grid-template-columns: 20px 90px 1fr 28px;
+  grid-template-columns: 20px 1fr 28px;
   gap: 8px;
   align-items: start;
   padding: 8px 0;
@@ -512,14 +512,20 @@ a.snav-item { text-decoration: none; }
   border-top: none;
 }
 
+.hidden-msg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .hidden-msg-drag-handle {
   cursor: grab;
   color: var(--fg-faint);
   font-size: 14px;
-  padding-top: 8px;
-  text-align: center;
   user-select: none;
   line-height: 1;
+  padding-top: 8px;
+  text-align: center;
 }
 
 .hidden-msg-drag-handle:active {
@@ -531,19 +537,18 @@ a.snav-item { text-decoration: none; }
   font-size: 12px;
 }
 
-.hidden-msg-content {
-  min-height: 56px;
-  resize: vertical;
-}
-
 .hidden-msg-delete {
   padding: 6px;
   color: var(--fg-muted);
-  flex-shrink: 0;
+  padding-top: 6px;
 }
 
 .hidden-msg-delete:hover {
   color: var(--brick-500, #c0392b);
+}
+
+.hidden-msg-content {
+  min-height: 56px;
 }
 
 .hidden-msg-row--dragging {

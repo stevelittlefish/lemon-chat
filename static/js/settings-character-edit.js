@@ -193,11 +193,13 @@ function renderHiddenMessages() {
   container.innerHTML = hiddenMessages.map((msg, i) => `
     <div class="hidden-msg-row" data-index="${i}" draggable="true">
       <div class="hidden-msg-drag-handle" aria-hidden="true">⠿</div>
-      <select class="input hidden-msg-role" data-index="${i}">
-        <option value="user"      ${msg.role === 'user'      ? 'selected' : ''}>user</option>
-        <option value="assistant" ${msg.role === 'assistant' ? 'selected' : ''}>assistant</option>
-      </select>
-      <textarea class="input hidden-msg-content" data-index="${i}" rows="2">${escapeHtml(msg.content)}</textarea>
+      <div class="hidden-msg-body">
+        <select class="input hidden-msg-role" data-index="${i}">
+          <option value="user"      ${msg.role === 'user'      ? 'selected' : ''}>user</option>
+          <option value="assistant" ${msg.role === 'assistant' ? 'selected' : ''}>assistant</option>
+        </select>
+        <textarea class="input hidden-msg-content" data-index="${i}" rows="2">${escapeHtml(msg.content)}</textarea>
+      </div>
       <button type="button" class="btn btn-ghost btn-sm hidden-msg-delete" data-index="${i}" aria-label="Remove">${svgTrash}</button>
     </div>
   `).join('');
