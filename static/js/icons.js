@@ -2,8 +2,8 @@ const _cache = new Map();
 
 const ICONS = [
   'plus', 'trash', 'settings', 'log-out', 'send',
-  'drama', 'chevron-down', 'arrow-left', 'user', 'users',
-  'lock', 'eye', 'pencil',
+  'cpu', 'drama', 'chevron-down', 'arrow-left', 'user', 'users',
+  'lock', 'eye', 'pencil', 'check',
 ];
 
 export async function preload() {

@@ -43,6 +43,8 @@ export function setSelection(conv) {
   }
   const label = document.getElementById('model-label');
   if (label) label.textContent = selectedDisplayName();
+  const typeIcon = document.getElementById('model-type-icon');
+  if (typeIcon) typeIcon.innerHTML = icon(selectionIcon(), 13);
 }
 
 // Returns { type: 'model', name } or { type: 'character', id }.
@@ -61,7 +63,7 @@ function render() {
     </div>
     <div class="model-picker-wrap" id="model-picker-wrap">
       <button class="model-picker-trigger" id="model-picker-trigger" type="button">
-        ${icon('cpu', 13)}
+        <span id="model-type-icon">${icon(selectionIcon(), 13)}</span>
         <span id="model-label">${escapeHtml(selectedDisplayName())}</span>
         ${icon('chevron-down', 12)}
       </button>
@@ -91,7 +93,7 @@ function toggleDropdown() {
     const sel = isMSel && m.name === state.selection.name;
     return `
       <div class="model-picker-option${sel ? ' selected' : ''}" data-type="model" data-name="${escapeHtml(m.name)}">
-        <span class="model-picker-option-check">${sel ? icon('check', 13) : ''}</span>
+        <span class="model-picker-option-icon">${icon(sel ? 'check' : 'cpu', 13)}</span>
         <span class="model-picker-option-name">${escapeHtml(m.display_name)}</span>
       </div>`;
   }).join('');
@@ -103,7 +105,7 @@ function toggleDropdown() {
       const sel = isCSel && c.id === state.selection.id;
       return `
         <div class="model-picker-option${sel ? ' selected' : ''}" data-type="character" data-id="${c.id}">
-          <span class="model-picker-option-check">${sel ? icon('check', 13) : ''}</span>
+          <span class="model-picker-option-icon">${icon(sel ? 'check' : 'drama', 13)}</span>
           <span class="model-picker-option-name">${escapeHtml(c.name)}</span>
         </div>`;
     }).join('');
@@ -121,6 +123,8 @@ function toggleDropdown() {
       }
       const label = document.getElementById('model-label');
       if (label) label.textContent = selectedDisplayName();
+      const typeIcon = document.getElementById('model-type-icon');
+      if (typeIcon) typeIcon.innerHTML = icon(selectionIcon(), 13);
       dropdown.remove();
       const changed = JSON.stringify(prev) !== JSON.stringify(state.selection);
       if (changed) state.onChange?.(state.selection);
@@ -134,6 +138,10 @@ function toggleDropdown() {
       document.getElementById('model-picker-dropdown')?.remove();
     }, { once: true });
   }, 0);
+}
+
+function selectionIcon() {
+  return state.selection?.type === 'character' ? 'drama' : 'cpu';
 }
 
 function selectedDisplayName() {
