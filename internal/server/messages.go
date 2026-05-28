@@ -212,3 +212,70 @@ func writeSSEError(w io.Writer, msg string) {
 	errJSON, _ := json.Marshal(map[string]string{"error": msg})
 	fmt.Fprintf(w, "data: %s\n\n", errJSON)
 }
+
+func (s *Server) handleFirstMessage(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	convID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	conv, err := s.store.GetConversation(convID, user.ID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+
+	var req struct {
+		CharacterID *int64 `json:"character_id"`
+	}
+	json.NewDecoder(r.Body).Decode(&req) // body is optional
+
+	msgs, err := s.store.ListMessages(convID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	if len(msgs) > 0 {
+		writeError(w, http.StatusConflict, "conversation already has messages")
+		return
+	}
+
+	charID := conv.CharacterID
+	if req.CharacterID != nil {
+		charID = req.CharacterID
+	}
+	if charID == nil {
+		writeError(w, http.StatusBadRequest, "no character")
+		return
+	}
+
+	char, err := s.store.GetCharacter(*charID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "character not found")
+		return
+	}
+	if char.Visibility == "private" && char.CreatedBy != user.ID && !user.IsAdmin {
+		writeError(w, http.StatusForbidden, "forbidden")
+		return
+	}
+	if char.FirstMessage == nil {
+		writeError(w, http.StatusBadRequest, "character has no first message")
+		return
+	}
+
+	// If a character override was provided, update the conversation to use it.
+	if req.CharacterID != nil {
+		if err := s.store.UpdateConversationAfterMessage(convID, nil, charID); err != nil {
+			internalError(w, err)
+			return
+		}
+	}
+
+	msg, err := s.store.CreateMessage(convID, "assistant", *char.FirstMessage, &char.Name)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, msg)
+}

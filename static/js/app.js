@@ -13,6 +13,7 @@ const loginError = document.getElementById('login-error');
 
 let currentUser = null;
 let activeConversationId = null;
+let activeHasMessages = false;
 
 async function start() {
   try {
@@ -53,7 +54,11 @@ async function initApp() {
     onNew: newConversation,
   });
 
-  header.init({ models: modelList, characters: characterList });
+  header.init({
+    models: modelList,
+    characters: characterList,
+    onChange: handleSelectionChange,
+  });
 
   composer.init({
     onSend: sendMessage,
@@ -65,6 +70,7 @@ async function initApp() {
 async function loadConversation(id) {
   if (!id) {
     activeConversationId = null;
+    activeHasMessages = false;
     header.setConversation(null, null);
     thread.showEmpty();
     sidebar.setActive(null);
@@ -73,6 +79,7 @@ async function loadConversation(id) {
   activeConversationId = id;
   sidebar.setActive(id);
   const msgs = await msgApi.list(id);
+  activeHasMessages = msgs.length > 0;
   const conv = sidebar.getConversation(id);
   header.setConversation(id, conv?.title ?? null);
   if (conv) header.setSelection(conv);
@@ -86,8 +93,12 @@ async function newConversation() {
   const conv = await convApi.create(null, model, charId);
   sidebar.addConversation(conv);
   activeConversationId = conv.id;
+  activeHasMessages = false;
   header.setConversation(conv.id, conv.title ?? null);
   thread.showEmpty();
+  if (charId !== null) {
+    await applyFirstMessage(conv.id, null);
+  }
 }
 
 async function sendMessage(content) {
@@ -98,10 +109,15 @@ async function sendMessage(content) {
     const conv = await convApi.create(null, model, charId);
     sidebar.addConversation(conv);
     activeConversationId = conv.id;
+    activeHasMessages = false;
     header.setConversation(conv.id, conv.title ?? null);
+    if (charId !== null) {
+      await applyFirstMessage(conv.id, null);
+    }
   }
 
   const convId = activeConversationId;
+  activeHasMessages = true;
   thread.appendMessage('user', content);
   const stream = thread.startStreaming();
   composer.setStreaming(true);
@@ -112,7 +128,6 @@ async function sendMessage(content) {
     onDone: () => {
       stream.finish();
       composer.setStreaming(false);
-      // Keep sidebar cache in sync with the model/character actually used.
       sidebar.updateConversation(convId, {
         model: sel?.type === 'model' ? sel.name : null,
         character_id: sel?.type === 'character' ? sel.id : null,
@@ -123,6 +138,32 @@ async function sendMessage(content) {
       composer.setStreaming(false);
     },
   });
+}
+
+// Called when the picker selection changes. If the conversation is empty and
+// the new selection is a character, save and show their first message.
+async function handleSelectionChange(sel) {
+  if (!activeConversationId) return;
+  if (activeHasMessages) return;
+  if (!sel || sel.type !== 'character') return;
+  await applyFirstMessage(activeConversationId, sel.id);
+}
+
+// Saves and displays the first message for a character.
+// Pass charId to override (and update) the conversation's character; pass null
+// to use the character already set on the conversation.
+async function applyFirstMessage(convId, charId) {
+  try {
+    const msg = await msgApi.firstMessage(convId, charId);
+    if (!msg) return;
+    thread.appendMessage('assistant', msg.content, msg.name);
+    activeHasMessages = true;
+    if (charId !== null) {
+      sidebar.updateConversation(convId, { character_id: charId, model: null });
+    }
+  } catch {
+    // Character has no first message, or already has messages — silent
+  }
 }
 
 // Login form

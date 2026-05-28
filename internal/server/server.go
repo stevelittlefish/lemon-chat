@@ -39,6 +39,7 @@ func (s *Server) Handler() http.Handler {
 	// Messages
 	mux.HandleFunc("GET /api/conversations/{id}/messages", s.requireAuth(s.handleListMessages))
 	mux.HandleFunc("POST /api/conversations/{id}/messages", s.requireAuth(s.handleSendMessage))
+	mux.HandleFunc("POST /api/conversations/{id}/first-message", s.requireAuth(s.handleFirstMessage))
 
 	// Characters
 	mux.HandleFunc("GET /api/characters", s.requireAuth(s.handleListCharacters))

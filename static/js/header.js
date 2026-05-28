@@ -9,11 +9,13 @@ let state = {
   characters: [],
   // { type: 'model', name: string } | { type: 'character', id: number }
   selection: null,
+  onChange: null,
 };
 
-export function init({ models, characters }) {
+export function init({ models, characters, onChange = null }) {
   state.models = models;
   state.characters = characters;
+  state.onChange = onChange;
   const def = models.find(m => m.default) ?? models[0];
   state.selection = def ? { type: 'model', name: def.name } : null;
   render();
@@ -111,6 +113,7 @@ function toggleDropdown() {
 
   dropdown.querySelectorAll('.model-picker-option').forEach(opt => {
     opt.addEventListener('click', () => {
+      const prev = state.selection;
       if (opt.dataset.type === 'model') {
         state.selection = { type: 'model', name: opt.dataset.name };
       } else {
@@ -119,6 +122,8 @@ function toggleDropdown() {
       const label = document.getElementById('model-label');
       if (label) label.textContent = selectedDisplayName();
       dropdown.remove();
+      const changed = JSON.stringify(prev) !== JSON.stringify(state.selection);
+      if (changed) state.onChange?.(state.selection);
     });
   });
 

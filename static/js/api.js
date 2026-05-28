@@ -37,6 +37,10 @@ export const conversations = {
 // Messages
 export const messages = {
   list: (conversationId) => request('GET', `/api/conversations/${conversationId}/messages`),
+  firstMessage: (conversationId, characterId = null) => {
+    const body = characterId != null ? { character_id: characterId } : {};
+    return request('POST', `/api/conversations/${conversationId}/first-message`, body);
+  },
   // selection: { type: 'model', name } | { type: 'character', id } | null
   send: (conversationId, content, selection, { onName, onDelta, onDone, onError }) => {
     const url = `/api/conversations/${conversationId}/messages`;
