@@ -290,6 +290,7 @@ a.snav-item { text-decoration: none; }
 .section-toolbar h2 { margin-bottom: 4px; }
 .section-toolbar .lead { margin-bottom: 0; }
 .section-toolbar > button { flex-shrink: 0; margin-top: 2px; }
+.section-toolbar .toolbar-actions { display: flex; gap: 8px; flex-shrink: 0; margin-top: 2px; }
 
 /* ── User list ──────────────────────────────────────────── */
 
