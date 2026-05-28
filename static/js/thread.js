@@ -69,6 +69,7 @@ export function startStreaming() {
   scrollToBottom();
 
   let accumulated = '';
+  let streamStats = null;
 
   return {
     setName(name) {
@@ -79,12 +80,20 @@ export function startStreaming() {
       contentEl.innerHTML = renderMarkdown(accumulated) || typingIndicatorHTML();
       if (!userScrolledDuringStream) scrollToBottom();
     },
+    setStats(stats) {
+      streamStats = stats;
+    },
     finish() {
+      const shouldScroll = !userScrolledDuringStream;
       userScrolledDuringStream = false;
       if (!accumulated) {
         wrapper.remove();
       } else {
         contentEl.innerHTML = renderMarkdown(accumulated);
+        if (streamStats && hasStats(streamStats)) {
+          wrapper.appendChild(buildFooter(streamStats));
+        }
+        if (shouldScroll) scrollToBottom();
       }
     },
     error(msg) {

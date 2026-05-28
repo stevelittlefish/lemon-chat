@@ -231,6 +231,18 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if usageStats != nil {
+		statsJSON, _ := json.Marshal(map[string]any{
+			"stats": map[string]int64{
+				"prompt_tokens":     usageStats.PromptTokens,
+				"completion_tokens": usageStats.CompletionTokens,
+				"total_time_ms":     usageStats.TotalTimeMS,
+			},
+		})
+		fmt.Fprintf(w, "data: %s\n\n", statsJSON)
+		flusher.Flush()
+	}
+
 	fmt.Fprintf(w, "data: [DONE]\n\n")
 	flusher.Flush()
 

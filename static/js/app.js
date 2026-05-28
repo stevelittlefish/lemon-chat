@@ -154,6 +154,7 @@ async function sendMessage(content) {
   msgApi.send(convId, content, sel, {
     onName: (name) => stream.setName(name),
     onDelta: (delta) => stream.append(delta),
+    onStats: (stats) => stream.setStats(stats),
     onDone: () => {
       stream.finish();
       composer.setStreaming(false);

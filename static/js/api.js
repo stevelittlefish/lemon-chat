@@ -42,7 +42,7 @@ export const messages = {
     return request('POST', `/api/conversations/${conversationId}/first-message`, body);
   },
   // selection: { type: 'model', name } | { type: 'character', id } | null
-  send: (conversationId, content, selection, { onName, onDelta, onDone, onError }) => {
+  send: (conversationId, content, selection, { onName, onDelta, onDone, onError, onStats }) => {
     const url = `/api/conversations/${conversationId}/messages`;
     const body = { content };
     if (selection?.type === 'model') body.model = selection.name;
@@ -71,10 +71,11 @@ export const messages = {
           const payload = line.slice(6);
           if (payload === '[DONE]') { onDone?.(); return; }
           try {
-            const { delta, error, name } = JSON.parse(payload);
+            const { delta, error, name, stats } = JSON.parse(payload);
             if (error) { onError?.(new Error(error)); return; }
             if (name) onName?.(name);
             if (delta) onDelta?.(delta);
+            if (stats) onStats?.(stats);
           } catch { /* malformed chunk, skip */ }
         }
       }
