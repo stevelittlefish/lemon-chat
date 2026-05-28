@@ -2,7 +2,7 @@ const _cache = new Map();
 
 const ICONS = [
   'plus', 'trash', 'settings', 'log-out', 'send',
-  'cpu', 'chevron-down', 'arrow-left', 'user', 'users',
+  'drama', 'chevron-down', 'arrow-left', 'user', 'users',
   'lock', 'eye', 'pencil',
 ];
 

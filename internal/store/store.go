@@ -84,7 +84,7 @@ func (s *Store) migrate() error {
 			system_prompt TEXT,
 			first_message TEXT,
 			created_by    INTEGER NOT NULL REFERENCES user(id),
-			allow_editing INTEGER NOT NULL DEFAULT 0,
+			visibility    TEXT    NOT NULL DEFAULT 'private',
 			created_at    TEXT    NOT NULL,
 			updated_at    TEXT    NOT NULL
 		);

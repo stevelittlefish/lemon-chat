@@ -10,7 +10,8 @@ import (
 )
 
 func (s *Server) handleListCharacters(w http.ResponseWriter, r *http.Request) {
-	chars, err := s.store.ListCharacters()
+	user := currentUser(r)
+	chars, err := s.store.ListCharacters(user.ID, user.IsAdmin)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -28,7 +29,7 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 		Model        string  `json:"model"`
 		SystemPrompt *string `json:"system_prompt"`
 		FirstMessage *string `json:"first_message"`
-		AllowEditing bool    `json:"allow_editing"`
+		Visibility   string  `json:"visibility"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -38,7 +39,10 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "name and model are required")
 		return
 	}
-	char, err := s.store.CreateCharacter(req.Name, req.Model, req.SystemPrompt, req.FirstMessage, user.ID, req.AllowEditing)
+	if !validVisibility(req.Visibility) {
+		req.Visibility = "private"
+	}
+	char, err := s.store.CreateCharacter(req.Name, req.Model, req.SystemPrompt, req.FirstMessage, user.ID, req.Visibility)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
@@ -62,8 +66,9 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	// Owner, admin, or allow_editing may edit.
-	canEdit := existing.CreatedBy == user.ID || user.IsAdmin || existing.AllowEditing
+
+	isOwnerOrAdmin := existing.CreatedBy == user.ID || user.IsAdmin
+	canEdit := isOwnerOrAdmin || existing.Visibility == "readwrite"
 	if !canEdit {
 		writeError(w, http.StatusForbidden, "forbidden")
 		return
@@ -75,13 +80,13 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		Model        string  `json:"model"`
 		SystemPrompt *string `json:"system_prompt"`
 		FirstMessage *string `json:"first_message"`
-		AllowEditing bool    `json:"allow_editing"`
+		Visibility   string  `json:"visibility"`
 	}{
 		Name:         existing.Name,
 		Model:        existing.Model,
 		SystemPrompt: existing.SystemPrompt,
 		FirstMessage: existing.FirstMessage,
-		AllowEditing: existing.AllowEditing,
+		Visibility:   existing.Visibility,
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -91,11 +96,13 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "name and model are required")
 		return
 	}
-	// Only owner or admin may toggle allow_editing.
-	if existing.CreatedBy != user.ID && !user.IsAdmin {
-		req.AllowEditing = existing.AllowEditing
+	// Only owner or admin may change visibility.
+	if !isOwnerOrAdmin {
+		req.Visibility = existing.Visibility
+	} else if !validVisibility(req.Visibility) {
+		req.Visibility = existing.Visibility
 	}
-	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.AllowEditing); err != nil {
+	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.Visibility); err != nil {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
@@ -128,4 +135,8 @@ func (s *Server) handleDeleteCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func validVisibility(v string) bool {
+	return v == "private" || v == "readonly" || v == "readwrite"
 }

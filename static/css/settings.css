@@ -418,7 +418,24 @@ html, body {
   align-items: center;
 }
 
-.character-chip--editable {
+.character-chip-slot {
+  width: 108px;
+  flex-shrink: 0;
+}
+
+.character-chip--private {
+  background: var(--brick-100);
+  border-color: #DCA898;
+  color: var(--brick-700);
+}
+
+.character-chip--readonly {
+  background: var(--lemon-50);
+  border-color: var(--lemon-300);
+  color: var(--lemon-900);
+}
+
+.character-chip--readwrite {
   background: var(--leaf-100);
   border-color: #C2D1A4;
   color: var(--leaf-700);

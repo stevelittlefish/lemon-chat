@@ -17,7 +17,7 @@ async function init() {
   svgArrowLeft = icon('arrow-left', 14);
   svgUser      = icon('user', 16);
   svgUsers     = icon('users', 16);
-  svgCpu       = icon('cpu', 16);
+  svgCpu       = icon('drama', 16);
   svgLock      = icon('lock', 14);
   svgEye       = icon('eye', 14);
   svgPlus      = icon('plus', 14);
@@ -289,7 +289,7 @@ async function showCharactersPanel() {
 }
 
 function canEditChar(c) {
-  return c.created_by === user.id || user.is_admin || c.allow_editing;
+  return c.created_by === user.id || user.is_admin || c.visibility === 'readwrite';
 }
 
 function canDeleteChar(c) {
@@ -345,7 +345,7 @@ function charFormHtml(idPrefix, c) {
   const model        = c ? c.model                               : (modelsData[0]?.name ?? '');
   const systemPrompt = c ? (c.system_prompt ?? '')               : '';
   const firstMessage = c ? (c.first_message ?? '')               : '';
-  const allowEditing = c ? c.allow_editing                       : false;
+  const visibility = c ? c.visibility : 'private';
   const isOwnerOrAdmin = !c || c.created_by === user.id || user.is_admin;
 
   return `
@@ -368,11 +368,13 @@ function charFormHtml(idPrefix, c) {
           <textarea id="${idPrefix}-first-message" class="input" rows="3" placeholder="Optional opening message…">${escapeHtml(firstMessage)}</textarea>
         </div>
         ${isOwnerOrAdmin ? `
-        <div class="character-form-row character-form-check">
-          <label>
-            <input type="checkbox" id="${idPrefix}-allow-editing" ${allowEditing ? 'checked' : ''}>
-            Let others edit this character
-          </label>
+        <div class="character-form-row">
+          <label class="character-form-lbl" for="${idPrefix}-visibility">Visibility</label>
+          <select id="${idPrefix}-visibility" class="input">
+            <option value="private"   ${visibility === 'private'   ? 'selected' : ''}>Private — only you</option>
+            <option value="readonly"  ${visibility === 'readonly'  ? 'selected' : ''}>Read-only — others can see, not edit</option>
+            <option value="readwrite" ${visibility === 'readwrite' ? 'selected' : ''}>Read-write — others can see and edit</option>
+          </select>
         </div>` : ''}
       </div>
       <div class="field-msg field-msg--error" id="${idPrefix}-err" hidden></div>
@@ -405,7 +407,7 @@ function renderCharRows(list, isMine) {
         <div class="character-row" data-id="${c.id}">
           <div class="character-name">${escapeHtml(c.name)}</div>
           <span class="chip">${escapeHtml(c.model)}</span>
-          ${c.allow_editing ? '<span class="chip character-chip--editable">editable</span>' : ''}
+          <span class="character-chip-slot"><span class="chip character-chip--${c.visibility}">${{ private: 'private', readonly: 'read-only', readwrite: 'read-write' }[c.visibility] ?? c.visibility}</span></span>
           <div class="user-row-actions">${editBtn}${deleteBtn}</div>
         </div>`;
     }
@@ -452,7 +454,7 @@ function readCharForm(prefix) {
     model:         document.getElementById(`${prefix}-model`)?.value           ?? '',
     system_prompt: document.getElementById(`${prefix}-system-prompt`)?.value.trim() || null,
     first_message: document.getElementById(`${prefix}-first-message`)?.value.trim() || null,
-    allow_editing: isOwnerOrAdmin ? (document.getElementById(`${prefix}-allow-editing`)?.checked ?? false) : undefined,
+    visibility: isOwnerOrAdmin ? (document.getElementById(`${prefix}-visibility`)?.value ?? undefined) : undefined,
   };
 }
 
@@ -504,7 +506,7 @@ async function saveEditChar(id) {
       c.model         = data.model;
       c.system_prompt = data.system_prompt;
       c.first_message = data.first_message;
-      if (data.allow_editing !== undefined) c.allow_editing = data.allow_editing;
+      if (data.visibility !== undefined) c.visibility = data.visibility;
     }
     charactersData.sort((a, b) => a.name.localeCompare(b.name));
     editingCharId = null;
