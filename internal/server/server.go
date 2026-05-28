@@ -65,6 +65,8 @@ func (s *Server) Handler() http.Handler {
 	})
 	mux.HandleFunc("GET /settings/account", serveFile("static/settings/account.html"))
 	mux.HandleFunc("GET /settings/characters", serveFile("static/settings/characters.html"))
+	mux.HandleFunc("GET /settings/characters/new", serveFile("static/settings/character-edit.html"))
+	mux.HandleFunc("GET /settings/characters/{id}/edit", serveFile("static/settings/character-edit.html"))
 	mux.HandleFunc("GET /settings/users", serveFile("static/settings/users.html"))
 
 	// Static files
