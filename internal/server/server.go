@@ -43,6 +43,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Characters
 	mux.HandleFunc("GET /api/characters", s.requireAuth(s.handleListCharacters))
+	mux.HandleFunc("GET /api/characters/{id}", s.requireAuth(s.handleGetCharacter))
 	mux.HandleFunc("POST /api/characters", s.requireAuth(s.handleCreateCharacter))
 	mux.HandleFunc("PATCH /api/characters/{id}", s.requireAuth(s.handleUpdateCharacter))
 	mux.HandleFunc("DELETE /api/characters/{id}", s.requireAuth(s.handleDeleteCharacter))

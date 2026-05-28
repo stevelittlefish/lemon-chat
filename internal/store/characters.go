@@ -5,6 +5,15 @@ import (
 	"errors"
 )
 
+type CharacterHiddenMessage struct {
+	ID          int64  `json:"id"`
+	CharacterID int64  `json:"character_id"`
+	Role        string `json:"role"`
+	Content     string `json:"content"`
+	SortOrder   int    `json:"sort_order"`
+	CreatedAt   string `json:"created_at"`
+}
+
 type Character struct {
 	ID           int64   `json:"id"`
 	Name         string  `json:"name"`
@@ -86,4 +95,49 @@ func (s *Store) UpdateCharacter(id int64, name, model string, systemPrompt, firs
 func (s *Store) DeleteCharacter(id int64) error {
 	_, err := s.db.Exec(`DELETE FROM character WHERE id = ?`, id)
 	return err
+}
+
+func (s *Store) ListCharacterHiddenMessages(characterID int64) ([]CharacterHiddenMessage, error) {
+	rows, err := s.db.Query(
+		`SELECT id, character_id, role, content, sort_order, created_at
+		 FROM character_hidden_message
+		 WHERE character_id = ?
+		 ORDER BY sort_order ASC`,
+		characterID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var msgs []CharacterHiddenMessage
+	for rows.Next() {
+		var m CharacterHiddenMessage
+		if err := rows.Scan(&m.ID, &m.CharacterID, &m.Role, &m.Content, &m.SortOrder, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, m)
+	}
+	return msgs, rows.Err()
+}
+
+func (s *Store) ReplaceCharacterHiddenMessages(characterID int64, msgs []CharacterHiddenMessage) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM character_hidden_message WHERE character_id = ?`, characterID); err != nil {
+		return err
+	}
+	t := now()
+	for i, m := range msgs {
+		if _, err := tx.Exec(
+			`INSERT INTO character_hidden_message (character_id, role, content, sort_order, created_at)
+			 VALUES (?, ?, ?, ?, ?)`,
+			characterID, m.Role, m.Content, i, t,
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

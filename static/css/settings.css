@@ -477,6 +477,87 @@ a.snav-item { text-decoration: none; }
   user-select: none;
 }
 
+/* ── Hidden messages editor ─────────────────────────────── */
+
+.character-form-lbl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.character-form-hint {
+  font-size: 12px;
+  color: var(--fg-muted);
+  margin-bottom: 8px;
+}
+
+.hidden-msgs-empty {
+  font-size: 13px;
+  color: var(--fg-muted);
+  padding: 6px 0 2px;
+  font-style: italic;
+}
+
+.hidden-msg-row {
+  display: grid;
+  grid-template-columns: 20px 90px 1fr 28px;
+  gap: 8px;
+  align-items: start;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.hidden-msg-row:first-child {
+  border-top: none;
+}
+
+.hidden-msg-drag-handle {
+  cursor: grab;
+  color: var(--fg-faint);
+  font-size: 14px;
+  padding-top: 8px;
+  text-align: center;
+  user-select: none;
+  line-height: 1;
+}
+
+.hidden-msg-drag-handle:active {
+  cursor: grabbing;
+}
+
+.hidden-msg-role {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.hidden-msg-content {
+  min-height: 56px;
+  resize: vertical;
+}
+
+.hidden-msg-delete {
+  padding: 6px;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+
+.hidden-msg-delete:hover {
+  color: var(--brick-500, #c0392b);
+}
+
+.hidden-msg-row--dragging {
+  opacity: 0.4;
+}
+
+.hidden-msg-row--drop-above {
+  border-top: 2px solid var(--lemon-500);
+}
+
+.hidden-msg-row--drop-below {
+  border-bottom: 2px solid var(--lemon-500);
+}
+
 /* ── Scrollbar ──────────────────────────────────────────── */
 
 .smain::-webkit-scrollbar { width: 10px; }

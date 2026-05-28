@@ -2,12 +2,16 @@ import { auth, characters as charactersApi, models as modelsApi } from './api.js
 import { preload as preloadIcons, icon } from './icons.js';
 
 let user = null;
-let svgArrowLeft, svgUser, svgUsers, svgCpu;
+let svgArrowLeft, svgUser, svgUsers, svgCpu, svgTrash, svgPlus;
 
 const urlPath   = window.location.pathname;
 const isNew     = urlPath === '/settings/characters/new';
 const editMatch = urlPath.match(/^\/settings\/characters\/(\d+)\/edit$/);
 const editId    = editMatch ? Number(editMatch[1]) : null;
+
+// In-memory state for the hidden messages editor.
+let hiddenMessages = [];
+let dragSrcIndex   = null;
 
 async function init() {
   try {
@@ -27,6 +31,8 @@ async function init() {
   svgUser      = icon('user', 16);
   svgUsers     = icon('users', 16);
   svgCpu       = icon('drama', 16);
+  svgTrash     = icon('trash', 14);
+  svgPlus      = icon('plus', 14);
   renderNav();
 
   let character  = null;
@@ -36,9 +42,9 @@ async function init() {
     if (isNew) {
       modelsData = await modelsApi.list();
     } else {
-      const [chars, models] = await Promise.all([charactersApi.list(), modelsApi.list()]);
+      const [char, models] = await Promise.all([charactersApi.get(editId), modelsApi.list()]);
       modelsData = models;
-      character  = chars.find(c => c.id === editId) ?? null;
+      character  = char ?? null;
     }
   } catch {
     renderError('Could not load data.');
@@ -132,6 +138,14 @@ function renderForm(character, modelsData) {
           <textarea id="char-system-prompt" class="input" rows="6" placeholder="Optional system prompt…">${escapeHtml(systemPrompt)}</textarea>
         </div>
         <div class="character-form-row">
+          <div class="character-form-lbl-row">
+            <label class="character-form-lbl">Hidden messages</label>
+            <button type="button" class="btn btn-ghost btn-sm" id="hidden-msg-add-btn">${svgPlus} Add message</button>
+          </div>
+          <div class="character-form-hint">Injected after the system prompt, before the conversation. Use these to prime the model with examples.</div>
+          <div id="hidden-msgs-list"></div>
+        </div>
+        <div class="character-form-row">
           <label class="character-form-lbl" for="char-first-message">First message</label>
           <textarea id="char-first-message" class="input" rows="4" placeholder="Optional opening message…">${escapeHtml(firstMessage)}</textarea>
         </div>
@@ -153,6 +167,10 @@ function renderForm(character, modelsData) {
     </div>
   `;
 
+  hiddenMessages = (character?.hidden_messages ?? []).map(m => ({ role: m.role, content: m.content }));
+  renderHiddenMessages();
+  document.getElementById('hidden-msg-add-btn').addEventListener('click', addHiddenMessage);
+
   document.getElementById('char-name').focus();
   document.getElementById('char-save-btn').addEventListener('click', () => {
     if (isNew) createChar();
@@ -160,13 +178,114 @@ function renderForm(character, modelsData) {
   });
 }
 
+function renderHiddenMessages() {
+  const container = document.getElementById('hidden-msgs-list');
+  if (!container) return;
+
+  if (hiddenMessages.length === 0) {
+    container.innerHTML = `<div class="hidden-msgs-empty">No hidden messages yet.</div>`;
+    return;
+  }
+
+  container.innerHTML = hiddenMessages.map((msg, i) => `
+    <div class="hidden-msg-row" data-index="${i}" draggable="true">
+      <div class="hidden-msg-drag-handle" aria-hidden="true">⠿</div>
+      <select class="input hidden-msg-role" data-index="${i}">
+        <option value="user"      ${msg.role === 'user'      ? 'selected' : ''}>user</option>
+        <option value="assistant" ${msg.role === 'assistant' ? 'selected' : ''}>assistant</option>
+      </select>
+      <textarea class="input hidden-msg-content" data-index="${i}" rows="2">${escapeHtml(msg.content)}</textarea>
+      <button type="button" class="btn btn-ghost btn-sm hidden-msg-delete" data-index="${i}" aria-label="Remove">${svgTrash}</button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.hidden-msg-role').forEach(sel => {
+    sel.addEventListener('change', e => {
+      hiddenMessages[Number(e.target.dataset.index)].role = e.target.value;
+    });
+  });
+  container.querySelectorAll('.hidden-msg-content').forEach(ta => {
+    ta.addEventListener('input', e => {
+      hiddenMessages[Number(e.target.dataset.index)].content = e.target.value;
+    });
+  });
+  container.querySelectorAll('.hidden-msg-delete').forEach(btn => {
+    btn.addEventListener('click', e => {
+      hiddenMessages.splice(Number(e.currentTarget.dataset.index), 1);
+      renderHiddenMessages();
+    });
+  });
+
+  container.querySelectorAll('.hidden-msg-row').forEach(row => {
+    row.addEventListener('dragstart',  handleDragStart);
+    row.addEventListener('dragover',   handleDragOver);
+    row.addEventListener('dragleave',  handleDragLeave);
+    row.addEventListener('drop',       handleDrop);
+    row.addEventListener('dragend',    handleDragEnd);
+  });
+}
+
+function addHiddenMessage() {
+  hiddenMessages.push({ role: 'user', content: '' });
+  renderHiddenMessages();
+  const rows = document.querySelectorAll('.hidden-msg-content');
+  rows[rows.length - 1]?.focus();
+}
+
+function handleDragStart(e) {
+  dragSrcIndex = Number(e.currentTarget.dataset.index);
+  e.dataTransfer.effectAllowed = 'move';
+  requestAnimationFrame(() => e.currentTarget.classList.add('hidden-msg-row--dragging'));
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const row  = e.currentTarget;
+  const rect = row.getBoundingClientRect();
+  const mid  = rect.top + rect.height / 2;
+  row.classList.toggle('hidden-msg-row--drop-above', e.clientY < mid);
+  row.classList.toggle('hidden-msg-row--drop-below', e.clientY >= mid);
+}
+
+function handleDragLeave(e) {
+  if (e.currentTarget.contains(e.relatedTarget)) return;
+  e.currentTarget.classList.remove('hidden-msg-row--drop-above', 'hidden-msg-row--drop-below');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  const targetIndex = Number(e.currentTarget.dataset.index);
+  if (dragSrcIndex === null || dragSrcIndex === targetIndex) {
+    dragSrcIndex = null;
+    renderHiddenMessages();
+    return;
+  }
+  const rect    = e.currentTarget.getBoundingClientRect();
+  const after   = e.clientY >= rect.top + rect.height / 2;
+  const insertAt = after ? targetIndex + 1 : targetIndex;
+  const [moved] = hiddenMessages.splice(dragSrcIndex, 1);
+  const adjusted = dragSrcIndex < insertAt ? insertAt - 1 : insertAt;
+  hiddenMessages.splice(adjusted, 0, moved);
+  dragSrcIndex = null;
+  renderHiddenMessages();
+}
+
+function handleDragEnd() {
+  dragSrcIndex = null;
+  document.querySelectorAll('.hidden-msg-row').forEach(r => {
+    r.classList.remove('hidden-msg-row--dragging', 'hidden-msg-row--drop-above', 'hidden-msg-row--drop-below');
+  });
+}
+
 function readForm(isOwnerOrAdmin) {
   return {
-    name:          document.getElementById('char-name')?.value.trim()          ?? '',
-    model:         document.getElementById('char-model')?.value                ?? '',
-    system_prompt: document.getElementById('char-system-prompt')?.value.trim() || null,
-    first_message: document.getElementById('char-first-message')?.value.trim() || null,
-    visibility:    isOwnerOrAdmin ? (document.getElementById('char-visibility')?.value ?? undefined) : undefined,
+    name:            document.getElementById('char-name')?.value.trim()          ?? '',
+    model:           document.getElementById('char-model')?.value                ?? '',
+    system_prompt:   document.getElementById('char-system-prompt')?.value.trim() || null,
+    first_message:   document.getElementById('char-first-message')?.value.trim() || null,
+    visibility:      isOwnerOrAdmin ? (document.getElementById('char-visibility')?.value ?? undefined) : undefined,
+    hidden_messages: hiddenMessages.map(m => ({ role: m.role, content: m.content })),
   };
 }
 

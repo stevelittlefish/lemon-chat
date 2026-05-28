@@ -89,6 +89,14 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		if char.SystemPrompt != nil {
 			chatMsgs = append(chatMsgs, chatMsg{Role: "system", Content: *char.SystemPrompt})
 		}
+		hiddenMsgs, err := s.store.ListCharacterHiddenMessages(char.ID)
+		if err != nil {
+			internalError(w, err)
+			return
+		}
+		for _, hm := range hiddenMsgs {
+			chatMsgs = append(chatMsgs, chatMsg{Role: hm.Role, Content: hm.Content})
+		}
 	} else if req.Model != nil {
 		usedModel = req.Model
 		modelName = *req.Model
@@ -104,6 +112,14 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		assistantName = char.Name
 		if char.SystemPrompt != nil {
 			chatMsgs = append(chatMsgs, chatMsg{Role: "system", Content: *char.SystemPrompt})
+		}
+		hiddenMsgs, err := s.store.ListCharacterHiddenMessages(char.ID)
+		if err != nil {
+			internalError(w, err)
+			return
+		}
+		for _, hm := range hiddenMsgs {
+			chatMsgs = append(chatMsgs, chatMsg{Role: hm.Role, Content: hm.Content})
 		}
 	} else {
 		usedModel = conv.Model

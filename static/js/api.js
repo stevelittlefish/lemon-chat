@@ -86,6 +86,7 @@ export const messages = {
 // Characters
 export const characters = {
   list:   ()         => request('GET',    '/api/characters'),
+  get:    (id)       => request('GET',    `/api/characters/${id}`),
   create: (data)     => request('POST',   '/api/characters', data),
   update: (id, data) => request('PATCH',  `/api/characters/${id}`, data),
   delete: (id)       => request('DELETE', `/api/characters/${id}`),
