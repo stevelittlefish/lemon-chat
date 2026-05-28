@@ -128,6 +128,24 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v1 → v2 complete")
 	}
 
+	if version < 3 {
+		log.Println("store: migrating v2 → v3 (add token and timing stats to message)")
+		for _, stmt := range []string{
+			`ALTER TABLE message ADD COLUMN prompt_tokens     INTEGER`,
+			`ALTER TABLE message ADD COLUMN completion_tokens INTEGER`,
+			`ALTER TABLE message ADD COLUMN total_time_ms     INTEGER`,
+		} {
+			if _, err := s.db.Exec(stmt); err != nil {
+				return err
+			}
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (3, ?)`, now()); err != nil {
+			return err
+		}
+		version = 3
+		log.Println("store: migration v2 → v3 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

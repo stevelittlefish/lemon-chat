@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
@@ -141,7 +142,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	chatURL := strings.TrimRight(s.cfg.ModelServer.APIBase, "/") + "/chat/completions"
 
 	// Persist user message.
-	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil); err != nil {
+	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil, nil); err != nil {
 		internalError(w, err)
 		return
 	}
@@ -161,8 +162,12 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		"model":    modelName,
 		"messages": chatMsgs,
 		"stream":   true,
+		"stream_options": map[string]any{
+			"include_usage": true,
+		},
 	})
 
+	startTime := time.Now()
 	resp, err := http.Post(chatURL, "application/json", bytes.NewReader(payload)) //nolint:gosec
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "model unreachable")
@@ -182,14 +187,15 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// OpenAI-compatible streaming: each line is "data: <json>" or "data: [DONE]"
 	var fullContent string
+	var usageStats *store.MessageStats
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
 			continue
 		}
-		payload := line[6:]
-		if payload == "[DONE]" {
+		data := line[6:]
+		if data == "[DONE]" {
 			break
 		}
 		var chunk struct {
@@ -199,9 +205,20 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				} `json:"delta"`
 				FinishReason *string `json:"finish_reason"`
 			} `json:"choices"`
+			Usage *struct {
+				PromptTokens     int64 `json:"prompt_tokens"`
+				CompletionTokens int64 `json:"completion_tokens"`
+			} `json:"usage"`
 		}
-		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			continue
+		}
+		if chunk.Usage != nil {
+			usageStats = &store.MessageStats{
+				PromptTokens:     chunk.Usage.PromptTokens,
+				CompletionTokens: chunk.Usage.CompletionTokens,
+				TotalTimeMS:      time.Since(startTime).Milliseconds(),
+			}
 		}
 		if len(chunk.Choices) == 0 {
 			continue
@@ -219,7 +236,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Persist completed assistant message and update conversation model/character.
 	if fullContent != "" {
-		_, _ = s.store.CreateMessage(convID, "assistant", fullContent, &assistantName)
+		_, _ = s.store.CreateMessage(convID, "assistant", fullContent, &assistantName, usageStats)
 		_ = s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID)
 	}
 }
@@ -288,7 +305,7 @@ func (s *Server) handleFirstMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	msg, err := s.store.CreateMessage(convID, "assistant", *char.FirstMessage, &char.Name)
+	msg, err := s.store.CreateMessage(convID, "assistant", *char.FirstMessage, &char.Name, nil)
 	if err != nil {
 		internalError(w, err)
 		return
