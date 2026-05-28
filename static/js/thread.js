@@ -3,6 +3,20 @@ import { render as renderMarkdown } from './markdown.js';
 const threadEl = document.getElementById('thread');
 const container = document.getElementById('thread-container');
 
+let userScrolledDuringStream = false;
+let programmaticScroll = false;
+
+function isNearBottom() {
+  return container.scrollHeight - container.scrollTop - container.clientHeight < 40;
+}
+
+// Distinguish user-initiated scrolls from programmatic ones.
+// scroll fires after position changes, so isNearBottom() is accurate here.
+container.addEventListener('scroll', () => {
+  if (programmaticScroll) return;
+  if (!isNearBottom()) userScrolledDuringStream = true;
+}, { passive: true });
+
 export function showEmpty() {
   threadEl.innerHTML = `
     <div class="thread-empty">
@@ -35,6 +49,8 @@ export function appendMessage(role, content, assistantName) {
 // Adds a typing indicator and returns a controller to stream text into it.
 export function startStreaming() {
   removeEmpty();
+  userScrolledDuringStream = false;
+
   const wrapper = document.createElement('div');
   wrapper.className = 'message assistant';
 
@@ -60,9 +76,10 @@ export function startStreaming() {
     append(delta) {
       accumulated += delta;
       contentEl.innerHTML = renderMarkdown(accumulated) || typingIndicatorHTML();
-      scrollToBottom();
+      if (!userScrolledDuringStream) scrollToBottom();
     },
     finish() {
+      userScrolledDuringStream = false;
       if (!accumulated) {
         wrapper.remove();
       } else {
@@ -70,6 +87,7 @@ export function startStreaming() {
       }
     },
     error(msg) {
+      userScrolledDuringStream = false;
       contentEl.textContent = msg;
       contentEl.style.color = 'var(--danger)';
     },
@@ -100,7 +118,10 @@ function removeEmpty() {
 }
 
 function scrollToBottom() {
+  programmaticScroll = true;
   container.scrollTop = container.scrollHeight;
+  // Reset after the scroll event fires (next animation frame is sufficient).
+  requestAnimationFrame(() => { programmaticScroll = false; });
 }
 
 function typingIndicatorHTML() {
