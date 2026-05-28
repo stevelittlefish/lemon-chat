@@ -26,7 +26,7 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	msgs, err := s.store.ListMessages(id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	if msgs == nil {
@@ -71,7 +71,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	if conv.CharacterID != nil {
 		char, err := s.store.GetCharacter(*conv.CharacterID)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "internal error")
+			internalError(w, err)
 			return
 		}
 		modelName = char.Model
@@ -99,14 +99,14 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Persist user message.
 	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 
 	// Build message history for model.
 	history, err := s.store.ListMessages(convID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 

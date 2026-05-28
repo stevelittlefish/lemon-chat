@@ -422,6 +422,10 @@ html, body {
   gap: var(--space-3);
 }
 
+.character-row--form .user-row-actions {
+  margin-top: var(--space-3);
+}
+
 .character-form-row {
   display: flex;
   flex-direction: column;

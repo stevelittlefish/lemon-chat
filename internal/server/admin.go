@@ -18,7 +18,7 @@ func isDuplicateUsername(err error) bool {
 func (s *Server) handleAdminListUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := s.store.ListUsers()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	out := make([]map[string]any, len(users))
@@ -46,7 +46,7 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	if req.Password != nil && *req.Password != "" {
 		h, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "internal error")
+			internalError(w, err)
 			return
 		}
 		s := string(h)
@@ -58,7 +58,7 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, userResponse(user))
@@ -76,7 +76,7 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 
@@ -105,7 +105,7 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		} else {
 			h, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
 			if err != nil {
-				writeError(w, http.StatusInternalServerError, "internal error")
+				internalError(w, err)
 				return
 			}
 			s := string(h)
@@ -117,7 +117,7 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "username already taken")
 		return
 	} else if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -137,7 +137,7 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	} else if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

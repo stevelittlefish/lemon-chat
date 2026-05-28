@@ -25,7 +25,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "internal error")
+			internalError(w, err)
 			return
 		}
 		user, err := s.store.UserByID(userID)

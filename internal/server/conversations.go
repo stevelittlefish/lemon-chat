@@ -13,7 +13,7 @@ func (s *Server) handleListConversations(w http.ResponseWriter, r *http.Request)
 	user := currentUser(r)
 	convs, err := s.store.ListConversations(user.ID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	if convs == nil {
@@ -39,7 +39,7 @@ func (s *Server) handleCreateConversation(w http.ResponseWriter, r *http.Request
 	}
 	conv, err := s.store.CreateConversation(user.ID, req.Title, req.Model, req.CharacterID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, conv)
@@ -56,7 +56,7 @@ func (s *Server) handleDeleteConversation(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	} else if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

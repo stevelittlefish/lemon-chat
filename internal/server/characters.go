@@ -13,7 +13,7 @@ func (s *Server) handleListCharacters(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	chars, err := s.store.ListCharacters(user.ID, user.IsAdmin)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	if chars == nil {
@@ -44,7 +44,7 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 	}
 	char, err := s.store.CreateCharacter(req.Name, req.Model, req.SystemPrompt, req.FirstMessage, user.ID, req.Visibility)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, char)
@@ -63,7 +63,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 
@@ -103,7 +103,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		req.Visibility = existing.Visibility
 	}
 	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.Visibility); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -122,7 +122,7 @@ func (s *Server) handleDeleteCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	// Only owner or admin may delete.
@@ -131,7 +131,7 @@ func (s *Server) handleDeleteCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.DeleteCharacter(id); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

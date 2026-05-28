@@ -27,7 +27,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 
@@ -42,7 +42,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	sessionID, err := s.store.CreateSession(user.ID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 
@@ -102,12 +102,12 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 	hashStr := string(hash)
 	if err := s.store.UpdateUser(user.ID, user.Username, &hashStr, user.IsAdmin); err != nil {
-		writeError(w, http.StatusInternalServerError, "internal error")
+		internalError(w, err)
 		return
 	}
 

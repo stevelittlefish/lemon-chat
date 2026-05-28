@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -85,12 +86,12 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 
 	hijacker, ok := w.(http.Hijacker)
 	if !ok {
-		http.Error(w, "websocket not supported", http.StatusInternalServerError)
+		internalError(w, fmt.Errorf("websocket hijacker not supported"))
 		return
 	}
 	conn, buf, err := hijacker.Hijack()
 	if err != nil {
-		http.Error(w, "hijack failed", http.StatusInternalServerError)
+		internalError(w, fmt.Errorf("hijack: %w", err))
 		return
 	}
 
