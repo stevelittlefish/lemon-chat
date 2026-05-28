@@ -366,31 +366,54 @@ html, body {
 
 /* ── Characters ─────────────────────────────────────────── */
 
-.character-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 10px 0;
+.chars-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.chars-table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--fg-muted);
+  padding: 0 12px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.chars-table thead th:first-child { padding-left: 0; }
+.chars-table thead th:last-child  { padding-right: 0; }
+
+.chars-table tbody tr {
   border-bottom: 1px solid var(--border-soft);
 }
 
-.character-row:last-child {
+.chars-table tbody tr:last-child {
   border-bottom: none;
 }
 
-.character-name {
-  flex: 1;
+.chars-table td {
+  padding: 10px 12px;
+  vertical-align: middle;
+}
+
+.chars-table td:first-child { padding-left: 0; }
+.chars-table td:last-child  { padding-right: 0; }
+
+.char-col-name {
   font-weight: 600;
   font-size: 14px;
   color: var(--fg-strong);
 }
 
-.character-row--form {
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--space-3);
+.char-col-model  { width: 1px; white-space: nowrap; }
+.char-col-visibility { width: 1px; white-space: nowrap; }
+.char-col-actions { width: 1px; white-space: nowrap; }
+
+.character-row--form td {
   padding: 14px 0 10px;
-  border-bottom: 1px solid var(--border-soft);
 }
 
 .character-form-fields {
@@ -418,10 +441,6 @@ html, body {
   align-items: center;
 }
 
-.character-chip-slot {
-  width: 108px;
-  flex-shrink: 0;
-}
 
 .character-chip--private {
   background: var(--brick-100);

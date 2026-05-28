@@ -259,12 +259,18 @@ async function showCharactersPanel() {
           Add character
         </button>
       </div>
-      <div id="my-chars-list"><div class="users-status">Loading…</div></div>
+      <table class="chars-table">
+        <thead><tr><th>Name</th><th>Model</th><th>Visibility</th><th></th></tr></thead>
+        <tbody id="my-chars-list"><tr><td colspan="4" class="users-status">Loading…</td></tr></tbody>
+      </table>
     </div>
     <div class="section" id="other-chars-section">
       <h2>Other characters</h2>
       <p class="lead">Characters created by other users.</p>
-      <div id="other-chars-list"><div class="users-status">Loading…</div></div>
+      <table class="chars-table">
+        <thead><tr><th>Name</th><th>Model</th><th>Visibility</th><th></th></tr></thead>
+        <tbody id="other-chars-list"><tr><td colspan="4" class="users-status">Loading…</td></tr></tbody>
+      </table>
     </div>
   `;
 
@@ -349,41 +355,42 @@ function charFormHtml(idPrefix, c) {
   const isOwnerOrAdmin = !c || c.created_by === user.id || user.is_admin;
 
   return `
-    <div class="character-row character-row--form" id="${idPrefix}-form">
-      <div class="character-form-fields">
-        <div class="character-form-row">
-          <label class="character-form-lbl" for="${idPrefix}-name">Name</label>
-          <input id="${idPrefix}-name" class="input" value="${name}" placeholder="Character name" autocomplete="off">
+    <tr class="character-row--form" id="${idPrefix}-form">
+      <td colspan="4">
+        <div class="character-form-fields">
+          <div class="character-form-row">
+            <label class="character-form-lbl" for="${idPrefix}-name">Name</label>
+            <input id="${idPrefix}-name" class="input" value="${name}" placeholder="Character name" autocomplete="off">
+          </div>
+          <div class="character-form-row">
+            <label class="character-form-lbl" for="${idPrefix}-model">Model</label>
+            <select id="${idPrefix}-model" class="input">${modelOptions(model)}</select>
+          </div>
+          <div class="character-form-row">
+            <label class="character-form-lbl" for="${idPrefix}-system-prompt">System prompt</label>
+            <textarea id="${idPrefix}-system-prompt" class="input" rows="4" placeholder="Optional system prompt…">${escapeHtml(systemPrompt)}</textarea>
+          </div>
+          <div class="character-form-row">
+            <label class="character-form-lbl" for="${idPrefix}-first-message">First message</label>
+            <textarea id="${idPrefix}-first-message" class="input" rows="3" placeholder="Optional opening message…">${escapeHtml(firstMessage)}</textarea>
+          </div>
+          ${isOwnerOrAdmin ? `
+          <div class="character-form-row">
+            <label class="character-form-lbl" for="${idPrefix}-visibility">Visibility</label>
+            <select id="${idPrefix}-visibility" class="input">
+              <option value="private"   ${visibility === 'private'   ? 'selected' : ''}>Private — only you</option>
+              <option value="readonly"  ${visibility === 'readonly'  ? 'selected' : ''}>Read-only — others can see, not edit</option>
+              <option value="readwrite" ${visibility === 'readwrite' ? 'selected' : ''}>Read-write — others can see and edit</option>
+            </select>
+          </div>` : ''}
         </div>
-        <div class="character-form-row">
-          <label class="character-form-lbl" for="${idPrefix}-model">Model</label>
-          <select id="${idPrefix}-model" class="input">${modelOptions(model)}</select>
+        <div class="field-msg field-msg--error" id="${idPrefix}-err" hidden></div>
+        <div class="user-row-actions">
+          <button class="btn btn-ghost btn-sm" data-action="${c ? 'cancel-edit' : 'cancel-add'}" ${c ? `data-id="${c.id}"` : ''}>Cancel</button>
+          <button class="btn btn-primary btn-sm" data-action="${c ? 'save-edit' : 'save-add'}" ${c ? `data-id="${c.id}"` : ''}>${c ? 'Save' : 'Add character'}</button>
         </div>
-        <div class="character-form-row">
-          <label class="character-form-lbl" for="${idPrefix}-system-prompt">System prompt</label>
-          <textarea id="${idPrefix}-system-prompt" class="input" rows="4" placeholder="Optional system prompt…">${escapeHtml(systemPrompt)}</textarea>
-        </div>
-        <div class="character-form-row">
-          <label class="character-form-lbl" for="${idPrefix}-first-message">First message</label>
-          <textarea id="${idPrefix}-first-message" class="input" rows="3" placeholder="Optional opening message…">${escapeHtml(firstMessage)}</textarea>
-        </div>
-        ${isOwnerOrAdmin ? `
-        <div class="character-form-row">
-          <label class="character-form-lbl" for="${idPrefix}-visibility">Visibility</label>
-          <select id="${idPrefix}-visibility" class="input">
-            <option value="private"   ${visibility === 'private'   ? 'selected' : ''}>Private — only you</option>
-            <option value="readonly"  ${visibility === 'readonly'  ? 'selected' : ''}>Read-only — others can see, not edit</option>
-            <option value="readwrite" ${visibility === 'readwrite' ? 'selected' : ''}>Read-write — others can see and edit</option>
-          </select>
-        </div>` : ''}
-      </div>
-      <div class="field-msg field-msg--error" id="${idPrefix}-err" hidden></div>
-      <div class="user-row-actions">
-        <button class="btn btn-ghost btn-sm" data-action="${c ? 'cancel-edit' : 'cancel-add'}" ${c ? `data-id="${c.id}"` : ''}>Cancel</button>
-        <button class="btn btn-primary btn-sm" data-action="${c ? 'save-edit' : 'save-add'}" ${c ? `data-id="${c.id}"` : ''}>${c ? 'Save' : 'Add character'}</button>
-      </div>
-    </div>
-    <div class="user-form-err field-msg field-msg--error" id="${idPrefix}-form-err" hidden></div>`;
+      </td>
+    </tr>`;
 }
 
 function renderCharRows(list, isMine) {
@@ -394,7 +401,7 @@ function renderCharRows(list, isMine) {
   }
 
   if (!list.length && !(isMine && showingCharAddForm)) {
-    html += `<div class="users-status">${isMine ? 'You have no characters yet.' : 'No characters from other users.'}</div>`;
+    html += `<tr><td colspan="4" class="users-status">${isMine ? 'You have no characters yet.' : 'No characters from other users.'}</td></tr>`;
   }
 
   for (const c of list) {
@@ -403,13 +410,14 @@ function renderCharRows(list, isMine) {
     } else {
       const editBtn   = canEditChar(c)   ? `<button class="btn btn-ghost btn-sm" data-action="edit" data-id="${c.id}">${svgPencil} Edit</button>` : '';
       const deleteBtn = canDeleteChar(c) ? `<button class="btn btn-ghost btn-sm" data-action="delete" data-id="${c.id}">${svgTrash} Delete</button>` : '';
+      const visLabel  = { private: 'private', readonly: 'read-only', readwrite: 'read-write' }[c.visibility] ?? c.visibility;
       html += `
-        <div class="character-row" data-id="${c.id}">
-          <div class="character-name">${escapeHtml(c.name)}</div>
-          <span class="chip">${escapeHtml(c.model)}</span>
-          <span class="character-chip-slot"><span class="chip character-chip--${c.visibility}">${{ private: 'private', readonly: 'read-only', readwrite: 'read-write' }[c.visibility] ?? c.visibility}</span></span>
-          <div class="user-row-actions">${editBtn}${deleteBtn}</div>
-        </div>`;
+        <tr data-id="${c.id}">
+          <td class="char-col-name">${escapeHtml(c.name)}</td>
+          <td class="char-col-model"><span class="chip">${escapeHtml(c.model)}</span></td>
+          <td class="char-col-visibility"><span class="chip character-chip--${c.visibility}">${visLabel}</span></td>
+          <td class="char-col-actions"><div class="user-row-actions">${editBtn}${deleteBtn}</div></td>
+        </tr>`;
     }
   }
 
