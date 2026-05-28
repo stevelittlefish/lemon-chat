@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"log"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -33,69 +34,100 @@ func now() string {
 }
 
 func (s *Store) migrate() error {
-	_, err := s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS user (
-			id            INTEGER PRIMARY KEY,
-			username      TEXT    NOT NULL UNIQUE,
-			password_hash TEXT,
-			is_admin      INTEGER NOT NULL DEFAULT 0,
-			created_at    TEXT    NOT NULL
-		);
+	version := 0
 
-		CREATE TABLE IF NOT EXISTS conversation (
-			id           INTEGER PRIMARY KEY,
-			user_id      INTEGER NOT NULL REFERENCES user(id),
-			model        TEXT,
-			character_id INTEGER REFERENCES character(id),
-			title        TEXT,
-			created_at   TEXT    NOT NULL,
-			updated_at   TEXT    NOT NULL,
-			CHECK ((model IS NOT NULL) != (character_id IS NOT NULL))
-		);
+	var tableName string
+	err := s.db.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'`).Scan(&tableName)
+	if err == nil {
+		if err := s.db.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_version`).Scan(&version); err != nil {
+			return err
+		}
+	}
+	log.Printf("store: schema version is %d", version)
 
-		CREATE TABLE IF NOT EXISTS message (
-			id              INTEGER PRIMARY KEY,
-			conversation_id INTEGER NOT NULL REFERENCES conversation(id),
-			role            TEXT    NOT NULL,
-			content         TEXT    NOT NULL,
-			name            TEXT,
-			created_at      TEXT    NOT NULL
-		);
+	if version < 1 {
+		log.Println("store: migrating v0 → v1 (create schema)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE IF NOT EXISTS user (
+				id            INTEGER PRIMARY KEY,
+				username      TEXT    NOT NULL UNIQUE,
+				password_hash TEXT,
+				is_admin      INTEGER NOT NULL DEFAULT 0,
+				created_at    TEXT    NOT NULL
+			);
 
-		CREATE TABLE IF NOT EXISTS session (
-			id         TEXT    PRIMARY KEY,
-			user_id    INTEGER NOT NULL REFERENCES user(id),
-			created_at TEXT    NOT NULL,
-			expires_at TEXT    NOT NULL
-		);
+			CREATE TABLE IF NOT EXISTS conversation (
+				id           INTEGER PRIMARY KEY,
+				user_id      INTEGER NOT NULL REFERENCES user(id),
+				model        TEXT,
+				character_id INTEGER REFERENCES character(id),
+				title        TEXT,
+				created_at   TEXT    NOT NULL,
+				updated_at   TEXT    NOT NULL,
+				CHECK ((model IS NOT NULL) != (character_id IS NOT NULL))
+			);
 
-		CREATE TABLE IF NOT EXISTS character (
-			id            INTEGER PRIMARY KEY,
-			name          TEXT    NOT NULL,
-			model         TEXT    NOT NULL,
-			system_prompt TEXT,
-			first_message TEXT,
-			created_by    INTEGER NOT NULL REFERENCES user(id),
-			visibility    TEXT    NOT NULL DEFAULT 'private',
-			created_at    TEXT    NOT NULL,
-			updated_at    TEXT    NOT NULL
-		);
+			CREATE TABLE IF NOT EXISTS message (
+				id              INTEGER PRIMARY KEY,
+				conversation_id INTEGER NOT NULL REFERENCES conversation(id),
+				role            TEXT    NOT NULL,
+				content         TEXT    NOT NULL,
+				name            TEXT,
+				created_at      TEXT    NOT NULL
+			);
 
-		CREATE TABLE IF NOT EXISTS character_hidden_message (
-			id           INTEGER PRIMARY KEY,
-			character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE,
-			role         TEXT    NOT NULL CHECK (role IN ('user', 'assistant')),
-			content      TEXT    NOT NULL,
-			sort_order   INTEGER NOT NULL DEFAULT 0,
-			created_at   TEXT    NOT NULL
-		);
+			CREATE TABLE IF NOT EXISTS session (
+				id         TEXT    PRIMARY KEY,
+				user_id    INTEGER NOT NULL REFERENCES user(id),
+				created_at TEXT    NOT NULL,
+				expires_at TEXT    NOT NULL
+			);
 
-		CREATE TABLE IF NOT EXISTS schema_version (
-			version INTEGER NOT NULL
-		);
+			CREATE TABLE IF NOT EXISTS character (
+				id            INTEGER PRIMARY KEY,
+				name          TEXT    NOT NULL,
+				model         TEXT    NOT NULL,
+				system_prompt TEXT,
+				first_message TEXT,
+				created_by    INTEGER NOT NULL REFERENCES user(id),
+				visibility    TEXT    NOT NULL DEFAULT 'private',
+				created_at    TEXT    NOT NULL,
+				updated_at    TEXT    NOT NULL
+			);
 
-		INSERT INTO schema_version (version)
-		SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM schema_version);
-	`)
-	return err
+			CREATE TABLE IF NOT EXISTS character_hidden_message (
+				id           INTEGER PRIMARY KEY,
+				character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE,
+				role         TEXT    NOT NULL CHECK (role IN ('user', 'assistant')),
+				content      TEXT    NOT NULL,
+				sort_order   INTEGER NOT NULL DEFAULT 0,
+				created_at   TEXT    NOT NULL
+			);
+
+			CREATE TABLE IF NOT EXISTS schema_version (
+				version INTEGER NOT NULL
+			);
+
+			INSERT INTO schema_version (version) VALUES (1);
+		`); err != nil {
+			return err
+		}
+		version = 1
+		log.Println("store: migration v0 → v1 complete")
+	}
+
+	if version < 2 {
+		log.Println("store: migrating v1 → v2 (add timestamp to schema_version)")
+		if _, err := s.db.Exec(`ALTER TABLE schema_version ADD COLUMN timestamp TEXT`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (2, ?)`, now()); err != nil {
+			return err
+		}
+		version = 2
+		log.Println("store: migration v1 → v2 complete")
+	}
+
+	log.Printf("store: schema ready at version %d", version)
+	return nil
 }

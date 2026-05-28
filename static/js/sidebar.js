@@ -89,10 +89,12 @@ function render() {
   sidebarEl.querySelectorAll('.sidebar-item').forEach(el => {
     const id = Number(el.dataset.id);
     el.addEventListener('click', (e) => {
+      e.preventDefault();
       if (e.target.closest('.sidebar-item-delete')) return;
       state.onSelect?.(id);
     });
-    el.querySelector('.sidebar-item-delete').addEventListener('click', async () => {
+    el.querySelector('.sidebar-item-delete').addEventListener('click', async (e) => {
+      e.stopPropagation();
       if (!confirm('Delete this conversation?')) return;
       await api.delete(id);
       removeConversation(id);
@@ -107,10 +109,10 @@ function convItem(conv) {
     ? `<span class="sidebar-item-title">${escapeHtml(conv.title)}</span>`
     : `<span class="sidebar-item-title sidebar-item-title--empty">(new conversation)</span>`;
   return `
-    <div class="sidebar-item${active}" data-id="${conv.id}">
+    <a class="sidebar-item${active}" data-id="${conv.id}" href="/?c=${conv.id}">
       ${titleHtml}
       <button class="sidebar-item-delete" title="Delete">${icon('trash', 14)}</button>
-    </div>
+    </a>
   `;
 }
 

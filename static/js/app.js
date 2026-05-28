@@ -37,7 +37,17 @@ function showApp() {
     if (id === activeConversationId) header.updateTitle(title);
   });
   ws.connect();
+  window.addEventListener('popstate', (e) => {
+    const id = e.state?.conversationId ?? null;
+    loadConversation(id, { pushHistory: false });
+  });
   initApp();
+}
+
+function getConversationIdFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const c = params.get('c');
+  return c ? Number(c) : null;
 }
 
 async function initApp() {
@@ -64,10 +74,20 @@ async function initApp() {
     onSend: sendMessage,
   });
 
-  thread.showEmpty();
+  const initialId = getConversationIdFromUrl();
+  history.replaceState({ conversationId: initialId ?? null }, '', location.href);
+  if (initialId) {
+    await loadConversation(initialId, { pushHistory: false });
+  } else {
+    thread.showEmpty();
+  }
 }
 
-async function loadConversation(id) {
+async function loadConversation(id, { pushHistory = true } = {}) {
+  if (pushHistory) {
+    const url = id ? `/?c=${id}` : '/';
+    history.pushState({ conversationId: id ?? null }, '', url);
+  }
   if (!id) {
     activeConversationId = null;
     activeHasMessages = false;
@@ -78,12 +98,19 @@ async function loadConversation(id) {
   }
   activeConversationId = id;
   sidebar.setActive(id);
-  const msgs = await msgApi.list(id);
-  activeHasMessages = msgs.length > 0;
-  const conv = sidebar.getConversation(id);
-  header.setConversation(id, conv?.title ?? null);
-  if (conv) header.setSelection(conv);
-  thread.renderMessages(msgs);
+  try {
+    const msgs = await msgApi.list(id);
+    activeHasMessages = msgs.length > 0;
+    const conv = sidebar.getConversation(id);
+    header.setConversation(id, conv?.title ?? null);
+    if (conv) header.setSelection(conv);
+    thread.renderMessages(msgs);
+  } catch {
+    activeConversationId = null;
+    sidebar.setActive(null);
+    thread.showEmpty();
+    history.replaceState({ conversationId: null }, '', '/');
+  }
 }
 
 async function newConversation() {
@@ -94,6 +121,7 @@ async function newConversation() {
   sidebar.addConversation(conv);
   activeConversationId = conv.id;
   activeHasMessages = false;
+  history.pushState({ conversationId: conv.id }, '', `/?c=${conv.id}`);
   header.setConversation(conv.id, conv.title ?? null);
   thread.showEmpty();
   if (charId !== null) {
@@ -110,6 +138,7 @@ async function sendMessage(content) {
     sidebar.addConversation(conv);
     activeConversationId = conv.id;
     activeHasMessages = false;
+    history.pushState({ conversationId: conv.id }, '', `/?c=${conv.id}`);
     header.setConversation(conv.id, conv.title ?? null);
     if (charId !== null) {
       await applyFirstMessage(conv.id, null);
