@@ -1,6 +1,6 @@
 // Thread.jsx — message list + empty-state with suggested prompts.
 
-function Thread({ messages, onSuggest, modelName }) {
+function Thread({ messages, onSuggest, modelName, lastAssistantId, onDeleteMsg, onEditMsg, onRegenerate }) {
   const scrollRef = React.useRef();
 
   React.useEffect(() => {
@@ -38,7 +38,16 @@ function Thread({ messages, onSuggest, modelName }) {
   return (
     <div className="thread-scroll" ref={scrollRef}>
       <div className="thread">
-        {messages.map(m => <Message key={m.id} msg={m} />)}
+        {messages.map(m => (
+          <Message
+            key={m.id}
+            msg={m}
+            isLastAssistant={m.id === lastAssistantId}
+            onDelete={() => onDeleteMsg(m.id)}
+            onEdit={(t) => onEditMsg(m.id, t)}
+            onRegenerate={() => onRegenerate(m.id)}
+          />
+        ))}
       </div>
     </div>
   );
