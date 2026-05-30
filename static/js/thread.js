@@ -108,12 +108,10 @@ function buildMessage(msg) {
   const wrapper = document.createElement('div');
   wrapper.className = `message ${msg.role}`;
 
-  if (msg.role !== 'user') {
-    const roleEl = document.createElement('div');
-    roleEl.className = 'message-role';
-    roleEl.textContent = msg.name || msg.role;
-    wrapper.appendChild(roleEl);
-  }
+  const roleEl = document.createElement('div');
+  roleEl.className = 'message-role';
+  roleEl.textContent = msg.role === 'user' ? (msg.name || 'you') : (msg.name || msg.role);
+  wrapper.appendChild(roleEl);
 
   const contentEl = document.createElement('div');
   contentEl.className = 'message-content';

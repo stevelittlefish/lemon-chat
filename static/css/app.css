@@ -303,7 +303,6 @@ html, body {
 }
 
 .message.user { align-items: flex-end; }
-.message.user .message-role { display: none; }
 
 .typing-indicator {
   display: flex;

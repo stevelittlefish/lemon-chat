@@ -147,7 +147,7 @@ async function sendMessage(content) {
 
   const convId = activeConversationId;
   activeHasMessages = true;
-  thread.appendMessage('user', content);
+  thread.appendMessage('user', content, currentUser.display_name || 'you');
   const stream = thread.startStreaming();
   composer.setStreaming(true);
 

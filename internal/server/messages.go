@@ -146,7 +146,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	chatURL := strings.TrimRight(s.cfg.ModelServer.APIBase, "/") + "/chat/completions"
 
 	// Persist user message.
-	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil, nil); err != nil {
+	if _, err := s.store.CreateMessage(convID, "user", req.Content, user.DisplayName, nil); err != nil {
 		internalError(w, err)
 		return
 	}
