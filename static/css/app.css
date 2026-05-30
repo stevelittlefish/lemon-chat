@@ -28,11 +28,31 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  margin-top: -10vh;
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
 }
 
 .login-logo {
-  height: 32px;
-  align-self: center;
+  height: 80px;
+  width: auto;
+}
+
+.login-brand-name {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--fg);
+  letter-spacing: -0.03em;
+  margin: 0;
+  text-align: center;
 }
 
 .login-form {
