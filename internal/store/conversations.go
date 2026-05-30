@@ -89,6 +89,25 @@ func (s *Store) UpdateConversationTitle(id int64, title string) error {
 	return err
 }
 
+func (s *Store) DeleteStaleConversations() (conversations, messages int64, err error) {
+	threshold := time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339)
+	staleSubquery := `
+		SELECT id FROM conversation
+		WHERE created_at < ?
+		AND (SELECT COUNT(*) FROM message WHERE conversation_id = conversation.id) < 2`
+	res, err := s.db.Exec(`DELETE FROM message WHERE conversation_id IN (`+staleSubquery+`)`, threshold)
+	if err != nil {
+		return 0, 0, err
+	}
+	messages, _ = res.RowsAffected()
+	res, err = s.db.Exec(`DELETE FROM conversation WHERE id IN (`+staleSubquery+`)`, threshold)
+	if err != nil {
+		return 0, 0, err
+	}
+	conversations, _ = res.RowsAffected()
+	return conversations, messages, nil
+}
+
 func (s *Store) ListUntitledEligible() ([]int64, error) {
 	fiveMinAgo := time.Now().UTC().Add(-5 * time.Minute).Format(time.RFC3339)
 	rows, err := s.db.Query(`

@@ -34,6 +34,7 @@ func main() {
 
 	hub := server.NewHub()
 	tasks.StartTitleWorker(st, cfg, hub.BroadcastTitleUpdate)
+	tasks.StartCleanupWorker(st)
 
 	srv := server.New(cfg, st, hub)
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
