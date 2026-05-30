@@ -90,16 +90,13 @@ func (s *Store) UpdateConversationTitle(id int64, title string) error {
 }
 
 func (s *Store) ListUntitledEligible() ([]int64, error) {
-	oneMinAgo := time.Now().UTC().Add(-1 * time.Minute).Format(time.RFC3339)
 	fiveMinAgo := time.Now().UTC().Add(-5 * time.Minute).Format(time.RFC3339)
 	rows, err := s.db.Query(`
 		SELECT id FROM conversation
-		WHERE title IS NULL AND (
-			(created_at < ? AND (SELECT COUNT(*) FROM message WHERE conversation_id = conversation.id) >= 6)
-			OR
-			(created_at < ? AND (SELECT COUNT(*) FROM message WHERE conversation_id = conversation.id) >= 2)
-		)
-	`, oneMinAgo, fiveMinAgo)
+		WHERE title IS NULL
+		AND created_at < ?
+		AND (SELECT COUNT(*) FROM message WHERE conversation_id = conversation.id) >= 2
+	`, fiveMinAgo)
 	if err != nil {
 		return nil, err
 	}

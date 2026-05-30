@@ -268,6 +268,19 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				tasks.GenerateTitleForConversation(s.store, s.cfg, convID, s.hub.BroadcastTitleUpdate)
 			}
 		}
+
+		// Trigger title generation on the third assistant response for any untitled conversation.
+		if conv.Title == nil {
+			assistantMsgCount := 0
+			for _, m := range history {
+				if m.Role == "assistant" {
+					assistantMsgCount++
+				}
+			}
+			if assistantMsgCount >= 2 {
+				tasks.GenerateTitleForConversation(s.store, s.cfg, convID, s.hub.BroadcastTitleUpdate)
+			}
+		}
 	}
 }
 
