@@ -8,6 +8,7 @@ import (
 	_ "image/gif"
 	_ "image/png"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -137,9 +138,12 @@ func (s *Server) writeAvatar(prefix string, data []byte, ext string) (string, er
 		}
 	}
 
-	if err := os.WriteFile(filepath.Join(dir, filename), data, 0644); err != nil {
+	dest := filepath.Join(dir, filename)
+	log.Printf("avatars: saving %s (%d bytes)", dest, len(data))
+	if err := os.WriteFile(dest, data, 0644); err != nil {
 		return "", err
 	}
+	log.Printf("avatars: saved %s", dest)
 	return filename, nil
 }
 
