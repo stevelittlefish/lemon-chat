@@ -88,7 +88,8 @@ function renderPage() {
     </div>
   `;
   const avatarUrl = `/api/users/${user.id}/avatar`;
-  document.getElementById('avatar-section').innerHTML = renderAvatarSection(user.has_avatar, avatarUrl);
+  const displayUrl = user.has_avatar ? `${avatarUrl}?t=${Date.now()}` : avatarUrl;
+  document.getElementById('avatar-section').innerHTML = renderAvatarSection(user.has_avatar, displayUrl);
   attachAvatarSection(document.getElementById('avatar-section'), {
     avatarUrl,
     onUpload: async (file) => {
