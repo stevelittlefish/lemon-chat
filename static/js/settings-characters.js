@@ -157,7 +157,7 @@ function renderCharRows(list, emptyMsg) {
     const deleteBtn = canDeleteChar(c) ? `<button class="btn btn-ghost btn-sm" data-action="delete" data-id="${c.id}">${svgTrash} Delete</button>` : '';
     const visLabel  = { private: 'private', readonly: 'read-only', readwrite: 'read-write' }[c.visibility] ?? c.visibility;
     const avatarHtml = c.has_avatar
-      ? `<div class="avatar-sm"><img src="/api/characters/${c.id}/avatar" alt=""></div>`
+      ? `<img class="avatar-sm" src="/api/characters/${c.id}/avatar" alt="">`
       : '';
     return `
       <tr data-id="${c.id}">
