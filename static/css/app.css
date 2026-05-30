@@ -263,8 +263,8 @@ html, body {
 .message.user .message-col { align-items: flex-end; }
 
 .avatar-chat {
-  width: 30px;
-  height: 30px;
+  width: 64px;
+  height: 64px;
   flex-shrink: 0;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);

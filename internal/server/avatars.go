@@ -1,13 +1,23 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/jpeg"
+	_ "image/gif"
+	_ "image/png"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/image/draw"
+	_ "golang.org/x/image/webp"
 )
+
+const avatarSize = 256
 
 func (s *Server) avatarDir() string {
 	return filepath.Join(filepath.Dir(s.cfg.Server.DBPath), "avatars")
@@ -31,22 +41,9 @@ func mimeFromFilename(filename string) string {
 	return "application/octet-stream"
 }
 
-func extFromContentType(ct string) string {
-	switch {
-	case strings.Contains(ct, "jpeg"):
-		return ".jpg"
-	case strings.Contains(ct, "png"):
-		return ".png"
-	case strings.Contains(ct, "gif"):
-		return ".gif"
-	case strings.Contains(ct, "webp"):
-		return ".webp"
-	}
-	return ".jpg"
-}
-
-// receiveAvatar parses a multipart upload, validates it is an image ≤5 MB,
-// and returns the file bytes and detected extension.
+// receiveAvatar parses a multipart upload (field "avatar"), validates it is an
+// image ≤5 MB, then center-crops and resizes it to a 256×256 JPEG.
+// Always returns the ".jpg" extension so callers can ignore the original format.
 func receiveAvatar(r *http.Request) ([]byte, string, error) {
 	if err := r.ParseMultipartForm(5 << 20); err != nil {
 		return nil, "", fmt.Errorf("file too large or invalid form")
@@ -61,7 +58,7 @@ func receiveAvatar(r *http.Request) ([]byte, string, error) {
 		return nil, "", fmt.Errorf("file too large (max 5 MB)")
 	}
 
-	// Read the first 512 bytes to detect content type, then read the rest.
+	// Sniff the first 512 bytes to validate it's an image before reading all.
 	buf := make([]byte, 512)
 	n, _ := file.Read(buf)
 	ct := http.DetectContentType(buf[:n])
@@ -74,16 +71,46 @@ func receiveAvatar(r *http.Request) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to read file")
 	}
-	data := append(buf[:n], rest...)
+	raw := append(buf[:n], rest...)
 
-	// Prefer extension from original filename, fall back to detected type.
-	ext := strings.ToLower(filepath.Ext(header.Filename))
-	if ext == "" || !isImageExt(ext) {
-		ext = extFromContentType(ct)
+	processed, err := processAvatar(raw)
+	if err != nil {
+		return nil, "", fmt.Errorf("could not process image: %w", err)
 	}
-	return data, ext, nil
+	return processed, ".jpg", nil
 }
 
+// processAvatar decodes raw image bytes, center-crops to a square, scales to
+// avatarSize×avatarSize, and returns a JPEG-encoded result.
+func processAvatar(data []byte) ([]byte, error) {
+	src, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	// Center-crop to largest square.
+	b := src.Bounds()
+	w, h := b.Dx(), b.Dy()
+	size := w
+	if h < size {
+		size = h
+	}
+	x0 := b.Min.X + (w-size)/2
+	y0 := b.Min.Y + (h-size)/2
+	srcRect := image.Rect(x0, y0, x0+size, y0+size)
+
+	// Scale to target size using CatmullRom (high quality, similar to Lanczos).
+	dst := image.NewRGBA(image.Rect(0, 0, avatarSize, avatarSize))
+	draw.CatmullRom.Scale(dst, dst.Bounds(), src, srcRect, draw.Over, nil)
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, dst, &jpeg.Options{Quality: 85}); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// isImageExt returns true for common image file extensions.
 func isImageExt(ext string) bool {
 	switch ext {
 	case ".jpg", ".jpeg", ".png", ".gif", ".webp":
