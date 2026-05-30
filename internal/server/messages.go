@@ -146,7 +146,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	chatURL := strings.TrimRight(s.cfg.ModelServer.APIBase, "/") + "/chat/completions"
 
 	// Persist user message.
-	if _, err := s.store.CreateMessage(convID, "user", req.Content, user.DisplayName, nil); err != nil {
+	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil, user.DisplayName, nil); err != nil {
 		internalError(w, err)
 		return
 	}
@@ -252,7 +252,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Persist completed assistant message and update conversation model/character.
 	if fullContent != "" {
-		_, _ = s.store.CreateMessage(convID, "assistant", fullContent, &assistantName, usageStats)
+		_, _ = s.store.CreateMessage(convID, "assistant", fullContent, usedCharacterID, &assistantName, usageStats)
 		_ = s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID)
 
 		// Trigger auto-title on the first completed exchange when the character requests it.
@@ -348,7 +348,7 @@ func (s *Server) handleFirstMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	msg, err := s.store.CreateMessage(convID, "assistant", *char.FirstMessage, &char.Name, nil)
+	msg, err := s.store.CreateMessage(convID, "assistant", *char.FirstMessage, charID, &char.Name, nil)
 	if err != nil {
 		internalError(w, err)
 		return

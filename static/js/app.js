@@ -92,6 +92,7 @@ function applyAvatarContext(characterId) {
     userHasAvatar: currentUser.has_avatar,
     characterId: characterId ?? null,
     characterHasAvatar: char?.has_avatar ?? false,
+    characterMap: new Map(characterList.map(c => [c.id, c.has_avatar])),
   });
 }
 
@@ -202,7 +203,7 @@ async function applyFirstMessage(convId, charId) {
   try {
     const msg = await msgApi.firstMessage(convId, charId);
     if (!msg) return;
-    thread.appendMessage('assistant', msg.content, msg.name);
+    thread.appendMessage('assistant', msg.content, msg.name, msg.character_id);
     activeHasMessages = true;
     if (charId !== null) {
       sidebar.updateConversation(convId, { character_id: charId, model: null });

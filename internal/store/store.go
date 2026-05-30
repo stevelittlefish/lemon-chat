@@ -187,6 +187,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v5 → v6 complete")
 	}
 
+	if version < 7 {
+		log.Println("store: migrating v6 → v7 (add character_id to message)")
+		if _, err := s.db.Exec(`ALTER TABLE message ADD COLUMN character_id INTEGER REFERENCES character(id)`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (7, ?)`, now()); err != nil {
+			return err
+		}
+		version = 7
+		log.Println("store: migration v6 → v7 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }
