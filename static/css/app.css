@@ -280,6 +280,26 @@ html, body {
   display: block;
 }
 
+@media (min-width: 1160px) {
+  .message {
+    position: relative;
+  }
+
+  .avatar-chat {
+    position: absolute;
+    top: 14px;
+    margin-top: 0;
+  }
+
+  .message.assistant .avatar-chat {
+    left: calc(-64px - 16px);
+  }
+
+  .message.user .avatar-chat {
+    right: calc(-64px - 16px);
+  }
+}
+
 .message-role {
   font-family: var(--font-mono);
   font-size: 10px;
