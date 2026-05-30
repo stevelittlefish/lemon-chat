@@ -206,6 +206,7 @@ async function exportChar(id) {
     system_prompt:   data.system_prompt,
     first_message:   data.first_message,
     visibility:      data.visibility,
+    auto_title:      data.auto_title,
     hidden_messages: (data.hidden_messages || []).map(m => ({
       role:       m.role,
       content:    m.content,
