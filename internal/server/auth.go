@@ -202,5 +202,5 @@ func (s *Server) handleServeUserAvatar(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "no avatar")
 		return
 	}
-	s.serveAvatarFile(w, *u.AvatarFilename)
+	s.serveAvatarFile(w, r, *u.AvatarFilename)
 }

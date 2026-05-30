@@ -80,7 +80,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings/users", serveFile("static/settings/users.html"))
 
 	// Static files
-	mux.Handle("/", http.FileServer(http.Dir("static")))
+	mux.Handle("/", noCacheMiddleware(http.FileServer(http.Dir("static"))))
 
 	return mux
 }

@@ -154,15 +154,20 @@ func (s *Server) deleteAvatarFile(filename string) {
 	os.Remove(filepath.Join(s.avatarDir(), filename))
 }
 
-func (s *Server) serveAvatarFile(w http.ResponseWriter, filename string) {
+func (s *Server) serveAvatarFile(w http.ResponseWriter, r *http.Request, filename string) {
 	path := filepath.Join(s.avatarDir(), filename)
-	data, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		internalError(w, err)
+		return
+	}
 	w.Header().Set("Content-Type", mimeFromFilename(filename))
-	w.Header().Set("Cache-Control", "public, max-age=3600")
-	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeContent(w, r, filename, info.ModTime(), f)
 }
