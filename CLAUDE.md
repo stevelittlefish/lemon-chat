@@ -126,7 +126,7 @@ When something is stubbed, return a `501 Not Implemented` from the API endpoint 
 
 ## Database schema changes
 
-All migrations live in `internal/store/store.go` in the `migrate()` function. The current schema version is **3**.
+All migrations live in `internal/store/store.go` in the `migrate()` function. You should be able to work out the current schema version by looking in that file.
 
 ### Adding a new table
 
@@ -154,8 +154,8 @@ if version < N {
 
 - Increment the version number (next is **4**)
 - Always insert a row into `schema_version` with the new version and `now()` as the timestamp
-- Update the "current schema version" note above when done
 - Ask the user before doing anything destructive (dropping columns, dropping tables, data transforms)
+- Never delete or edit old migrations unless the user has specifically requested it
 
 ## Keeping TODO.md current
 

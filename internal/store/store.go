@@ -158,6 +158,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v3 → v4 complete")
 	}
 
+	if version < 5 {
+		log.Println("store: migrating v4 → v5 (add display_name to user)")
+		if _, err := s.db.Exec(`ALTER TABLE user ADD COLUMN display_name TEXT`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (5, ?)`, now()); err != nil {
+			return err
+		}
+		version = 5
+		log.Println("store: migration v4 → v5 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

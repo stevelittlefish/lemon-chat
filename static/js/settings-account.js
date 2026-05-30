@@ -2,7 +2,7 @@ import { auth } from './api.js';
 import { preload as preloadIcons, icon } from './icons.js';
 
 let user = null;
-let svgArrowLeft, svgUser, svgUsers, svgCpu, svgLock, svgEye;
+let svgArrowLeft, svgUser, svgUsers, svgCpu, svgLock, svgEye, svgPencil;
 
 async function init() {
   try {
@@ -18,6 +18,7 @@ async function init() {
   svgCpu       = icon('drama', 16);
   svgLock      = icon('lock', 14);
   svgEye       = icon('eye', 14);
+  svgPencil    = icon('pencil', 14);
   renderNav();
   renderPage();
 }
@@ -76,6 +77,7 @@ function renderPage() {
           <span class="mono-tag">${escapeHtml(user.username)}</span>
         </div>
       </div>
+      <div id="dn-section"></div>
     </div>
     <div class="section">
       <h2>Password</h2>
@@ -83,7 +85,80 @@ function renderPage() {
       <div id="pwd-section"></div>
     </div>
   `;
+  showDnDefault();
   showPwdDefault();
+}
+
+// ── Display name section ──────────────────────────────────────────────
+
+function showDnDefault(successMsg) {
+  const section = document.getElementById('dn-section');
+  const current = user.display_name;
+  section.innerHTML = `
+    ${successMsg ? `<div class="field-msg field-msg--success">${escapeHtml(successMsg)}</div>` : ''}
+    <div class="field">
+      <div class="meta">
+        <span class="lbl">Display name</span>
+        <span class="desc">${current ? escapeHtml(current) : '<span style="color:var(--fg-faint)">Not set — username is shown instead.</span>'}</span>
+      </div>
+      <div class="ctl">
+        <button class="btn btn-secondary btn-sm" id="open-dn-btn">
+          ${svgPencil}
+          Edit
+        </button>
+      </div>
+    </div>
+  `;
+  document.getElementById('open-dn-btn').addEventListener('click', showDnForm);
+}
+
+function showDnForm() {
+  const section = document.getElementById('dn-section');
+  section.innerHTML = `
+    <div class="pwd-form">
+      <div class="pwd-row">
+        <label for="dn-input">Display name</label>
+        <input id="dn-input" type="text" class="input" placeholder="Your name" maxlength="100"
+          value="${escapeHtml(user.display_name ?? '')}">
+      </div>
+      <div class="field-msg field-msg--error" id="dn-error" hidden></div>
+      <div class="pwd-actions">
+        <button class="btn btn-ghost btn-sm" id="cancel-dn-btn" type="button">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="save-dn-btn" type="button">Save</button>
+      </div>
+    </div>
+  `;
+
+  const input    = document.getElementById('dn-input');
+  const errorEl  = document.getElementById('dn-error');
+  const cancelBtn = document.getElementById('cancel-dn-btn');
+  const saveBtn   = document.getElementById('save-dn-btn');
+
+  input.focus();
+  input.select();
+
+  cancelBtn.addEventListener('click', () => showDnDefault());
+
+  saveBtn.addEventListener('click', async () => {
+    errorEl.hidden = true;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    try {
+      await auth.updateProfile(input.value.trim());
+      user = { ...user, display_name: input.value.trim() || null };
+      showDnDefault('Display name updated.');
+    } catch (err) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+      errorEl.hidden = false;
+      errorEl.textContent = err.message;
+    }
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveBtn.click();
+    if (e.key === 'Escape') cancelBtn.click();
+  });
 }
 
 // ── Password section ──────────────────────────────────────────────────

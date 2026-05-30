@@ -67,7 +67,8 @@ func bootstrap(st *store.Store, cfg *config.Config) error {
 		hash = &s
 	}
 
-	_, err = st.CreateUser(b.AdminUsername, hash, true)
+	adminDisplayName := "Administrator"
+	_, err = st.CreateUser(b.AdminUsername, hash, true, &adminDisplayName)
 	if err != nil {
 		return err
 	}

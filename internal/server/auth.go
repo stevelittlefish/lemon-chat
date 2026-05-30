@@ -77,6 +77,30 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, userResponse(currentUser(r)))
 }
 
+func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DisplayName *string `json:"display_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	user := currentUser(r)
+	displayName := user.DisplayName
+	if req.DisplayName != nil {
+		if *req.DisplayName == "" {
+			displayName = nil
+		} else {
+			displayName = req.DisplayName
+		}
+	}
+	if err := s.store.UpdateUser(user.ID, user.Username, user.PasswordHash, user.IsAdmin, displayName); err != nil {
+		internalError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		CurrentPassword string `json:"current_password"`
@@ -106,7 +130,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hashStr := string(hash)
-	if err := s.store.UpdateUser(user.ID, user.Username, &hashStr, user.IsAdmin); err != nil {
+	if err := s.store.UpdateUser(user.ID, user.Username, &hashStr, user.IsAdmin, user.DisplayName); err != nil {
 		internalError(w, err)
 		return
 	}
@@ -118,6 +142,7 @@ func userResponse(u *store.User) map[string]any {
 	return map[string]any{
 		"id":           u.ID,
 		"username":     u.Username,
+		"display_name": u.DisplayName,
 		"is_admin":     u.IsAdmin,
 		"has_password": u.PasswordHash != nil,
 	}

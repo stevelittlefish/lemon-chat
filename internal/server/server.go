@@ -26,6 +26,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
 	mux.HandleFunc("POST /api/auth/logout", s.requireAuth(s.handleLogout))
 	mux.HandleFunc("GET /api/auth/me", s.requireAuth(s.handleMe))
+	mux.HandleFunc("PATCH /api/auth/profile", s.requireAuth(s.handleUpdateProfile))
 	mux.HandleFunc("PATCH /api/auth/password", s.requireAuth(s.handleChangePassword))
 
 	// Models

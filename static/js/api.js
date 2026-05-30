@@ -20,6 +20,8 @@ export const auth = {
   me: () => request('GET', '/api/auth/me'),
   changePassword: (currentPassword, newPassword) =>
     request('PATCH', '/api/auth/password', { current_password: currentPassword, new_password: newPassword }),
+  updateProfile: (displayName) =>
+    request('PATCH', '/api/auth/profile', { display_name: displayName }),
 };
 
 // Models

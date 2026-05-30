@@ -30,9 +30,10 @@ func (s *Server) handleAdminListUsers(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Username string  `json:"username"`
-		Password *string `json:"password"`
-		IsAdmin  bool    `json:"is_admin"`
+		Username    string  `json:"username"`
+		DisplayName *string `json:"display_name"`
+		Password    *string `json:"password"`
+		IsAdmin     bool    `json:"is_admin"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -52,7 +53,7 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		s := string(h)
 		hash = &s
 	}
-	user, err := s.store.CreateUser(req.Username, hash, req.IsAdmin)
+	user, err := s.store.CreateUser(req.Username, hash, req.IsAdmin, req.DisplayName)
 	if isDuplicateUsername(err) {
 		writeError(w, http.StatusConflict, "username already taken")
 		return
@@ -81,9 +82,10 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Username *string `json:"username"`
-		Password *string `json:"password"`
-		IsAdmin  *bool   `json:"is_admin"`
+		Username    *string `json:"username"`
+		DisplayName *string `json:"display_name"`
+		Password    *string `json:"password"`
+		IsAdmin     *bool   `json:"is_admin"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -97,6 +99,14 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	isAdmin := existing.IsAdmin
 	if req.IsAdmin != nil {
 		isAdmin = *req.IsAdmin
+	}
+	displayName := existing.DisplayName
+	if req.DisplayName != nil {
+		if *req.DisplayName == "" {
+			displayName = nil
+		} else {
+			displayName = req.DisplayName
+		}
 	}
 	passwordHash := existing.PasswordHash
 	if req.Password != nil {
@@ -113,7 +123,7 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := s.store.UpdateUser(id, username, passwordHash, isAdmin); isDuplicateUsername(err) {
+	if err := s.store.UpdateUser(id, username, passwordHash, isAdmin, displayName); isDuplicateUsername(err) {
 		writeError(w, http.StatusConflict, "username already taken")
 		return
 	} else if err != nil {
