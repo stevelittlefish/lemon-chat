@@ -28,6 +28,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/auth/me", s.requireAuth(s.handleMe))
 	mux.HandleFunc("PATCH /api/auth/profile", s.requireAuth(s.handleUpdateProfile))
 	mux.HandleFunc("PATCH /api/auth/password", s.requireAuth(s.handleChangePassword))
+	mux.HandleFunc("PUT /api/auth/avatar", s.requireAuth(s.handleUploadUserAvatar))
+	mux.HandleFunc("DELETE /api/auth/avatar", s.requireAuth(s.handleDeleteUserAvatar))
+
+	// User avatars (read by any authenticated user)
+	mux.HandleFunc("GET /api/users/{id}/avatar", s.requireAuth(s.handleServeUserAvatar))
 
 	// Models
 	mux.HandleFunc("GET /api/models", s.requireAuth(s.handleModels))
@@ -48,6 +53,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/characters", s.requireAuth(s.handleCreateCharacter))
 	mux.HandleFunc("PATCH /api/characters/{id}", s.requireAuth(s.handleUpdateCharacter))
 	mux.HandleFunc("DELETE /api/characters/{id}", s.requireAuth(s.handleDeleteCharacter))
+	mux.HandleFunc("GET /api/characters/{id}/avatar", s.requireAuth(s.handleServeCharacterAvatar))
+	mux.HandleFunc("PUT /api/characters/{id}/avatar", s.requireAuth(s.handleUploadCharacterAvatar))
+	mux.HandleFunc("DELETE /api/characters/{id}/avatar", s.requireAuth(s.handleDeleteCharacterAvatar))
 
 	// Admin
 	mux.HandleFunc("GET /api/admin/users", s.requireAdmin(s.handleAdminListUsers))

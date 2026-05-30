@@ -1,5 +1,6 @@
 import { auth } from './api.js';
 import { preload as preloadIcons, icon } from './icons.js';
+import { renderAvatarSection, attachAvatarSection } from './settings-avatar.js';
 
 let user = null;
 let svgArrowLeft, svgUser, svgUsers, svgCpu, svgLock, svgEye, svgPencil;
@@ -68,6 +69,7 @@ function renderPage() {
     <div class="section">
       <h2>Profile</h2>
       <p class="lead">Your account on this server.</p>
+      <div id="avatar-section"></div>
       <div class="field">
         <div class="meta">
           <span class="lbl">Username</span>
@@ -85,6 +87,19 @@ function renderPage() {
       <div id="pwd-section"></div>
     </div>
   `;
+  const avatarUrl = `/api/users/${user.id}/avatar`;
+  document.getElementById('avatar-section').innerHTML = renderAvatarSection(user.has_avatar, avatarUrl);
+  attachAvatarSection(document.getElementById('avatar-section'), {
+    avatarUrl,
+    onUpload: async (file) => {
+      await auth.uploadAvatar(file);
+      user = { ...user, has_avatar: true };
+    },
+    onDelete: async () => {
+      await auth.deleteAvatar();
+      user = { ...user, has_avatar: false };
+    },
+  });
   showDnDefault();
   showPwdDefault();
 }

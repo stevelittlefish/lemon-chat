@@ -4,7 +4,9 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
@@ -145,5 +147,60 @@ func userResponse(u *store.User) map[string]any {
 		"display_name": u.DisplayName,
 		"is_admin":     u.IsAdmin,
 		"has_password": u.PasswordHash != nil,
+		"has_avatar":   u.AvatarFilename != nil,
 	}
+}
+
+func (s *Server) handleUploadUserAvatar(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	data, ext, err := receiveAvatar(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	prefix := fmt.Sprintf("user-%d", user.ID)
+	filename, err := s.writeAvatar(prefix, data, ext)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	if err := s.store.SetUserAvatar(user.ID, filename); err != nil {
+		internalError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"has_avatar": true})
+}
+
+func (s *Server) handleDeleteUserAvatar(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	if user.AvatarFilename != nil {
+		s.deleteAvatarFile(*user.AvatarFilename)
+	}
+	if err := s.store.ClearUserAvatar(user.ID); err != nil {
+		internalError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleServeUserAvatar(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	u, err := s.store.UserByID(id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	if u.AvatarFilename == nil {
+		writeError(w, http.StatusNotFound, "no avatar")
+		return
+	}
+	s.serveAvatarFile(w, *u.AvatarFilename)
 }

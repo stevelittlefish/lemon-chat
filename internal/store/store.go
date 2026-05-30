@@ -170,6 +170,23 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v4 → v5 complete")
 	}
 
+	if version < 6 {
+		log.Println("store: migrating v5 → v6 (add avatar_filename to user and character)")
+		for _, stmt := range []string{
+			`ALTER TABLE user ADD COLUMN avatar_filename TEXT`,
+			`ALTER TABLE character ADD COLUMN avatar_filename TEXT`,
+		} {
+			if _, err := s.db.Exec(stmt); err != nil {
+				return err
+			}
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (6, ?)`, now()); err != nil {
+			return err
+		}
+		version = 6
+		log.Println("store: migration v5 → v6 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

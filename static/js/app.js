@@ -14,6 +14,7 @@ const loginError = document.getElementById('login-error');
 let currentUser = null;
 let activeConversationId = null;
 let activeHasMessages = false;
+let characterList = [];
 
 async function start() {
   try {
@@ -51,12 +52,13 @@ function getConversationIdFromUrl() {
 }
 
 async function initApp() {
-  const [modelList, characterList] = await Promise.all([
+  const [modelList, chars] = await Promise.all([
     modelApi.list(),
     characterApi.list(),
     sidebar.load(),
     preloadIcons(),
   ]);
+  characterList = chars;
 
   sidebar.init({
     username: currentUser.username,
@@ -66,7 +68,7 @@ async function initApp() {
 
   header.init({
     models: modelList,
-    characters: characterList,
+    characters: chars,
     onChange: handleSelectionChange,
   });
 
@@ -81,6 +83,16 @@ async function initApp() {
   } else {
     thread.showEmpty();
   }
+}
+
+function applyAvatarContext(characterId) {
+  const char = characterId ? characterList.find(c => c.id === characterId) : null;
+  thread.setAvatarContext({
+    userId: currentUser.id,
+    userHasAvatar: currentUser.has_avatar,
+    characterId: characterId ?? null,
+    characterHasAvatar: char?.has_avatar ?? false,
+  });
 }
 
 async function loadConversation(id, { pushHistory = true } = {}) {
@@ -104,6 +116,7 @@ async function loadConversation(id, { pushHistory = true } = {}) {
     const conv = sidebar.getConversation(id);
     header.setConversation(id, conv?.title ?? null);
     if (conv) header.setSelection(conv);
+    applyAvatarContext(conv?.character_id ?? null);
     thread.renderMessages(msgs);
   } catch {
     activeConversationId = null;
@@ -123,6 +136,7 @@ async function newConversation() {
   activeHasMessages = false;
   history.pushState({ conversationId: conv.id }, '', `/?c=${conv.id}`);
   header.setConversation(conv.id, conv.title ?? null);
+  applyAvatarContext(charId);
   thread.showEmpty();
   if (charId !== null) {
     await applyFirstMessage(conv.id, null);
@@ -140,6 +154,7 @@ async function sendMessage(content) {
     activeHasMessages = false;
     history.pushState({ conversationId: conv.id }, '', `/?c=${conv.id}`);
     header.setConversation(conv.id, conv.title ?? null);
+    applyAvatarContext(charId);
     if (charId !== null) {
       await applyFirstMessage(conv.id, null);
     }
@@ -174,6 +189,7 @@ async function sendMessage(content) {
 // the new selection is a character, save and show their first message.
 async function handleSelectionChange(sel) {
   if (!activeConversationId) return;
+  applyAvatarContext(sel?.type === 'character' ? sel.id : null);
   if (activeHasMessages) return;
   if (!sel || sel.type !== 'character') return;
   await applyFirstMessage(activeConversationId, sel.id);

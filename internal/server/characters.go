@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -183,7 +184,100 @@ func (s *Server) handleDeleteCharacter(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "forbidden")
 		return
 	}
+	if existing.AvatarFilename != nil {
+		s.deleteAvatarFile(*existing.AvatarFilename)
+	}
 	if err := s.store.DeleteCharacter(id); err != nil {
+		internalError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleServeCharacterAvatar(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	char, err := s.store.GetCharacter(id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	if char.AvatarFilename == nil {
+		writeError(w, http.StatusNotFound, "no avatar")
+		return
+	}
+	s.serveAvatarFile(w, *char.AvatarFilename)
+}
+
+func (s *Server) handleUploadCharacterAvatar(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	existing, err := s.store.GetCharacter(id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	if existing.CreatedBy != user.ID && !user.IsAdmin && existing.Visibility != "readwrite" {
+		writeError(w, http.StatusForbidden, "forbidden")
+		return
+	}
+	data, ext, err := receiveAvatar(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	prefix := fmt.Sprintf("character-%d", id)
+	filename, err := s.writeAvatar(prefix, data, ext)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	if err := s.store.SetCharacterAvatar(id, filename); err != nil {
+		internalError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"has_avatar": true})
+}
+
+func (s *Server) handleDeleteCharacterAvatar(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	existing, err := s.store.GetCharacter(id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	if existing.CreatedBy != user.ID && !user.IsAdmin {
+		writeError(w, http.StatusForbidden, "forbidden")
+		return
+	}
+	if existing.AvatarFilename != nil {
+		s.deleteAvatarFile(*existing.AvatarFilename)
+	}
+	if err := s.store.ClearCharacterAvatar(id); err != nil {
 		internalError(w, err)
 		return
 	}

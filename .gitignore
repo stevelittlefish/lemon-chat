@@ -3,3 +3,4 @@ lemon.db
 /lemon-chat
 docker-compose.override.yml
 data/
+/avatars

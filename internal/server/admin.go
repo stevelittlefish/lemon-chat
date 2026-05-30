@@ -143,10 +143,18 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "cannot delete your own account")
 		return
 	}
-	if err := s.store.DeleteUser(id); errors.Is(err, store.ErrNotFound) {
+	target, err := s.store.UserByID(id)
+	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	} else if err != nil {
+		internalError(w, err)
+		return
+	}
+	if target.AvatarFilename != nil {
+		s.deleteAvatarFile(*target.AvatarFilename)
+	}
+	if err := s.store.DeleteUser(id); err != nil {
 		internalError(w, err)
 		return
 	}

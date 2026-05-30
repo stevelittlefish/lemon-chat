@@ -1,5 +1,6 @@
 import { auth, characters as charactersApi, models as modelsApi } from './api.js';
 import { preload as preloadIcons, icon } from './icons.js';
+import { renderAvatarSection, attachAvatarSection } from './settings-avatar.js';
 
 let user = null;
 let svgArrowLeft, svgUser, svgUsers, svgCpu, svgTrash, svgPlus;
@@ -126,6 +127,7 @@ function renderForm(character, modelsData) {
     </div>
     <div class="section">
       <div class="character-form-fields">
+        ${!isNew ? `<div class="character-form-row"><div id="char-avatar-section"></div></div>` : ''}
         <div class="character-form-row">
           <label class="character-form-lbl" for="char-name">Name</label>
           <input id="char-name" class="input" value="${name}" placeholder="Character name" autocomplete="off">
@@ -178,6 +180,20 @@ function renderForm(character, modelsData) {
   hiddenMessages = (character?.hidden_messages ?? []).map(m => ({ role: m.role, content: m.content }));
   renderHiddenMessages();
   document.getElementById('hidden-msg-add-btn').addEventListener('click', addHiddenMessage);
+
+  if (!isNew && character) {
+    const avatarUrl = `/api/characters/${character.id}/avatar`;
+    const charId = character.id;
+    const avatarSection = document.getElementById('char-avatar-section');
+    if (avatarSection) {
+      avatarSection.innerHTML = renderAvatarSection(character.has_avatar, avatarUrl);
+      attachAvatarSection(avatarSection, {
+        avatarUrl,
+        onUpload: async (file) => { await charactersApi.uploadAvatar(charId, file); },
+        onDelete: async () => { await charactersApi.deleteAvatar(charId); },
+      });
+    }
+  }
 
   const autoTitleEl = document.getElementById('char-auto-title');
   if (autoTitleEl) {

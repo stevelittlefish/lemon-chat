@@ -156,9 +156,12 @@ function renderCharRows(list, emptyMsg) {
     const editBtn   = canEditChar(c)   ? `<a href="/settings/characters/${c.id}/edit" class="btn btn-ghost btn-sm">${svgPencil} Edit</a>` : '';
     const deleteBtn = canDeleteChar(c) ? `<button class="btn btn-ghost btn-sm" data-action="delete" data-id="${c.id}">${svgTrash} Delete</button>` : '';
     const visLabel  = { private: 'private', readonly: 'read-only', readwrite: 'read-write' }[c.visibility] ?? c.visibility;
+    const avatarHtml = c.has_avatar
+      ? `<div class="avatar-sm"><img src="/api/characters/${c.id}/avatar" alt=""></div>`
+      : '';
     return `
       <tr data-id="${c.id}">
-        <td class="char-col-name">${escapeHtml(c.name)}</td>
+        <td class="char-col-name"><div class="char-name-cell">${avatarHtml}${escapeHtml(c.name)}</div></td>
         <td class="char-col-model"><span class="chip">${escapeHtml(c.model)}</span></td>
         <td class="char-col-visibility"><span class="chip character-chip--${c.visibility}">${visLabel}</span></td>
         <td class="char-col-actions"><div class="user-row-actions">${exportBtn}${editBtn}${deleteBtn}</div></td>
@@ -213,6 +216,20 @@ async function exportChar(id) {
       sort_order: m.sort_order,
     })),
   };
+
+  // Include avatar as base64 data URL if the character has one.
+  if (data.has_avatar) {
+    try {
+      const res = await fetch(`/api/characters/${id}/avatar`);
+      if (res.ok) {
+        const ab = await res.arrayBuffer();
+        const ct = res.headers.get('content-type') || 'image/jpeg';
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(ab)));
+        payload.avatar = `data:${ct};base64,${b64}`;
+      }
+    } catch { /* skip avatar on error */ }
+  }
+
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -235,7 +252,19 @@ async function importChar(file) {
     return;
   }
   try {
-    await charactersApi.create(parsed);
+    const created = await charactersApi.create(parsed);
+    // Restore avatar from base64 data URL if present.
+    if (parsed.avatar && created?.id) {
+      try {
+        const [header, b64] = parsed.avatar.split(',');
+        const mime = (header.match(/:(.*?);/) || [])[1] || 'image/jpeg';
+        const ext  = mime.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        const blob  = new Blob([bytes], { type: mime });
+        const avatarFile = new File([blob], `avatar.${ext}`, { type: mime });
+        await charactersApi.uploadAvatar(created.id, avatarFile);
+      } catch { /* skip avatar on error */ }
+    }
     await renderPage();
   } catch (err) {
     alert(`Could not import character: ${err.message}`);

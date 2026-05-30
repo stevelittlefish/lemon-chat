@@ -15,23 +15,25 @@ type CharacterHiddenMessage struct {
 }
 
 type Character struct {
-	ID           int64   `json:"id"`
-	Name         string  `json:"name"`
-	Model        string  `json:"model"`
-	SystemPrompt *string `json:"system_prompt"`
-	FirstMessage *string `json:"first_message"`
-	CreatedBy    int64   `json:"created_by"`
-	Visibility   string  `json:"visibility"`
-	AutoTitle    bool    `json:"auto_title"`
-	CreatedAt    string  `json:"created_at"`
-	UpdatedAt    string  `json:"updated_at"`
+	ID             int64   `json:"id"`
+	Name           string  `json:"name"`
+	Model          string  `json:"model"`
+	SystemPrompt   *string `json:"system_prompt"`
+	FirstMessage   *string `json:"first_message"`
+	CreatedBy      int64   `json:"created_by"`
+	Visibility     string  `json:"visibility"`
+	AutoTitle      bool    `json:"auto_title"`
+	AvatarFilename *string `json:"-"`
+	HasAvatar      bool    `json:"has_avatar"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
 }
 
 // ListCharacters returns all characters visible to the given user.
 // Private characters created by other users are excluded unless the user is an admin.
 func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, model, system_prompt, first_message, created_by, visibility, auto_title, created_at, updated_at
+		`SELECT id, name, model, system_prompt, first_message, created_by, visibility, auto_title, avatar_filename, created_at, updated_at
 		 FROM character
 		 WHERE visibility != 'private' OR created_by = ? OR ?
 		 ORDER BY name`,
@@ -45,10 +47,11 @@ func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) 
 	for rows.Next() {
 		var c Character
 		var autoTitle int
-		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.CreatedBy, &c.Visibility, &autoTitle, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.CreatedBy, &c.Visibility, &autoTitle, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		c.AutoTitle = autoTitle != 0
+		c.HasAvatar = c.AvatarFilename != nil
 		chars = append(chars, c)
 	}
 	return chars, rows.Err()
@@ -58,9 +61,9 @@ func (s *Store) GetCharacter(id int64) (*Character, error) {
 	c := &Character{}
 	var autoTitle int
 	err := s.db.QueryRow(
-		`SELECT id, name, model, system_prompt, first_message, created_by, visibility, auto_title, created_at, updated_at
+		`SELECT id, name, model, system_prompt, first_message, created_by, visibility, auto_title, avatar_filename, created_at, updated_at
 		 FROM character WHERE id = ?`, id,
-	).Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.CreatedBy, &c.Visibility, &autoTitle, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.CreatedBy, &c.Visibility, &autoTitle, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -68,6 +71,7 @@ func (s *Store) GetCharacter(id int64) (*Character, error) {
 		return nil, err
 	}
 	c.AutoTitle = autoTitle != 0
+	c.HasAvatar = c.AvatarFilename != nil
 	return c, nil
 }
 
@@ -99,6 +103,16 @@ func (s *Store) UpdateCharacter(id int64, name, model string, systemPrompt, firs
 
 func (s *Store) DeleteCharacter(id int64) error {
 	_, err := s.db.Exec(`DELETE FROM character WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) SetCharacterAvatar(id int64, filename string) error {
+	_, err := s.db.Exec(`UPDATE character SET avatar_filename = ? WHERE id = ?`, filename, id)
+	return err
+}
+
+func (s *Store) ClearCharacterAvatar(id int64) error {
+	_, err := s.db.Exec(`UPDATE character SET avatar_filename = NULL WHERE id = ?`, id)
 	return err
 }
 

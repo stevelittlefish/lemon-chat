@@ -13,6 +13,16 @@ async function request(method, path, body) {
   return data;
 }
 
+async function uploadFile(method, path, file) {
+  const form = new FormData();
+  form.append('avatar', file);
+  const res = await fetch(path, { method, body: form });
+  if (res.status === 204) return null;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
 // Auth
 export const auth = {
   login: (username, password) => request('POST', '/api/auth/login', { username, password }),
@@ -22,6 +32,8 @@ export const auth = {
     request('PATCH', '/api/auth/password', { current_password: currentPassword, new_password: newPassword }),
   updateProfile: (displayName) =>
     request('PATCH', '/api/auth/profile', { display_name: displayName }),
+  uploadAvatar: (file) => uploadFile('PUT', '/api/auth/avatar', file),
+  deleteAvatar: () => request('DELETE', '/api/auth/avatar'),
 };
 
 // Models
@@ -88,11 +100,13 @@ export const messages = {
 
 // Characters
 export const characters = {
-  list:   ()         => request('GET',    '/api/characters'),
-  get:    (id)       => request('GET',    `/api/characters/${id}`),
-  create: (data)     => request('POST',   '/api/characters', data),
-  update: (id, data) => request('PATCH',  `/api/characters/${id}`, data),
-  delete: (id)       => request('DELETE', `/api/characters/${id}`),
+  list:         ()         => request('GET',    '/api/characters'),
+  get:          (id)       => request('GET',    `/api/characters/${id}`),
+  create:       (data)     => request('POST',   '/api/characters', data),
+  update:       (id, data) => request('PATCH',  `/api/characters/${id}`, data),
+  delete:       (id)       => request('DELETE', `/api/characters/${id}`),
+  uploadAvatar: (id, file) => uploadFile('PUT', `/api/characters/${id}/avatar`, file),
+  deleteAvatar: (id)       => request('DELETE', `/api/characters/${id}/avatar`),
 };
 
 // Admin

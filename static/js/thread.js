@@ -7,8 +7,16 @@ const container = document.getElementById('thread-container');
 let userScrolledDuringStream = false;
 let programmaticScroll = false;
 
-function isNearBottom() {
-  return container.scrollHeight - container.scrollTop - container.clientHeight < 40;
+// Avatar context — set by app.js whenever the active conversation changes.
+let avatarCtx = {
+  userId: null,
+  userHasAvatar: false,
+  characterId: null,
+  characterHasAvatar: false,
+};
+
+export function setAvatarContext(ctx) {
+  avatarCtx = { ...ctx };
 }
 
 // Distinguish user-initiated scrolls from programmatic ones.
@@ -17,6 +25,10 @@ container.addEventListener('scroll', () => {
   if (programmaticScroll) return;
   if (!isNearBottom()) userScrolledDuringStream = true;
 }, { passive: true });
+
+function isNearBottom() {
+  return container.scrollHeight - container.scrollTop - container.clientHeight < 40;
+}
 
 export function showEmpty() {
   threadEl.innerHTML = `
@@ -55,6 +67,12 @@ export function startStreaming() {
   const wrapper = document.createElement('div');
   wrapper.className = 'message assistant';
 
+  const avatarEl = buildAvatar('assistant');
+  if (avatarEl) wrapper.appendChild(avatarEl);
+
+  const colEl = document.createElement('div');
+  colEl.className = 'message-col';
+
   const roleEl = document.createElement('div');
   roleEl.className = 'message-role';
   roleEl.textContent = '';
@@ -63,8 +81,9 @@ export function startStreaming() {
   contentEl.className = 'message-content';
   contentEl.innerHTML = typingIndicatorHTML();
 
-  wrapper.appendChild(roleEl);
-  wrapper.appendChild(contentEl);
+  colEl.appendChild(roleEl);
+  colEl.appendChild(contentEl);
+  wrapper.appendChild(colEl);
   threadEl.appendChild(wrapper);
   scrollToBottom();
 
@@ -91,7 +110,7 @@ export function startStreaming() {
       } else {
         contentEl.innerHTML = renderMarkdown(accumulated);
         if (streamStats && hasStats(streamStats)) {
-          wrapper.appendChild(buildFooter(streamStats));
+          colEl.appendChild(buildFooter(streamStats));
         }
         if (shouldScroll) scrollToBottom();
       }
@@ -104,24 +123,53 @@ export function startStreaming() {
   };
 }
 
+function buildAvatar(role) {
+  if (role === 'user') {
+    if (!avatarCtx.userHasAvatar || !avatarCtx.userId) return null;
+    const el = document.createElement('div');
+    el.className = 'avatar-chat';
+    const img = document.createElement('img');
+    img.src = `/api/users/${avatarCtx.userId}/avatar`;
+    img.alt = '';
+    el.appendChild(img);
+    return el;
+  }
+  // assistant
+  if (!avatarCtx.characterHasAvatar || !avatarCtx.characterId) return null;
+  const el = document.createElement('div');
+  el.className = 'avatar-chat';
+  const img = document.createElement('img');
+  img.src = `/api/characters/${avatarCtx.characterId}/avatar`;
+  img.alt = '';
+  el.appendChild(img);
+  return el;
+}
+
 function buildMessage(msg) {
   const wrapper = document.createElement('div');
   wrapper.className = `message ${msg.role}`;
 
+  const avatarEl = buildAvatar(msg.role);
+  if (avatarEl) wrapper.appendChild(avatarEl);
+
+  const colEl = document.createElement('div');
+  colEl.className = 'message-col';
+
   const roleEl = document.createElement('div');
   roleEl.className = 'message-role';
   roleEl.textContent = msg.role === 'user' ? (msg.name || 'you') : (msg.name || msg.role);
-  wrapper.appendChild(roleEl);
+  colEl.appendChild(roleEl);
 
   const contentEl = document.createElement('div');
   contentEl.className = 'message-content';
   contentEl.innerHTML = renderMarkdown(msg.content);
-  wrapper.appendChild(contentEl);
+  colEl.appendChild(contentEl);
 
   if (msg.role === 'assistant' && hasStats(msg)) {
-    wrapper.appendChild(buildFooter(msg));
+    colEl.appendChild(buildFooter(msg));
   }
 
+  wrapper.appendChild(colEl);
   return wrapper;
 }
 
