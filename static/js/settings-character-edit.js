@@ -115,6 +115,7 @@ function renderForm(character, modelsData) {
   const systemPrompt = character ? (character.system_prompt ?? '')     : '';
   const firstMessage = character ? (character.first_message ?? '')     : '';
   const visibility   = character ? character.visibility                : 'private';
+  const autoTitle    = character ? !!character.auto_title              : false;
 
   document.title = `${isNew ? 'New character' : 'Edit character'} — Settings — lemon chat`;
 
@@ -149,6 +150,13 @@ function renderForm(character, modelsData) {
           <label class="character-form-lbl" for="char-first-message">First message</label>
           <textarea id="char-first-message" class="input" rows="4" placeholder="Optional opening message…">${escapeHtml(firstMessage)}</textarea>
         </div>
+        <div class="character-form-row character-form-check">
+          <span class="character-form-lbl">Behaviour</span>
+          <label id="char-auto-title-label">
+            <div class="toggle${autoTitle ? ' on' : ''}" id="char-auto-title" role="checkbox" aria-checked="${autoTitle}" tabindex="0"></div>
+            Generate title after first reply
+          </label>
+        </div>
         ${isOwnerOrAdmin ? `
         <div class="character-form-row">
           <label class="character-form-lbl" for="char-visibility">Visibility</label>
@@ -170,6 +178,16 @@ function renderForm(character, modelsData) {
   hiddenMessages = (character?.hidden_messages ?? []).map(m => ({ role: m.role, content: m.content }));
   renderHiddenMessages();
   document.getElementById('hidden-msg-add-btn').addEventListener('click', addHiddenMessage);
+
+  const autoTitleEl = document.getElementById('char-auto-title');
+  if (autoTitleEl) {
+    const toggleAutoTitle = () => {
+      autoTitleEl.classList.toggle('on');
+      autoTitleEl.setAttribute('aria-checked', autoTitleEl.classList.contains('on'));
+    };
+    autoTitleEl.addEventListener('click', toggleAutoTitle);
+    autoTitleEl.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleAutoTitle(); } });
+  }
 
   wireAutoExpand('char-system-prompt');
   wireAutoExpand('char-first-message');
@@ -292,6 +310,7 @@ function readForm(isOwnerOrAdmin) {
     system_prompt:   document.getElementById('char-system-prompt')?.value.trim() || null,
     first_message:   document.getElementById('char-first-message')?.value.trim() || null,
     visibility:      isOwnerOrAdmin ? (document.getElementById('char-visibility')?.value ?? undefined) : undefined,
+    auto_title:      document.getElementById('char-auto-title')?.classList.contains('on') ?? false,
     hidden_messages: hiddenMessages.map(m => ({ role: m.role, content: m.content })),
   };
 }

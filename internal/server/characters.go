@@ -61,12 +61,13 @@ func (s *Server) handleGetCharacter(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	var req struct {
-		Name           string                          `json:"name"`
-		Model          string                          `json:"model"`
-		SystemPrompt   *string                         `json:"system_prompt"`
-		FirstMessage   *string                         `json:"first_message"`
-		Visibility     string                          `json:"visibility"`
-		HiddenMessages []store.CharacterHiddenMessage  `json:"hidden_messages"`
+		Name           string                         `json:"name"`
+		Model          string                         `json:"model"`
+		SystemPrompt   *string                        `json:"system_prompt"`
+		FirstMessage   *string                        `json:"first_message"`
+		Visibility     string                         `json:"visibility"`
+		AutoTitle      bool                           `json:"auto_title"`
+		HiddenMessages []store.CharacterHiddenMessage `json:"hidden_messages"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -79,7 +80,7 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 	if !validVisibility(req.Visibility) {
 		req.Visibility = "private"
 	}
-	char, err := s.store.CreateCharacter(req.Name, req.Model, req.SystemPrompt, req.FirstMessage, user.ID, req.Visibility)
+	char, err := s.store.CreateCharacter(req.Name, req.Model, req.SystemPrompt, req.FirstMessage, user.ID, req.Visibility, req.AutoTitle)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -119,18 +120,20 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 
 	// Seed with existing values so partial updates work.
 	req := struct {
-		Name           string                           `json:"name"`
-		Model          string                           `json:"model"`
-		SystemPrompt   *string                          `json:"system_prompt"`
-		FirstMessage   *string                          `json:"first_message"`
-		Visibility     string                           `json:"visibility"`
-		HiddenMessages *[]store.CharacterHiddenMessage  `json:"hidden_messages"`
+		Name           string                          `json:"name"`
+		Model          string                          `json:"model"`
+		SystemPrompt   *string                         `json:"system_prompt"`
+		FirstMessage   *string                         `json:"first_message"`
+		Visibility     string                          `json:"visibility"`
+		AutoTitle      bool                            `json:"auto_title"`
+		HiddenMessages *[]store.CharacterHiddenMessage `json:"hidden_messages"`
 	}{
 		Name:         existing.Name,
 		Model:        existing.Model,
 		SystemPrompt: existing.SystemPrompt,
 		FirstMessage: existing.FirstMessage,
 		Visibility:   existing.Visibility,
+		AutoTitle:    existing.AutoTitle,
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -146,7 +149,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 	} else if !validVisibility(req.Visibility) {
 		req.Visibility = existing.Visibility
 	}
-	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.Visibility); err != nil {
+	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.Visibility, req.AutoTitle); err != nil {
 		internalError(w, err)
 		return
 	}

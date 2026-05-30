@@ -26,6 +26,31 @@ func StartTitleWorker(st *store.Store, cfg *config.Config, onTitled func(int64, 
 	}()
 }
 
+// GenerateTitleForConversation generates a title for convID and persists it.
+// It runs the generation in a goroutine and calls onTitled on success.
+func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID int64, onTitled func(int64, string)) {
+	go func() {
+		modelName := cfg.ModelServer.Default
+		if modelName == "" {
+			return
+		}
+		chatURL := strings.TrimRight(cfg.ModelServer.APIBase, "/") + "/chat/completions"
+		title, err := generateTitle(st, chatURL, modelName, convID)
+		if err != nil {
+			log.Printf("title worker: conversation %d: %v", convID, err)
+			return
+		}
+		if err := st.UpdateConversationTitle(convID, title); err != nil {
+			log.Printf("title worker: update %d: %v", convID, err)
+			return
+		}
+		log.Printf("title worker: titled conversation %d: %q", convID, title)
+		if onTitled != nil {
+			onTitled(convID, title)
+		}
+	}()
+}
+
 func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, string)) {
 	modelName := cfg.ModelServer.Default
 	if modelName == "" {

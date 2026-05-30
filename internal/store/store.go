@@ -146,6 +146,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v2 → v3 complete")
 	}
 
+	if version < 4 {
+		log.Println("store: migrating v3 → v4 (add auto_title to character)")
+		if _, err := s.db.Exec(`ALTER TABLE character ADD COLUMN auto_title INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (4, ?)`, now()); err != nil {
+			return err
+		}
+		version = 4
+		log.Println("store: migration v3 → v4 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

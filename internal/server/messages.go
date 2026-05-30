@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
+	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
 
 func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
@@ -77,6 +78,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	var modelName, assistantName string
 	var usedModel *string
 	var usedCharacterID *int64
+	var usedCharacter *store.Character
 
 	if req.CharacterID != nil {
 		char, err := s.store.GetCharacter(*req.CharacterID)
@@ -85,6 +87,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		usedCharacterID = req.CharacterID
+		usedCharacter = char
 		modelName = char.Model
 		assistantName = char.Name
 		if char.SystemPrompt != nil {
@@ -109,6 +112,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		usedCharacterID = conv.CharacterID
+		usedCharacter = char
 		modelName = char.Model
 		assistantName = char.Name
 		if char.SystemPrompt != nil {
@@ -250,6 +254,20 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	if fullContent != "" {
 		_, _ = s.store.CreateMessage(convID, "assistant", fullContent, &assistantName, usageStats)
 		_ = s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID)
+
+		// Trigger auto-title on the first completed exchange when the character requests it.
+		// Count user messages in history — if this is the only one, it's the first exchange.
+		if usedCharacter != nil && usedCharacter.AutoTitle && conv.Title == nil {
+			userMsgCount := 0
+			for _, m := range history {
+				if m.Role == "user" {
+					userMsgCount++
+				}
+			}
+			if userMsgCount == 1 {
+				tasks.GenerateTitleForConversation(s.store, s.cfg, convID, s.hub.BroadcastTitleUpdate)
+			}
+		}
 	}
 }
 
