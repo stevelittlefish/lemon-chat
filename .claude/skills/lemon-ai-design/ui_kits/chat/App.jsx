@@ -66,6 +66,29 @@ function App() {
   const [model, setModel] = React.useState(MODELS[0]);
   const [pendingInput, setPendingInput] = React.useState("");
 
+  // Profile pictures for the two participants. `src` is a data-URL once the
+  // user sets one; null falls back to the brand mark / person glyph.
+  const [profiles, setProfiles] = React.useState(() => {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem("lemon.profiles") || "{}"); } catch (e) {}
+    return {
+      user:      { name: "you",   src: saved.user || null },
+      assistant: { name: "lemon", src: saved.assistant || null },
+    };
+  });
+
+  const setProfilePic = (role, src) => {
+    setProfiles(prev => {
+      const next = { ...prev, [role]: { ...prev[role], src } };
+      try {
+        localStorage.setItem("lemon.profiles", JSON.stringify({
+          user: next.user.src, assistant: next.assistant.src,
+        }));
+      } catch (e) {}
+      return next;
+    });
+  };
+
   const active = chats.find(c => c.id === activeId);
 
   const updateChat = (id, fn) => {
@@ -196,6 +219,8 @@ function App() {
           onSuggest={(s) => setPendingInput({ text: s, key: Date.now() })}
           modelName={model.name}
           lastAssistantId={lastAssistantId}
+          profiles={profiles}
+          onSetPic={setProfilePic}
           onDeleteMsg={handleDeleteMsg}
           onEditMsg={handleEditMsg}
           onRegenerate={handleRegenerate}

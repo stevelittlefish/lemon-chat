@@ -282,8 +282,10 @@ body { overflow: hidden; }
   gap: 22px;
 }
 
-.msg { display: flex; flex-direction: column; gap: 6px; }
-.msg.user { align-items: flex-end; }
+.msg { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; }
+.msg.user { flex-direction: row-reverse; }
+.msg-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 auto; }
+.msg.user .msg-col { align-items: flex-end; }
 .msg .meta {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -292,12 +294,46 @@ body { overflow: hidden; }
   color: var(--fg-faint);
   padding: 0 2px;
 }
-.msg.ai .meta { display: flex; align-items: center; gap: 6px; }
-.msg.ai .meta::before {
-  content: "";
-  width: 14px; height: 14px;
-  background: url("../../assets/lemon-slice.svg") no-repeat center / contain;
-  display: inline-block;
+
+/* ---------- Message avatars ---------- */
+.avatar {
+  flex: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  margin-top: 14px;            /* drop past the meta label so it reads beside the text */
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--bg-lifted);
+  color: var(--fg-muted);
+  overflow: hidden;
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+button.avatar { -webkit-appearance: none; appearance: none; cursor: pointer; }
+.avatar.assistant { background: var(--lemon-50); border-color: var(--lemon-300); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar .avatar-mark { width: 74%; height: 74%; object-fit: contain; }
+.avatar .avatar-glyph { display: grid; place-items: center; color: var(--fg-faint); }
+button.avatar:hover { border-color: var(--border-strong); }
+button.avatar:focus-visible { outline: none; box-shadow: var(--ring-accent); }
+
+/* camera scrim, revealed on hover/focus of an editable avatar */
+.avatar-cam {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(27, 24, 20, 0.46);
+  color: var(--paper-50);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+button.avatar:hover .avatar-cam,
+button.avatar:focus-visible .avatar-cam { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar, .avatar-cam { transition: none; }
 }
 
 .bubble {

@@ -27,6 +27,8 @@ const ICONS = {
   close:   "M18 6L6 18 M6 6l12 12",
   bolt:    "M13 2L3 14h9l-1 8 10-12h-9l1-8z",
   clock:   "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M12 6v6l4 2",
+  user:    "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
+  camera:  "M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
 };
 
 function Icon({ name, size = 18, className = "", style = {} }) {

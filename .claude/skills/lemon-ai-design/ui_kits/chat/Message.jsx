@@ -3,7 +3,7 @@
 // User:      edit, copy, delete.
 // Info popover shows the metrics attached to the assistant message.
 
-function Message({ msg, isLastAssistant, onDelete, onEdit, onRegenerate }) {
+function Message({ msg, isLastAssistant, profile, onSetPic, onDelete, onEdit, onRegenerate }) {
   const isUser = msg.role === "user";
   const [editing, setEditing] = React.useState(false);
   const [infoOpen, setInfoOpen] = React.useState(false);
@@ -21,6 +21,8 @@ function Message({ msg, isLastAssistant, onDelete, onEdit, onRegenerate }) {
       <MessageEditor
         initial={msg.content}
         isUser={isUser}
+        profile={profile}
+        onSetPic={onSetPic}
         onCancel={() => setEditing(false)}
         onSave={(t) => { setEditing(false); onEdit(t); }}
       />
@@ -29,6 +31,8 @@ function Message({ msg, isLastAssistant, onDelete, onEdit, onRegenerate }) {
 
   return (
     <div className={"msg " + (isUser ? "user" : "ai")}>
+      <Avatar role={msg.role} profile={profile} onSetPic={onSetPic} />
+      <div className="msg-col">
       <div className="meta">{isUser ? "you" : "lemon"}</div>
       <div className={"bubble " + (isUser ? "user" : "ai")}>
         {msg.streaming
@@ -90,6 +94,7 @@ function Message({ msg, isLastAssistant, onDelete, onEdit, onRegenerate }) {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -107,7 +112,7 @@ function FootBtn({ title, onClick, icon, danger, active }) {
   );
 }
 
-function MessageEditor({ initial, isUser, onSave, onCancel }) {
+function MessageEditor({ initial, isUser, profile, onSetPic, onSave, onCancel }) {
   const [val, setVal] = React.useState(initial);
   const taRef = React.useRef();
 
@@ -135,6 +140,8 @@ function MessageEditor({ initial, isUser, onSave, onCancel }) {
 
   return (
     <div className={"msg " + (isUser ? "user" : "ai")}>
+      <Avatar role={isUser ? "user" : "assistant"} profile={profile} onSetPic={onSetPic} />
+      <div className="msg-col">
       <div className="meta">{isUser ? "you · editing" : "lemon · editing"}</div>
       <div className={"msg-editor " + (isUser ? "user" : "ai")}>
         <textarea
@@ -156,6 +163,7 @@ function MessageEditor({ initial, isUser, onSave, onCancel }) {
             {isUser ? "Save & rerun" : "Save"}
           </button>
         </div>
+      </div>
       </div>
     </div>
   );
