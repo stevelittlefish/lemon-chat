@@ -1,6 +1,36 @@
 import { marked } from './vendor/marked.esm.js';
+import katex from './vendor/katex.esm.js';
 
 marked.setOptions({ breaks: true });
+
+marked.use({
+  extensions: [
+    {
+      name: 'blockMath',
+      level: 'block',
+      start(src) { return src.indexOf('$$'); },
+      tokenizer(src) {
+        const match = src.match(/^\$\$([\s\S]+?)\$\$/);
+        if (match) return { type: 'blockMath', raw: match[0], text: match[1].trim() };
+      },
+      renderer(token) {
+        return katex.renderToString(token.text, { displayMode: true, throwOnError: false });
+      },
+    },
+    {
+      name: 'inlineMath',
+      level: 'inline',
+      start(src) { return src.indexOf('$'); },
+      tokenizer(src) {
+        const match = src.match(/^\$([^\$\n]+?)\$/);
+        if (match) return { type: 'inlineMath', raw: match[0], text: match[1].trim() };
+      },
+      renderer(token) {
+        return katex.renderToString(token.text, { displayMode: false, throwOnError: false });
+      },
+    },
+  ],
+});
 
 export function render(text) {
   return marked.parse(text);
