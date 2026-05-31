@@ -54,6 +54,7 @@ export const conversations = {
 // Messages
 export const messages = {
   list: (conversationId) => request('GET', `/api/conversations/${conversationId}/messages`),
+  context: (conversationId, messageId) => request('GET', `/api/conversations/${conversationId}/messages/${messageId}/context`),
   firstMessage: (conversationId, characterId = null) => {
     const body = characterId != null ? { character_id: characterId } : {};
     return request('POST', `/api/conversations/${conversationId}/first-message`, body);

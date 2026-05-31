@@ -299,6 +299,75 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 }
 
+func (s *Server) handleGetMessageContext(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	convID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	msgID, err := strconv.ParseInt(r.PathValue("msgId"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid message id")
+		return
+	}
+
+	conv, err := s.store.GetConversation(convID, user.ID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+
+	allMsgs, err := s.store.ListMessages(convID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+
+	// Collect messages up to and including the target message.
+	var history []store.Message
+	for _, m := range allMsgs {
+		history = append(history, m)
+		if m.ID == msgID {
+			break
+		}
+	}
+	if len(history) == 0 || history[len(history)-1].ID != msgID {
+		writeError(w, http.StatusNotFound, "message not found")
+		return
+	}
+
+	type chatMsg struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
+	}
+	var chatMsgs []chatMsg
+
+	if conv.CharacterID != nil {
+		char, err := s.store.GetCharacter(*conv.CharacterID)
+		if err == nil {
+			if char.SystemPrompt != nil {
+				chatMsgs = append(chatMsgs, chatMsg{Role: "system", Content: *char.SystemPrompt})
+			}
+			hiddenMsgs, err := s.store.ListCharacterHiddenMessages(char.ID)
+			if err == nil {
+				for _, hm := range hiddenMsgs {
+					chatMsgs = append(chatMsgs, chatMsg{Role: hm.Role, Content: hm.Content})
+				}
+			}
+		}
+	}
+
+	for _, m := range history {
+		chatMsgs = append(chatMsgs, chatMsg{Role: m.Role, Content: m.Content})
+	}
+	if chatMsgs == nil {
+		chatMsgs = []chatMsg{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"messages": chatMsgs})
+}
+
 func writeSSEError(w io.Writer, msg string) {
 	errJSON, _ := json.Marshal(map[string]string{"error": msg})
 	fmt.Fprintf(w, "data: %s\n\n", errJSON)

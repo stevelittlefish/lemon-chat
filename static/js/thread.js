@@ -1,5 +1,6 @@
 import { render as renderMarkdown } from './markdown.js';
 import { icon } from './icons.js';
+import { messages as msgApi } from './api.js';
 
 const threadEl = document.getElementById('thread');
 const container = document.getElementById('thread-container');
@@ -7,6 +8,11 @@ const container = document.getElementById('thread-container');
 let userScrolledDuringStream = false;
 let programmaticScroll = false;
 let forkHandler = null;
+let currentConvId = null;
+
+export function setConversationId(id) {
+  currentConvId = id;
+}
 
 export function setForkHandler(fn) {
   forkHandler = fn;
@@ -344,6 +350,104 @@ function closeForkModal() {
   _forkModal?.overlay.classList.remove('open');
 }
 
+// ── Context modal ────────────────────────────────────────────
+
+let _ctxModal = null;
+
+function getCtxModal() {
+  if (_ctxModal) return _ctxModal;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'ctx-modal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'LLM context');
+
+  const dialog = document.createElement('div');
+  dialog.className = 'ctx-modal-dialog';
+
+  const head = document.createElement('div');
+  head.className = 'md-modal-head';
+
+  const eyebrow = document.createElement('span');
+  eyebrow.className = 'md-modal-eyebrow';
+  eyebrow.textContent = 'LLM context';
+
+  const actions = document.createElement('div');
+  actions.className = 'md-modal-actions';
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn btn-secondary btn-sm';
+  const copyLabel = document.createElement('span');
+  copyLabel.textContent = 'Copy JSON';
+  copyBtn.appendChild(copyLabel);
+  copyBtn.addEventListener('click', async () => {
+    if (!_ctxModal?._messages) return;
+    await navigator.clipboard.writeText(JSON.stringify(_ctxModal._messages, null, 2));
+    copyLabel.textContent = 'Copied';
+    setTimeout(() => { copyLabel.textContent = 'Copy JSON'; }, 1500);
+  });
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'md-modal-x';
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.innerHTML = icon('x', 14);
+  closeBtn.addEventListener('click', closeCtxModal);
+
+  actions.appendChild(copyBtn);
+  actions.appendChild(closeBtn);
+  head.appendChild(eyebrow);
+  head.appendChild(actions);
+
+  const body = document.createElement('div');
+  body.className = 'ctx-modal-body';
+
+  dialog.appendChild(head);
+  dialog.appendChild(body);
+  overlay.appendChild(dialog);
+
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target === overlay) closeCtxModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeCtxModal();
+  });
+
+  document.body.appendChild(overlay);
+  _ctxModal = { overlay, body, _messages: null };
+  return _ctxModal;
+}
+
+async function openCtxModal(convId, msgId) {
+  const modal = getCtxModal();
+  modal.body.innerHTML = '<p class="ctx-modal-loading">Loading…</p>';
+  modal.overlay.classList.add('open');
+  try {
+    const { messages } = await msgApi.context(convId, msgId);
+    modal._messages = messages;
+    modal.body.innerHTML = '';
+    for (const msg of messages) {
+      const block = document.createElement('div');
+      block.className = 'ctx-msg-block';
+      const role = document.createElement('div');
+      role.className = 'ctx-msg-role';
+      role.textContent = msg.role;
+      const pre = document.createElement('pre');
+      pre.className = 'ctx-msg-content';
+      pre.textContent = msg.content;
+      block.appendChild(role);
+      block.appendChild(pre);
+      modal.body.appendChild(block);
+    }
+  } catch (err) {
+    modal.body.innerHTML = `<p class="ctx-modal-loading">Failed to load context: ${err.message}</p>`;
+  }
+}
+
+function closeCtxModal() {
+  _ctxModal?.overlay.classList.remove('open');
+}
+
 // ── Message footer ───────────────────────────────────────────
 
 function buildFooter(msg, content) {
@@ -366,6 +470,17 @@ function buildFooter(msg, content) {
     forkBtn.innerHTML = icon('fork', 14);
     forkBtn.addEventListener('click', () => showForkConfirm(msg.id));
     footer.appendChild(forkBtn);
+  }
+
+  const convId = msg.conversation_id ?? currentConvId;
+  if (msg.id && convId) {
+    const ctxBtn = document.createElement('button');
+    ctxBtn.className = 'foot-btn';
+    ctxBtn.title = 'View LLM context';
+    ctxBtn.setAttribute('aria-label', 'View LLM context');
+    ctxBtn.innerHTML = icon('list', 14);
+    ctxBtn.addEventListener('click', () => openCtxModal(convId, msg.id));
+    footer.appendChild(ctxBtn);
   }
 
   if (hasStats(msg)) {

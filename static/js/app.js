@@ -120,6 +120,7 @@ async function loadConversation(id, { pushHistory = true } = {}) {
     return;
   }
   activeConversationId = id;
+  thread.setConversationId(id);
   sidebar.setActive(id);
   try {
     const msgs = await msgApi.list(id);
@@ -131,6 +132,7 @@ async function loadConversation(id, { pushHistory = true } = {}) {
     thread.renderMessages(msgs);
   } catch {
     activeConversationId = null;
+    thread.setConversationId(null);
     sidebar.setActive(null);
     thread.showEmpty();
     history.replaceState({ conversationId: null }, '', '/');
@@ -144,6 +146,7 @@ async function newConversation() {
   const conv = await convApi.create(null, model, charId);
   sidebar.addConversation(conv);
   activeConversationId = conv.id;
+  thread.setConversationId(conv.id);
   activeHasMessages = false;
   history.pushState({ conversationId: conv.id }, '', `/?c=${conv.id}`);
   header.setConversation(conv.id, conv.title ?? null);
@@ -162,6 +165,7 @@ async function sendMessage(content) {
     const conv = await convApi.create(null, model, charId);
     sidebar.addConversation(conv);
     activeConversationId = conv.id;
+    thread.setConversationId(conv.id);
     activeHasMessages = false;
     history.pushState({ conversationId: conv.id }, '', `/?c=${conv.id}`);
     header.setConversation(conv.id, conv.title ?? null);
