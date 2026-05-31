@@ -116,6 +116,7 @@ function renderForm(character, modelsData) {
   const model        = character ? character.model                     : (modelsData[0]?.name ?? '');
   const systemPrompt = character ? (character.system_prompt ?? '')     : '';
   const firstMessage = character ? (character.first_message ?? '')     : '';
+  const titlePrompt  = character ? (character.title_prompt  ?? '')     : '';
   const visibility   = character ? character.visibility                : 'private';
   const autoTitle    = character ? !!character.auto_title              : false;
 
@@ -159,6 +160,11 @@ function renderForm(character, modelsData) {
             <div class="toggle${autoTitle ? ' on' : ''}" id="char-auto-title" role="checkbox" aria-checked="${autoTitle}" tabindex="0"></div>
             Generate title after first reply
           </label>
+        </div>
+        <div class="character-form-row">
+          <label class="character-form-lbl" for="char-title-prompt">Title generation prompt</label>
+          <textarea id="char-title-prompt" class="input" rows="3" placeholder="Leave empty to use the default prompt…">${escapeHtml(titlePrompt)}</textarea>
+          <div class="character-form-hint">Default: "Generate a short title (at most 6 words) for the following conversation. Respond with only the title — no quotes, no trailing punctuation, no explanation."</div>
         </div>
         ${isOwnerOrAdmin ? `
         <div class="character-form-row">
@@ -209,6 +215,7 @@ function renderForm(character, modelsData) {
 
   wireAutoExpand('char-system-prompt');
   wireAutoExpand('char-first-message');
+  wireAutoExpand('char-title-prompt');
 
   document.getElementById('char-name').focus();
   document.getElementById('char-save-btn').addEventListener('click', () => {
@@ -328,6 +335,7 @@ function readForm(isOwnerOrAdmin) {
     model:           document.getElementById('char-model')?.value                ?? '',
     system_prompt:   document.getElementById('char-system-prompt')?.value.trim() || null,
     first_message:   document.getElementById('char-first-message')?.value.trim() || null,
+    title_prompt:    document.getElementById('char-title-prompt')?.value.trim()  || null,
     visibility:      isOwnerOrAdmin ? (document.getElementById('char-visibility')?.value ?? undefined) : undefined,
     auto_title:      document.getElementById('char-auto-title')?.classList.contains('on') ?? false,
     hidden_messages: hiddenMessages.map(m => ({ role: m.role, content: m.content })),
@@ -395,6 +403,7 @@ async function cloneChar(character) {
       model:           character.model,
       system_prompt:   character.system_prompt ?? null,
       first_message:   character.first_message ?? null,
+      title_prompt:    character.title_prompt  ?? null,
       visibility:      'private',
       auto_title:      character.auto_title,
       hidden_messages: hiddenMessages.map(m => ({ role: m.role, content: m.content })),

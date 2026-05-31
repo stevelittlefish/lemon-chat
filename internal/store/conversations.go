@@ -108,6 +108,23 @@ func (s *Store) DeleteStaleConversations() (conversations, messages int64, err e
 	return conversations, messages, nil
 }
 
+// GetConversationTitlePrompt returns the title_prompt from the character associated with a
+// conversation, or an empty string if the conversation has no character or the character has
+// no custom title prompt set.
+func (s *Store) GetConversationTitlePrompt(convID int64) (string, error) {
+	var prompt string
+	err := s.db.QueryRow(
+		`SELECT COALESCE(ch.title_prompt, '')
+		 FROM conversation conv
+		 JOIN character ch ON ch.id = conv.character_id
+		 WHERE conv.id = ?`, convID,
+	).Scan(&prompt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return prompt, err
+}
+
 func (s *Store) ListUntitledEligible() ([]int64, error) {
 	fiveMinAgo := time.Now().UTC().Add(-5 * time.Minute).Format(time.RFC3339)
 	rows, err := s.db.Query(`

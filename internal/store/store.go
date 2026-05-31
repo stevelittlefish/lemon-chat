@@ -199,6 +199,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v6 → v7 complete")
 	}
 
+	if version < 8 {
+		log.Println("store: migrating v7 → v8 (add title_prompt to character)")
+		if _, err := s.db.Exec(`ALTER TABLE character ADD COLUMN title_prompt TEXT`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (8, ?)`, now()); err != nil {
+			return err
+		}
+		version = 8
+		log.Println("store: migration v7 → v8 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

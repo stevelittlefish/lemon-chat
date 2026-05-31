@@ -66,6 +66,7 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 		Model          string                         `json:"model"`
 		SystemPrompt   *string                        `json:"system_prompt"`
 		FirstMessage   *string                        `json:"first_message"`
+		TitlePrompt    *string                        `json:"title_prompt"`
 		Visibility     string                         `json:"visibility"`
 		AutoTitle      bool                           `json:"auto_title"`
 		HiddenMessages []store.CharacterHiddenMessage `json:"hidden_messages"`
@@ -81,7 +82,7 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 	if !validVisibility(req.Visibility) {
 		req.Visibility = "private"
 	}
-	char, err := s.store.CreateCharacter(req.Name, req.Model, req.SystemPrompt, req.FirstMessage, user.ID, req.Visibility, req.AutoTitle)
+	char, err := s.store.CreateCharacter(req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.TitlePrompt, user.ID, req.Visibility, req.AutoTitle)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -125,6 +126,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		Model          string                          `json:"model"`
 		SystemPrompt   *string                         `json:"system_prompt"`
 		FirstMessage   *string                         `json:"first_message"`
+		TitlePrompt    *string                         `json:"title_prompt"`
 		Visibility     string                          `json:"visibility"`
 		AutoTitle      bool                            `json:"auto_title"`
 		HiddenMessages *[]store.CharacterHiddenMessage `json:"hidden_messages"`
@@ -133,6 +135,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		Model:        existing.Model,
 		SystemPrompt: existing.SystemPrompt,
 		FirstMessage: existing.FirstMessage,
+		TitlePrompt:  existing.TitlePrompt,
 		Visibility:   existing.Visibility,
 		AutoTitle:    existing.AutoTitle,
 	}
@@ -150,7 +153,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 	} else if !validVisibility(req.Visibility) {
 		req.Visibility = existing.Visibility
 	}
-	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.Visibility, req.AutoTitle); err != nil {
+	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.TitlePrompt, req.Visibility, req.AutoTitle); err != nil {
 		internalError(w, err)
 		return
 	}

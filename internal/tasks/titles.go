@@ -99,6 +99,8 @@ func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, st
 	}
 }
 
+const defaultTitlePrompt = "Generate a short title (at most 6 words) for the following conversation. Respond with only the title — no quotes, no trailing punctuation, no explanation."
+
 func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID int64) (string, error) {
 	msgs, err := st.ListMessages(convID)
 	if err != nil {
@@ -106,6 +108,13 @@ func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID in
 	}
 	if len(msgs) == 0 {
 		return "", fmt.Errorf("no messages")
+	}
+
+	systemPrompt := defaultTitlePrompt
+	if p, err := st.GetConversationTitlePrompt(convID); err != nil {
+		log.Printf("title worker: get title prompt for conversation %d: %v", convID, err)
+	} else if p != "" {
+		systemPrompt = p
 	}
 
 	type chatMsg struct {
@@ -116,7 +125,7 @@ func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID in
 	out := []chatMsg{
 		{
 			Role:    "system",
-			Content: "Generate a short title (at most 6 words) for the following conversation. Respond with only the title — no quotes, no trailing punctuation, no explanation.",
+			Content: systemPrompt,
 		},
 	}
 

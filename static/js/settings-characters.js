@@ -208,6 +208,7 @@ async function exportChar(id) {
     model:           data.model,
     system_prompt:   data.system_prompt,
     first_message:   data.first_message,
+    title_prompt:    data.title_prompt,
     visibility:      data.visibility,
     auto_title:      data.auto_title,
     hidden_messages: (data.hidden_messages || []).map(m => ({
