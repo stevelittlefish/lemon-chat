@@ -66,6 +66,53 @@ export function showEmpty() {
   `;
 }
 
+export function showPicker(models, characters, onSelect) {
+  const modelCards = models.map(m => `
+    <button class="picker-card" data-type="model" data-name="${escHtml(m.name)}">
+      <span class="picker-card-icon">${icon('cpu', 22)}</span>
+      <span class="picker-card-name">${escHtml(m.display_name)}</span>
+    </button>
+  `).join('');
+
+  const charCards = characters.map(c => `
+    <button class="picker-card" data-type="character" data-id="${c.id}">
+      ${c.has_avatar
+        ? `<div class="picker-card-avatar"><img src="/api/characters/${c.id}/avatar" alt=""></div>`
+        : `<span class="picker-card-icon">${icon('drama', 22)}</span>`
+      }
+      <span class="picker-card-name">${escHtml(c.name)}</span>
+    </button>
+  `).join('');
+
+  threadEl.innerHTML = `
+    <div class="picker">
+      <div class="picker-section">
+        <div class="picker-section-label">models</div>
+        <div class="picker-grid">${modelCards}</div>
+      </div>
+      ${characters.length ? `
+        <div class="picker-section">
+          <div class="picker-section-label">characters</div>
+          <div class="picker-grid">${charCards}</div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  threadEl.querySelectorAll('.picker-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sel = btn.dataset.type === 'model'
+        ? { type: 'model', name: btn.dataset.name }
+        : { type: 'character', id: Number(btn.dataset.id) };
+      onSelect(sel);
+    });
+  });
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 export function renderMessages(msgs) {
   threadEl.innerHTML = '';
   if (!msgs.length) {

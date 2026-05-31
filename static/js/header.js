@@ -52,6 +52,15 @@ export function getSelection() {
   return state.selection;
 }
 
+// Directly set the active selection and update the picker label.
+export function selectDirect(sel) {
+  state.selection = sel;
+  const label = document.getElementById('model-label');
+  if (label) label.textContent = selectedDisplayName();
+  const typeIcon = document.getElementById('model-type-icon');
+  if (typeIcon) typeIcon.innerHTML = icon(selectionIcon(), 13);
+}
+
 function render() {
   const hasConv = state.conversationId !== null;
   headerEl.innerHTML = `

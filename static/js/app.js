@@ -10,10 +10,12 @@ const loginScreen = document.getElementById('login-screen');
 const appEl = document.getElementById('app');
 const loginForm = document.getElementById('login-form');
 const loginError = document.getElementById('login-error');
+const composerContainer = document.getElementById('composer-container');
 
 let currentUser = null;
 let activeConversationId = null;
 let activeHasMessages = false;
+let modelList = [];
 let characterList = [];
 
 async function start() {
@@ -54,24 +56,57 @@ function getConversationIdFromUrl() {
   return c ? Number(c) : null;
 }
 
+function showPickerScreen() {
+  composerContainer.classList.add('hidden');
+  thread.showPicker(modelList, characterList, handlePickerSelect);
+}
+
+async function handlePickerSelect(sel) {
+  header.selectDirect(sel);
+
+  if (sel.type === 'model') {
+    composerContainer.classList.remove('hidden');
+    thread.showEmpty();
+    return;
+  }
+
+  // Character: create conversation so the first message can be shown.
+  try {
+    const conv = await convApi.create(null, null, sel.id);
+    sidebar.addConversation(conv);
+    activeConversationId = conv.id;
+    thread.setConversationId(conv.id);
+    activeHasMessages = false;
+    history.pushState({ conversationId: conv.id }, '', `/?c=${conv.id}`);
+    header.setConversation(conv.id, conv.title ?? null);
+    applyAvatarContext(sel.id);
+    composerContainer.classList.remove('hidden');
+    thread.showEmpty();
+    await applyFirstMessage(conv.id, null);
+  } catch {
+    // Creation failed — stay on picker
+  }
+}
+
 async function initApp() {
-  const [modelList, chars] = await Promise.all([
+  const [models, chars] = await Promise.all([
     modelApi.list(),
     characterApi.list(),
     sidebar.load(),
     preloadIcons(),
   ]);
+  modelList = models;
   characterList = chars;
 
   sidebar.init({
     username: currentUser.username,
     onSelect: loadConversation,
-    onNew: newConversation,
+    onNew: showPickerScreen,
   });
 
   header.init({
     models: modelList,
-    characters: chars,
+    characters: characterList,
     onChange: handleSelectionChange,
   });
 
@@ -91,7 +126,7 @@ async function initApp() {
   if (initialId) {
     await loadConversation(initialId, { pushHistory: false });
   } else {
-    thread.showEmpty();
+    showPickerScreen();
   }
 }
 
@@ -115,10 +150,11 @@ async function loadConversation(id, { pushHistory = true } = {}) {
     activeConversationId = null;
     activeHasMessages = false;
     header.setConversation(null, null);
-    thread.showEmpty();
     sidebar.setActive(null);
+    showPickerScreen();
     return;
   }
+  composerContainer.classList.remove('hidden');
   activeConversationId = id;
   thread.setConversationId(id);
   sidebar.setActive(id);
@@ -134,26 +170,8 @@ async function loadConversation(id, { pushHistory = true } = {}) {
     activeConversationId = null;
     thread.setConversationId(null);
     sidebar.setActive(null);
-    thread.showEmpty();
     history.replaceState({ conversationId: null }, '', '/');
-  }
-}
-
-async function newConversation() {
-  const sel = header.getSelection();
-  const model = sel?.type === 'model' ? sel.name : null;
-  const charId = sel?.type === 'character' ? sel.id : null;
-  const conv = await convApi.create(null, model, charId);
-  sidebar.addConversation(conv);
-  activeConversationId = conv.id;
-  thread.setConversationId(conv.id);
-  activeHasMessages = false;
-  history.pushState({ conversationId: conv.id }, '', `/?c=${conv.id}`);
-  header.setConversation(conv.id, conv.title ?? null);
-  applyAvatarContext(charId);
-  thread.showEmpty();
-  if (charId !== null) {
-    await applyFirstMessage(conv.id, null);
+    showPickerScreen();
   }
 }
 

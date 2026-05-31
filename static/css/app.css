@@ -761,6 +761,87 @@ html, body {
   margin-left: 3px;
 }
 
+/* ── Start screen picker ────────────────────────────────────── */
+
+.picker {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding-top: var(--space-2);
+}
+
+.picker-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.picker-section-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-faint);
+}
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: var(--space-3);
+}
+
+.picker-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--paper-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+
+.picker-card:hover {
+  background: var(--lemon-50);
+  border-color: var(--lemon-300);
+}
+
+.picker-card-icon {
+  color: var(--fg-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.picker-card-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.picker-card-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.picker-card-name {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--fg);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
 /* ── Markdown modal ─────────────────────────────────────────── */
 
 .md-modal {
