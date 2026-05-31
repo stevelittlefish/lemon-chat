@@ -143,3 +143,4 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] Keyboard shortcuts
 - [ ] Conversation export
 - [x] Docker Compose setup
+- [x] Fork conversation — duplicate up to a chosen assistant message (`POST /api/conversations/{id}/fork`)

@@ -6,6 +6,11 @@ const container = document.getElementById('thread-container');
 
 let userScrolledDuringStream = false;
 let programmaticScroll = false;
+let forkHandler = null;
+
+export function setForkHandler(fn) {
+  forkHandler = fn;
+}
 
 // Avatar context — set by app.js whenever the active conversation changes.
 let avatarCtx = {
@@ -90,6 +95,7 @@ export function startStreaming() {
 
   let accumulated = '';
   let streamStats = null;
+  let streamMsgId = null;
 
   return {
     setName(name) {
@@ -103,6 +109,9 @@ export function startStreaming() {
     setStats(stats) {
       streamStats = stats;
     },
+    setMessageId(id) {
+      streamMsgId = id;
+    },
     finish() {
       const shouldScroll = !userScrolledDuringStream;
       userScrolledDuringStream = false;
@@ -110,7 +119,7 @@ export function startStreaming() {
         wrapper.remove();
       } else {
         contentEl.innerHTML = renderMarkdown(accumulated);
-        colEl.appendChild(buildFooter(streamStats || {}, accumulated));
+        colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId }, accumulated));
         if (shouldScroll) scrollToBottom();
       }
     },
@@ -259,6 +268,83 @@ function closeMdModal() {
   _mdModal?.overlay.classList.remove('open');
 }
 
+// ── Fork confirmation modal ──────────────────────────────────
+
+let _forkModal = null;
+
+function getForkModal() {
+  if (_forkModal) return _forkModal;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'fork-modal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Duplicate conversation');
+
+  const dialog = document.createElement('div');
+  dialog.className = 'fork-modal-dialog';
+
+  const title = document.createElement('p');
+  title.className = 'fork-modal-title';
+  title.textContent = 'Duplicate conversation';
+
+  const body = document.createElement('p');
+  body.className = 'fork-modal-body';
+  body.textContent = 'This will create a new conversation containing all messages up to and including this one. The title will be prefixed with "copy:".';
+
+  const actions = document.createElement('div');
+  actions.className = 'fork-modal-actions';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn-secondary btn-sm';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', closeForkModal);
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'btn btn-primary btn-sm';
+  confirmBtn.textContent = 'Duplicate';
+
+  actions.appendChild(cancelBtn);
+  actions.appendChild(confirmBtn);
+  dialog.appendChild(title);
+  dialog.appendChild(body);
+  dialog.appendChild(actions);
+  overlay.appendChild(dialog);
+
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target === overlay) closeForkModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeForkModal();
+  });
+
+  document.body.appendChild(overlay);
+  _forkModal = { overlay, confirmBtn };
+  return _forkModal;
+}
+
+function showForkConfirm(messageId) {
+  const { overlay, confirmBtn } = getForkModal();
+  const newConfirm = confirmBtn.cloneNode(true);
+  newConfirm.textContent = 'Duplicate';
+  newConfirm.addEventListener('click', async () => {
+    newConfirm.disabled = true;
+    newConfirm.textContent = 'Duplicating…';
+    try {
+      await forkHandler?.(messageId);
+    } finally {
+      closeForkModal();
+    }
+  });
+  confirmBtn.replaceWith(newConfirm);
+  _forkModal.confirmBtn = newConfirm;
+  overlay.classList.add('open');
+}
+
+function closeForkModal() {
+  _forkModal?.overlay.classList.remove('open');
+}
+
 // ── Message footer ───────────────────────────────────────────
 
 function buildFooter(msg, content) {
@@ -272,6 +358,16 @@ function buildFooter(msg, content) {
   clipBtn.innerHTML = icon('code');
   clipBtn.addEventListener('click', () => openMdModal(content));
   footer.appendChild(clipBtn);
+
+  if (msg.role === 'assistant' && msg.id) {
+    const forkBtn = document.createElement('button');
+    forkBtn.className = 'foot-btn';
+    forkBtn.title = 'Duplicate conversation to this point';
+    forkBtn.setAttribute('aria-label', 'Duplicate conversation to this point');
+    forkBtn.innerHTML = icon('fork', 14);
+    forkBtn.addEventListener('click', () => showForkConfirm(msg.id));
+    footer.appendChild(forkBtn);
+  }
 
   if (hasStats(msg)) {
     const infoWrap = document.createElement('div');

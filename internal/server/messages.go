@@ -251,13 +251,15 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
-	fmt.Fprintf(w, "data: [DONE]\n\n")
-	flusher.Flush()
-
 	// Persist completed assistant message and update conversation model/character.
 	if fullContent != "" {
-		_, _ = s.store.CreateMessage(convID, "assistant", fullContent, usedCharacterID, &assistantName, usageStats)
+		msg, err := s.store.CreateMessage(convID, "assistant", fullContent, usedCharacterID, &assistantName, usageStats)
 		_ = s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID)
+		if err == nil {
+			idJSON, _ := json.Marshal(map[string]int64{"message_id": msg.ID})
+			fmt.Fprintf(w, "data: %s\n\n", idJSON)
+			flusher.Flush()
+		}
 
 		// Trigger auto-title on the first completed exchange when the character requests it.
 		// Count user messages in history — if this is the only one, it's the first exchange.
@@ -288,6 +290,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	fmt.Fprintf(w, "data: [DONE]\n\n")
+	flusher.Flush()
 }
 
 func writeSSEError(w io.Writer, msg string) {

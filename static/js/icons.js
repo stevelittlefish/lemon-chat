@@ -4,7 +4,7 @@ const ICONS = [
   'plus', 'trash', 'settings', 'log-out', 'send',
   'cpu', 'drama', 'chevron-down', 'arrow-left', 'user', 'users',
   'lock', 'eye', 'pencil', 'check', 'info', 'x', 'code',
-  'ellipsis-vertical', 'refresh-cw',
+  'ellipsis-vertical', 'refresh-cw', 'copy', 'fork',
 ];
 
 export async function preload() {

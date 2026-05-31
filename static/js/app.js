@@ -76,6 +76,13 @@ async function initApp() {
     onSend: sendMessage,
   });
 
+  thread.setForkHandler(async (messageId) => {
+    if (!activeConversationId) return;
+    const conv = await convApi.fork(activeConversationId, messageId);
+    sidebar.addConversation(conv);
+    await loadConversation(conv.id);
+  });
+
   const initialId = getConversationIdFromUrl();
   history.replaceState({ conversationId: initialId ?? null }, '', location.href);
   if (initialId) {
@@ -171,6 +178,7 @@ async function sendMessage(content) {
     onName: (name) => stream.setName(name),
     onDelta: (delta) => stream.append(delta),
     onStats: (stats) => stream.setStats(stats),
+    onMessageId: (id) => stream.setMessageId(id),
     onDone: () => {
       stream.finish();
       composer.setStreaming(false);

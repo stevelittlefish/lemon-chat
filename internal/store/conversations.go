@@ -108,9 +108,77 @@ func (s *Store) DeleteStaleConversations() (conversations, messages int64, err e
 	return conversations, messages, nil
 }
 
-// GetConversationTitlePrompt returns the title_prompt from the character associated with a
-// conversation, or an empty string if the conversation has no character or the character has
-// no custom title prompt set.
+func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int64) (*Conversation, error) {
+	src, err := s.GetConversation(sourceConvID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	title := "copy: untitled"
+	if src.Title != nil {
+		title = "copy: " + *src.Title
+	}
+
+	// Verify untilMessageID belongs to this conversation.
+	var check int
+	err = s.db.QueryRow(
+		`SELECT COUNT(*) FROM message WHERE id = ? AND conversation_id = ?`,
+		untilMessageID, sourceConvID,
+	).Scan(&check)
+	if err != nil || check == 0 {
+		return nil, ErrNotFound
+	}
+
+	newConv, err := s.CreateConversation(userID, &title, src.Model, src.CharacterID)
+	if err != nil {
+		return nil, err
+	}
+
+	type msgRow struct {
+		role, content        string
+		name                 *string
+		charID               *int64
+		promptTokens         *int64
+		completionTokens     *int64
+		totalTimeMS          *int64
+	}
+
+	rows, err := s.db.Query(
+		`SELECT role, content, name, character_id, prompt_tokens, completion_tokens, total_time_ms
+		 FROM message WHERE conversation_id = ? AND id <= ? ORDER BY created_at ASC`,
+		sourceConvID, untilMessageID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	var msgRows []msgRow
+	for rows.Next() {
+		var m msgRow
+		if err := rows.Scan(&m.role, &m.content, &m.name, &m.charID, &m.promptTokens, &m.completionTokens, &m.totalTimeMS); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		msgRows = append(msgRows, m)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	t := now()
+	for _, m := range msgRows {
+		if _, err := s.db.Exec(
+			`INSERT INTO message (conversation_id, role, content, name, character_id, created_at, prompt_tokens, completion_tokens, total_time_ms)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			newConv.ID, m.role, m.content, m.name, m.charID, t, m.promptTokens, m.completionTokens, m.totalTimeMS,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	return newConv, nil
+}
+
 func (s *Store) GetConversationTitlePrompt(convID int64) (string, error) {
 	var prompt string
 	err := s.db.QueryRow(

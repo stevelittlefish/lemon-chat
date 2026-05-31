@@ -45,6 +45,7 @@ export const models = {
 export const conversations = {
   list: () => request('GET', '/api/conversations'),
   create: (title, model, characterId) => request('POST', '/api/conversations', { title, model, character_id: characterId }),
+  fork: (id, messageId) => request('POST', `/api/conversations/${id}/fork`, { message_id: messageId }),
   delete: (id) => request('DELETE', `/api/conversations/${id}`),
   regenerateTitle: (id) => request('POST', `/api/conversations/${id}/regenerate-title`),
 };
@@ -57,7 +58,7 @@ export const messages = {
     return request('POST', `/api/conversations/${conversationId}/first-message`, body);
   },
   // selection: { type: 'model', name } | { type: 'character', id } | null
-  send: (conversationId, content, selection, { onName, onDelta, onDone, onError, onStats }) => {
+  send: (conversationId, content, selection, { onName, onDelta, onDone, onError, onStats, onMessageId }) => {
     const url = `/api/conversations/${conversationId}/messages`;
     const body = { content };
     if (selection?.type === 'model') body.model = selection.name;
@@ -86,11 +87,12 @@ export const messages = {
           const payload = line.slice(6);
           if (payload === '[DONE]') { onDone?.(); return; }
           try {
-            const { delta, error, name, stats } = JSON.parse(payload);
+            const { delta, error, name, stats, message_id } = JSON.parse(payload);
             if (error) { onError?.(new Error(error)); return; }
             if (name) onName?.(name);
             if (delta) onDelta?.(delta);
             if (stats) onStats?.(stats);
+            if (message_id) onMessageId?.(message_id);
           } catch { /* malformed chunk, skip */ }
         }
       }

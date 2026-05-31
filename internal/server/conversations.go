@@ -66,6 +66,31 @@ func (s *Server) handleRegenerateTitle(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (s *Server) handleForkConversation(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var req struct {
+		MessageID int64 `json:"message_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.MessageID == 0 {
+		writeError(w, http.StatusBadRequest, "message_id required")
+		return
+	}
+	conv, err := s.store.ForkConversation(id, user.ID, req.MessageID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	} else if err != nil {
+		internalError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, conv)
+}
+
 func (s *Server) handleDeleteConversation(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)

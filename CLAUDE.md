@@ -46,6 +46,12 @@ Non-negotiable design rules:
 - Lucide icons (1.8px stroke) for UI; hand-drawn SVGs for brand decoration only
 - No glass/backdrop-blur, no bluish-purple gradients, no left-border-accent cards
 
+## Icons
+
+Icons are Lucide SVGs served from `static/assets/icons/` and loaded by `static/js/icons.js`.
+
+**Whenever you use a new icon name, you must add it to the `ICONS` array in `icons.js`.** Icons not in that list are preloaded at startup; any name missing from the list will return an empty string from `icon()` and render as nothing.
+
 ## Code layout
 
 ```
