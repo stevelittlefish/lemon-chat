@@ -37,6 +37,9 @@ function showApp() {
     sidebar.updateTitle(id, title);
     if (id === activeConversationId) header.updateTitle(title);
   });
+  ws.on('conversations_changed', () => {
+    sidebar.load();
+  });
   ws.connect();
   window.addEventListener('popstate', (e) => {
     const id = e.state?.conversationId ?? null;

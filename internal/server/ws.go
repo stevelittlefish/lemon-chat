@@ -63,6 +63,11 @@ func (h *Hub) BroadcastTitleUpdate(convID int64, title string) {
 	h.broadcast(data)
 }
 
+func (h *Hub) BroadcastConversationListChanged() {
+	data, _ := json.Marshal(map[string]any{"type": "conversations_changed"})
+	h.broadcast(data)
+}
+
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session")
 	if err != nil {

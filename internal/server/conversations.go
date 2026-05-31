@@ -88,6 +88,7 @@ func (s *Server) handleForkConversation(w http.ResponseWriter, r *http.Request) 
 		internalError(w, err)
 		return
 	}
+	s.hub.BroadcastConversationListChanged()
 	writeJSON(w, http.StatusCreated, conv)
 }
 
