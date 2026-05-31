@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
+	"github.com/stevelittlefish/lemon-chat/internal/debug"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
@@ -29,9 +31,11 @@ func StartTitleWorker(st *store.Store, cfg *config.Config, onTitled func(int64, 
 // GenerateTitleForConversation generates a title for convID and persists it.
 // It runs the generation in a goroutine and calls onTitled on success.
 func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID int64, onTitled func(int64, string)) {
+	debug.Log("title: GenerateTitleForConversation triggered for conversation %d", convID)
 	go func() {
 		modelName := cfg.DefaultModel
 		if modelName == "" {
+			log.Printf("title worker: no default_model configured, skipping conversation %d", convID)
 			return
 		}
 		apiBase, err := cfg.APIBaseForModel(modelName)
@@ -40,6 +44,7 @@ func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID in
 			return
 		}
 		chatURL := apiBase + "/chat/completions"
+		debug.Log("title: generating title for conversation %d using model %q at %s", convID, modelName, chatURL)
 		title, err := generateTitle(st, chatURL, modelName, convID)
 		if err != nil {
 			log.Printf("title worker: conversation %d: %v", convID, err)
@@ -72,6 +77,9 @@ func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, st
 	if err != nil {
 		log.Printf("title worker: list eligible: %v", err)
 		return
+	}
+	if len(ids) > 0 {
+		debug.Log("title: background worker found %d untitled eligible conversation(s): %v", len(ids), ids)
 	}
 
 	for _, id := range ids {
@@ -132,11 +140,23 @@ func generateTitle(st *store.Store, chatURL, modelName string, convID int64) (st
 		"max_tokens": 20,
 	})
 
+	debug.Log("title: POST %s (model=%s, conv=%d, %d messages)", chatURL, modelName, convID, len(out)-1)
 	resp, err := http.Post(chatURL, "application/json", bytes.NewReader(payload)) //nolint:gosec
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("POST %s: %w", chatURL, err)
 	}
 	defer resp.Body.Close()
+	debug.Log("title: response status %d for conversation %d", resp.StatusCode, convID)
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read response: %w", err)
+	}
+	debug.Log("title: response body for conversation %d: %s", convID, body)
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("model server returned %d: %s", resp.StatusCode, body)
+	}
 
 	var result struct {
 		Choices []struct {
@@ -145,8 +165,8 @@ func generateTitle(st *store.Store, chatURL, modelName string, convID int64) (st
 			} `json:"message"`
 		} `json:"choices"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
 	}
 	if len(result.Choices) == 0 {
 		return "", fmt.Errorf("no choices in response")

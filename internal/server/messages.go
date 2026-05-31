@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stevelittlefish/lemon-chat/internal/debug"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
@@ -258,6 +259,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 					userMsgCount++
 				}
 			}
+			debug.Log("title trigger (character auto-title): conv=%d userMsgCount=%d autoTitle=%v titleIsNil=%v", convID, userMsgCount, usedCharacter.AutoTitle, conv.Title == nil)
 			if userMsgCount == 1 {
 				tasks.GenerateTitleForConversation(s.store, s.cfg, convID, s.hub.BroadcastTitleUpdate)
 			}
@@ -271,6 +273,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 					assistantMsgCount++
 				}
 			}
+			debug.Log("title trigger (3rd assistant): conv=%d assistantMsgCount=%d (need >=2 to fire)", convID, assistantMsgCount)
 			if assistantMsgCount >= 2 {
 				tasks.GenerateTitleForConversation(s.store, s.cfg, convID, s.hub.BroadcastTitleUpdate)
 			}

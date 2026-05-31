@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
+	"github.com/stevelittlefish/lemon-chat/internal/debug"
 	"github.com/stevelittlefish/lemon-chat/internal/server"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"github.com/stevelittlefish/lemon-chat/internal/tasks"
@@ -21,6 +22,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
+
+	debug.Enabled = cfg.Debug
 
 	st, err := store.Open(cfg.Server.DBPath)
 	if err != nil {

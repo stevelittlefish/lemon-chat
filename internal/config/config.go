@@ -12,6 +12,7 @@ import (
 type Config struct {
 	Server       Server        `toml:"server"`
 	Bootstrap    Bootstrap     `toml:"bootstrap"`
+	Debug        bool          `toml:"debug"`
 	DefaultModel string        `toml:"default_model"`
 	ModelServers []ModelServer `toml:"model_server"`
 	Models       []Model       `toml:"model"`
@@ -49,8 +50,12 @@ func Load(path string) (*Config, error) {
 		},
 	}
 
-	if _, err := toml.DecodeFile(path, cfg); err != nil {
+	meta, err := toml.DecodeFile(path, cfg)
+	if err != nil {
 		return nil, err
+	}
+	if keys := meta.Undecoded(); len(keys) > 0 {
+		return nil, fmt.Errorf("config: unknown or misplaced keys: %v", keys)
 	}
 
 	applyEnv(cfg)
