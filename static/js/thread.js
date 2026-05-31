@@ -323,21 +323,20 @@ function getForkModal() {
   return _forkModal;
 }
 
+
 function showForkConfirm(messageId) {
   const { overlay, confirmBtn } = getForkModal();
-  const newConfirm = confirmBtn.cloneNode(true);
-  newConfirm.textContent = 'Duplicate';
-  newConfirm.addEventListener('click', async () => {
-    newConfirm.disabled = true;
-    newConfirm.textContent = 'Duplicating…';
+  confirmBtn.disabled = false;
+  confirmBtn.textContent = 'Duplicate';
+  confirmBtn.onclick = async () => {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Duplicating…';
     try {
       await forkHandler?.(messageId);
     } finally {
       closeForkModal();
     }
-  });
-  confirmBtn.replaceWith(newConfirm);
-  _forkModal.confirmBtn = newConfirm;
+  };
   overlay.classList.add('open');
 }
 
