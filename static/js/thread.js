@@ -2,6 +2,21 @@ import { render as renderMarkdown } from './markdown.js';
 import { icon } from './icons.js';
 import { messages as msgApi } from './api.js';
 
+async function copyToClipboard(text) {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  document.execCommand('copy');
+  ta.remove();
+}
+
 const threadEl = document.getElementById('thread');
 const container = document.getElementById('thread-container');
 
@@ -229,7 +244,7 @@ function getMdModal() {
   copyLabel.textContent = 'Copy';
   copyBtn.appendChild(copyLabel);
   copyBtn.addEventListener('click', async () => {
-    await navigator.clipboard.writeText(pre.textContent);
+    await copyToClipboard(pre.textContent);
     copyLabel.textContent = 'Copied';
     setTimeout(() => { copyLabel.textContent = 'Copy'; }, 1500);
   });
@@ -383,7 +398,7 @@ function getCtxModal() {
   copyBtn.appendChild(copyLabel);
   copyBtn.addEventListener('click', async () => {
     if (!_ctxModal?._messages) return;
-    await navigator.clipboard.writeText(JSON.stringify(_ctxModal._messages, null, 2));
+    await copyToClipboard(JSON.stringify(_ctxModal._messages, null, 2));
     copyLabel.textContent = 'Copied';
     setTimeout(() => { copyLabel.textContent = 'Copy JSON'; }, 1500);
   });
