@@ -78,7 +78,7 @@ export function showPicker(models, characters, onSelect) {
     <button class="picker-card" data-type="character" data-id="${c.id}">
       ${c.has_avatar
         ? `<div class="picker-card-avatar"><img src="/api/characters/${c.id}/avatar" alt=""></div>`
-        : `<span class="picker-card-icon">${icon('drama', 22)}</span>`
+        : `<div class="picker-card-avatar picker-card-avatar--placeholder">${icon('drama', 20)}</div>`
       }
       <span class="picker-card-name">${escHtml(c.name)}</span>
     </button>

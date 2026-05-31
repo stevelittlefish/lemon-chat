@@ -834,6 +834,14 @@ html, body {
   display: block;
 }
 
+.picker-card-avatar--placeholder {
+  background: var(--bg-sunken);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-muted);
+}
+
 .picker-card-name {
   font-size: var(--fs-14);
   font-weight: 600;

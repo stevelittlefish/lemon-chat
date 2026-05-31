@@ -273,7 +273,7 @@ func (s *Server) handleDeleteCharacterAvatar(w http.ResponseWriter, r *http.Requ
 		internalError(w, err)
 		return
 	}
-	if existing.CreatedBy != user.ID && !user.IsAdmin {
+	if existing.CreatedBy != user.ID && !user.IsAdmin && existing.Visibility != "readwrite" {
 		writeError(w, http.StatusForbidden, "forbidden")
 		return
 	}
