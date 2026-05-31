@@ -1,17 +1,20 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
 
 type Config struct {
-	Server      Server      `toml:"server"`
-	Bootstrap   Bootstrap   `toml:"bootstrap"`
-	ModelServer ModelServer `toml:"model_server"`
-	Models      []Model     `toml:"model"`
+	Server       Server        `toml:"server"`
+	Bootstrap    Bootstrap     `toml:"bootstrap"`
+	DefaultModel string        `toml:"default_model"`
+	ModelServers []ModelServer `toml:"model_server"`
+	Models       []Model       `toml:"model"`
 }
 
 type Server struct {
@@ -25,13 +28,14 @@ type Bootstrap struct {
 }
 
 type ModelServer struct {
+	Name    string `toml:"name"`
 	APIBase string `toml:"api_base"`
-	Default string `toml:"default"`
 }
 
 type Model struct {
 	Name        string `toml:"name"`
 	DisplayName string `toml:"display_name"`
+	ModelServer string `toml:"model_server"`
 }
 
 func Load(path string) (*Config, error) {
@@ -50,7 +54,46 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyEnv(cfg)
+
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
 	return cfg, nil
+}
+
+func (c *Config) Validate() error {
+	serverNames := make(map[string]struct{}, len(c.ModelServers))
+	for _, s := range c.ModelServers {
+		if s.Name == "" {
+			return fmt.Errorf("config: model_server missing name field")
+		}
+		serverNames[s.Name] = struct{}{}
+	}
+	for _, m := range c.Models {
+		if m.ModelServer == "" {
+			return fmt.Errorf("config: model %q missing model_server field", m.Name)
+		}
+		if _, ok := serverNames[m.ModelServer]; !ok {
+			return fmt.Errorf("config: model %q references unknown model_server %q", m.Name, m.ModelServer)
+		}
+	}
+	return nil
+}
+
+// APIBaseForModel returns the trimmed api_base URL for the server that hosts modelName.
+func (c *Config) APIBaseForModel(modelName string) (string, error) {
+	for _, m := range c.Models {
+		if m.Name == modelName {
+			for _, s := range c.ModelServers {
+				if s.Name == m.ModelServer {
+					return strings.TrimRight(s.APIBase, "/"), nil
+				}
+			}
+			return "", fmt.Errorf("config: model server %q not found", m.ModelServer)
+		}
+	}
+	return "", fmt.Errorf("config: model %q not found", modelName)
 }
 
 func applyEnv(cfg *Config) {

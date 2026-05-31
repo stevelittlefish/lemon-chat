@@ -30,11 +30,16 @@ func StartTitleWorker(st *store.Store, cfg *config.Config, onTitled func(int64, 
 // It runs the generation in a goroutine and calls onTitled on success.
 func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID int64, onTitled func(int64, string)) {
 	go func() {
-		modelName := cfg.ModelServer.Default
+		modelName := cfg.DefaultModel
 		if modelName == "" {
 			return
 		}
-		chatURL := strings.TrimRight(cfg.ModelServer.APIBase, "/") + "/chat/completions"
+		apiBase, err := cfg.APIBaseForModel(modelName)
+		if err != nil {
+			log.Printf("title worker: %v", err)
+			return
+		}
+		chatURL := apiBase + "/chat/completions"
 		title, err := generateTitle(st, chatURL, modelName, convID)
 		if err != nil {
 			log.Printf("title worker: conversation %d: %v", convID, err)
@@ -52,11 +57,16 @@ func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID in
 }
 
 func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, string)) {
-	modelName := cfg.ModelServer.Default
+	modelName := cfg.DefaultModel
 	if modelName == "" {
 		return
 	}
-	chatURL := strings.TrimRight(cfg.ModelServer.APIBase, "/") + "/chat/completions"
+	apiBase, err := cfg.APIBaseForModel(modelName)
+	if err != nil {
+		log.Printf("title worker: %v", err)
+		return
+	}
+	chatURL := apiBase + "/chat/completions"
 
 	ids, err := st.ListUntitledEligible()
 	if err != nil {

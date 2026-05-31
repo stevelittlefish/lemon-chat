@@ -9,14 +9,27 @@ db_path = "lemon.db"
 admin_username = "admin"
 admin_password = ""        # empty = no password required to log in
 
-[model_server]
+# The model used for background tasks (e.g. auto-title generation).
+# Must match the name of one of the [[model]] entries below.
+default_model = "meta-llama/Llama-3.2-8B-Instruct"
+
+# One [[model_server]] section per OpenAI-compatible inference server.
+# The name is referenced by each [[model]] entry via model_server.
+[[model_server]]
+name     = "local"
 api_base = "http://localhost:8000/v1"
-default  = "meta-llama/Llama-3.2-8B-Instruct"
+
+# Add more servers as needed:
+# [[model_server]]
+# name     = "remote"
+# api_base = "http://remote-host:8000/v1"
 
 [[model]]
 name         = "meta-llama/Llama-3.2-8B-Instruct"
 display_name = "Llama 3.2 8B"
+model_server = "local"
 
 [[model]]
 name         = "mistralai/Mistral-7B-Instruct-v0.3"
 display_name = "Mistral 7B"
+model_server = "local"

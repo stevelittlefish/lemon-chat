@@ -132,18 +132,12 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		assistantName = modelName
 	}
 
-	known := false
-	for _, m := range s.cfg.Models {
-		if m.Name == modelName {
-			known = true
-			break
-		}
-	}
-	if !known {
+	apiBase, err := s.cfg.APIBaseForModel(modelName)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, "unknown model")
 		return
 	}
-	chatURL := strings.TrimRight(s.cfg.ModelServer.APIBase, "/") + "/chat/completions"
+	chatURL := apiBase + "/chat/completions"
 
 	// Persist user message.
 	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil, user.DisplayName, nil); err != nil {

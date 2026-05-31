@@ -8,7 +8,7 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 		DisplayName string `json:"display_name"`
 		Default     bool   `json:"default"`
 	}
-	defaultName := s.cfg.ModelServer.Default
+	defaultName := s.cfg.DefaultModel
 	models := make([]modelResponse, len(s.cfg.Models))
 	for i, m := range s.cfg.Models {
 		models[i] = modelResponse{
