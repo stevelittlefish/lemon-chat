@@ -3,7 +3,7 @@ import { preload as preloadIcons, icon } from './icons.js';
 import { renderAvatarSection, attachAvatarSection } from './settings-avatar.js';
 
 let user = null;
-let svgArrowLeft, svgUser, svgUsers, svgCpu, svgTrash, svgPlus;
+let svgArrowLeft, svgUser, svgUsers, svgCpu, svgTrash, svgPlus, svgCopy;
 
 const urlPath   = window.location.pathname;
 const isNew     = urlPath === '/settings/characters/new';
@@ -34,6 +34,7 @@ async function init() {
   svgCpu       = icon('drama', 16);
   svgTrash     = icon('trash', 14);
   svgPlus      = icon('plus', 14);
+  svgCopy      = icon('copy', 14);
   renderNav();
 
   let character  = null;
@@ -172,6 +173,7 @@ function renderForm(character, modelsData) {
       <div class="field-msg field-msg--error" id="char-err" hidden></div>
       <div class="char-form-actions">
         <a href="/settings/characters" class="btn btn-ghost btn-sm">Cancel</a>
+        ${!isNew ? `<button class="btn btn-ghost btn-sm" id="char-clone-btn">${svgCopy} Clone</button>` : ''}
         <button class="btn btn-primary btn-sm" id="char-save-btn">${isNew ? 'Create character' : 'Save changes'}</button>
       </div>
     </div>
@@ -213,6 +215,7 @@ function renderForm(character, modelsData) {
     if (isNew) createChar();
     else saveChar(character);
   });
+  document.getElementById('char-clone-btn')?.addEventListener('click', () => cloneChar(character));
 }
 
 function renderHiddenMessages() {
@@ -375,6 +378,34 @@ async function saveChar(character) {
     saveBtn.textContent = 'Save changes';
     errorEl.hidden      = false;
     errorEl.textContent = err.message;
+  }
+}
+
+async function cloneChar(character) {
+  const errorEl   = document.getElementById('char-err');
+  const cloneBtn  = document.getElementById('char-clone-btn');
+
+  errorEl.hidden     = true;
+  cloneBtn.disabled  = true;
+  cloneBtn.textContent = 'Cloning…';
+
+  try {
+    const data = {
+      name:            `Copy of ${character.name}`,
+      model:           character.model,
+      system_prompt:   character.system_prompt ?? null,
+      first_message:   character.first_message ?? null,
+      visibility:      'private',
+      auto_title:      character.auto_title,
+      hidden_messages: hiddenMessages.map(m => ({ role: m.role, content: m.content })),
+    };
+    const created = await charactersApi.create(data);
+    window.location.href = `/settings/characters/${created.id}/edit`;
+  } catch (err) {
+    cloneBtn.disabled    = false;
+    cloneBtn.innerHTML   = `${svgCopy} Clone`;
+    errorEl.hidden       = false;
+    errorEl.textContent  = err.message;
   }
 }
 
