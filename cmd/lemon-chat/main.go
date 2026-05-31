@@ -16,6 +16,7 @@ import (
 
 func main() {
 	cfgPath := flag.String("config", "lemon.toml", "path to config file")
+	debugFlag := flag.Bool("debug", false, "enable debug mode (overrides config)")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)
@@ -23,7 +24,7 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	debug.Enabled = cfg.Debug
+	debug.Enabled = cfg.Debug || *debugFlag
 
 	st, err := store.Open(cfg.Server.DBPath)
 	if err != nil {
