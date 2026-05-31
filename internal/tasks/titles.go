@@ -38,14 +38,14 @@ func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID in
 			log.Printf("title worker: no default_model configured, skipping conversation %d", convID)
 			return
 		}
-		apiBase, err := cfg.APIBaseForModel(modelName)
+		srv, err := cfg.ServerForModel(modelName)
 		if err != nil {
 			log.Printf("title worker: %v", err)
 			return
 		}
-		chatURL := apiBase + "/chat/completions"
+		chatURL := srv.APIBase + "/chat/completions"
 		debug.Log("title: generating title for conversation %d using model %q at %s", convID, modelName, chatURL)
-		title, err := generateTitle(st, chatURL, modelName, convID)
+		title, err := generateTitle(st, chatURL, modelName, srv.APIKey, convID)
 		if err != nil {
 			log.Printf("title worker: conversation %d: %v", convID, err)
 			return
@@ -66,12 +66,12 @@ func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, st
 	if modelName == "" {
 		return
 	}
-	apiBase, err := cfg.APIBaseForModel(modelName)
+	srv, err := cfg.ServerForModel(modelName)
 	if err != nil {
 		log.Printf("title worker: %v", err)
 		return
 	}
-	chatURL := apiBase + "/chat/completions"
+	chatURL := srv.APIBase + "/chat/completions"
 
 	ids, err := st.ListUntitledEligible()
 	if err != nil {
@@ -83,7 +83,7 @@ func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, st
 	}
 
 	for _, id := range ids {
-		title, err := generateTitle(st, chatURL, modelName, id)
+		title, err := generateTitle(st, chatURL, modelName, srv.APIKey, id)
 		if err != nil {
 			log.Printf("title worker: conversation %d: %v", id, err)
 			continue
@@ -99,7 +99,7 @@ func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, st
 	}
 }
 
-func generateTitle(st *store.Store, chatURL, modelName string, convID int64) (string, error) {
+func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID int64) (string, error) {
 	msgs, err := st.ListMessages(convID)
 	if err != nil {
 		return "", err
@@ -141,7 +141,15 @@ func generateTitle(st *store.Store, chatURL, modelName string, convID int64) (st
 	})
 
 	debug.Log("title: POST %s (model=%s, conv=%d, %d messages)", chatURL, modelName, convID, len(out)-1)
-	resp, err := http.Post(chatURL, "application/json", bytes.NewReader(payload)) //nolint:gosec
+	httpReq, err := http.NewRequest("POST", chatURL, bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("POST %s: %w", chatURL, err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return "", fmt.Errorf("POST %s: %w", chatURL, err)
 	}

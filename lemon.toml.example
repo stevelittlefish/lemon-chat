@@ -21,11 +21,13 @@ admin_password = ""        # empty = no password required to log in
 [[model_server]]
 name     = "local"
 api_base = "http://localhost:8000/v1"
+# api_key  = ""     # optional — sent as Bearer token if set
 
 # Add more servers as needed:
 # [[model_server]]
 # name     = "remote"
 # api_base = "http://remote-host:8000/v1"
+# api_key  = "sk-..."
 
 [[model]]
 name         = "meta-llama/Llama-3.2-8B-Instruct"

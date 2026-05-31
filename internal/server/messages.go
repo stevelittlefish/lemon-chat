@@ -133,12 +133,12 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		assistantName = modelName
 	}
 
-	apiBase, err := s.cfg.APIBaseForModel(modelName)
+	modelServer, err := s.cfg.ServerForModel(modelName)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "unknown model")
 		return
 	}
-	chatURL := apiBase + "/chat/completions"
+	chatURL := modelServer.APIBase + "/chat/completions"
 
 	// Persist user message.
 	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil, user.DisplayName, nil); err != nil {
@@ -166,8 +166,17 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
+	httpReq, err := http.NewRequestWithContext(r.Context(), "POST", chatURL, bytes.NewReader(payload))
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "model unreachable")
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if modelServer.APIKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+modelServer.APIKey)
+	}
 	startTime := time.Now()
-	resp, err := http.Post(chatURL, "application/json", bytes.NewReader(payload)) //nolint:gosec
+	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "model unreachable")
 		return

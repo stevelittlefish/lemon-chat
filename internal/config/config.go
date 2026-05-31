@@ -31,6 +31,7 @@ type Bootstrap struct {
 type ModelServer struct {
 	Name    string `toml:"name"`
 	APIBase string `toml:"api_base"`
+	APIKey  string `toml:"api_key"`
 }
 
 type Model struct {
@@ -86,19 +87,21 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// APIBaseForModel returns the trimmed api_base URL for the server that hosts modelName.
-func (c *Config) APIBaseForModel(modelName string) (string, error) {
+// ServerForModel returns the ModelServer that hosts modelName.
+func (c *Config) ServerForModel(modelName string) (*ModelServer, error) {
 	for _, m := range c.Models {
 		if m.Name == modelName {
-			for _, s := range c.ModelServers {
+			for i, s := range c.ModelServers {
 				if s.Name == m.ModelServer {
-					return strings.TrimRight(s.APIBase, "/"), nil
+					srv := c.ModelServers[i]
+					srv.APIBase = strings.TrimRight(s.APIBase, "/")
+					return &srv, nil
 				}
 			}
-			return "", fmt.Errorf("config: model server %q not found", m.ModelServer)
+			return nil, fmt.Errorf("config: model server %q not found", m.ModelServer)
 		}
 	}
-	return "", fmt.Errorf("config: model %q not found", modelName)
+	return nil, fmt.Errorf("config: model %q not found", modelName)
 }
 
 func applyEnv(cfg *Config) {
