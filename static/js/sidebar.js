@@ -11,6 +11,60 @@ let state = {
   username: '',
 };
 
+// Body-level context menu — avoids overflow clipping from the scrollable list
+let _menuEl = null;
+let _menuConvId = null;
+
+function openConvMenu(id, anchorEl) {
+  if (_menuConvId === id) { closeConvMenu(); return; }
+  closeConvMenu();
+  const rect = anchorEl.getBoundingClientRect();
+  const menu = document.createElement('div');
+  menu.className = 'menu conv-context-menu';
+  menu.style.cssText = `position:fixed;top:${rect.bottom + 4}px;right:${document.documentElement.clientWidth - rect.right}px;z-index:200;min-width:160px;`;
+  menu.innerHTML = `
+    <div class="menu-item" data-action="regen">
+      ${icon('refresh-cw', 14)} Regenerate title
+    </div>
+    <div class="menu-sep"></div>
+    <div class="menu-item danger" data-action="delete">
+      ${icon('trash', 14)} Delete
+    </div>
+  `;
+  document.body.appendChild(menu);
+  _menuEl = menu;
+  _menuConvId = id;
+
+  menu.querySelector('[data-action="regen"]').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    closeConvMenu();
+    await api.regenerateTitle(id);
+  });
+
+  menu.querySelector('[data-action="delete"]').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    closeConvMenu();
+    if (!confirm('Delete this conversation?')) return;
+    await api.delete(id);
+    removeConversation(id);
+    if (state.activeId === id) state.onSelect?.(null);
+  });
+}
+
+function closeConvMenu() {
+  if (_menuEl) {
+    _menuEl.remove();
+    _menuEl = null;
+    _menuConvId = null;
+  }
+}
+
+document.addEventListener('click', (e) => {
+  if (_menuEl && !e.target.closest('.conv-context-menu') && !e.target.closest('.sidebar-item-menu')) {
+    closeConvMenu();
+  }
+});
+
 export function init({ onSelect, onNew, username }) {
   state.onSelect = onSelect;
   state.onNew = onNew;
@@ -93,15 +147,13 @@ function render() {
     const id = Number(el.dataset.id);
     el.addEventListener('click', (e) => {
       e.preventDefault();
-      if (e.target.closest('.sidebar-item-delete')) return;
+      if (e.target.closest('.sidebar-item-menu')) return;
       state.onSelect?.(id);
     });
-    el.querySelector('.sidebar-item-delete').addEventListener('click', async (e) => {
+    el.querySelector('.sidebar-item-menu').addEventListener('click', (e) => {
       e.stopPropagation();
-      if (!confirm('Delete this conversation?')) return;
-      await api.delete(id);
-      removeConversation(id);
-      if (state.activeId === id) state.onSelect?.(null);
+      e.preventDefault();
+      openConvMenu(id, e.currentTarget);
     });
   });
 }
@@ -114,7 +166,7 @@ function convItem(conv) {
   return `
     <a class="sidebar-item${active}" data-id="${conv.id}" href="/?c=${conv.id}">
       ${titleHtml}
-      <button class="sidebar-item-delete" title="Delete">${icon('trash', 14)}</button>
+      <button class="sidebar-item-menu" title="More options">${icon('ellipsis-vertical', 14)}</button>
     </a>
   `;
 }
@@ -128,4 +180,3 @@ async function handleLogout() {
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-

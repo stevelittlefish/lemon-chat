@@ -160,7 +160,7 @@ html, body {
   font-style: italic;
 }
 
-.sidebar-item-delete {
+.sidebar-item-menu {
   opacity: 0;
   background: none;
   border: none;
@@ -172,12 +172,12 @@ html, body {
   flex-shrink: 0;
 }
 
-.sidebar-item:hover .sidebar-item-delete {
+.sidebar-item:hover .sidebar-item-menu {
   opacity: 1;
 }
 
-.sidebar-item-delete:hover {
-  color: var(--danger);
+.sidebar-item-menu:hover {
+  color: var(--fg);
   background: var(--bg-inset);
 }
 

@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
+	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
 
 func (s *Server) handleListConversations(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +44,26 @@ func (s *Server) handleCreateConversation(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusCreated, conv)
+}
+
+func (s *Server) handleRegenerateTitle(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if _, err := s.store.GetConversation(id, user.ID); errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	} else if err != nil {
+		internalError(w, err)
+		return
+	}
+	tasks.GenerateTitleForConversation(s.store, s.cfg, id, func(convID int64, title string) {
+		s.hub.BroadcastTitleUpdate(convID, title)
+	})
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (s *Server) handleDeleteConversation(w http.ResponseWriter, r *http.Request) {
