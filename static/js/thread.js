@@ -110,9 +110,7 @@ export function startStreaming() {
         wrapper.remove();
       } else {
         contentEl.innerHTML = renderMarkdown(accumulated);
-        if (streamStats && hasStats(streamStats)) {
-          colEl.appendChild(buildFooter(streamStats));
-        }
+        colEl.appendChild(buildFooter(streamStats || {}, accumulated));
         if (shouldScroll) scrollToBottom();
       }
     },
@@ -174,9 +172,7 @@ function buildMessage(msg) {
   contentEl.innerHTML = renderMarkdown(msg.content);
   colEl.appendChild(contentEl);
 
-  if (msg.role === 'assistant' && hasStats(msg)) {
-    colEl.appendChild(buildFooter(msg));
-  }
+  colEl.appendChild(buildFooter(msg, msg.content));
 
   wrapper.appendChild(colEl);
   return wrapper;
@@ -186,37 +182,127 @@ function hasStats(msg) {
   return msg.prompt_tokens != null || msg.completion_tokens != null || msg.total_time_ms != null;
 }
 
-function buildFooter(msg) {
+// ── Markdown modal ───────────────────────────────────────────
+
+let _mdModal = null;
+
+function getMdModal() {
+  if (_mdModal) return _mdModal;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'md-modal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Raw markdown');
+
+  const dialog = document.createElement('div');
+  dialog.className = 'md-modal-dialog';
+
+  const head = document.createElement('div');
+  head.className = 'md-modal-head';
+
+  const eyebrow = document.createElement('span');
+  eyebrow.className = 'md-modal-eyebrow';
+  eyebrow.textContent = 'Raw markdown';
+
+  const actions = document.createElement('div');
+  actions.className = 'md-modal-actions';
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn btn-secondary btn-sm';
+  const copyLabel = document.createElement('span');
+  copyLabel.textContent = 'Copy';
+  copyBtn.appendChild(copyLabel);
+  copyBtn.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(pre.textContent);
+    copyLabel.textContent = 'Copied';
+    setTimeout(() => { copyLabel.textContent = 'Copy'; }, 1500);
+  });
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'md-modal-x';
+  closeBtn.setAttribute('aria-label', 'Close');
+  closeBtn.innerHTML = icon('x', 14);
+  closeBtn.addEventListener('click', closeMdModal);
+
+  actions.appendChild(copyBtn);
+  actions.appendChild(closeBtn);
+  head.appendChild(eyebrow);
+  head.appendChild(actions);
+
+  const pre = document.createElement('pre');
+  pre.className = 'md-modal-pre';
+
+  dialog.appendChild(head);
+  dialog.appendChild(pre);
+  overlay.appendChild(dialog);
+
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target === overlay) closeMdModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeMdModal();
+  });
+
+  document.body.appendChild(overlay);
+  _mdModal = { overlay, pre };
+  return _mdModal;
+}
+
+function openMdModal(content) {
+  const { overlay, pre } = getMdModal();
+  pre.textContent = content;
+  overlay.classList.add('open');
+}
+
+function closeMdModal() {
+  _mdModal?.overlay.classList.remove('open');
+}
+
+// ── Message footer ───────────────────────────────────────────
+
+function buildFooter(msg, content) {
   const footer = document.createElement('div');
   footer.className = 'message-footer';
 
-  const infoWrap = document.createElement('div');
-  infoWrap.className = 'info-wrap';
+  const clipBtn = document.createElement('button');
+  clipBtn.className = 'foot-btn';
+  clipBtn.title = 'View raw markdown';
+  clipBtn.setAttribute('aria-label', 'View raw markdown');
+  clipBtn.innerHTML = icon('code');
+  clipBtn.addEventListener('click', () => openMdModal(content));
+  footer.appendChild(clipBtn);
 
-  const btn = document.createElement('button');
-  btn.className = 'foot-btn';
-  btn.title = 'Token usage';
-  btn.setAttribute('aria-label', 'Token usage');
-  btn.innerHTML = icon('info', 14);
+  if (hasStats(msg)) {
+    const infoWrap = document.createElement('div');
+    infoWrap.className = 'info-wrap';
 
-  btn.addEventListener('click', () => {
-    const existing = infoWrap.querySelector('.info-pop');
-    if (existing) {
-      existing.remove();
-      btn.classList.remove('active');
-    } else {
-      btn.classList.add('active');
-      const openUp = btn.closest('.message') === threadEl.lastElementChild;
-      const pop = buildInfoPop(msg, () => {
-        pop.remove();
+    const btn = document.createElement('button');
+    btn.className = 'foot-btn';
+    btn.title = 'Token usage';
+    btn.setAttribute('aria-label', 'Token usage');
+    btn.innerHTML = icon('info', 14);
+
+    btn.addEventListener('click', () => {
+      const existing = infoWrap.querySelector('.info-pop');
+      if (existing) {
+        existing.remove();
         btn.classList.remove('active');
-      }, openUp);
-      infoWrap.appendChild(pop);
-    }
-  });
+      } else {
+        btn.classList.add('active');
+        const openUp = btn.closest('.message') === threadEl.lastElementChild;
+        const pop = buildInfoPop(msg, () => {
+          pop.remove();
+          btn.classList.remove('active');
+        }, openUp);
+        infoWrap.appendChild(pop);
+      }
+    });
 
-  infoWrap.appendChild(btn);
-  footer.appendChild(infoWrap);
+    infoWrap.appendChild(btn);
+    footer.appendChild(infoWrap);
+  }
+
   return footer;
 }
 
