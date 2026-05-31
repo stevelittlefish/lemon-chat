@@ -46,6 +46,37 @@ func (s *Server) handleCreateConversation(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusCreated, conv)
 }
 
+func (s *Server) handleUpdateConversation(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var req struct {
+		Title *string `json:"title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if _, err := s.store.GetConversation(id, user.ID); errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	} else if err != nil {
+		internalError(w, err)
+		return
+	}
+	if req.Title != nil {
+		if err := s.store.UpdateConversationTitle(id, *req.Title); err != nil {
+			internalError(w, err)
+			return
+		}
+		s.hub.BroadcastTitleUpdate(id, *req.Title)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) handleRegenerateTitle(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)

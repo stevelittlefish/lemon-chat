@@ -23,6 +23,9 @@ function openConvMenu(id, anchorEl) {
   menu.className = 'menu conv-context-menu';
   menu.style.cssText = `position:fixed;top:${rect.bottom + 4}px;right:${document.documentElement.clientWidth - rect.right}px;z-index:200;min-width:160px;`;
   menu.innerHTML = `
+    <div class="menu-item" data-action="edit-title">
+      ${icon('pencil', 14)} Edit title
+    </div>
     <div class="menu-item" data-action="regen">
       ${icon('refresh-cw', 14)} Regenerate title
     </div>
@@ -34,6 +37,18 @@ function openConvMenu(id, anchorEl) {
   document.body.appendChild(menu);
   _menuEl = menu;
   _menuConvId = id;
+
+  menu.querySelector('[data-action="edit-title"]').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeConvMenu();
+    const conv = state.items.find(c => c.id === id);
+    const current = conv?.title ?? '';
+    const newTitle = prompt('Edit title', current);
+    if (newTitle === null) return;
+    const trimmed = newTitle.trim();
+    if (trimmed === current) return;
+    api.update(id, { title: trimmed }).then(() => updateTitle(id, trimmed));
+  });
 
   menu.querySelector('[data-action="regen"]').addEventListener('click', async (e) => {
     e.stopPropagation();

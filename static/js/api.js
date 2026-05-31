@@ -46,6 +46,7 @@ export const conversations = {
   list: () => request('GET', '/api/conversations'),
   create: (title, model, characterId) => request('POST', '/api/conversations', { title, model, character_id: characterId }),
   fork: (id, messageId) => request('POST', `/api/conversations/${id}/fork`, { message_id: messageId }),
+  update: (id, data) => request('PATCH', `/api/conversations/${id}`, data),
   delete: (id) => request('DELETE', `/api/conversations/${id}`),
   regenerateTitle: (id) => request('POST', `/api/conversations/${id}/regenerate-title`),
 };

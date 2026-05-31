@@ -253,8 +253,12 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Persist completed assistant message and update conversation model/character.
 	if fullContent != "" {
+		prevUpdatedAt, _ := time.Parse(time.RFC3339, conv.UpdatedAt)
 		msg, err := s.store.CreateMessage(convID, "assistant", fullContent, usedCharacterID, &assistantName, usageStats)
 		_ = s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID)
+		if time.Since(prevUpdatedAt) > 2*time.Minute {
+			s.hub.BroadcastConversationListChanged()
+		}
 		if err == nil {
 			idJSON, _ := json.Marshal(map[string]int64{"message_id": msg.ID})
 			fmt.Fprintf(w, "data: %s\n\n", idJSON)

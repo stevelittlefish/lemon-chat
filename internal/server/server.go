@@ -40,6 +40,7 @@ func (s *Server) Handler() http.Handler {
 	// Conversations
 	mux.HandleFunc("GET /api/conversations", s.requireAuth(s.handleListConversations))
 	mux.HandleFunc("POST /api/conversations", s.requireAuth(s.handleCreateConversation))
+	mux.HandleFunc("PATCH /api/conversations/{id}", s.requireAuth(s.handleUpdateConversation))
 	mux.HandleFunc("DELETE /api/conversations/{id}", s.requireAuth(s.handleDeleteConversation))
 	mux.HandleFunc("POST /api/conversations/{id}/fork", s.requireAuth(s.handleForkConversation))
 	mux.HandleFunc("POST /api/conversations/{id}/regenerate-title", s.requireAuth(s.handleRegenerateTitle))
