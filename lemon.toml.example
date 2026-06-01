@@ -5,6 +5,12 @@
 # Must match the name of one of the [[model]] entries below.
 default_model = "meta-llama/Llama-3.2-8B-Instruct"
 
+# Timeout for establishing a TCP connection to any model server (seconds).
+dial_timeout_seconds = 10
+
+# Maximum total time allowed for a single model response, streaming or otherwise (seconds).
+response_timeout_seconds = 600
+
 [server]
 port    = 8080
 db_path = "lemon.db"

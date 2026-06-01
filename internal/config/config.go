@@ -10,12 +10,14 @@ import (
 )
 
 type Config struct {
-	Server       Server        `toml:"server"`
-	Bootstrap    Bootstrap     `toml:"bootstrap"`
-	Debug        bool          `toml:"debug"`
-	DefaultModel string        `toml:"default_model"`
-	ModelServers []ModelServer `toml:"model_server"`
-	Models       []Model       `toml:"model"`
+	Server                 Server        `toml:"server"`
+	Bootstrap              Bootstrap     `toml:"bootstrap"`
+	Debug                  bool          `toml:"debug"`
+	DefaultModel           string        `toml:"default_model"`
+	DialTimeoutSeconds     int           `toml:"dial_timeout_seconds"`
+	ResponseTimeoutSeconds int           `toml:"response_timeout_seconds"`
+	ModelServers           []ModelServer `toml:"model_server"`
+	Models                 []Model       `toml:"model"`
 }
 
 type Server struct {
@@ -49,6 +51,8 @@ func Load(path string) (*Config, error) {
 		Bootstrap: Bootstrap{
 			AdminUsername: "admin",
 		},
+		DialTimeoutSeconds:     10,
+		ResponseTimeoutSeconds: 600,
 	}
 
 	meta, err := toml.DecodeFile(path, cfg)

@@ -3,11 +3,11 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -50,16 +50,6 @@ func (s *Server) resolveCharacter(w http.ResponseWriter, user *store.User, charI
 	return char, msgs
 }
 
-// modelClient is used for all outbound calls to model servers. No Timeout is
-// set because streaming responses run indefinitely; the dial timeout guards
-// against a server that accepts the TCP connection but never responds.
-var modelClient = &http.Client{
-	Transport: &http.Transport{
-		DialContext: (&net.Dialer{
-			Timeout: 10 * time.Second,
-		}).DialContext,
-	},
-}
 
 func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
@@ -185,7 +175,10 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
-	httpReq, err := http.NewRequestWithContext(r.Context(), "POST", chatURL, bytes.NewReader(payload))
+	responseTimeout := time.Duration(s.cfg.ResponseTimeoutSeconds) * time.Second
+	ctx, cancelResp := context.WithTimeout(r.Context(), responseTimeout)
+	defer cancelResp()
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "model unreachable")
 		return
@@ -195,7 +188,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		httpReq.Header.Set("Authorization", "Bearer "+modelServer.APIKey)
 	}
 	startTime := time.Now()
-	resp, err := modelClient.Do(httpReq)
+	resp, err := s.modelClient.Do(httpReq)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "model unreachable")
 		return

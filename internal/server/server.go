@@ -3,20 +3,31 @@ package server
 import (
 	"encoding/json"
 	"log"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
 type Server struct {
-	cfg   *config.Config
-	store *store.Store
-	hub   *Hub
+	cfg         *config.Config
+	store       *store.Store
+	hub         *Hub
+	modelClient *http.Client
 }
 
 func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
-	return &Server{cfg: cfg, store: st, hub: hub}
+	dialTimeout := time.Duration(cfg.DialTimeoutSeconds) * time.Second
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout: dialTimeout,
+			}).DialContext,
+		},
+	}
+	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client}
 }
 
 func (s *Server) Handler() http.Handler {

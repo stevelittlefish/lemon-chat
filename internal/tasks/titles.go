@@ -46,7 +46,8 @@ func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID in
 		}
 		chatURL := srv.APIBase + "/chat/completions"
 		debug.Log("title: generating title for conversation %d using model %q at %s", convID, modelName, chatURL)
-		title, err := generateTitle(st, chatURL, modelName, srv.APIKey, convID)
+		responseTimeout := time.Duration(cfg.ResponseTimeoutSeconds) * time.Second
+		title, err := generateTitle(st, chatURL, modelName, srv.APIKey, convID, responseTimeout)
 		if err != nil {
 			log.Printf("title worker: conversation %d: %v", convID, err)
 			return
@@ -73,6 +74,7 @@ func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, st
 		return
 	}
 	chatURL := srv.APIBase + "/chat/completions"
+	responseTimeout := time.Duration(cfg.ResponseTimeoutSeconds) * time.Second
 
 	ids, err := st.ListUntitledEligible()
 	if err != nil {
@@ -84,7 +86,7 @@ func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, st
 	}
 
 	for _, id := range ids {
-		title, err := generateTitle(st, chatURL, modelName, srv.APIKey, id)
+		title, err := generateTitle(st, chatURL, modelName, srv.APIKey, id, responseTimeout)
 		if err != nil {
 			log.Printf("title worker: conversation %d: %v", id, err)
 			continue
@@ -102,7 +104,7 @@ func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, st
 
 const defaultTitlePrompt = "Generate a short title (at most 6 words) for the following conversation. Respond with only the title — no quotes, no trailing punctuation, no explanation."
 
-func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID int64) (string, error) {
+func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID int64, responseTimeout time.Duration) (string, error) {
 	msgs, err := st.ListMessages(convID)
 	if err != nil {
 		return "", err
@@ -151,7 +153,7 @@ func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID in
 	})
 
 	debug.Log("title: POST %s (model=%s, conv=%d, %d messages)", chatURL, modelName, convID, len(out)-1)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), responseTimeout)
 	defer cancel()
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
 	if err != nil {
