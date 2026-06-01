@@ -269,6 +269,8 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		}
 
+		titleTriggered := false
+
 		// Trigger auto-title on the first completed exchange when the character requests it.
 		// Count user messages in history — if this is the only one, it's the first exchange.
 		if usedCharacter != nil && usedCharacter.AutoTitle && conv.Title == nil {
@@ -281,11 +283,12 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			debug.Log("title trigger (character auto-title): conv=%d userMsgCount=%d autoTitle=%v titleIsNil=%v", convID, userMsgCount, usedCharacter.AutoTitle, conv.Title == nil)
 			if userMsgCount == 1 {
 				tasks.GenerateTitleForConversation(s.store, s.cfg, convID, s.hub.BroadcastTitleUpdate)
+				titleTriggered = true
 			}
 		}
 
 		// Trigger title generation on the third assistant response for any untitled conversation.
-		if conv.Title == nil {
+		if !titleTriggered && conv.Title == nil {
 			assistantMsgCount := 0
 			for _, m := range history {
 				if m.Role == "assistant" {

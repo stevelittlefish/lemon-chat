@@ -22,7 +22,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] **SQLite busy errors under concurrent writes** (`internal/store/store.go:16`)
   `sql.Open` uses WAL mode but sets no `_busy_timeout` and no `SetMaxOpenConns(1)`. Concurrent writers (SSE, title goroutines, WebSocket broadcasts) immediately get `SQLITE_BUSY` instead of waiting. Add `&_busy_timeout=5000` to the DSN and call `db.SetMaxOpenConns(1)` after opening.
 
-- [ ] **Title generation can fire twice concurrently on one request** (`internal/server/messages.go:270–294`)
+- [x] **Title generation can fire twice concurrently on one request** (`internal/server/messages.go:270–294`)
   The `auto_title` and "3rd assistant response" triggers both evaluate `conv.Title == nil` from the pre-request snapshot. A conversation that satisfies both conditions spawns two goroutines that race to write the title. Add a guard so only one fires.
 
 - [ ] **No timeout on model API calls** (`internal/server/messages.go:179`, `internal/tasks/titles.go:161`)
