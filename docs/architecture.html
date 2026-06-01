@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>lemon-chat — Architecture &amp; Structure</title>
+<style>
+  :root {
+    --ink: #1c1a16;
+    --ink-2: #4a4640;
+    --ink-3: #7a746c;
+    --paper: #faf8f4;
+    --paper-2: #f3f0e9;
+    --paper-3: #e8e3d8;
+    --lemon: #f5c842;
+    --lemon-light: #fdf3c0;
+    --leaf: #4a7c59;
+    --leaf-light: #d4eddd;
+    --brick: #c0412a;
+    --brick-light: #fde8e4;
+    --sky: #2c6fac;
+    --sky-light: #d9eaf7;
+    --purple: #6b4fa0;
+    --purple-light: #ede5f7;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --shadow: 0 1px 4px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.05);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.1), 0 0 0 1px rgba(0,0,0,.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  a { color: var(--sky); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ── Layout ── */
+  .page { max-width: 1100px; margin: 0 auto; padding: 40px 32px 80px; }
+  .doc-header {
+    border-bottom: 2px solid var(--lemon);
+    padding-bottom: 24px;
+    margin-bottom: 40px;
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+  }
+  .doc-header-badge {
+    background: var(--lemon);
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    display: inline-block;
+  }
+  h1 { font-size: 28px; font-weight: 800; letter-spacing: -.3px; }
+  h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 40px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--paper-3);
+    letter-spacing: -.1px;
+  }
+  h3 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); }
+  p { margin-bottom: 12px; color: var(--ink-2); }
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+    font-size: 12px;
+    background: var(--paper-3);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  pre {
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    font-size: 12px;
+    background: var(--paper-2);
+    border: 1px solid var(--paper-3);
+    border-radius: var(--radius);
+    padding: 16px;
+    overflow-x: auto;
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: #fff;
+    border: 1px solid var(--paper-3);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .card-title {
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  /* ── Layer diagram ── */
+  .arch-diagram {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 24px 0;
+  }
+  .arch-layer {
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+  }
+  .arch-layer-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    min-width: 120px;
+    opacity: .75;
+  }
+  .arch-layer-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .arch-chip {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid currentColor;
+    opacity: .9;
+  }
+  .layer-browser { background: var(--sky-light); color: var(--sky); }
+  .layer-server  { background: var(--lemon-light); color: #7a5e00; }
+  .layer-tasks   { background: var(--leaf-light); color: var(--leaf); }
+  .layer-store   { background: var(--purple-light); color: var(--purple); }
+  .layer-db      { background: var(--paper-2); color: var(--ink-2); }
+
+  .arch-arrow {
+    text-align: center;
+    font-size: 18px;
+    color: var(--ink-3);
+    line-height: 1;
+    margin: 2px 0;
+  }
+
+  /* ── Data flow ── */
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 8px;
+    overflow-x: auto;
+  }
+  .flow-node {
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-align: center;
+  }
+  .flow-arrow {
+    font-size: 14px;
+    color: var(--ink-3);
+    padding: 0 4px;
+    flex-shrink: 0;
+  }
+  .fn-user     { background: var(--sky-light);    color: var(--sky); }
+  .fn-api      { background: var(--lemon-light);  color: #7a5e00; }
+  .fn-llm      { background: var(--leaf-light);   color: var(--leaf); }
+  .fn-db       { background: var(--purple-light); color: var(--purple); }
+  .fn-ws       { background: var(--brick-light);  color: var(--brick); }
+  .fn-task     { background: var(--paper-2);      color: var(--ink-2); }
+  .fn-browser  { background: #fff;               color: var(--ink); border: 1px solid var(--paper-3); }
+
+  .flow-note {
+    font-size: 11px;
+    color: var(--ink-3);
+    margin-left: 8px;
+    font-style: italic;
+  }
+
+  /* ── Module map ── */
+  .module-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .module-card {
+    background: #fff;
+    border: 1px solid var(--paper-3);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+  }
+  .module-file {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--sky);
+    margin-bottom: 4px;
+    word-break: break-all;
+  }
+  .module-desc {
+    font-size: 12px;
+    color: var(--ink-2);
+    line-height: 1.4;
+  }
+  .module-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-top: 6px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .tag-go      { background: var(--lemon-light); color: #7a5e00; }
+  .tag-js      { background: var(--sky-light);   color: var(--sky); }
+  .tag-css     { background: var(--leaf-light);  color: var(--leaf); }
+  .tag-html    { background: var(--brick-light); color: var(--brick); }
+
+  /* ── Schema table ── */
+  .schema-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 24px;
+    font-size: 12.5px;
+  }
+  .schema-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--paper-2);
+    border-bottom: 2px solid var(--paper-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--ink-2);
+  }
+  .schema-table td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--paper-2);
+    vertical-align: top;
+  }
+  .schema-table tr:last-child td { border-bottom: none; }
+  .schema-table tr:hover td { background: var(--paper); }
+  .col-type { color: var(--sky); font-family: monospace; }
+  .col-flag { font-size: 11px; color: var(--leaf); font-weight: 600; }
+  .col-pk   { color: var(--brick); font-weight: 700; }
+  .col-fk   { color: var(--purple); }
+
+  /* ── API table ── */
+  .api-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 24px;
+    font-size: 12.5px;
+  }
+  .api-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--paper-2);
+    border-bottom: 2px solid var(--paper-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--ink-2);
+  }
+  .api-table td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--paper-2);
+    vertical-align: top;
+  }
+  .api-table tr:last-child td { border-bottom: none; }
+  .api-table tr:hover td { background: var(--paper); }
+  .method {
+    font-family: monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .m-get    { background: var(--leaf-light);   color: var(--leaf); }
+  .m-post   { background: var(--sky-light);    color: var(--sky); }
+  .m-patch  { background: var(--lemon-light);  color: #7a5e00; }
+  .m-put    { background: var(--purple-light); color: var(--purple); }
+  .m-delete { background: var(--brick-light);  color: var(--brick); }
+  .api-path { font-family: monospace; font-size: 12px; }
+  .api-auth {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  .auth-req   { background: var(--lemon-light); color: #7a5e00; }
+  .auth-admin { background: var(--brick-light); color: var(--brick); }
+  .auth-none  { background: var(--paper-2);     color: var(--ink-3); }
+  .auth-ws    { background: var(--sky-light);   color: var(--sky); }
+
+  /* ── Section with side note ── */
+  .section-with-note {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 24px;
+    align-items: start;
+  }
+  .side-note {
+    background: var(--lemon-light);
+    border: 1px solid #e8d070;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-size: 12px;
+    color: #6b5500;
+    margin-top: 24px;
+  }
+  .side-note strong { display: block; margin-bottom: 4px; }
+
+  /* ── Toc ── */
+  .toc {
+    background: var(--paper-2);
+    border: 1px solid var(--paper-3);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 32px;
+    display: inline-block;
+    min-width: 260px;
+  }
+  .toc-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    margin-bottom: 10px;
+    color: var(--ink-3);
+  }
+  .toc ol { padding-left: 18px; }
+  .toc li { margin-bottom: 4px; }
+  .toc a { color: var(--ink-2); font-size: 13px; }
+  .toc a:hover { color: var(--sky); }
+
+  /* ── Misc ── */
+  ul { padding-left: 20px; margin-bottom: 12px; color: var(--ink-2); }
+  li { margin-bottom: 4px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) {
+    .two-col { grid-template-columns: 1fr; }
+    .section-with-note { grid-template-columns: 1fr; }
+  }
+
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--paper-3);
+    background: #fff;
+    color: var(--ink-2);
+  }
+  .badge-go     { border-color: #c8b060; background: var(--lemon-light); color: #7a5e00; }
+  .badge-sqlite { border-color: #b0a0d0; background: var(--purple-light); color: var(--purple); }
+  .badge-js     { border-color: #90c0e0; background: var(--sky-light); color: var(--sky); }
+  .badge-sse    { border-color: #80b090; background: var(--leaf-light); color: var(--leaf); }
+  .badge-ws     { border-color: #e09080; background: var(--brick-light); color: var(--brick); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Header ── -->
+  <div class="doc-header">
+    <div>
+      <div class="doc-header-badge">Architecture Reference</div>
+      <h1>lemon-chat</h1>
+      <p style="margin:6px 0 0;color:var(--ink-3);font-size:13px;">Local, open-source AI chat UI &mdash; Go backend &bull; Vanilla JS &bull; SQLite &bull; No build step</p>
+    </div>
+  </div>
+
+  <!-- ── Badges ── -->
+  <div class="badge-row">
+    <span class="badge badge-go">Go 1.26.3</span>
+    <span class="badge badge-sqlite">SQLite (modernc)</span>
+    <span class="badge badge-js">Vanilla JS ES modules</span>
+    <span class="badge badge-sse">SSE streaming</span>
+    <span class="badge badge-ws">Custom WebSocket</span>
+    <span class="badge">OpenAI-compatible API</span>
+    <span class="badge">bcrypt auth</span>
+    <span class="badge">No bundler</span>
+  </div>
+
+  <!-- ── TOC ── -->
+  <div class="toc">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#overview">Overview &amp; Design Goals</a></li>
+      <li><a href="#layer-diagram">Layer Diagram</a></li>
+      <li><a href="#data-flows">Key Data Flows</a></li>
+      <li><a href="#backend">Backend Packages</a></li>
+      <li><a href="#database">Database Schema</a></li>
+      <li><a href="#api">REST API Endpoints</a></li>
+      <li><a href="#frontend">Frontend Modules</a></li>
+      <li><a href="#realtime">Real-time: WebSocket &amp; SSE</a></li>
+      <li><a href="#background">Background Tasks</a></li>
+      <li><a href="#security">Authentication &amp; Security</a></li>
+      <li><a href="#files">File Map</a></li>
+      <li><a href="#deps">Dependencies</a></li>
+    </ol>
+  </div>
+
+  <!-- ── 1. Overview ── -->
+  <h2 id="overview">1 &mdash; Overview &amp; Design Goals</h2>
+  <p>lemon-chat is a self-hosted AI chat UI that connects to locally-running language models via any OpenAI-compatible HTTP API (Ollama, vLLM, llama.cpp, etc.). Every conversation is persisted in a local SQLite database. The application ships as a single Go binary that also serves the frontend's static files.</p>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Core constraints (non-negotiable)</div>
+      <ul>
+        <li>No CGo — pure Go SQLite driver (<code>modernc.org/sqlite</code>)</li>
+        <li>No JS bundler, transpiler, or build step</li>
+        <li>Minimal dependencies — justify every new package</li>
+        <li>Config in TOML only; no runtime config UI for model/server settings</li>
+        <li>Singular DB table names (<code>user</code>, not <code>users</code>)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Architecture principles</div>
+      <ul>
+        <li>Standard library <code>net/http</code> with Go 1.22 method+path routing</li>
+        <li>Server-side sessions in SQLite (not JWTs)</li>
+        <li>SSE for streaming model responses</li>
+        <li>Custom WebSocket (RFC 6455) without external library</li>
+        <li>Responsive Vanilla JS with native ES module imports</li>
+        <li>Design system tokens defined in CSS custom properties</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── 2. Layer Diagram ── -->
+  <h2 id="layer-diagram">2 &mdash; Layer Diagram</h2>
+  <div class="arch-diagram">
+
+    <div class="arch-layer layer-browser">
+      <span class="arch-layer-label">Browser</span>
+      <div class="arch-layer-items">
+        <span class="arch-chip">app.js (orchestrator)</span>
+        <span class="arch-chip">sidebar.js</span>
+        <span class="arch-chip">header.js</span>
+        <span class="arch-chip">thread.js</span>
+        <span class="arch-chip">composer.js</span>
+        <span class="arch-chip">api.js (fetch wrappers)</span>
+        <span class="arch-chip">ws.js (WebSocket client)</span>
+        <span class="arch-chip">markdown.js</span>
+        <span class="arch-chip">icons.js</span>
+        <span class="arch-chip">settings/*</span>
+      </div>
+    </div>
+
+    <div class="arch-arrow">↕ HTTP (REST + SSE) &nbsp;&nbsp; ↕ WebSocket</div>
+
+    <div class="arch-layer layer-server">
+      <span class="arch-layer-label">HTTP Server</span>
+      <div class="arch-layer-items">
+        <span class="arch-chip">server.go (router)</span>
+        <span class="arch-chip">auth.go</span>
+        <span class="arch-chip">conversations.go</span>
+        <span class="arch-chip">messages.go (SSE)</span>
+        <span class="arch-chip">characters.go</span>
+        <span class="arch-chip">avatars.go</span>
+        <span class="arch-chip">admin.go</span>
+        <span class="arch-chip">middleware.go</span>
+        <span class="arch-chip">ws.go (Hub)</span>
+      </div>
+    </div>
+
+    <div class="arch-arrow">↕ function calls</div>
+
+    <div class="arch-layer" style="background:var(--leaf-light);color:var(--leaf);">
+      <span class="arch-layer-label" style="opacity:.75;">Background Tasks</span>
+      <div class="arch-layer-items">
+        <span class="arch-chip">tasks/titles.go (title worker)</span>
+        <span class="arch-chip">tasks/cleanup.go (stale conv cleanup)</span>
+      </div>
+    </div>
+
+    <div class="arch-arrow">↕ store interface</div>
+
+    <div class="arch-layer layer-store">
+      <span class="arch-layer-label">Store Layer</span>
+      <div class="arch-layer-items">
+        <span class="arch-chip">store.go (migrations)</span>
+        <span class="arch-chip">users.go</span>
+        <span class="arch-chip">sessions.go</span>
+        <span class="arch-chip">conversations.go</span>
+        <span class="arch-chip">messages.go</span>
+        <span class="arch-chip">characters.go</span>
+      </div>
+    </div>
+
+    <div class="arch-arrow">↕ SQL</div>
+
+    <div class="arch-layer layer-db">
+      <span class="arch-layer-label">SQLite DB</span>
+      <div class="arch-layer-items">
+        <span class="arch-chip">lemon.db (WAL mode, FK enforcement)</span>
+        <span class="arch-chip">avatars/ (filesystem)</span>
+      </div>
+    </div>
+
+    <div class="arch-arrow">↕ HTTP (OpenAI-compatible)</div>
+
+    <div class="arch-layer" style="background:#fff;border:1px solid var(--paper-3);">
+      <span class="arch-layer-label" style="color:var(--ink-2);opacity:.75;">Model Server</span>
+      <div class="arch-layer-items">
+        <span class="arch-chip" style="color:var(--ink-2);border-color:var(--ink-3);">Ollama / vLLM / llama.cpp / OpenAI</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── 3. Data Flows ── -->
+  <h2 id="data-flows">3 &mdash; Key Data Flows</h2>
+
+  <h3>Send a message &amp; stream a response</h3>
+  <div class="flow-row">
+    <div class="flow-node fn-user">User types &amp; sends</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-browser">composer.js<br><small>onSend()</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-browser">app.js<br><small>sendMessage()</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-api">POST /api/conversations<br><small>create if needed</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-api">POST /api/conversations/{id}/messages<br><small>SSE stream</small></div>
+  </div>
+  <div class="flow-row" style="margin-top:4px;">
+    <div class="flow-node fn-api">handleSendMessage</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-db">store.CreateMessage<br><small>(user msg)</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-llm">POST {model_server}/chat/completions<br><small>stream=true</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-api">SSE chunks → client</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-db">store.CreateMessage<br><small>(assistant msg)</small></div>
+  </div>
+  <div class="flow-row" style="margin-top:4px;">
+    <div class="flow-node fn-browser">thread.js<br><small>stream.append(delta)</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-browser">renderMarkdown()<br><small>incremental re-render</small></div>
+    <div class="flow-note">After [DONE]: tasks.GenerateTitleForConversation() may fire async</div>
+  </div>
+
+  <h3 style="margin-top:24px;">Title generation (async)</h3>
+  <div class="flow-row">
+    <div class="flow-node fn-api">handler (trigger)</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-task">goroutine</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-llm">POST {model_server}/chat/completions<br><small>stream=false, max_tokens=20</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-db">UpdateConversationTitle</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-ws">hub.BroadcastTitleUpdate</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-browser">sidebar.updateTitle()</div>
+  </div>
+  <p style="margin-top:8px;font-size:12px;">Triggers: (1) character with <code>auto_title=true</code> after first exchange; (2) after 3rd assistant message for any untitled conversation; (3) background ticker every 30s for eligible untitled conversations; (4) manual "Regenerate title" in sidebar menu.</p>
+
+  <h3 style="margin-top:24px;">Authentication flow</h3>
+  <div class="flow-row">
+    <div class="flow-node fn-user">Username + password</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-api">POST /api/auth/login</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-db">UserByUsername<br>bcrypt.CompareHashAndPassword</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-db">CreateSession<br><small>16-byte random hex</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-browser">HttpOnly SameSite=Strict<br><small>session cookie (30d)</small></div>
+  </div>
+  <div class="flow-row" style="margin-top:4px;">
+    <div class="flow-node fn-browser">Cookie on every request</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-api">requireAuth middleware</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-db">store.SessionUserID<br><small>checks expiry</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-db">store.UserByID</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node fn-api">User in request context</div>
+  </div>
+
+  <!-- ── 4. Backend Packages ── -->
+  <h2 id="backend">4 &mdash; Backend Packages</h2>
+  <div class="two-col">
+    <div>
+      <h3>cmd/lemon-chat</h3>
+      <div class="card">
+        <div class="module-file">main.go</div>
+        <div class="module-desc">Entry point. Parses flags (<code>-config</code>, <code>-debug</code>, <code>-list-models</code>), loads TOML config, opens SQLite store, bootstraps admin user on first run, starts background workers (title, cleanup), creates WebSocket hub, starts HTTP server.</div>
+        <span class="module-tag tag-go">Go</span>
+      </div>
+
+      <h3>internal/config</h3>
+      <div class="card">
+        <div class="module-file">config.go</div>
+        <div class="module-desc">TOML structs. Top-level fields: <code>Debug</code>, <code>DefaultModel</code>. Nested: <code>Server</code> (port, db_path), <code>Bootstrap</code> (admin credentials), <code>ModelServers[]</code>, <code>Models[]</code>. <code>ServerForModel()</code> resolves which server hosts a given model name. Env var overrides for port, db path, admin credentials.</div>
+        <span class="module-tag tag-go">Go</span>
+      </div>
+
+      <h3>internal/debug</h3>
+      <div class="card">
+        <div class="module-file">debug.go</div>
+        <div class="module-desc">Package-level <code>Enabled</code> bool. <code>debug.Log()</code> is a no-op unless enabled. Set via <code>-debug</code> flag or <code>debug = true</code> in config.</div>
+        <span class="module-tag tag-go">Go</span>
+      </div>
+
+      <h3>internal/tasks</h3>
+      <div class="card">
+        <div class="module-file">titles.go</div>
+        <div class="module-desc">
+          <strong>StartTitleWorker</strong>: background goroutine, polls every 30s via <code>ListUntitledEligible</code> (5+ min old, ≥2 messages, no title).<br>
+          <strong>GenerateTitleForConversation</strong>: on-demand async title gen; truncates message history to 3000 chars; uses character's <code>title_prompt</code> if set; calls onTitled callback on success.
+        </div>
+        <span class="module-tag tag-go">Go</span>
+      </div>
+      <div class="card">
+        <div class="module-file">cleanup.go</div>
+        <div class="module-desc"><strong>StartCleanupWorker</strong>: runs every minute. <code>DeleteStaleConversations</code> removes conversations &gt;30 min old with fewer than 2 messages (abandoned new-chat sessions). Broadcasts <code>conversations_changed</code> on delete.</div>
+        <span class="module-tag tag-go">Go</span>
+      </div>
+    </div>
+
+    <div>
+      <h3>internal/server</h3>
+      <div class="card">
+        <div class="module-file">server.go</div>
+        <div class="module-desc">Router setup with Go 1.22 <code>method /path</code> syntax. Houses <code>writeJSON</code>, <code>writeError</code>, <code>internalError</code>, <code>serveFile</code> helpers. Static files served from <code>http.Dir("static")</code> wrapped in no-cache middleware.</div>
+        <span class="module-tag tag-go">Go</span>
+      </div>
+      <div class="card">
+        <div class="module-file">middleware.go</div>
+        <div class="module-desc"><code>requireAuth</code>: validates session cookie, loads user into request context. <code>requireAdmin</code>: composes on top of requireAuth, checks <code>is_admin</code>. <code>noCacheMiddleware</code>: adds <code>Cache-Control: no-cache</code> to all static responses. <code>currentUser(r)</code>: extracts user from context.</div>
+        <span class="module-tag tag-go">Go</span>
+      </div>
+      <div class="card">
+        <div class="module-file">ws.go</div>
+        <div class="module-desc">Custom RFC 6455 WebSocket. <code>Hub</code> holds a mutex-protected <code>map[net.Conn]struct{}</code>. Upgrade via HTTP hijacking. <code>sendTextFrame</code> builds wire frame. <code>drainFrames</code> reads incoming frames, handles ping→pong. Broadcast methods: <code>BroadcastTitleUpdate</code>, <code>BroadcastConversationListChanged</code>.</div>
+        <span class="module-tag tag-go">Go</span>
+      </div>
+      <div class="card">
+        <div class="module-file">avatars.go</div>
+        <div class="module-desc">Receives multipart upload, sniffs content-type (512-byte prefix), validates ≤5 MB image. Processes: center-crops to square, scales to 256×256 via CatmullRom, encodes as JPEG (85% quality). Saves to <code>{db_dir}/avatars/{prefix}.jpg</code>, deletes old files for same entity.</div>
+        <span class="module-tag tag-go">Go</span>
+      </div>
+      <div class="card">
+        <div class="module-file">messages.go</div>
+        <div class="module-desc">
+          <strong>handleSendMessage</strong>: resolves model/character, builds chat history, POSTs to model server, streams SSE deltas back, persists assistant message.<br>
+          <strong>handleGetMessageContext</strong>: returns the exact messages array that was/would be sent to the LLM for a given message.<br>
+          <strong>handleFirstMessage</strong>: seeds a new conversation with a character's <code>first_message</code>.
+        </div>
+        <span class="module-tag tag-go">Go</span>
+      </div>
+
+      <h3>internal/store</h3>
+      <div class="card">
+        <div class="module-file">store.go</div>
+        <div class="module-desc">Opens DB with FK enforcement + WAL mode. Runs sequential version-gated migrations (currently v9). Each migration inserts a row into <code>schema_version</code>.</div>
+        <span class="module-tag tag-go">Go</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. Database Schema ── -->
+  <h2 id="database">5 &mdash; Database Schema</h2>
+  <p>SQLite in WAL mode, foreign keys enabled. All timestamps are RFC 3339 strings in UTC. Current schema version: <strong>9</strong>.</p>
+
+  <h3>user</h3>
+  <table class="schema-table">
+    <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="col-pk">id</td><td class="col-type">INTEGER PK</td><td>autoincrement</td></tr>
+      <tr><td>username</td><td class="col-type">TEXT NOT NULL UNIQUE</td><td>login handle</td></tr>
+      <tr><td>password_hash</td><td class="col-type">TEXT</td><td>bcrypt hash; NULL = no password required</td></tr>
+      <tr><td>is_admin</td><td class="col-type">INTEGER NOT NULL DEFAULT 0</td><td>boolean (0/1)</td></tr>
+      <tr><td>display_name</td><td class="col-type">TEXT</td><td>shown in message list; falls back to username (added v5)</td></tr>
+      <tr><td>avatar_filename</td><td class="col-type">TEXT</td><td>relative to <code>avatars/</code> dir; NULL = no avatar (added v6)</td></tr>
+      <tr><td>created_at</td><td class="col-type">TEXT NOT NULL</td><td>RFC 3339 UTC</td></tr>
+    </tbody>
+  </table>
+
+  <h3>conversation</h3>
+  <table class="schema-table">
+    <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="col-pk">id</td><td class="col-type">INTEGER PK</td><td></td></tr>
+      <tr><td class="col-fk">user_id</td><td class="col-type">INTEGER NOT NULL → user(id)</td><td>owner</td></tr>
+      <tr><td>model</td><td class="col-type">TEXT</td><td>NULL when character_id is set</td></tr>
+      <tr><td class="col-fk">character_id</td><td class="col-type">INTEGER → character(id)</td><td>NULL when model is set</td></tr>
+      <tr><td>title</td><td class="col-type">TEXT</td><td>NULL until generated or manually set</td></tr>
+      <tr><td>created_at / updated_at</td><td class="col-type">TEXT NOT NULL</td><td><code>updated_at</code> drives sidebar sort order</td></tr>
+      <tr><td colspan="3"><em>CHECK: <code>(model IS NOT NULL) != (character_id IS NOT NULL)</code> — exactly one must be set</em></td></tr>
+    </tbody>
+  </table>
+
+  <h3>message</h3>
+  <table class="schema-table">
+    <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="col-pk">id</td><td class="col-type">INTEGER PK</td><td></td></tr>
+      <tr><td class="col-fk">conversation_id</td><td class="col-type">INTEGER NOT NULL → conversation(id)</td><td></td></tr>
+      <tr><td>role</td><td class="col-type">TEXT NOT NULL</td><td><code>user</code> | <code>assistant</code></td></tr>
+      <tr><td>content</td><td class="col-type">TEXT NOT NULL</td><td>raw markdown / plain text</td></tr>
+      <tr><td>name</td><td class="col-type">TEXT</td><td>display name (user's display_name or character name)</td></tr>
+      <tr><td class="col-fk">character_id</td><td class="col-type">INTEGER → character(id)</td><td>which character produced this message (added v7)</td></tr>
+      <tr><td>prompt_tokens / completion_tokens / total_time_ms</td><td class="col-type">INTEGER</td><td>nullable; from model's usage stats (added v3)</td></tr>
+      <tr><td>created_at</td><td class="col-type">TEXT NOT NULL</td><td>RFC 3339 UTC</td></tr>
+    </tbody>
+  </table>
+
+  <h3>character</h3>
+  <table class="schema-table">
+    <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="col-pk">id</td><td class="col-type">INTEGER PK</td><td></td></tr>
+      <tr><td>name</td><td class="col-type">TEXT NOT NULL</td><td>display name</td></tr>
+      <tr><td>model</td><td class="col-type">TEXT NOT NULL</td><td>required — characters always pin to a model</td></tr>
+      <tr><td>system_prompt</td><td class="col-type">TEXT</td><td>injected as first system message</td></tr>
+      <tr><td>first_message</td><td class="col-type">TEXT</td><td>pre-seeded assistant message shown before user types</td></tr>
+      <tr><td>title_prompt</td><td class="col-type">TEXT</td><td>custom system prompt for title generation (added v8)</td></tr>
+      <tr><td class="col-fk">created_by</td><td class="col-type">INTEGER NOT NULL → user(id)</td><td>owner</td></tr>
+      <tr><td>visibility</td><td class="col-type">TEXT NOT NULL DEFAULT 'private'</td><td><code>private</code> | <code>readonly</code> | <code>readwrite</code></td></tr>
+      <tr><td>auto_title</td><td class="col-type">INTEGER NOT NULL DEFAULT 0</td><td>trigger title gen after first exchange (added v4)</td></tr>
+      <tr><td>avatar_filename</td><td class="col-type">TEXT</td><td>relative to <code>avatars/</code> (added v6)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>character_hidden_message</h3>
+  <table class="schema-table">
+    <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="col-pk">id</td><td class="col-type">INTEGER PK</td><td></td></tr>
+      <tr><td class="col-fk">character_id</td><td class="col-type">INTEGER NOT NULL → character(id) ON DELETE CASCADE</td><td></td></tr>
+      <tr><td>role</td><td class="col-type">TEXT NOT NULL CHECK (role IN ('user','assistant'))</td><td>injected before real history</td></tr>
+      <tr><td>content</td><td class="col-type">TEXT NOT NULL</td><td></td></tr>
+      <tr><td>sort_order</td><td class="col-type">INTEGER NOT NULL DEFAULT 0</td><td>ordering within character's hidden messages</td></tr>
+      <tr><td>created_at</td><td class="col-type">TEXT NOT NULL</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <h3>session</h3>
+  <table class="schema-table">
+    <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td class="col-pk">id</td><td class="col-type">TEXT PK</td><td>16-byte crypto-random hex string</td></tr>
+      <tr><td class="col-fk">user_id</td><td class="col-type">INTEGER NOT NULL → user(id)</td><td></td></tr>
+      <tr><td>created_at / expires_at</td><td class="col-type">TEXT NOT NULL</td><td>30-day TTL; enforced on read in <code>SessionUserID()</code></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── 6. API ── -->
+  <h2 id="api">6 &mdash; REST API Endpoints</h2>
+  <p>All API routes are under <code>/api/</code>. Auth uses an <code>HttpOnly SameSite=Strict</code> session cookie. <code>requireAuth</code> is applied to every route except <code>POST /api/auth/login</code>.</p>
+
+  <h3>Auth &mdash; <code>/api/auth/</code></h3>
+  <table class="api-table">
+    <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method m-post">POST</span></td><td class="api-path">/api/auth/login</td><td><span class="api-auth auth-none">none</span></td><td>Verify credentials, set session cookie</td></tr>
+      <tr><td><span class="method m-post">POST</span></td><td class="api-path">/api/auth/logout</td><td><span class="api-auth auth-req">user</span></td><td>Delete session, clear cookie</td></tr>
+      <tr><td><span class="method m-get">GET</span></td><td class="api-path">/api/auth/me</td><td><span class="api-auth auth-req">user</span></td><td>Return current user (no password_hash)</td></tr>
+      <tr><td><span class="method m-patch">PATCH</span></td><td class="api-path">/api/auth/profile</td><td><span class="api-auth auth-req">user</span></td><td>Update display_name</td></tr>
+      <tr><td><span class="method m-patch">PATCH</span></td><td class="api-path">/api/auth/password</td><td><span class="api-auth auth-req">user</span></td><td>Change password (min 6 chars)</td></tr>
+      <tr><td><span class="method m-put">PUT</span></td><td class="api-path">/api/auth/avatar</td><td><span class="api-auth auth-req">user</span></td><td>Upload user avatar (multipart)</td></tr>
+      <tr><td><span class="method m-delete">DELETE</span></td><td class="api-path">/api/auth/avatar</td><td><span class="api-auth auth-req">user</span></td><td>Delete user avatar</td></tr>
+      <tr><td><span class="method m-get">GET</span></td><td class="api-path">/api/users/{id}/avatar</td><td><span class="api-auth auth-req">user</span></td><td>Serve avatar image file</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Conversations</h3>
+  <table class="api-table">
+    <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method m-get">GET</span></td><td class="api-path">/api/conversations</td><td><span class="api-auth auth-req">user</span></td><td>List user's conversations, ordered by <code>updated_at DESC</code></td></tr>
+      <tr><td><span class="method m-post">POST</span></td><td class="api-path">/api/conversations</td><td><span class="api-auth auth-req">user</span></td><td>Create; exactly one of <code>model</code> or <code>character_id</code> required</td></tr>
+      <tr><td><span class="method m-patch">PATCH</span></td><td class="api-path">/api/conversations/{id}</td><td><span class="api-auth auth-req">user</span></td><td>Update title; broadcasts via WebSocket</td></tr>
+      <tr><td><span class="method m-delete">DELETE</span></td><td class="api-path">/api/conversations/{id}</td><td><span class="api-auth auth-req">user</span></td><td>Delete (cascades to messages via FK)</td></tr>
+      <tr><td><span class="method m-post">POST</span></td><td class="api-path">/api/conversations/{id}/fork</td><td><span class="api-auth auth-req">user</span></td><td>Fork up to <code>message_id</code>, copying all prior messages</td></tr>
+      <tr><td><span class="method m-post">POST</span></td><td class="api-path">/api/conversations/{id}/regenerate-title</td><td><span class="api-auth auth-req">user</span></td><td>Trigger async title generation; returns 202</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Messages</h3>
+  <table class="api-table">
+    <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method m-get">GET</span></td><td class="api-path">/api/conversations/{id}/messages</td><td><span class="api-auth auth-req">user</span></td><td>List all messages for a conversation</td></tr>
+      <tr><td><span class="method m-post">POST</span></td><td class="api-path">/api/conversations/{id}/messages</td><td><span class="api-auth auth-req">user</span></td><td>Send message; response is <strong>SSE stream</strong> (<code>text/event-stream</code>)</td></tr>
+      <tr><td><span class="method m-get">GET</span></td><td class="api-path">/api/conversations/{id}/messages/{msgId}/context</td><td><span class="api-auth auth-req">user</span></td><td>Return exact messages array sent to LLM for given message</td></tr>
+      <tr><td><span class="method m-post">POST</span></td><td class="api-path">/api/conversations/{id}/first-message</td><td><span class="api-auth auth-req">user</span></td><td>Seed character's <code>first_message</code> as initial assistant message</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Characters</h3>
+  <table class="api-table">
+    <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method m-get">GET</span></td><td class="api-path">/api/characters</td><td><span class="api-auth auth-req">user</span></td><td>List visible characters (excludes private from other users)</td></tr>
+      <tr><td><span class="method m-get">GET</span></td><td class="api-path">/api/characters/{id}</td><td><span class="api-auth auth-req">user</span></td><td>Get character + hidden messages; enforces private visibility</td></tr>
+      <tr><td><span class="method m-post">POST</span></td><td class="api-path">/api/characters</td><td><span class="api-auth auth-req">user</span></td><td>Create; invalid visibility defaults to <code>private</code></td></tr>
+      <tr><td><span class="method m-patch">PATCH</span></td><td class="api-path">/api/characters/{id}</td><td><span class="api-auth auth-req">user</span></td><td>Update; only owner/admin can change visibility</td></tr>
+      <tr><td><span class="method m-delete">DELETE</span></td><td class="api-path">/api/characters/{id}</td><td><span class="api-auth auth-req">user</span></td><td>Only owner or admin can delete</td></tr>
+      <tr><td><span class="method m-get">GET</span></td><td class="api-path">/api/characters/{id}/avatar</td><td><span class="api-auth auth-req">user</span></td><td>Serve avatar image</td></tr>
+      <tr><td><span class="method m-put">PUT</span></td><td class="api-path">/api/characters/{id}/avatar</td><td><span class="api-auth auth-req">user</span></td><td>Upload avatar; owner/admin/readwrite only</td></tr>
+      <tr><td><span class="method m-delete">DELETE</span></td><td class="api-path">/api/characters/{id}/avatar</td><td><span class="api-auth auth-req">user</span></td><td>Delete avatar; owner/admin/readwrite only</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Admin &mdash; <code>/api/admin/</code></h3>
+  <table class="api-table">
+    <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method m-get">GET</span></td><td class="api-path">/api/admin/users</td><td><span class="api-auth auth-admin">admin</span></td><td>List all users</td></tr>
+      <tr><td><span class="method m-post">POST</span></td><td class="api-path">/api/admin/users</td><td><span class="api-auth auth-admin">admin</span></td><td>Create user</td></tr>
+      <tr><td><span class="method m-patch">PATCH</span></td><td class="api-path">/api/admin/users/{id}</td><td><span class="api-auth auth-admin">admin</span></td><td>Update user (username, password, is_admin)</td></tr>
+      <tr><td><span class="method m-delete">DELETE</span></td><td class="api-path">/api/admin/users/{id}</td><td><span class="api-auth auth-admin">admin</span></td><td>Delete user; cannot delete own account</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Models &amp; WebSocket</h3>
+  <table class="api-table">
+    <thead><tr><th>Method</th><th>Path</th><th>Auth</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method m-get">GET</span></td><td class="api-path">/api/models</td><td><span class="api-auth auth-req">user</span></td><td>List configured models with display names</td></tr>
+      <tr><td><span class="method m-get">GET</span></td><td class="api-path">/ws</td><td><span class="api-auth auth-ws">session</span></td><td>WebSocket upgrade; broadcasts title/list-changed events</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── 7. Frontend ── -->
+  <h2 id="frontend">7 &mdash; Frontend Modules</h2>
+  <p>No build step. Files are served directly from <code>static/</code>. Native ES module imports resolved by the browser. The main app is <code>static/index.html</code>; settings pages live under <code>static/settings/</code>.</p>
+
+  <h3>Main App JS (<code>static/js/</code>)</h3>
+  <div class="module-grid">
+    <div class="module-card">
+      <div class="module-file">app.js</div>
+      <div class="module-desc">Root orchestrator. Auth check → showApp/showLogin. Initialises all modules, handles URL state (<code>?c={id}</code>), routes user actions to API calls, manages <code>activeConversationId</code> and streaming abort handle.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">api.js</div>
+      <div class="module-desc">Fetch wrappers for every REST endpoint. SSE streaming parser in <code>messages.send()</code> — reads chunks via <code>ReadableStream</code>, dispatches callbacks for <code>name</code>, <code>delta</code>, <code>stats</code>, <code>message_id</code>, <code>[DONE]</code>.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">thread.js</div>
+      <div class="module-desc">Message list rendering, SSE streaming controller, auto-scroll (paused on user scroll during stream). Contains three lazy-created modals: raw markdown viewer, fork confirmation, LLM context viewer. Token stats popover.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">sidebar.js</div>
+      <div class="module-desc">Conversation list. Full re-render on state changes. Body-level context menu (avoids overflow clipping). Handles title edit, regenerate, delete. <code>updateTitle()</code> does targeted DOM update without full re-render.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">header.js</div>
+      <div class="module-desc">Chat header: conversation title display + model/character picker dropdown. Reports selection changes via <code>onChange</code> callback to app.js. Displays checkmark on active selection.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">composer.js</div>
+      <div class="module-desc">Textarea with auto-resize (max 200px). Send button. Shift+Enter = newline, Enter = send. Disabled during streaming. Refocuses after completion unless user blurred intentionally.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">markdown.js</div>
+      <div class="module-desc">Wraps vendored <code>marked.js</code>. Adds KaTeX math extensions: <code>$$block$$</code> and <code>$inline$</code>. <code>breaks: true</code> for newline handling.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">ws.js</div>
+      <div class="module-desc">WebSocket client. Auto-reconnect after 3s on close. <code>ws.on(type, handler)</code> dispatches events. <code>ws.connect()</code> called after successful auth.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">icons.js</div>
+      <div class="module-desc">SVG cache. Fetches Lucide SVGs from <code>/assets/icons/{name}.svg</code>. <code>preload()</code> fetches the full <code>ICONS</code> array at startup. <code>icon(name, size?)</code> returns cached SVG string. Missing names return empty string.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+  </div>
+
+  <h3>Settings JS (<code>static/settings/</code>)</h3>
+  <div class="module-grid">
+    <div class="module-card">
+      <div class="module-file">settings-account.js</div>
+      <div class="module-desc">Profile (display_name) editing, password change with strength meter, avatar upload/delete preview.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">settings-characters.js</div>
+      <div class="module-desc">Character list with create/edit/delete. Delete confirmation inline. Links to character-edit page for create/edit.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">settings-character-edit.js</div>
+      <div class="module-desc">Full character form: name, model, system prompt, first message, title prompt, visibility, auto_title. Drag-sortable hidden messages editor.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">settings-users.js</div>
+      <div class="module-desc">Admin user management: list, create, edit (username, password, is_admin flag), delete with guard against self-deletion.</div>
+      <span class="module-tag tag-js">JS</span>
+    </div>
+  </div>
+
+  <h3>CSS</h3>
+  <div class="module-grid">
+    <div class="module-card">
+      <div class="module-file">colors_and_type.css</div>
+      <div class="module-desc">Design system tokens: colour palette (<code>--ink-*</code>, <code>--paper-*</code>, <code>--lemon-*</code>, <code>--leaf-*</code>, <code>--brick-*</code>, <code>--danger</code>), typography, spacing (<code>--space-1..8</code>), radius, shadow, motion.</div>
+      <span class="module-tag tag-css">CSS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">components.css</div>
+      <div class="module-desc">Shared component styles: buttons (<code>.btn</code>, <code>.btn-primary</code>, <code>.btn-secondary</code>, <code>.btn-ghost</code>), inputs, cards, message bubbles, toggles, menus.</div>
+      <span class="module-tag tag-css">CSS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">app.css</div>
+      <div class="module-desc">Main app layout: sidebar (260px) + thread + composer grid. Message layout with avatars. Typing indicator animation. Picker screen. All three modals. ~1095 lines.</div>
+      <span class="module-tag tag-css">CSS</span>
+    </div>
+    <div class="module-card">
+      <div class="module-file">settings.css</div>
+      <div class="module-desc">Settings layout: nav (240px) + main grid. Field grid (2-col label/control). Avatar upload circle. Password strength bar. Character hidden messages drag list. ~669 lines.</div>
+      <span class="module-tag tag-css">CSS</span>
+    </div>
+  </div>
+
+  <!-- ── 8. Real-time ── -->
+  <h2 id="realtime">8 &mdash; Real-time: WebSocket &amp; SSE</h2>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">SSE (Server-Sent Events) — model streaming</div>
+      <p>Used for streaming model output back to the client. Each <code>POST /api/conversations/{id}/messages</code> request upgrades to <code>text/event-stream</code>. The server reads OpenAI-compatible streaming chunks from the model server, re-emits them as SSE events.</p>
+      <p><strong>Event payloads (all prefixed <code>data: {json}\n\n</code>):</strong></p>
+      <ul>
+        <li><code>{ "name": "assistant name" }</code> — first event, sets header display name</li>
+        <li><code>{ "delta": "..." }</code> — incremental text chunk</li>
+        <li><code>{ "stats": { prompt_tokens, completion_tokens, total_time_ms } }</code></li>
+        <li><code>{ "message_id": 123 }</code> — ID of persisted assistant message</li>
+        <li><code>{ "error": "..." }</code> — on failure</li>
+        <li><code>[DONE]</code> — stream termination</li>
+      </ul>
+      <p>Client uses <code>AbortController</code> to cancel mid-stream (stop button).</p>
+    </div>
+    <div class="card">
+      <div class="card-title">WebSocket — server push notifications</div>
+      <p>Custom RFC 6455 implementation in <code>ws.go</code>. Used only for server→client push; client messages are ignored (drained). Authenticated via session cookie at upgrade time.</p>
+      <p><strong>Message types:</strong></p>
+      <ul>
+        <li><code>conversation_titled</code> — <code>{ id, title }</code> — updates sidebar title in place</li>
+        <li><code>conversations_changed</code> — triggers full conversation list reload (e.g. after stale cleanup)</li>
+      </ul>
+      <p><strong>Hub:</strong> mutex-protected <code>map[net.Conn]struct{}</code>. Broadcast copies connection list before writing to avoid holding lock during I/O. Failed writes remove the connection.</p>
+    </div>
+  </div>
+
+  <!-- ── 9. Background Tasks ── -->
+  <h2 id="background">9 &mdash; Background Tasks</h2>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Title Worker (tasks/titles.go)</div>
+      <ul>
+        <li><strong>Polling:</strong> goroutine, ticks every 30s via <code>time.Ticker</code></li>
+        <li><strong>Eligibility:</strong> <code>title IS NULL</code>, created &gt;5 min ago, ≥2 messages</li>
+        <li><strong>Generation:</strong> sends system + last 3000 chars of history to <code>default_model</code> with <code>max_tokens=20</code></li>
+        <li><strong>Custom prompt:</strong> character's <code>title_prompt</code> overrides default if set</li>
+        <li><strong>On-demand triggers:</strong> (1) char <code>auto_title=true</code> after first exchange; (2) 3rd assistant response on any untitled conv; (3) manual via <code>POST regenerate-title</code></li>
+        <li><strong>Broadcast:</strong> WebSocket <code>conversation_titled</code> event on success</li>
+        <li><strong>Post-processing:</strong> strips surrounding quotes and whitespace from model output</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Cleanup Worker (tasks/cleanup.go)</div>
+      <ul>
+        <li><strong>Interval:</strong> every 60 seconds</li>
+        <li><strong>Target:</strong> conversations created &gt;30 min ago with fewer than 2 messages (abandoned "new chat" sessions that were never used)</li>
+        <li><strong>Action:</strong> delete matching messages first, then conversations (two-query pattern to avoid FK violation)</li>
+        <li><strong>Broadcast:</strong> <code>conversations_changed</code> WebSocket event if anything was deleted</li>
+        <li><strong>Logging:</strong> logs count of deleted conversations and messages</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── 10. Security ── -->
+  <h2 id="security">10 &mdash; Authentication &amp; Security</h2>
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <div class="card-title">Authentication model</div>
+        <ul>
+          <li>Server-side sessions in SQLite (not JWTs)</li>
+          <li>16-byte crypto-random session IDs (hex encoded)</li>
+          <li>30-day session TTL enforced in <code>SessionUserID()</code></li>
+          <li><code>HttpOnly SameSite=Strict</code> session cookie</li>
+          <li>bcrypt password hashing (<code>DefaultCost</code>)</li>
+          <li>Password-less accounts supported (NULL hash — any input accepted)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">Input handling</div>
+        <ul>
+          <li>Parameterised SQL queries throughout (no string interpolation)</li>
+          <li>Avatar uploads: content-type sniffing + 5 MB limit + full image decode/re-encode (strips metadata)</li>
+          <li>HTML escaping in JS templates via <code>escHtml()</code> / <code>escapeHtml()</code></li>
+          <li>JSON decode errors return 400; internal errors return generic 500 (no stack trace leak)</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-title">Access control</div>
+        <ul>
+          <li>All API routes protected by <code>requireAuth</code> except <code>POST /api/auth/login</code></li>
+          <li>Admin routes protected by <code>requireAdmin</code> (composes on <code>requireAuth</code>)</li>
+          <li>Conversation ownership enforced: all reads/writes pass <code>user_id</code> to store queries</li>
+          <li>Character visibility: <code>private</code> = owner/admin only; <code>readonly</code> = others can read; <code>readwrite</code> = others can edit</li>
+          <li>Only owner/admin can change character visibility</li>
+          <li>Admin cannot delete their own account</li>
+          <li>Private character access returns 404 (not 403) to avoid enumeration</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">Notable omissions (by design for local use)</div>
+        <ul>
+          <li>No HTTPS enforcement (intended for localhost/LAN)</li>
+          <li>No CORS headers (same-origin only)</li>
+          <li>No CSP headers</li>
+          <li>No rate limiting on login endpoint</li>
+          <li>No request body size limits on JSON endpoints</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 11. File Map ── -->
+  <h2 id="files">11 &mdash; File Map</h2>
+  <pre>lemon-chat/
+├── cmd/lemon-chat/
+│   └── main.go                    Entry point, bootstrap, server start
+├── internal/
+│   ├── config/config.go           TOML struct + ServerForModel()
+│   ├── debug/debug.go             Conditional debug logging
+│   ├── server/
+│   │   ├── server.go              Router, response helpers
+│   │   ├── middleware.go          requireAuth, requireAdmin, noCacheMiddleware
+│   │   ├── auth.go                Login, logout, me, profile, password, avatar
+│   │   ├── conversations.go       Conversation CRUD + fork + regen-title
+│   │   ├── messages.go            Send (SSE), list, context, first-message
+│   │   ├── characters.go          Character CRUD + avatar
+│   │   ├── avatars.go             Multipart receive, crop/resize, serve
+│   │   ├── admin.go               Admin user management
+│   │   ├── models.go              Model list handler
+│   │   └── ws.go                  WebSocket Hub + RFC 6455 implementation
+│   ├── store/
+│   │   ├── store.go               DB open, migration runner (v0→v9)
+│   │   ├── users.go               User CRUD + avatar
+│   │   ├── sessions.go            Session create/lookup/delete
+│   │   ├── conversations.go       Conversation CRUD + fork + cleanup
+│   │   ├── messages.go            Message CRUD + stats
+│   │   └── characters.go          Character CRUD + hidden messages
+│   └── tasks/
+│       ├── titles.go              Title worker + on-demand generation
+│       └── cleanup.go             Stale conversation cleanup worker
+├── static/
+│   ├── index.html                 Main app shell (login + app)
+│   ├── settings/
+│   │   ├── account.html           Profile settings page
+│   │   ├── characters.html        Character list settings page
+│   │   ├── character-edit.html    Character create/edit page
+│   │   └── users.html             Admin user management page
+│   ├── js/
+│   │   ├── app.js                 Root orchestrator
+│   │   ├── api.js                 Fetch + SSE wrappers
+│   │   ├── sidebar.js             Conversation list + context menu
+│   │   ├── thread.js              Message rendering + modals
+│   │   ├── header.js              Title + model/char picker
+│   │   ├── composer.js            Text input + send logic
+│   │   ├── markdown.js            marked.js wrapper + math extensions
+│   │   ├── icons.js               SVG icon cache + preloader
+│   │   ├── ws.js                  WebSocket client + auto-reconnect
+│   │   ├── settings-account.js    Account settings logic
+│   │   ├── settings-avatar.js     Avatar upload/preview component
+│   │   ├── settings-characters.js Character list logic
+│   │   ├── settings-character-edit.js Character form + hidden msgs
+│   │   ├── settings-users.js      Admin user management logic
+│   │   └── vendor/
+│   │       └── marked.esm.js      Vendored marked.js (no build step)
+│   ├── css/
+│   │   ├── colors_and_type.css    Design system tokens
+│   │   ├── components.css         Shared component styles
+│   │   ├── app.css                Main app layout
+│   │   ├── settings.css           Settings page layout
+│   │   └── katex.min.css          Vendored KaTeX styles
+│   └── assets/
+│       ├── icons/                 Lucide SVG icons (served individually)
+│       └── *.svg                  Brand SVGs (logo-mark, lemon-slice, etc.)
+├── data/                          Docker volume mount for lemon.toml
+├── go.mod / go.sum
+├── Dockerfile
+├── docker-compose.yml
+├── run.sh                         Shortcut: go run ./cmd/lemon-chat
+├── lemon.toml.example             Documented config template
+├── SPEC.md / README.md / TODO.md / CLAUDE.md</pre>
+
+  <!-- ── 12. Dependencies ── -->
+  <h2 id="deps">12 &mdash; Dependencies</h2>
+  <table class="schema-table">
+    <thead><tr><th>Package</th><th>Purpose</th><th>Why this one</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>modernc.org/sqlite</code></td>
+        <td>SQLite database driver</td>
+        <td>Pure Go — no CGo, compiles without a C toolchain. Significant for Docker/CI.</td>
+      </tr>
+      <tr>
+        <td><code>github.com/BurntSushi/toml</code></td>
+        <td>TOML config parsing</td>
+        <td>Mature, well-tested TOML library for Go.</td>
+      </tr>
+      <tr>
+        <td><code>golang.org/x/crypto</code></td>
+        <td>bcrypt password hashing</td>
+        <td>Standard library extension; bcrypt is the right choice for password storage.</td>
+      </tr>
+      <tr>
+        <td><code>golang.org/x/image</code></td>
+        <td>Image processing (CatmullRom resampling, WebP decode)</td>
+        <td>High-quality resampling for avatar processing; WebP support beyond stdlib.</td>
+      </tr>
+      <tr>
+        <td><code>github.com/google/uuid</code></td>
+        <td>UUID generation</td>
+        <td>Transitive dependency (via modernc.org/sqlite); not used directly.</td>
+      </tr>
+      <tr>
+        <td colspan="3" style="color:var(--ink-3);font-style:italic;">All other entries are transitive dependencies of modernc.org/sqlite (bigfft, humanize, libc, mathutil, memory, go-strftime, go-isatty, sys)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:48px;padding-top:16px;border-top:1px solid var(--paper-3);color:var(--ink-3);font-size:12px;">
+    Architecture document generated by code review — lemon-chat, schema version 9.
+  </div>
+
+</div>
+</body>
+</html>
