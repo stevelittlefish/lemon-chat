@@ -38,7 +38,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Medium priority
 
-- [ ] **`DeleteConversation` never returns `ErrNotFound`** (`internal/store/conversations.go:66`)
+- [x] **`DeleteConversation` never returns `ErrNotFound`** (`internal/store/conversations.go:66`)
   Uses `db.Exec` without checking `RowsAffected`. Deleting a nonexistent conversation returns 204 instead of 404. Check rows affected and return `ErrNotFound` when zero.
 
 - [ ] **Duplicate character-loading block in `handleSendMessage`** (`internal/server/messages.go:84–133`)
