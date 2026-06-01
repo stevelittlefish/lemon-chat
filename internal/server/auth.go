@@ -1,7 +1,6 @@
 package server
 
 import (
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,8 +34,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	if user.PasswordHash != nil {
 		if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password)); err != nil {
-			// Constant-time comparison already done by bcrypt; belt-and-suspenders.
-			_ = subtle.ConstantTimeCompare([]byte(req.Password), []byte(req.Password))
 			writeError(w, http.StatusUnauthorized, "invalid credentials")
 			return
 		}
