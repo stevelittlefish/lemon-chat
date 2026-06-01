@@ -99,6 +99,8 @@ export function showPicker(models, characters, onSelect) {
     </div>
   `;
 
+  threadEl.querySelectorAll('.picker-card-avatar img').forEach(withRetry);
+
   threadEl.querySelectorAll('.picker-card').forEach(btn => {
     btn.addEventListener('click', () => {
       const sel = btn.dataset.type === 'model'
@@ -212,12 +214,22 @@ export function startStreaming() {
   };
 }
 
+// Retry a failed image load once with a cache-busting param.
+function withRetry(img) {
+  img.onerror = () => {
+    img.onerror = null;
+    const base = img.src.split('?')[0];
+    setTimeout(() => { img.src = `${base}?r=${Date.now()}`; }, 800);
+  };
+  return img;
+}
+
 function buildAvatar(role, msgCharacterId) {
   if (role === 'user') {
     if (!avatarCtx.userHasAvatar || !avatarCtx.userId) return null;
     const el = document.createElement('div');
     el.className = 'avatar-chat';
-    const img = document.createElement('img');
+    const img = withRetry(document.createElement('img'));
     img.src = `/api/users/${avatarCtx.userId}/avatar`;
     img.alt = '';
     el.appendChild(img);
@@ -232,7 +244,7 @@ function buildAvatar(role, msgCharacterId) {
   if (!hasAvatar) return null;
   const el = document.createElement('div');
   el.className = 'avatar-chat';
-  const img = document.createElement('img');
+  const img = withRetry(document.createElement('img'));
   img.src = `/api/characters/${charId}/avatar`;
   img.alt = '';
   el.appendChild(img);
