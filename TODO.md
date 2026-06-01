@@ -47,7 +47,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`UpdateConversationAfterMessage` error is silently ignored** (`internal/server/messages.go:258`)
   `_ = s.store.UpdateConversationAfterMessage(...)` — if this fails, the conversation's model/character metadata silently drifts. At minimum log the error.
 
-- [ ] **Missing database indexes on frequently queried columns** (`internal/store/store.go`)
+- [x] **Missing database indexes on frequently queried columns** (`internal/store/store.go`)
   Add indexes on:
   - `message(conversation_id)` — scanned on every message list and send
   - `conversation(user_id)` — scanned on every conversation list

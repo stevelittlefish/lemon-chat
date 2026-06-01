@@ -233,6 +233,25 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v8 → v9 complete")
 	}
 
+	if version < 10 {
+		log.Println("store: migrating v9 → v10 (add indexes on message, conversation, session)")
+		for _, stmt := range []string{
+			`CREATE INDEX IF NOT EXISTS idx_message_conversation_id ON message(conversation_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_conversation_user_id    ON conversation(user_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_conversation_created_at ON conversation(created_at)`,
+			`CREATE INDEX IF NOT EXISTS idx_session_expires_at      ON session(expires_at)`,
+		} {
+			if _, err := s.db.Exec(stmt); err != nil {
+				return err
+			}
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (10, ?)`, now()); err != nil {
+			return err
+		}
+		version = 10
+		log.Println("store: migration v9 → v10 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }
