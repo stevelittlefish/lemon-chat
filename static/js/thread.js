@@ -141,7 +141,7 @@ export function startStreaming() {
   const wrapper = document.createElement('div');
   wrapper.className = 'message assistant';
 
-  const avatarEl = buildAvatar('assistant', null); // null → streaming fallback uses avatarCtx
+  const avatarEl = buildAvatar('assistant', avatarCtx.characterId);
   if (avatarEl) wrapper.appendChild(avatarEl);
 
   const colEl = document.createElement('div');
@@ -212,8 +212,6 @@ export function startStreaming() {
   };
 }
 
-// msgCharacterId: the character_id from the individual message (null for streaming placeholder).
-// Falls back to avatarCtx.characterId for the streaming case where no message exists yet.
 function buildAvatar(role, msgCharacterId) {
   if (role === 'user') {
     if (!avatarCtx.userHasAvatar || !avatarCtx.userId) return null;
@@ -225,10 +223,9 @@ function buildAvatar(role, msgCharacterId) {
     el.appendChild(img);
     return el;
   }
-  // assistant — resolve which character ID to use
-  const charId = msgCharacterId ?? avatarCtx.characterId;
+  // assistant — use the character ID stored on the message (or passed explicitly for streaming)
+  const charId = msgCharacterId;
   if (!charId) return null;
-  // Check the character map first; fall back to the conversation-level flag for the streaming case.
   const hasAvatar = avatarCtx.characterMap.has(charId)
     ? avatarCtx.characterMap.get(charId)
     : (charId === avatarCtx.characterId ? avatarCtx.characterHasAvatar : false);
