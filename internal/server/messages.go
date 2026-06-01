@@ -18,6 +18,38 @@ import (
 	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
 
+type chatMsg struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// resolveCharacter fetches a character, checks visibility for the given user,
+// and prepends its system prompt and hidden messages to msgs.
+// Returns nil, nil after writing the HTTP error if anything fails.
+func (s *Server) resolveCharacter(w http.ResponseWriter, user *store.User, charID int64, msgs []chatMsg) (*store.Character, []chatMsg) {
+	char, err := s.store.GetCharacter(charID)
+	if err != nil {
+		internalError(w, err)
+		return nil, nil
+	}
+	if char.Visibility == "private" && char.CreatedBy != user.ID && !user.IsAdmin {
+		writeError(w, http.StatusForbidden, "forbidden")
+		return nil, nil
+	}
+	if char.SystemPrompt != nil {
+		msgs = append(msgs, chatMsg{Role: "system", Content: *char.SystemPrompt})
+	}
+	hiddenMsgs, err := s.store.ListCharacterHiddenMessages(char.ID)
+	if err != nil {
+		internalError(w, err)
+		return nil, nil
+	}
+	for _, hm := range hiddenMsgs {
+		msgs = append(msgs, chatMsg{Role: hm.Role, Content: hm.Content})
+	}
+	return char, msgs
+}
+
 // modelClient is used for all outbound calls to model servers. No Timeout is
 // set because streaming responses run indefinitely; the dial timeout guards
 // against a server that accepts the TCP connection but never responds.
@@ -82,10 +114,6 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type chatMsg struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}
 	var chatMsgs []chatMsg
 
 	// Resolve which model/character to use: request override takes precedence over conversation.
@@ -95,55 +123,29 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	var usedCharacter *store.Character
 
 	if req.CharacterID != nil {
-		char, err := s.store.GetCharacter(*req.CharacterID)
-		if err != nil {
-			internalError(w, err)
-			return
-		}
-		if char.Visibility == "private" && char.CreatedBy != user.ID && !user.IsAdmin {
-			writeError(w, http.StatusForbidden, "forbidden")
+		var char *store.Character
+		char, chatMsgs = s.resolveCharacter(w, user, *req.CharacterID, chatMsgs)
+		if char == nil {
 			return
 		}
 		usedCharacterID = req.CharacterID
 		usedCharacter = char
 		modelName = char.Model
 		assistantName = char.Name
-		if char.SystemPrompt != nil {
-			chatMsgs = append(chatMsgs, chatMsg{Role: "system", Content: *char.SystemPrompt})
-		}
-		hiddenMsgs, err := s.store.ListCharacterHiddenMessages(char.ID)
-		if err != nil {
-			internalError(w, err)
-			return
-		}
-		for _, hm := range hiddenMsgs {
-			chatMsgs = append(chatMsgs, chatMsg{Role: hm.Role, Content: hm.Content})
-		}
 	} else if req.Model != nil {
 		usedModel = req.Model
 		modelName = *req.Model
 		assistantName = modelName
 	} else if conv.CharacterID != nil {
-		char, err := s.store.GetCharacter(*conv.CharacterID)
-		if err != nil {
-			internalError(w, err)
+		var char *store.Character
+		char, chatMsgs = s.resolveCharacter(w, user, *conv.CharacterID, chatMsgs)
+		if char == nil {
 			return
 		}
 		usedCharacterID = conv.CharacterID
 		usedCharacter = char
 		modelName = char.Model
 		assistantName = char.Name
-		if char.SystemPrompt != nil {
-			chatMsgs = append(chatMsgs, chatMsg{Role: "system", Content: *char.SystemPrompt})
-		}
-		hiddenMsgs, err := s.store.ListCharacterHiddenMessages(char.ID)
-		if err != nil {
-			internalError(w, err)
-			return
-		}
-		for _, hm := range hiddenMsgs {
-			chatMsgs = append(chatMsgs, chatMsg{Role: hm.Role, Content: hm.Content})
-		}
 	} else {
 		usedModel = conv.Model
 		modelName = *conv.Model
@@ -361,10 +363,6 @@ func (s *Server) handleGetMessageContext(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	type chatMsg struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}
 	var chatMsgs []chatMsg
 
 	if conv.CharacterID != nil {
