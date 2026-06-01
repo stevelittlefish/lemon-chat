@@ -28,6 +28,9 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **No timeout on model API calls** (`internal/server/messages.go:179`, `internal/tasks/titles.go:161`)
   Both use `http.DefaultClient` which has no timeout. A hung model server holds goroutines and SSE connections indefinitely. Use a custom `http.Client` with a dial timeout, or pass a `context.WithTimeout` for non-streaming calls (title generation especially).
 
+- [ ] **Make LLM API timeouts configurable** (`internal/config/config.go:31`, `internal/server/messages.go:27`, `internal/tasks/titles.go:153`)
+  The dial timeout (10 s) and title-generation timeout (30 s) are hardcoded. Add optional `dial_timeout_seconds` and `response_timeout_seconds` fields to `ModelServer` in the config so operators can tune them per server; fall back to the current hardcoded values when unset.
+
 - [x] **`bufio.Scanner` 64 KB limit on SSE stream** (`internal/server/messages.go:199`)
   The default scanner buffer is 64 KB. A `data:` line longer than that causes `Scan()` to silently return false mid-response. Set a larger buffer (`scanner.Buffer(make([]byte, 1<<20), 1<<20)`) and check `scanner.Err()` after the loop.
 
