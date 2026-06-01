@@ -44,7 +44,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **Duplicate character-loading block in `handleSendMessage`** (`internal/server/messages.go:84–133`)
   The character fetch + system message + hidden messages block is copy-pasted verbatim twice (once for `req.CharacterID`, once for `conv.CharacterID`). Extract a helper function; this also makes the visibility fix from the critical bug above easier to apply in one place.
 
-- [ ] **`UpdateConversationAfterMessage` error is silently ignored** (`internal/server/messages.go:258`)
+- [x] **`UpdateConversationAfterMessage` error is silently ignored** (`internal/server/messages.go:258`)
   `_ = s.store.UpdateConversationAfterMessage(...)` — if this fails, the conversation's model/character metadata silently drifts. At minimum log the error.
 
 - [ ] **Missing database indexes on frequently queried columns** (`internal/store/store.go`)

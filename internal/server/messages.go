@@ -278,7 +278,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	if fullContent != "" {
 		prevUpdatedAt, _ := time.Parse(time.RFC3339, conv.UpdatedAt)
 		msg, err := s.store.CreateMessage(convID, "assistant", fullContent, usedCharacterID, &assistantName, usageStats)
-		_ = s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID)
+		if err := s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID); err != nil {
+			log.Printf("messages: failed to update conversation %d after message: %v", convID, err)
+		}
 		if time.Since(prevUpdatedAt) > 2*time.Minute {
 			s.hub.BroadcastConversationListChanged()
 		}
