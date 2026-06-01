@@ -19,7 +19,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`ForkConversation` is not wrapped in a transaction** (`internal/store/conversations.go:111`)
   Creates the new conversation and inserts messages in separate calls. A failure mid-insert leaves an empty forked conversation in the DB. Wrap the whole thing in a `db.Begin()` / `tx.Commit()`.
 
-- [ ] **SQLite busy errors under concurrent writes** (`internal/store/store.go:16`)
+- [x] **SQLite busy errors under concurrent writes** (`internal/store/store.go:16`)
   `sql.Open` uses WAL mode but sets no `_busy_timeout` and no `SetMaxOpenConns(1)`. Concurrent writers (SSE, title goroutines, WebSocket broadcasts) immediately get `SQLITE_BUSY` instead of waiting. Add `&_busy_timeout=5000` to the DSN and call `db.SetMaxOpenConns(1)` after opening.
 
 - [x] **Title generation can fire twice concurrently on one request** (`internal/server/messages.go:270–294`)
