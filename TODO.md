@@ -67,13 +67,13 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **O(n²) string concatenation in streaming loop** (`internal/server/messages.go:235`)
   `fullContent += text` in a loop allocates on every iteration. Use `strings.Builder`.
 
-- [ ] **`isImageExt()` is defined but never called** (`internal/server/avatars.go:115`)
+- [x] **`isImageExt()` is defined but never called** (`internal/server/avatars.go:115`)
   Dead code — remove it.
 
-- [ ] **`mimeFromFilename` non-JPEG cases are unreachable** (`internal/server/avatars.go:27`)
+- [x] **`mimeFromFilename` non-JPEG cases are unreachable** (`internal/server/avatars.go:27`)
   `receiveAvatar` always returns `".jpg"`, so only the JPEG branch is ever hit. Remove the dead cases or add a comment explaining the function is currently JPEG-only.
 
-- [ ] **`go.mod` marks direct dependencies as `// indirect`** (`go.mod`)
+- [x] **`go.mod` marks direct dependencies as `// indirect`** (`go.mod`)
   `BurntSushi/toml`, `golang.org/x/crypto`, and `golang.org/x/image` are imported directly. Run `go mod tidy` to fix.
 
 - [ ] **Title generation uses `http.NewRequest` without a context** (`internal/tasks/titles.go:153`)

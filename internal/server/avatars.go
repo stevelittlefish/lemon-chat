@@ -24,21 +24,19 @@ func (s *Server) avatarDir() string {
 	return filepath.Join(filepath.Dir(s.cfg.Server.DBPath), "avatars")
 }
 
+// mimeFromFilename returns the MIME type for a filename. receiveAvatar always
+// produces ".jpg" files, so only the JPEG case is reachable in practice.
 func mimeFromFilename(filename string) string {
 	parts := strings.Split(filename, ".")
 	if len(parts) < 2 {
 		return "application/octet-stream"
 	}
-	switch strings.ToLower(parts[len(parts)-1]) {
+	ext := strings.ToLower(parts[len(parts)-1])
+	switch ext {
 	case "jpg", "jpeg":
 		return "image/jpeg"
-	case "png":
-		return "image/png"
-	case "gif":
-		return "image/gif"
-	case "webp":
-		return "image/webp"
 	}
+	log.Printf("avatars: unhandled extension %q, falling back to octet-stream", ext)
 	return "application/octet-stream"
 }
 
@@ -109,15 +107,6 @@ func processAvatar(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-// isImageExt returns true for common image file extensions.
-func isImageExt(ext string) bool {
-	switch ext {
-	case ".jpg", ".jpeg", ".png", ".gif", ".webp":
-		return true
-	}
-	return false
 }
 
 // writeAvatar saves avatar bytes to the avatar directory with the given prefix
