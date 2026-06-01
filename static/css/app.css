@@ -181,6 +181,20 @@ html, body {
   background: var(--bg-inset);
 }
 
+.sidebar-item-title-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--lemon-400);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: var(--fs-14);
+  line-height: 1.4;
+  padding: 1px var(--space-1);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--lemon-100);
+}
+
 .sidebar-footer {
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border-soft);

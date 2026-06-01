@@ -269,7 +269,10 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Persist completed assistant message and update conversation model/character.
 	if fullContent.Len() > 0 {
-		prevUpdatedAt, _ := time.Parse(time.RFC3339, conv.UpdatedAt)
+		prevUpdatedAt, parseErr := time.Parse(time.RFC3339, conv.UpdatedAt)
+		if parseErr != nil {
+			log.Printf("messages: conv %d: failed to parse updated_at %q: %v", convID, conv.UpdatedAt, parseErr)
+		}
 		msg, err := s.store.CreateMessage(convID, "assistant", fullContent.String(), usedCharacterID, &assistantName, usageStats)
 		if err := s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID); err != nil {
 			log.Printf("messages: failed to update conversation %d after message: %v", convID, err)

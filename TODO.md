@@ -36,6 +36,11 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ---
 
+## High priority
+
+- [ ] **Inline title edit exits immediately when clicking to reposition the cursor** (`static/js/sidebar.js`)
+  The `blur` event fires (or the page navigates) when the user clicks inside the inline title input to move the cursor. `stopPropagation` on `mousedown` and `click` did not fix it. The input lives inside an `<a>` element with an `href`; the browser may be following the link before the input can intercept the event. Needs proper investigation — browser devtools event breakpoints recommended.
+
 ## Medium priority
 
 - [x] **`DeleteConversation` never returns `ErrNotFound`** (`internal/store/conversations.go:66`)
@@ -76,13 +81,13 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`go.mod` marks direct dependencies as `// indirect`** (`go.mod`)
   `BurntSushi/toml`, `golang.org/x/crypto`, and `golang.org/x/image` are imported directly. Run `go mod tidy` to fix.
 
-- [ ] **Title generation uses `http.NewRequest` without a context** (`internal/tasks/titles.go:153`)
+- [x] **Title generation uses `http.NewRequest` without a context** (`internal/tasks/titles.go:153`)
   Use `http.NewRequestWithContext` with a timeout context so a slow model server doesn't hang the worker goroutine indefinitely.
 
-- [ ] **`time.Parse` error ignored for `prevUpdatedAt`** (`internal/server/messages.go:256`)
+- [x] **`time.Parse` error ignored for `prevUpdatedAt`** (`internal/server/messages.go:256`)
   If `conv.UpdatedAt` is malformed, `prevUpdatedAt` is the zero time and `BroadcastConversationListChanged` fires on every message. Handle or at least log the parse error.
 
-- [ ] **`prompt()` / `confirm()` dialogs in sidebar** (`static/js/sidebar.js:47, 62`)
+- [x] **`prompt()` / `confirm()` dialogs in sidebar** (`static/js/sidebar.js:47, 62`)
   Native browser dialogs are blocking and visually inconsistent with the rest of the UI. The title edit would be better as an inline editable field; the delete confirm should use the same modal pattern as the fork dialog.
 
 - [ ] **Full `innerHTML` re-render of sidebar on every state change** (`static/js/sidebar.js:132`)

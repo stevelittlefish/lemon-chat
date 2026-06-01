@@ -42,13 +42,7 @@ function openConvMenu(id, anchorEl) {
   menu.querySelector('[data-action="edit-title"]').addEventListener('click', (e) => {
     e.stopPropagation();
     closeConvMenu();
-    const conv = state.items.find(c => c.id === id);
-    const current = conv?.title ?? '';
-    const newTitle = prompt('Edit title', current);
-    if (newTitle === null) return;
-    const trimmed = newTitle.trim();
-    if (trimmed === current) return;
-    api.update(id, { title: trimmed }).then(() => updateTitle(id, trimmed));
+    startInlineEdit(id);
   });
 
   menu.querySelector('[data-action="regen"]').addEventListener('click', async (e) => {
@@ -57,13 +51,10 @@ function openConvMenu(id, anchorEl) {
     await api.regenerateTitle(id);
   });
 
-  menu.querySelector('[data-action="delete"]').addEventListener('click', async (e) => {
+  menu.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
     e.stopPropagation();
     closeConvMenu();
-    if (!confirm('Delete this conversation?')) return;
-    await api.delete(id);
-    removeConversation(id);
-    if (state.activeId === id) state.onSelect?.(null);
+    showDeleteConfirm(id);
   });
 }
 
@@ -73,6 +64,124 @@ function closeConvMenu() {
     _menuEl = null;
     _menuConvId = null;
   }
+}
+
+function startInlineEdit(id) {
+  const itemEl = sidebarEl.querySelector(`.sidebar-item[data-id="${id}"]`);
+  if (!itemEl) return;
+  const titleEl = itemEl.querySelector('.sidebar-item-title');
+  if (!titleEl) return;
+
+  const conv = state.items.find(c => c.id === id);
+  const current = conv?.title ?? '';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'sidebar-item-title-input';
+  input.value = current;
+
+  let committed = false;
+  function commit() {
+    if (committed) return;
+    committed = true;
+    input.replaceWith(titleEl);
+    const trimmed = input.value.trim();
+    if (trimmed && trimmed !== current) {
+      api.update(id, { title: trimmed }).then(() => updateTitle(id, trimmed));
+    }
+  }
+  function cancel() {
+    if (committed) return;
+    committed = true;
+    input.replaceWith(titleEl);
+  }
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+  });
+  input.addEventListener('blur', commit);
+  input.addEventListener('mousedown', (e) => e.stopPropagation());
+  input.addEventListener('click', (e) => e.stopPropagation());
+
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+let _deleteModal = null;
+
+function getDeleteModal() {
+  if (_deleteModal) return _deleteModal;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'fork-modal';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Delete conversation');
+
+  const dialog = document.createElement('div');
+  dialog.className = 'fork-modal-dialog';
+
+  const title = document.createElement('p');
+  title.className = 'fork-modal-title';
+  title.textContent = 'Delete conversation';
+
+  const body = document.createElement('p');
+  body.className = 'fork-modal-body';
+  body.textContent = 'This conversation and all its messages will be permanently deleted.';
+
+  const actions = document.createElement('div');
+  actions.className = 'fork-modal-actions';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn-secondary btn-sm';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', closeDeleteModal);
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'btn btn-danger btn-sm';
+  confirmBtn.textContent = 'Delete';
+
+  actions.appendChild(cancelBtn);
+  actions.appendChild(confirmBtn);
+  dialog.appendChild(title);
+  dialog.appendChild(body);
+  dialog.appendChild(actions);
+  overlay.appendChild(dialog);
+
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target === overlay) closeDeleteModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeDeleteModal();
+  });
+
+  document.body.appendChild(overlay);
+  _deleteModal = { overlay, confirmBtn };
+  return _deleteModal;
+}
+
+function showDeleteConfirm(id) {
+  const { overlay, confirmBtn } = getDeleteModal();
+  confirmBtn.disabled = false;
+  confirmBtn.textContent = 'Delete';
+  confirmBtn.onclick = async () => {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Deleting…';
+    try {
+      await api.delete(id);
+      removeConversation(id);
+      if (state.activeId === id) state.onSelect?.(null);
+    } finally {
+      closeDeleteModal();
+    }
+  };
+  overlay.classList.add('open');
+}
+
+function closeDeleteModal() {
+  _deleteModal?.overlay.classList.remove('open');
 }
 
 document.addEventListener('click', (e) => {

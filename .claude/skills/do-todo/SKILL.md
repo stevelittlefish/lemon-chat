@@ -71,6 +71,10 @@ Change the marker from `[~]` to `[x]` in `TODO.md`.
 
 Two to four sentences summarising: what was wrong, what you changed, and (if a test was written) that it now passes. No padding.
 
+## Step 10 — Verification steps
+
+List the exact steps the user should take to verify the change works and exercise the affected code paths. Be specific: name the UI action, URL, or command to run, and describe what correct behaviour looks like. Group by change if multiple items were completed. If a change is only verifiable by code inspection (e.g. dead code removal, a log line that only fires on corrupted data), say so explicitly rather than omitting the step.
+
 ---
 
 ## If the user invokes this skill with no arguments
