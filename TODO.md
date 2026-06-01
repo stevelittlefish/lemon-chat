@@ -54,7 +54,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
   - `conversation(created_at)` — used by stale cleanup and untitled eligible queries
   - `session(expires_at)` — scanned on every auth check
 
-- [ ] **WebSocket pong does not validate ping payload ≤ 125 bytes** (`internal/server/ws.go:198`)
+- [x] **WebSocket pong does not validate ping payload ≤ 125 bytes** (`internal/server/ws.go:198`)
   RFC 6455 §5.5: control frame payloads must not exceed 125 bytes. The pong is built as `append([]byte{0x8A, byte(length)}, payload...)` without checking length. Add `if length > 125 { return }` before building the pong.
 
 - [ ] **`defer resp.Body.Close()` inside loop in `listModels`** (`cmd/lemon-chat/main.go:87`)

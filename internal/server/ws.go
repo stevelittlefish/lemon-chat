@@ -196,6 +196,9 @@ func drainFrames(conn net.Conn) {
 		case 0x8: // close
 			return
 		case 0x9: // ping — respond with pong
+			if length > 125 {
+				return
+			}
 			pong := append([]byte{0x8A, byte(length)}, payload...)
 			conn.Write(pong) //nolint:errcheck
 		}
