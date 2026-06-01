@@ -17,6 +17,7 @@ let activeConversationId = null;
 let activeHasMessages = false;
 let modelList = [];
 let characterList = [];
+let currentAbort = null;
 
 async function start() {
   try {
@@ -112,6 +113,7 @@ async function initApp() {
 
   composer.init({
     onSend: sendMessage,
+    onStop: () => { if (currentAbort) currentAbort(); },
   });
 
   thread.setForkHandler(async (messageId) => {
@@ -199,7 +201,7 @@ async function sendMessage(content) {
   const stream = thread.startStreaming();
   composer.setStreaming(true);
 
-  msgApi.send(convId, content, sel, {
+  currentAbort = msgApi.send(convId, content, sel, {
     onName: (name) => stream.setName(name),
     onDelta: (delta) => stream.append(delta),
     onStats: (stats) => stream.setStats(stats),
@@ -207,14 +209,21 @@ async function sendMessage(content) {
     onDone: () => {
       stream.finish();
       composer.setStreaming(false);
+      currentAbort = null;
       sidebar.updateConversation(convId, {
         model: sel?.type === 'model' ? sel.name : null,
         character_id: sel?.type === 'character' ? sel.id : null,
       });
     },
+    onAborted: () => {
+      stream.truncate();
+      composer.setStreaming(false);
+      currentAbort = null;
+    },
     onError: (err) => {
       stream.error('something went wrong — ' + err.message);
       composer.setStreaming(false);
+      currentAbort = null;
     },
   });
 }

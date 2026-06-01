@@ -1082,3 +1082,14 @@ html, body {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ── Stopped message indicator ──────────────────────────────── */
+
+.message-stopped {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-faint);
+}

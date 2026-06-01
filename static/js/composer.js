@@ -4,14 +4,16 @@ const composerContainer = document.getElementById('composer-container');
 
 let state = {
   onSend: null,
+  onStop: null,
   streaming: false,
   userBlurred: false,
 };
 
 let blurWatcher = null;
 
-export function init({ onSend }) {
+export function init({ onSend, onStop }) {
   state.onSend = onSend;
+  state.onStop = onStop;
   render();
 }
 
@@ -19,7 +21,17 @@ export function setStreaming(active) {
   state.streaming = active;
   const btn = composerContainer.querySelector('.composer-send');
   const textarea = composerContainer.querySelector('.composer-textarea');
-  if (btn) btn.disabled = active;
+  if (btn) {
+    if (active) {
+      btn.innerHTML = icon('square');
+      btn.disabled = false;
+      btn.title = 'Stop';
+    } else {
+      btn.innerHTML = icon('send');
+      btn.disabled = textarea?.value.trim() === '';
+      btn.title = 'Send';
+    }
+  }
   if (textarea) {
     textarea.disabled = active;
     if (active) {
@@ -68,7 +80,10 @@ function render() {
     }
   });
 
-  sendBtn.addEventListener('click', doSend);
+  sendBtn.addEventListener('click', () => {
+    if (state.streaming) state.onStop?.();
+    else doSend();
+  });
 }
 
 function doSend() {

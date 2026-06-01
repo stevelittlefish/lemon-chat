@@ -191,6 +191,19 @@ export function startStreaming() {
         if (shouldScroll) scrollToBottom();
       }
     },
+    truncate() {
+      userScrolledDuringStream = false;
+      if (!accumulated) {
+        wrapper.remove();
+        return;
+      }
+      contentEl.innerHTML = renderMarkdown(accumulated);
+      const stopNote = document.createElement('p');
+      stopNote.className = 'message-stopped';
+      stopNote.textContent = 'stopped';
+      colEl.appendChild(stopNote);
+      colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId }, accumulated));
+    },
     error(msg) {
       userScrolledDuringStream = false;
       contentEl.textContent = msg;

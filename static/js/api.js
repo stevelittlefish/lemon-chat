@@ -60,15 +60,18 @@ export const messages = {
     return request('POST', `/api/conversations/${conversationId}/first-message`, body);
   },
   // selection: { type: 'model', name } | { type: 'character', id } | null
-  send: (conversationId, content, selection, { onName, onDelta, onDone, onError, onStats, onMessageId }) => {
+  // Returns an abort() function that cancels the in-flight request.
+  send: (conversationId, content, selection, { onName, onDelta, onDone, onAborted, onError, onStats, onMessageId }) => {
     const url = `/api/conversations/${conversationId}/messages`;
     const body = { content };
     if (selection?.type === 'model') body.model = selection.name;
     if (selection?.type === 'character') body.character_id = selection.id;
+    const ctrl = new AbortController();
     fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: ctrl.signal,
     }).then(async (res) => {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -99,7 +102,11 @@ export const messages = {
         }
       }
       onDone?.();
-    }).catch((err) => onError?.(err));
+    }).catch((err) => {
+      if (err.name === 'AbortError') onAborted?.();
+      else onError?.(err);
+    });
+    return ctrl.abort.bind(ctrl);
   },
 };
 
