@@ -1,6 +1,7 @@
 import { render as renderMarkdown } from './markdown.js';
 import { icon } from './icons.js';
 import { messages as msgApi } from './api.js';
+import { escapeHtml } from './utils.js';
 
 async function copyToClipboard(text) {
   if (navigator.clipboard) {
@@ -68,9 +69,9 @@ export function showEmpty() {
 
 export function showPicker(models, characters, onSelect) {
   const modelCards = models.map(m => `
-    <button class="picker-card" data-type="model" data-name="${escHtml(m.name)}">
+    <button class="picker-card" data-type="model" data-name="${escapeHtml(m.name)}">
       <span class="picker-card-icon">${icon('cpu', 22)}</span>
-      <span class="picker-card-name">${escHtml(m.display_name)}</span>
+      <span class="picker-card-name">${escapeHtml(m.display_name)}</span>
     </button>
   `).join('');
 
@@ -80,7 +81,7 @@ export function showPicker(models, characters, onSelect) {
         ? `<div class="picker-card-avatar"><img src="/api/characters/${c.id}/avatar" alt=""></div>`
         : `<div class="picker-card-avatar picker-card-avatar--placeholder">${icon('drama', 20)}</div>`
       }
-      <span class="picker-card-name">${escHtml(c.name)}</span>
+      <span class="picker-card-name">${escapeHtml(c.name)}</span>
     </button>
   `).join('');
 
@@ -111,9 +112,6 @@ export function showPicker(models, characters, onSelect) {
   });
 }
 
-function escHtml(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
 
 export function renderMessages(msgs) {
   threadEl.innerHTML = '';

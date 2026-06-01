@@ -1,4 +1,5 @@
 import { icon } from './icons.js';
+import { escapeHtml } from './utils.js';
 
 const headerEl = document.getElementById('chat-header');
 
@@ -161,6 +162,3 @@ function selectedDisplayName() {
   return state.characters.find(c => c.id === state.selection.id)?.name ?? 'character';
 }
 
-function escapeHtml(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}

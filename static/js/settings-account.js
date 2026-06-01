@@ -1,6 +1,7 @@
 import { auth } from './api.js';
 import { preload as preloadIcons, icon } from './icons.js';
 import { renderAvatarSection, attachAvatarSection } from './settings-avatar.js';
+import { escapeHtml } from './utils.js';
 
 let user = null;
 let svgArrowLeft, svgUser, svgUsers, svgCpu, svgLock, svgEye, svgPencil;
@@ -311,12 +312,5 @@ function passwordStrength(pwd) {
   return             { level: 'strong', label: 'Strong.' };
 }
 
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 init();

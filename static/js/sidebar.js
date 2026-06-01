@@ -1,5 +1,6 @@
 import { conversations as api } from './api.js';
 import { icon } from './icons.js';
+import { escapeHtml } from './utils.js';
 
 const sidebarEl = document.getElementById('sidebar');
 
@@ -192,6 +193,3 @@ async function handleLogout() {
   window.location.reload();
 }
 
-function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}

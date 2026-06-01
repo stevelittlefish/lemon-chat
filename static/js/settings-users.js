@@ -1,5 +1,6 @@
 import { auth, admin } from './api.js';
 import { preload as preloadIcons, icon } from './icons.js';
+import { escapeHtml } from './utils.js';
 
 let user = null;
 let svgArrowLeft, svgUser, svgUsers, svgCpu, svgPlus, svgPencil, svgTrash;
@@ -283,14 +284,5 @@ async function deleteUser(id) {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 init();

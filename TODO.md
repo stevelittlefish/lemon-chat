@@ -88,7 +88,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] **Full `innerHTML` re-render of sidebar on every state change** (`static/js/sidebar.js:132`)
   `render()` rebuilds the entire sidebar and re-attaches all event listeners on `setActive()`, `addConversation()`, etc. Targeted DOM updates (as already done in `updateTitle()`) would be better.
 
-- [ ] **`escHtml` vs `escapeHtml` — same function, two names** (`static/js/thread.js:112`, `static/js/sidebar.js:195`)
+- [x] **`escHtml` vs `escapeHtml` — same function, two names** (`static/js/thread.js:112`, `static/js/sidebar.js:195`)
   Identical implementations with inconsistent names. Extract to a shared module or at least pick one name.
 
 - [ ] **`sendMessage` in `app.js` is missing a try/catch** (`static/js/app.js:185`)
