@@ -87,6 +87,10 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			internalError(w, err)
 			return
 		}
+		if char.Visibility == "private" && char.CreatedBy != user.ID && !user.IsAdmin {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
 		usedCharacterID = req.CharacterID
 		usedCharacter = char
 		modelName = char.Model

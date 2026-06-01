@@ -6,7 +6,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Critical bugs
 
-- [ ] **Missing character visibility check in `handleSendMessage`** (`internal/server/messages.go:84`)
+- [x] **Missing character visibility check in `handleSendMessage`** (`internal/server/messages.go:84`)
   Any authenticated user can invoke a private character they don't own by passing `character_id` in the message body. Add the same visibility check that `handleFirstMessage` already has.
 
 - [ ] **`subtle.ConstantTimeCompare` compares string to itself** (`internal/server/auth.go:38`)
