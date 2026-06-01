@@ -129,18 +129,13 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 		return nil, ErrNotFound
 	}
 
-	newConv, err := s.CreateConversation(userID, &title, src.Model, src.CharacterID)
-	if err != nil {
-		return nil, err
-	}
-
 	type msgRow struct {
-		role, content        string
-		name                 *string
-		charID               *int64
-		promptTokens         *int64
-		completionTokens     *int64
-		totalTimeMS          *int64
+		role, content    string
+		name             *string
+		charID           *int64
+		promptTokens     *int64
+		completionTokens *int64
+		totalTimeMS      *int64
 	}
 
 	rows, err := s.db.Query(
@@ -165,15 +160,35 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 		return nil, err
 	}
 
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
 	t := now()
+	res, err := tx.Exec(
+		`INSERT INTO conversation (user_id, model, character_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		userID, src.Model, src.CharacterID, &title, t, t,
+	)
+	if err != nil {
+		return nil, err
+	}
+	newID, _ := res.LastInsertId()
+	newConv := &Conversation{ID: newID, UserID: userID, Model: src.Model, CharacterID: src.CharacterID, Title: &title, CreatedAt: t, UpdatedAt: t}
+
 	for _, m := range msgRows {
-		if _, err := s.db.Exec(
+		if _, err := tx.Exec(
 			`INSERT INTO message (conversation_id, role, content, name, character_id, created_at, prompt_tokens, completion_tokens, total_time_ms)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			newConv.ID, m.role, m.content, m.name, m.charID, t, m.promptTokens, m.completionTokens, m.totalTimeMS,
 		); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 
 	return newConv, nil

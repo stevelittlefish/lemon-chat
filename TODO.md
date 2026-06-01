@@ -16,7 +16,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## High priority
 
-- [ ] **`ForkConversation` is not wrapped in a transaction** (`internal/store/conversations.go:111`)
+- [x] **`ForkConversation` is not wrapped in a transaction** (`internal/store/conversations.go:111`)
   Creates the new conversation and inserts messages in separate calls. A failure mid-insert leaves an empty forked conversation in the DB. Wrap the whole thing in a `db.Begin()` / `tx.Commit()`.
 
 - [ ] **Title generation can fire twice concurrently on one request** (`internal/server/messages.go:270–294`)
