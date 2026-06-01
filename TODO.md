@@ -64,7 +64,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Low priority / polish
 
-- [ ] **O(n²) string concatenation in streaming loop** (`internal/server/messages.go:235`)
+- [x] **O(n²) string concatenation in streaming loop** (`internal/server/messages.go:235`)
   `fullContent += text` in a loop allocates on every iteration. Use `strings.Builder`.
 
 - [ ] **`isImageExt()` is defined but never called** (`internal/server/avatars.go:115`)

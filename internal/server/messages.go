@@ -206,7 +206,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 
 	// OpenAI-compatible streaming: each line is "data: <json>" or "data: [DONE]"
-	var fullContent string
+	var fullContent strings.Builder
 	var usageStats *store.MessageStats
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 1<<20), 1<<20)
@@ -245,7 +245,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if text := chunk.Choices[0].Delta.Content; text != "" {
-			fullContent += text
+			fullContent.WriteString(text)
 			delta, _ := json.Marshal(map[string]string{"delta": text})
 			fmt.Fprintf(w, "data: %s\n\n", delta)
 			flusher.Flush()
@@ -268,9 +268,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Persist completed assistant message and update conversation model/character.
-	if fullContent != "" {
+	if fullContent.Len() > 0 {
 		prevUpdatedAt, _ := time.Parse(time.RFC3339, conv.UpdatedAt)
-		msg, err := s.store.CreateMessage(convID, "assistant", fullContent, usedCharacterID, &assistantName, usageStats)
+		msg, err := s.store.CreateMessage(convID, "assistant", fullContent.String(), usedCharacterID, &assistantName, usageStats)
 		if err := s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID); err != nil {
 			log.Printf("messages: failed to update conversation %d after message: %v", convID, err)
 		}
