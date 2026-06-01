@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -34,11 +35,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	if user.PasswordHash != nil {
 		if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password)); err != nil {
+			log.Printf("auth: failed login for user %q", req.Username)
 			writeError(w, http.StatusUnauthorized, "invalid credentials")
 			return
 		}
 	}
 
+	log.Printf("auth: user %q logged in", req.Username)
 	sessionID, err := s.store.CreateSession(user.ID)
 	if err != nil {
 		internalError(w, err)
