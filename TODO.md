@@ -57,7 +57,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **WebSocket pong does not validate ping payload ≤ 125 bytes** (`internal/server/ws.go:198`)
   RFC 6455 §5.5: control frame payloads must not exceed 125 bytes. The pong is built as `append([]byte{0x8A, byte(length)}, payload...)` without checking length. Add `if length > 125 { return }` before building the pong.
 
-- [ ] **`defer resp.Body.Close()` inside loop in `listModels`** (`cmd/lemon-chat/main.go:87`)
+- [x] **`defer resp.Body.Close()` inside loop in `listModels`** (`cmd/lemon-chat/main.go:87`)
   `defer` inside a loop defers until the function returns, not the end of each iteration. All response bodies stay open until `listModels` exits. Call `resp.Body.Close()` explicitly at the end of each loop body.
 
 ---

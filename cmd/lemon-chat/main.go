@@ -84,13 +84,14 @@ func listModels(cfg *config.Config) {
 			fmt.Fprintf(os.Stderr, "  error: %v\n", err)
 			continue
 		}
-		defer resp.Body.Close()
 
 		var result modelsResponse
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			resp.Body.Close()
 			fmt.Fprintf(os.Stderr, "  error decoding response: %v\n", err)
 			continue
 		}
+		resp.Body.Close()
 
 		slices.SortFunc(result.Data, func(a, b modelEntry) int { return strings.Compare(a.ID, b.ID) })
 
