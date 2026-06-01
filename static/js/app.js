@@ -102,7 +102,7 @@ async function initApp() {
   sidebar.init({
     username: currentUser.username,
     onSelect: loadConversation,
-    onNew: showPickerScreen,
+    onNew: () => loadConversation(null),
   });
 
   header.init({
