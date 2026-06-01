@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -201,6 +202,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	var fullContent string
 	var usageStats *store.MessageStats
 	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 1<<20), 1<<20)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
@@ -241,6 +243,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "data: %s\n\n", delta)
 			flusher.Flush()
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		log.Printf("messages: SSE scanner error for conv %d: %v", convID, err)
 	}
 
 	if usageStats != nil {

@@ -28,7 +28,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] **No timeout on model API calls** (`internal/server/messages.go:179`, `internal/tasks/titles.go:161`)
   Both use `http.DefaultClient` which has no timeout. A hung model server holds goroutines and SSE connections indefinitely. Use a custom `http.Client` with a dial timeout, or pass a `context.WithTimeout` for non-streaming calls (title generation especially).
 
-- [ ] **`bufio.Scanner` 64 KB limit on SSE stream** (`internal/server/messages.go:199`)
+- [x] **`bufio.Scanner` 64 KB limit on SSE stream** (`internal/server/messages.go:199`)
   The default scanner buffer is 64 KB. A `data:` line longer than that causes `Scan()` to silently return false mid-response. Set a larger buffer (`scanner.Buffer(make([]byte, 1<<20), 1<<20)`) and check `scanner.Err()` after the loop.
 
 ---
