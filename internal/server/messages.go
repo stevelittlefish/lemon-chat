@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,6 +17,17 @@ import (
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
+
+// modelClient is used for all outbound calls to model servers. No Timeout is
+// set because streaming responses run indefinitely; the dial timeout guards
+// against a server that accepts the TCP connection but never responds.
+var modelClient = &http.Client{
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout: 10 * time.Second,
+		}).DialContext,
+	},
+}
 
 func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
@@ -181,7 +193,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		httpReq.Header.Set("Authorization", "Bearer "+modelServer.APIKey)
 	}
 	startTime := time.Now()
-	resp, err := http.DefaultClient.Do(httpReq)
+	resp, err := modelClient.Do(httpReq)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "model unreachable")
 		return

@@ -25,7 +25,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **Title generation can fire twice concurrently on one request** (`internal/server/messages.go:270–294`)
   The `auto_title` and "3rd assistant response" triggers both evaluate `conv.Title == nil` from the pre-request snapshot. A conversation that satisfies both conditions spawns two goroutines that race to write the title. Add a guard so only one fires.
 
-- [ ] **No timeout on model API calls** (`internal/server/messages.go:179`, `internal/tasks/titles.go:161`)
+- [x] **No timeout on model API calls** (`internal/server/messages.go:179`, `internal/tasks/titles.go:161`)
   Both use `http.DefaultClient` which has no timeout. A hung model server holds goroutines and SSE connections indefinitely. Use a custom `http.Client` with a dial timeout, or pass a `context.WithTimeout` for non-streaming calls (title generation especially).
 
 - [x] **`bufio.Scanner` 64 KB limit on SSE stream** (`internal/server/messages.go:199`)

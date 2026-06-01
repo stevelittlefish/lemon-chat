@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -150,7 +151,9 @@ func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID in
 	})
 
 	debug.Log("title: POST %s (model=%s, conv=%d, %d messages)", chatURL, modelName, convID, len(out)-1)
-	httpReq, err := http.NewRequest("POST", chatURL, bytes.NewReader(payload))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
 	if err != nil {
 		return "", fmt.Errorf("POST %s: %w", chatURL, err)
 	}
