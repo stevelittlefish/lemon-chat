@@ -255,6 +255,9 @@ function render() {
     </div>
     <div class="sidebar-footer">
       <span class="sidebar-user">${escapeHtml(state.username)}</span>
+      <button class="btn btn-ghost btn-sm btn-icon" id="menu-btn" title="Menu">
+        ${icon('layout-grid', 16)}
+      </button>
       <button class="btn btn-ghost btn-sm btn-icon" id="settings-btn" title="Settings">
         ${icon('settings', 16)}
       </button>
@@ -265,6 +268,7 @@ function render() {
   `;
 
   document.getElementById('new-chat-btn').addEventListener('click', () => state.onNew?.());
+  document.getElementById('menu-btn').addEventListener('click', () => { window.location.href = '/menu'; });
   document.getElementById('settings-btn').addEventListener('click', () => { window.location.href = '/settings/account'; });
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
 

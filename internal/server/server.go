@@ -81,6 +81,10 @@ func (s *Server) Handler() http.Handler {
 	// WebSocket
 	mux.HandleFunc("GET /ws", s.handleWS)
 
+	// Menu and feature pages
+	mux.HandleFunc("GET /menu", serveFile("static/menu.html"))
+	mux.HandleFunc("GET /complete", serveFile("static/complete.html"))
+
 	// Settings pages
 	mux.HandleFunc("GET /settings", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings/account", http.StatusFound)
