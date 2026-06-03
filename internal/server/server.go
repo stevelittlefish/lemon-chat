@@ -92,6 +92,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/completions/{id}/redo", s.requireAuth(s.handleRedoCompletion))
 	mux.HandleFunc("POST /api/completions/{id}/regenerate-title", s.requireAuth(s.handleRegenerateCompletionTitle))
 
+	// Root — no-cache so deploys are picked up immediately
+	mux.HandleFunc("GET /{$}", serveFile("static/index.html"))
+
 	// Menu and feature pages
 	mux.HandleFunc("GET /menu", serveFile("static/menu.html"))
 	mux.HandleFunc("GET /complete", serveFile("static/complete.html"))
@@ -109,8 +112,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings/characters/{id}/edit", serveFile("static/settings/character-edit.html"))
 	mux.HandleFunc("GET /settings/users", serveFile("static/settings/users.html"))
 
-	// Static files
-	mux.Handle("/", noCacheMiddleware(http.FileServer(http.Dir("static"))))
+	// Static files — no forced no-cache; ETags handle revalidation naturally
+	mux.Handle("/", http.FileServer(http.Dir("static")))
 
 	return mux
 }
@@ -132,6 +135,7 @@ func internalError(w http.ResponseWriter, err error) {
 
 func serveFile(path string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeFile(w, r, path)
 	}
 }
