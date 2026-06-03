@@ -274,6 +274,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v10 → v11 complete")
 	}
 
+	if version < 12 {
+		log.Println("store: migrating v11 → v12 (add content to completion)")
+		if _, err := s.db.Exec(`ALTER TABLE completion ADD COLUMN content TEXT`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (12, ?)`, now()); err != nil {
+			return err
+		}
+		version = 12
+		log.Println("store: migration v11 → v12 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

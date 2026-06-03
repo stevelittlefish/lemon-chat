@@ -1,11 +1,19 @@
 package server
 
 import (
+	"bufio"
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
+	"github.com/stevelittlefish/lemon-chat/internal/debug"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
@@ -20,6 +28,24 @@ func (s *Server) handleListCompletions(w http.ResponseWriter, r *http.Request) {
 		items = []store.Completion{}
 	}
 	writeJSON(w, http.StatusOK, items)
+}
+
+func (s *Server) handleGetCompletion(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	item, err := s.store.GetCompletion(id, user.ID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	} else if err != nil {
+		internalError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
 }
 
 func (s *Server) handleCreateCompletion(w http.ResponseWriter, r *http.Request) {
@@ -51,22 +77,34 @@ func (s *Server) handleUpdateCompletion(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var req struct {
-		Title *string `json:"title"`
+		Title   *string `json:"title"`
+		Content *string `json:"content"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	if req.Title == nil {
-		writeError(w, http.StatusBadRequest, "title is required")
+	if req.Title == nil && req.Content == nil {
+		writeError(w, http.StatusBadRequest, "title or content required")
 		return
 	}
-	if err := s.store.UpdateCompletionTitle(id, user.ID, *req.Title); errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	} else if err != nil {
-		internalError(w, err)
-		return
+	if req.Title != nil {
+		if err := s.store.UpdateCompletionTitle(id, user.ID, *req.Title); errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		} else if err != nil {
+			internalError(w, err)
+			return
+		}
+	}
+	if req.Content != nil {
+		if err := s.store.UpdateCompletionContent(id, user.ID, *req.Content); errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		} else if err != nil {
+			internalError(w, err)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -91,4 +129,145 @@ func (s *Server) handleDeleteCompletion(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	comp, err := s.store.GetCompletion(id, user.ID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	} else if err != nil {
+		internalError(w, err)
+		return
+	}
+
+	var req struct {
+		Content     string   `json:"content"`
+		MaxTokens   *int     `json:"max_tokens"`
+		Temperature *float64 `json:"temperature"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	// Save the prompt content before running.
+	if err := s.store.UpdateCompletionContent(id, user.ID, req.Content); err != nil {
+		internalError(w, err)
+		return
+	}
+
+	modelServer, err := s.cfg.ServerForModel(comp.Model)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "unknown model")
+		return
+	}
+	completionURL := modelServer.APIBase + "/completions"
+
+	modelPayload := map[string]any{
+		"model":  comp.Model,
+		"prompt": req.Content,
+		"stream": true,
+		"stream_options": map[string]any{
+			"include_usage": true,
+		},
+	}
+	if req.MaxTokens != nil {
+		modelPayload["max_tokens"] = *req.MaxTokens
+	}
+	if req.Temperature != nil {
+		modelPayload["temperature"] = *req.Temperature
+	}
+	payload, _ := json.Marshal(modelPayload)
+	debug.Log("completions: POST %s", completionURL)
+	debug.Log("completions: payload %s", payload)
+
+	responseTimeout := time.Duration(s.cfg.ResponseTimeoutSeconds) * time.Second
+	ctx, cancelResp := context.WithTimeout(r.Context(), responseTimeout)
+	defer cancelResp()
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", completionURL, bytes.NewReader(payload))
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "model unreachable")
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if modelServer.APIKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+modelServer.APIKey)
+	}
+
+	resp, err := s.modelClient.Do(httpReq)
+	if err != nil {
+		debug.Log("completions: model request failed: %v", err)
+		writeError(w, http.StatusBadGateway, "model unreachable")
+		return
+	}
+	defer resp.Body.Close()
+	debug.Log("completions: model responded status=%d", resp.StatusCode)
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	flusher := w.(http.Flusher)
+
+	var generated strings.Builder
+	var chunkCount int
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 1<<20), 1<<20)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			debug.Log("completions: non-data line: %q", line)
+			continue
+		}
+		data := line[6:]
+		if data == "[DONE]" {
+			debug.Log("completions: received [DONE] after %d chunks, %d generated chars", chunkCount, generated.Len())
+			break
+		}
+		var chunk struct {
+			Choices []struct {
+				Text         string  `json:"text"`
+				FinishReason *string `json:"finish_reason"`
+			} `json:"choices"`
+		}
+		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+			debug.Log("completions: failed to parse chunk: %v — raw: %q", err, data)
+			continue
+		}
+		if len(chunk.Choices) == 0 {
+			debug.Log("completions: chunk with no choices: %q", data)
+			continue
+		}
+		if text := chunk.Choices[0].Text; text != "" {
+			chunkCount++
+			generated.WriteString(text)
+			if chunkCount <= 5 {
+				debug.Log("completions: chunk #%d text=%q", chunkCount, text)
+			}
+			delta, _ := json.Marshal(map[string]string{"delta": text})
+			fmt.Fprintf(w, "data: %s\n\n", delta)
+			flusher.Flush()
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		log.Printf("completions: SSE scanner error for completion %d: %v", id, err)
+	}
+
+	// Save the final content (prompt + generated).
+	if generated.Len() > 0 {
+		finalContent := req.Content + generated.String()
+		debug.Log("completions: saving final content (%d prompt + %d generated = %d total chars)", len(req.Content), generated.Len(), len(finalContent))
+		if err := s.store.UpdateCompletionContent(id, user.ID, finalContent); err != nil {
+			log.Printf("completions: failed to save final content for %d: %v", id, err)
+		}
+	}
+
+	fmt.Fprintf(w, "data: [DONE]\n\n")
+	flusher.Flush()
 }

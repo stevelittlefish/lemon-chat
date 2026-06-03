@@ -124,10 +124,53 @@ export const characters = {
 // Completions
 export const completions = {
   list: () => request('GET', '/api/completions'),
+  get: (id) => request('GET', `/api/completions/${id}`),
   create: (model) => request('POST', '/api/completions', { model }),
   update: (id, data) => request('PATCH', `/api/completions/${id}`, data),
   delete: (id) => request('DELETE', `/api/completions/${id}`),
   regenerateTitle: (id) => request('POST', `/api/completions/${id}/regenerate-title`),
+  run: (id, content, { onDelta, onDone, onError, maxTokens, temperature } = {}) => {
+    const ctrl = new AbortController();
+    const body = { content };
+    if (maxTokens != null) body.max_tokens = maxTokens;
+    if (temperature != null) body.temperature = temperature;
+    fetch(`/api/completions/${id}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    }).then(async (res) => {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        onError?.(new Error(data.error || res.statusText));
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6);
+          if (payload === '[DONE]') { onDone?.(); return; }
+          try {
+            const { delta, error } = JSON.parse(payload);
+            if (error) { onError?.(new Error(error)); return; }
+            if (delta) onDelta?.(delta);
+          } catch {}
+        }
+      }
+      onDone?.();
+    }).catch((err) => {
+      if (err.name !== 'AbortError') onError?.(err);
+    });
+    return () => ctrl.abort();
+  },
 };
 
 // Admin

@@ -84,8 +84,10 @@ func (s *Server) Handler() http.Handler {
 	// Completions
 	mux.HandleFunc("GET /api/completions", s.requireAuth(s.handleListCompletions))
 	mux.HandleFunc("POST /api/completions", s.requireAuth(s.handleCreateCompletion))
+	mux.HandleFunc("GET /api/completions/{id}", s.requireAuth(s.handleGetCompletion))
 	mux.HandleFunc("PATCH /api/completions/{id}", s.requireAuth(s.handleUpdateCompletion))
 	mux.HandleFunc("DELETE /api/completions/{id}", s.requireAuth(s.handleDeleteCompletion))
+	mux.HandleFunc("POST /api/completions/{id}/run", s.requireAuth(s.handleRunCompletion))
 	mux.HandleFunc("POST /api/completions/{id}/regenerate-title", s.requireAuth(s.handleRegenerateCompletionTitle))
 
 	// Menu and feature pages
