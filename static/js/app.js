@@ -270,8 +270,11 @@ async function applyFirstMessage(convId, charId) {
     if (charId !== null) {
       sidebar.updateItem(convId, { character_id: charId, model: null });
     }
-  } catch {
-    // Character has no first message, or already has messages — silent
+  } catch (err) {
+    // 400: character has no first message / no character set — expected, silent
+    // 409: conversation already has messages — expected, silent
+    if (err.status === 400 || err.status === 409) return;
+    thread.startStreaming().error('could not load first message — ' + (err.message || 'network error'));
   }
 }
 

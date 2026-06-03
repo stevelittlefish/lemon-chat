@@ -105,7 +105,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`initApp` does not handle `Promise.all` rejection** (`static/js/app.js:93`)
   If model or character list fetch fails on startup, the whole app silently fails to initialise. Add a catch that shows the user a meaningful error.
 
-- [ ] **`applyFirstMessage` swallows all errors** (`static/js/app.js:254`)
+- [x] **`applyFirstMessage` swallows all errors** (`static/js/app.js:254`)
   The catch block is intentionally silent for expected 409/400 responses, but also hides network errors and server errors. Narrow the suppression to expected status codes.
 
 - [ ] **Show per-message timestamps in the thread** (`static/js/thread.js:116,252,535`)
