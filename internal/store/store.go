@@ -304,6 +304,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v12 → v13 complete")
 	}
 
+	if version < 14 {
+		log.Println("store: migrating v13 → v14 (add undone flag to completion)")
+		if _, err := s.db.Exec(`ALTER TABLE completion ADD COLUMN undone INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (14, ?)`, now()); err != nil {
+			return err
+		}
+		version = 14
+		log.Println("store: migration v13 → v14 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

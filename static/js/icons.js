@@ -6,7 +6,7 @@ const ICONS = [
   'lock', 'eye', 'pencil', 'check', 'info', 'x', 'code',
   'ellipsis-vertical', 'refresh-cw', 'copy', 'fork', 'list',
   'layout-grid',
-  'play', 'rotate-ccw', 'sliders',
+  'play', 'rotate-ccw', 'rotate-cw', 'sliders',
 ];
 
 export async function preload() {

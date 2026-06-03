@@ -130,6 +130,7 @@ export const completions = {
   delete: (id) => request('DELETE', `/api/completions/${id}`),
   regenerateTitle: (id) => request('POST', `/api/completions/${id}/regenerate-title`),
   undo: (id) => request('POST', `/api/completions/${id}/undo`),
+  redo: (id) => request('POST', `/api/completions/${id}/redo`),
   run: (id, content, { onDelta, onDone, onError, maxTokens, temperature } = {}) => {
     const ctrl = new AbortController();
     const body = { content };

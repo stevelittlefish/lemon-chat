@@ -18,7 +18,8 @@ let mode = 'write';       // 'write' | 'read'
 let streaming = false;
 let genStart = null;      // char offset where generated text begins
 let settled = true;       // lemon highlight faded
-let prevContent = null;   // content before last run (for undo)
+let prevContent = null;   // the "other" content snapshot (pre-run when undone=false, post-run when undone=true)
+let undone = false;       // true when the last action was an undo (enabling redo)
 let abortRun = null;      // fn to abort in-flight stream
 let settleTimer = null;
 let autoSaveTimer = null;
@@ -182,7 +183,7 @@ function createEditorDOM() {
   editorWrapEl.appendChild(contentRowEl);
   completeMainEl.appendChild(editorWrapEl);
 
-  undoBtnEl.addEventListener('click', handleUndo);
+  undoBtnEl.addEventListener('click', () => undone ? handleRedo() : handleUndo());
   runBtnEl.addEventListener('click', () => {
     if (streaming) handleStop();
     else handleRun();
@@ -258,6 +259,7 @@ function onTextareaInput() {
   autoGrowTextarea();
   genStart = null;
   prevContent = null;
+  undone = false;
   undoBtnEl.classList.add('hidden');
   scheduleAutoSave();
 }
@@ -369,6 +371,7 @@ async function loadCompletion(id, { pushHistory = true } = {}) {
   currentText = '';
   genStart = null;
   prevContent = null;
+  undone = false;
   lastPromptTokens = null;
   lastCompletionTokens = null;
   settled = true;
@@ -387,6 +390,7 @@ async function loadCompletion(id, { pushHistory = true } = {}) {
     if (comp.id !== activeCompletionId) return; // switched away
     currentText = comp.content ?? '';
     prevContent = comp.prev_content ?? null;
+    undone = comp.undone ?? false;
     lastPromptTokens = comp.prompt_tokens ?? null;
     lastCompletionTokens = comp.completion_tokens ?? null;
     textareaEl.value = currentText;
@@ -418,6 +422,7 @@ function handleRun() {
   if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
 
   prevContent = currentText;
+  undone = false;
   undoBtnEl.classList.add('hidden');
 
   const promptText = currentText;
@@ -461,6 +466,7 @@ async function finishStreaming() {
       if (comp.id === activeCompletionId && comp.content != null) {
         currentText = comp.content;
         prevContent = comp.prev_content ?? null;
+        undone = comp.undone ?? false;
         lastPromptTokens = comp.prompt_tokens ?? null;
         lastCompletionTokens = comp.completion_tokens ?? null;
         genStart = null;
@@ -491,7 +497,9 @@ function handleStop() {
 
 function updateUndoBtn() {
   if (prevContent != null && !streaming) {
-    undoBtnEl.innerHTML = icon('rotate-ccw', 14) + ' Undo run';
+    undoBtnEl.innerHTML = undone
+      ? icon('rotate-cw', 14) + ' Redo run'
+      : icon('rotate-ccw', 14) + ' Undo run';
     undoBtnEl.classList.remove('hidden');
   } else {
     undoBtnEl.classList.add('hidden');
@@ -499,21 +507,45 @@ function updateUndoBtn() {
 }
 
 async function handleUndo() {
-  if (prevContent == null) return;
-  prevContent = null;
-  genStart = null;
-  settled = true;
+  if (prevContent == null || undone) return;
   undoBtnEl.classList.add('hidden');
   try {
     const result = await completionsApi.undo(activeCompletionId);
     currentText = result.content;
+    prevContent = textareaEl.value; // the post-run content is now the snapshot
+    undone = true;
   } catch (err) {
     console.error('failed to undo completion:', err);
+    return;
   }
+  genStart = null;
+  settled = true;
   textareaEl.value = currentText;
   setMode('write');
-  autoGrowTextarea();
   renderControls();
+  updateUndoBtn();
+  setTimeout(() => { editorScrollEl.scrollTop = editorScrollEl.scrollHeight; }, 0);
+}
+
+async function handleRedo() {
+  if (prevContent == null || !undone) return;
+  undoBtnEl.classList.add('hidden');
+  try {
+    const result = await completionsApi.redo(activeCompletionId);
+    currentText = result.content;
+    prevContent = textareaEl.value; // the pre-run content is now the snapshot
+    undone = false;
+  } catch (err) {
+    console.error('failed to redo completion:', err);
+    return;
+  }
+  genStart = null;
+  settled = true;
+  textareaEl.value = currentText;
+  setMode('write');
+  renderControls();
+  updateUndoBtn();
+  setTimeout(() => { editorScrollEl.scrollTop = editorScrollEl.scrollHeight; }, 0);
 }
 
 function updateTokenStats() {

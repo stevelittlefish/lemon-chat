@@ -9,13 +9,14 @@ type Completion struct {
 	PrevContent      *string `json:"prev_content"`
 	PromptTokens     *int64  `json:"prompt_tokens"`
 	CompletionTokens *int64  `json:"completion_tokens"`
+	Undone           bool    `json:"undone"`
 	CreatedAt        string  `json:"created_at"`
 	UpdatedAt        string  `json:"updated_at"`
 }
 
 func (s *Store) ListCompletions(userID int64) ([]Completion, error) {
 	rows, err := s.db.Query(
-		`SELECT id, user_id, model, title, content, prev_content, prompt_tokens, completion_tokens, created_at, updated_at
+		`SELECT id, user_id, model, title, content, prev_content, prompt_tokens, completion_tokens, undone, created_at, updated_at
 		 FROM completion WHERE user_id = ? ORDER BY updated_at DESC`,
 		userID,
 	)
@@ -26,7 +27,7 @@ func (s *Store) ListCompletions(userID int64) ([]Completion, error) {
 	var items []Completion
 	for rows.Next() {
 		var c Completion
-		if err := rows.Scan(&c.ID, &c.UserID, &c.Model, &c.Title, &c.Content, &c.PrevContent, &c.PromptTokens, &c.CompletionTokens, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Model, &c.Title, &c.Content, &c.PrevContent, &c.PromptTokens, &c.CompletionTokens, &c.Undone, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, c)
@@ -37,10 +38,10 @@ func (s *Store) ListCompletions(userID int64) ([]Completion, error) {
 func (s *Store) GetCompletion(id, userID int64) (*Completion, error) {
 	var c Completion
 	err := s.db.QueryRow(
-		`SELECT id, user_id, model, title, content, prev_content, prompt_tokens, completion_tokens, created_at, updated_at
+		`SELECT id, user_id, model, title, content, prev_content, prompt_tokens, completion_tokens, undone, created_at, updated_at
 		 FROM completion WHERE id = ? AND user_id = ?`,
 		id, userID,
-	).Scan(&c.ID, &c.UserID, &c.Model, &c.Title, &c.Content, &c.PrevContent, &c.PromptTokens, &c.CompletionTokens, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.UserID, &c.Model, &c.Title, &c.Content, &c.PrevContent, &c.PromptTokens, &c.CompletionTokens, &c.Undone, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, ErrNotFound
 	}
@@ -113,10 +114,10 @@ func (s *Store) DeleteCompletion(id, userID int64) error {
 	return nil
 }
 
-// SetPrevContent saves a snapshot of the current content before a run starts.
+// SetPrevContent saves a snapshot of the current content before a run starts and clears undone.
 func (s *Store) SetPrevContent(id, userID int64, prevContent string) error {
 	res, err := s.db.Exec(
-		`UPDATE completion SET prev_content = ? WHERE id = ? AND user_id = ?`,
+		`UPDATE completion SET prev_content = ?, undone = 0 WHERE id = ? AND user_id = ?`,
 		prevContent, id, userID,
 	)
 	if err != nil {
@@ -143,23 +144,36 @@ func (s *Store) UpdateTokenCounts(id, userID int64, promptTokens, completionToke
 	return nil
 }
 
-// UndoCompletion atomically restores content from prev_content, clears prev_content,
-// and returns the restored content. Returns ErrNotFound if no snapshot exists.
+// UndoCompletion swaps content ↔ prev_content and marks undone=1.
+// Returns the restored (now-current) content. Returns ErrNotFound if no snapshot exists.
 func (s *Store) UndoCompletion(id, userID int64) (string, error) {
-	var prevContent *string
+	return s.swapContents(id, userID, true)
+}
+
+// RedoCompletion swaps content ↔ prev_content and marks undone=0.
+// Returns the re-applied (now-current) content. Returns ErrNotFound if no snapshot exists.
+func (s *Store) RedoCompletion(id, userID int64) (string, error) {
+	return s.swapContents(id, userID, false)
+}
+
+func (s *Store) swapContents(id, userID int64, undone bool) (string, error) {
+	var content, prevContent *string
 	err := s.db.QueryRow(
-		`SELECT prev_content FROM completion WHERE id = ? AND user_id = ?`,
+		`SELECT content, prev_content FROM completion WHERE id = ? AND user_id = ?`,
 		id, userID,
-	).Scan(&prevContent)
+	).Scan(&content, &prevContent)
 	if err != nil || prevContent == nil {
 		return "", ErrNotFound
 	}
-	content := *prevContent
+	undoneVal := 0
+	if undone {
+		undoneVal = 1
+	}
 	if _, err := s.db.Exec(
-		`UPDATE completion SET content = ?, prev_content = NULL, updated_at = ? WHERE id = ? AND user_id = ?`,
-		content, now(), id, userID,
+		`UPDATE completion SET content = ?, prev_content = ?, undone = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+		*prevContent, content, undoneVal, now(), id, userID,
 	); err != nil {
 		return "", err
 	}
-	return content, nil
+	return *prevContent, nil
 }

@@ -146,6 +146,24 @@ func (s *Server) handleUndoCompletion(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"content": content})
 }
 
+func (s *Server) handleRedoCompletion(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	content, err := s.store.RedoCompletion(id, user.ID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusConflict, "no snapshot to redo")
+		return
+	} else if err != nil {
+		internalError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"content": content})
+}
+
 func (s *Server) handleDeleteCompletion(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
