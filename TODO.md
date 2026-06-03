@@ -108,6 +108,9 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] **`applyFirstMessage` swallows all errors** (`static/js/app.js:254`)
   The catch block is intentionally silent for expected 409/400 responses, but also hides network errors and server errors. Narrow the suppression to expected status codes.
 
+- [ ] **Show per-message timestamps in the thread** (`static/js/thread.js:116,252,535`)
+  Add a subtle timestamp (e.g. "2:34 pm") to each message using `msg.created_at`. When the date changes mid-conversation, insert a date separator (e.g. "Tuesday 3 June") between messages so the day boundary is visible. Should be unobtrusive — small, muted text — but legible without hovering.
+
 - [ ] **`window.location.reload()` after logout** (`static/js/sidebar.js:191`)
   Redirect to `/` instead to clear the `?c=…` query param and avoid a 401 redirect loop on reload.
 
