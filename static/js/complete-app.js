@@ -330,19 +330,21 @@ function renderControls() {
 
 function setMode(newMode) {
   if (streaming && newMode === 'write') return;
+  const savedScroll = editorScrollEl.scrollTop;
   mode = newMode;
   if (mode === 'write') {
     genStart = null;
     textareaEl.classList.remove('hidden');
     readPromptEl.classList.add('hidden');
     readGenEl.classList.add('hidden');
-    setTimeout(() => { textareaEl.focus(); autoGrowTextarea(); }, 0);
+    setTimeout(() => { textareaEl.focus(); autoGrowTextarea(); editorScrollEl.scrollTop = savedScroll; }, 0);
   } else {
     textareaEl.classList.add('hidden');
     readPromptEl.classList.remove('hidden');
     readGenEl.classList.toggle('hidden', genStart == null);
     updateReadView();
   }
+  editorScrollEl.scrollTop = savedScroll;
   renderControls();
 }
 
