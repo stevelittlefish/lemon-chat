@@ -41,9 +41,11 @@ func mimeFromFilename(filename string) string {
 }
 
 // receiveAvatar parses a multipart upload (field "avatar"), validates it is an
-// image ≤5 MB, then center-crops and resizes it to a 256×256 JPEG.
+// image ≤5 MB, then crops and resizes it to a 256×256 JPEG.
+// Pass ?crop=top to crop from the top of the image instead of the center.
 // Always returns the ".jpg" extension so callers can ignore the original format.
 func receiveAvatar(r *http.Request) ([]byte, string, error) {
+	cropTop := r.URL.Query().Get("crop") == "top"
 	if err := r.ParseMultipartForm(5 << 20); err != nil {
 		return nil, "", fmt.Errorf("file too large or invalid form")
 	}
@@ -72,31 +74,45 @@ func receiveAvatar(r *http.Request) ([]byte, string, error) {
 	}
 	raw := append(buf[:n], rest...)
 
-	processed, err := processAvatar(raw)
+	processed, err := processAvatar(raw, cropTop)
 	if err != nil {
 		return nil, "", fmt.Errorf("could not process image: %w", err)
 	}
 	return processed, ".jpg", nil
 }
 
-// processAvatar decodes raw image bytes, center-crops to a square, scales to
+// processAvatar decodes raw image bytes, crops to a square, scales to
 // avatarSize×avatarSize, and returns a JPEG-encoded result.
-func processAvatar(data []byte) ([]byte, error) {
+// When cropTop is true the square is taken from the top of the image rather
+// than the center — better for full-body portrait images.
+func processAvatar(data []byte, cropTop bool) ([]byte, error) {
 	src, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
 
-	// Center-crop to largest square.
 	b := src.Bounds()
 	w, h := b.Dx(), b.Dy()
-	size := w
-	if h < size {
-		size = h
+	var srcRect image.Rectangle
+	if cropTop {
+		// Largest square anchored at the top of the image.
+		topH := h / 2
+		size := w
+		if topH < size {
+			size = topH
+		}
+		x0 := b.Min.X + (w-size)/2
+		srcRect = image.Rect(x0, b.Min.Y, x0+size, b.Min.Y+size)
+	} else {
+		// Center-crop to largest square.
+		size := w
+		if h < size {
+			size = h
+		}
+		x0 := b.Min.X + (w-size)/2
+		y0 := b.Min.Y + (h-size)/2
+		srcRect = image.Rect(x0, y0, x0+size, y0+size)
 	}
-	x0 := b.Min.X + (w-size)/2
-	y0 := b.Min.Y + (h-size)/2
-	srcRect := image.Rect(x0, y0, x0+size, y0+size)
 
 	// Scale to target size using CatmullRom (high quality, similar to Lanczos).
 	dst := image.NewRGBA(image.Rect(0, 0, avatarSize, avatarSize))

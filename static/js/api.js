@@ -121,7 +121,7 @@ export const characters = {
   create:       (data)     => request('POST',   '/api/characters', data),
   update:       (id, data) => request('PATCH',  `/api/characters/${id}`, data),
   delete:       (id)       => request('DELETE', `/api/characters/${id}`),
-  uploadAvatar: (id, file) => uploadFile('PUT', `/api/characters/${id}/avatar`, file),
+  uploadAvatar: (id, file, crop) => uploadFile('PUT', `/api/characters/${id}/avatar${crop ? `?crop=${crop}` : ''}`, file),
   deleteAvatar: (id)       => request('DELETE', `/api/characters/${id}/avatar`),
 };
 

@@ -1,4 +1,4 @@
-import { auth, characters as charactersApi } from './api.js';
+import { auth, characters as charactersApi, models as modelsApi } from './api.js';
 import { preload as preloadIcons, icon } from './icons.js';
 import { escapeHtml } from './utils.js';
 
@@ -82,6 +82,11 @@ async function renderPage() {
             Import
           </button>
           <input type="file" id="import-char-input" accept=".json" style="display:none">
+          <button class="btn btn-secondary btn-sm" id="import-card-btn">
+            ${svgUpload}
+            Import character card
+          </button>
+          <input type="file" id="import-card-input" accept=".png" style="display:none">
           <a href="/settings/characters/new" class="btn btn-secondary btn-sm">
             ${svgPlus}
             Add character
@@ -144,6 +149,15 @@ function renderCharacterLists() {
     importBtn.addEventListener('click', () => importInput.click());
     importInput.addEventListener('change', () => {
       if (importInput.files[0]) importChar(importInput.files[0]);
+    });
+  }
+
+  const importCardBtn   = document.getElementById('import-card-btn');
+  const importCardInput = document.getElementById('import-card-input');
+  if (importCardBtn && importCardInput) {
+    importCardBtn.addEventListener('click', () => importCardInput.click());
+    importCardInput.addEventListener('change', () => {
+      if (importCardInput.files[0]) importSillyTavernCard(importCardInput.files[0]);
     });
   }
 }
@@ -273,5 +287,112 @@ async function importChar(file) {
   }
 }
 
+
+// ── SillyTavern character card import ────────────────────────────────
+
+function parseSillyTavernPng(buffer) {
+  const view = new DataView(buffer);
+  let pos = 8; // skip PNG signature
+  while (pos < buffer.byteLength) {
+    const length    = view.getUint32(pos, false);
+    const chunkType = String.fromCharCode(
+      view.getUint8(pos + 4), view.getUint8(pos + 5),
+      view.getUint8(pos + 6), view.getUint8(pos + 7),
+    );
+    if (chunkType === 'tEXt') {
+      const bytes = new Uint8Array(buffer, pos + 8, length);
+      const nullIdx = bytes.indexOf(0);
+      if (nullIdx !== -1) {
+        const keyword = new TextDecoder('latin1').decode(bytes.slice(0, nullIdx));
+        if (keyword === 'chara') {
+          const value = new TextDecoder('latin1').decode(bytes.slice(nullIdx + 1));
+          return JSON.parse(atob(value));
+        }
+      }
+    }
+    pos += 12 + length;
+  }
+  throw new Error('No chara chunk found in PNG.');
+}
+
+function parseMesExample(text) {
+  if (!text || !text.trim()) return [];
+  const messages = [];
+  let order = 0;
+  for (const block of text.split(/<START>/i)) {
+    for (const line of block.split(/\r?\n/)) {
+      const userMatch = line.match(/^\{\{user\}\}:\s*/i);
+      const charMatch = line.match(/^\{\{char\}\}:\s*/i);
+      if (userMatch) {
+        messages.push({ role: 'user', content: line.slice(userMatch[0].length).trim(), sort_order: order++ });
+      } else if (charMatch) {
+        messages.push({ role: 'assistant', content: line.slice(charMatch[0].length).trim(), sort_order: order++ });
+      }
+    }
+  }
+  return messages.filter(m => m.content);
+}
+
+function buildCharFromCard(card, defaultModel) {
+  const d = card.data || {};
+
+  const name        = (d.name        || card.name        || '').trim();
+  const systemP     = (d.system_prompt                   || '').trim();
+  const description = (d.description || card.description || '').trim();
+  const personality = (d.personality || card.personality || '').trim();
+  const scenario    = (d.scenario    || card.scenario    || '').trim();
+  const firstMes    = (d.first_mes   || card.first_mes   || '').trim();
+  const mesExample  = (d.mes_example || card.mes_example || '').trim();
+
+  const systemParts = [systemP, description, personality, scenario].filter(Boolean);
+  const system_prompt  = systemParts.join('\n\n') || null;
+  const first_message  = firstMes || null;
+  const hidden_messages = parseMesExample(mesExample);
+
+  return {
+    name,
+    model:          defaultModel,
+    system_prompt,
+    first_message,
+    visibility:     'private',
+    auto_title:     false,
+    hidden_messages,
+  };
+}
+
+async function importSillyTavernCard(file) {
+  let card;
+  try {
+    const buffer = await file.arrayBuffer();
+    card = parseSillyTavernPng(buffer);
+  } catch (err) {
+    alert(`Could not read character card: ${err.message}`);
+    return;
+  }
+
+  let defaultModel = '';
+  try {
+    const modelList = await modelsApi.list();
+    defaultModel = modelList[0]?.name ?? '';
+  } catch { /* leave blank; user can edit */ }
+
+  const payload = buildCharFromCard(card, defaultModel);
+  if (!payload.name) {
+    alert('Character card has no name.');
+    return;
+  }
+
+  try {
+    const created = await charactersApi.create(payload);
+    if (created?.id) {
+      try {
+        await charactersApi.uploadAvatar(created.id, file, 'top');
+      } catch { /* skip avatar on error */ }
+      window.location.href = `/settings/characters/${created.id}/edit`;
+    }
+  } catch (err) {
+    alert(`Could not import character card: ${err.message}`);
+  }
+}
 
 init();
