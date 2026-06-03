@@ -15,6 +15,7 @@ import (
 
 	"github.com/stevelittlefish/lemon-chat/internal/debug"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
+	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
 
 func (s *Server) handleListCompletions(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +125,22 @@ func (s *Server) handleUpdateCompletion(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleRegenerateCompletionTitle(w http.ResponseWriter, r *http.Request) {
-	// TODO: implement background title generation once completions have content
+	user := currentUser(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if _, err := s.store.GetCompletion(id, user.ID); errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	} else if err != nil {
+		internalError(w, err)
+		return
+	}
+	tasks.GenerateTitleForCompletion(s.store, s.cfg, id, func(compID int64, title string) {
+		s.hub.BroadcastCompletionTitleUpdate(compID, title)
+	})
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -334,6 +350,13 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 		if err := s.store.UpdateTokenCounts(id, user.ID, promptTokens, completionTokens); err != nil {
 			log.Printf("completions: failed to save token counts for %d: %v", id, err)
 		}
+	}
+
+	// Auto-title if prompt + completion tokens meet the threshold and no title yet.
+	if comp.Title == nil && (promptTokens+completionTokens) >= tasks.CompletionAutoTitleMinTokens {
+		tasks.GenerateTitleForCompletion(s.store, s.cfg, id, func(compID int64, title string) {
+			s.hub.BroadcastCompletionTitleUpdate(compID, title)
+		})
 	}
 
 	fmt.Fprintf(w, "data: [DONE]\n\n")

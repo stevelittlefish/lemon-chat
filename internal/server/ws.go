@@ -63,6 +63,15 @@ func (h *Hub) BroadcastTitleUpdate(convID int64, title string) {
 	h.broadcast(data)
 }
 
+func (h *Hub) BroadcastCompletionTitleUpdate(compID int64, title string) {
+	data, _ := json.Marshal(map[string]any{
+		"type":  "completion_titled",
+		"id":    compID,
+		"title": title,
+	})
+	h.broadcast(data)
+}
+
 func (h *Hub) BroadcastConversationListChanged() {
 	data, _ := json.Marshal(map[string]any{"type": "conversations_changed"})
 	h.broadcast(data)

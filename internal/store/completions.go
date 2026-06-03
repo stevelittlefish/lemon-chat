@@ -1,5 +1,7 @@
 package store
 
+import "time"
+
 type Completion struct {
 	ID               int64   `json:"id"`
 	UserID           int64   `json:"user_id"`
@@ -154,6 +156,45 @@ func (s *Store) UndoCompletion(id, userID int64) (string, error) {
 // Returns the re-applied (now-current) content. Returns ErrNotFound if no snapshot exists.
 func (s *Store) RedoCompletion(id, userID int64) (string, error) {
 	return s.swapContents(id, userID, false)
+}
+
+// GetCompletionForTitle fetches the fields needed for title generation.
+// Does not enforce user ownership — for use by background workers only.
+func (s *Store) GetCompletionForTitle(id int64) (userID int64, content *string, err error) {
+	err = s.db.QueryRow(
+		`SELECT user_id, content FROM completion WHERE id = ?`, id,
+	).Scan(&userID, &content)
+	if err != nil {
+		return 0, nil, ErrNotFound
+	}
+	return userID, content, nil
+}
+
+// ListUntitledEligibleCompletions returns IDs of completions that have no title,
+// enough generated tokens, and have not been modified recently (to avoid
+// racing with an in-progress run).
+func (s *Store) ListUntitledEligibleCompletions(minTokens int64) ([]int64, error) {
+	cutoff := time.Now().UTC().Add(-5 * time.Minute).Format(time.RFC3339)
+	rows, err := s.db.Query(`
+		SELECT id FROM completion
+		WHERE title IS NULL
+		  AND (COALESCE(prompt_tokens, 0) + COALESCE(completion_tokens, 0)) >= ?
+		  AND updated_at < ?
+		ORDER BY updated_at ASC
+	`, minTokens, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func (s *Store) swapContents(id, userID int64, undone bool) (string, error) {

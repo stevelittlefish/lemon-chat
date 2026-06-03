@@ -1,6 +1,7 @@
 import { auth, models as modelApi, completions as completionsApi } from './api.js';
 import * as sidebar from './sidebar.js';
 import * as header from './header.js';
+import * as ws from './ws.js';
 import { preload as preloadIcons, icon } from './icons.js';
 import { render as renderMarkdown } from './markdown.js';
 
@@ -84,6 +85,12 @@ async function initApp() {
       }
     },
   });
+
+  ws.on('completion_titled', ({ id, title }) => {
+    sidebar.updateTitle(id, title);
+    if (id === activeCompletionId) header.updateTitle(title);
+  });
+  ws.connect();
 
   createEditorDOM();
 
