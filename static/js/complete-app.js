@@ -42,6 +42,7 @@ let readGenEl = null;
 let caretEl = null;
 let actionbarEl = null;
 let undoBtnEl = null;
+let saveBtnEl = null;
 let runBtnEl = null;
 let modeWriteBtnEl = null;
 let modeReadBtnEl = null;
@@ -114,6 +115,10 @@ async function initApp() {
       e.preventDefault();
       if (activeCompletionId && !streaming && currentText.trim().length > 0) handleRun();
     }
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      e.preventDefault();
+      handleSave();
+    }
   });
 }
 
@@ -163,6 +168,9 @@ function createEditorDOM() {
   undoBtnEl.className = 'cmp-undo-btn';
   undoBtnEl.classList.add('hidden');
 
+  saveBtnEl = document.createElement('button');
+  saveBtnEl.className = 'btn btn-secondary btn-sm';
+
   runBtnEl = document.createElement('button');
   runBtnEl.className = 'run-btn';
 
@@ -180,7 +188,7 @@ function createEditorDOM() {
   modeReadBtnEl = document.createElement('button');
 
   rwToggleEl.append(modeWriteBtnEl, modeReadBtnEl);
-  actionbarEl.append(undoBtnEl, growEl, hintEl, rwToggleEl, runBtnEl);
+  actionbarEl.append(undoBtnEl, growEl, saveBtnEl, hintEl, rwToggleEl, runBtnEl);
   editorColEl.append(editorScrollEl, actionbarEl);
 
   // Right rail: params
@@ -191,6 +199,7 @@ function createEditorDOM() {
   completeMainEl.appendChild(editorWrapEl);
 
   undoBtnEl.addEventListener('click', () => undone ? handleRedo() : handleUndo());
+  saveBtnEl.addEventListener('click', handleSave);
   runBtnEl.addEventListener('click', () => {
     if (streaming) handleStop();
     else handleRun();
@@ -300,6 +309,12 @@ function renderControls() {
 
   modeReadBtnEl.innerHTML = icon('eye', 14) + ' Read';
   modeReadBtnEl.className = 'btn' + (mode === 'read' ? ' on' : '');
+
+  // Save button — only update label if not in the brief "Saved" state
+  if (!saveBtnEl.dataset.saved) {
+    saveBtnEl.innerHTML = icon('save', 14) + ' Save';
+  }
+  saveBtnEl.disabled = !activeCompletionId || streaming;
 
   // Run / Stop button
   if (streaming) {
@@ -460,7 +475,7 @@ function handleRun() {
   });
 }
 
-async function finishStreaming() {
+async function finishStreaming(stopped = false) {
   streaming = false;
   abortRun = null;
   renderControls();
@@ -468,6 +483,23 @@ async function finishStreaming() {
   updateUndoBtn();
 
   if (activeCompletionId) {
+    if (stopped) {
+      // Save whatever partial content was accumulated, then settle locally.
+      // Don't reload from server — there's a race between our GET and the
+      // server's own partial-content save, and the server hasn't finished yet.
+      try {
+        await completionsApi.update(activeCompletionId, { content: currentText });
+      } catch (err) {
+        console.error('failed to save partial content on stop:', err);
+      }
+      genStart = null;
+      settled = true;
+      textareaEl.value = currentText;
+      autoGrowTextarea();
+      updateReadView();
+      return;
+    }
+
     try {
       const comp = await completionsApi.get(activeCompletionId);
       if (comp.id === activeCompletionId && comp.content != null) {
@@ -499,7 +531,23 @@ async function finishStreaming() {
 
 function handleStop() {
   if (abortRun) { abortRun(); abortRun = null; }
-  finishStreaming();
+  finishStreaming(true);
+}
+
+async function handleSave() {
+  if (!activeCompletionId || streaming) return;
+  if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+  try {
+    await completionsApi.update(activeCompletionId, { content: currentText });
+    saveBtnEl.dataset.saved = '1';
+    saveBtnEl.innerHTML = icon('check', 14) + ' Saved';
+    setTimeout(() => {
+      delete saveBtnEl.dataset.saved;
+      saveBtnEl.innerHTML = icon('save', 14) + ' Save';
+    }, 1500);
+  } catch (err) {
+    console.error('save failed:', err);
+  }
 }
 
 function updateUndoBtn() {
