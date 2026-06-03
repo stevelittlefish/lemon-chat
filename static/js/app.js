@@ -100,11 +100,21 @@ async function initApp() {
     newLabel: 'New conversation',
   });
 
-  const [models, chars] = await Promise.all([
-    modelApi.list('chat'),
-    characterApi.list(),
-    sidebar.load(),
-  ]);
+  let models, chars;
+  try {
+    [models, chars] = await Promise.all([
+      modelApi.list('chat'),
+      characterApi.list(),
+      sidebar.load(),
+    ]);
+  } catch (err) {
+    const threadEl = document.getElementById('thread');
+    const msg = document.createElement('p');
+    msg.className = 'init-error';
+    msg.textContent = 'could not load — ' + (err.message || 'network error');
+    threadEl.appendChild(msg);
+    return;
+  }
   modelList = models;
   characterList = chars;
 

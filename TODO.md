@@ -102,7 +102,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`sendMessage` in `app.js` is missing a try/catch** (`static/js/app.js:185`)
   If `convApi.create()` throws, the exception propagates with no user feedback and the composer is left in a broken state.
 
-- [ ] **`initApp` does not handle `Promise.all` rejection** (`static/js/app.js:93`)
+- [x] **`initApp` does not handle `Promise.all` rejection** (`static/js/app.js:93`)
   If model or character list fetch fails on startup, the whole app silently fails to initialise. Add a catch that shows the user a meaningful error.
 
 - [ ] **`applyFirstMessage` swallows all errors** (`static/js/app.js:254`)

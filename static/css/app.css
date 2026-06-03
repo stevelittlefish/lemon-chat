@@ -1118,3 +1118,16 @@ html, body {
   letter-spacing: 0.08em;
   color: var(--fg-faint);
 }
+
+/* ── Init error ─────────────────────────────────────────────── */
+
+.init-error {
+  margin: var(--space-8) auto;
+  max-width: 480px;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  font-size: var(--fs-14);
+  color: var(--fg-muted);
+  text-align: center;
+}
