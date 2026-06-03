@@ -59,6 +59,37 @@ body { overflow: hidden; }
   box-shadow: 0 0 0 3px rgba(92, 122, 62, 0.18);
 }
 
+/* Chat / Complete segmented switcher */
+.mode-switch {
+  display: flex;
+  gap: 3px;
+  margin: 2px 12px 12px;
+  padding: 3px;
+  background: var(--paper-200);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+}
+.mode-switch a {
+  flex: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-500);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.mode-switch a:hover { color: var(--ink-900); }
+.mode-switch a.active {
+  background: var(--paper-0);
+  color: var(--ink-900);
+  border-color: var(--border-soft);
+  box-shadow: var(--shadow-xs);
+}
+
 .new-chat {
   margin: 4px 12px 12px;
   display: flex; align-items: center; gap: 8px;

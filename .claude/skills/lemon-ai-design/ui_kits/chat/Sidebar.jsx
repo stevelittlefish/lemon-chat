@@ -33,6 +33,15 @@ function Sidebar({ chats, activeId, onSelect, onNew, onDelete, onRename }) {
         <span className="running" title="A model is loaded and ready">local</span>
       </div>
 
+      <nav className="mode-switch" aria-label="Workspace">
+        <a href="#" className="active" aria-current="page" onClick={(e) => e.preventDefault()}>
+          <Icon name="message" size={15} /> Chat
+        </a>
+        <a href="../complete/app.html">
+          <Icon name="edit" size={15} /> Complete
+        </a>
+      </nav>
+
       <button className="new-chat" onClick={onNew}>
         <Icon name="plus" size={16} />
         New chat
