@@ -74,7 +74,7 @@ async function handlePickerSelect(sel) {
   // Character: create conversation so the first message can be shown.
   try {
     const conv = await convApi.create(null, null, sel.id);
-    sidebar.addConversation(conv);
+    sidebar.addItem(conv);
     activeConversationId = conv.id;
     thread.setConversationId(conv.id);
     activeHasMessages = false;
@@ -90,6 +90,14 @@ async function handlePickerSelect(sel) {
 }
 
 async function initApp() {
+  sidebar.init({
+    username: currentUser.username,
+    onSelect: loadConversation,
+    onNew: () => loadConversation(null),
+    api: convApi,
+    newLabel: 'New conversation',
+  });
+
   const [models, chars] = await Promise.all([
     modelApi.list(),
     characterApi.list(),
@@ -98,12 +106,6 @@ async function initApp() {
   ]);
   modelList = models;
   characterList = chars;
-
-  sidebar.init({
-    username: currentUser.username,
-    onSelect: loadConversation,
-    onNew: () => loadConversation(null),
-  });
 
   header.init({
     models: modelList,
@@ -119,7 +121,7 @@ async function initApp() {
   thread.setForkHandler(async (messageId) => {
     if (!activeConversationId) return;
     const conv = await convApi.fork(activeConversationId, messageId);
-    sidebar.addConversation(conv);
+    sidebar.addItem(conv);
     await loadConversation(conv.id);
   });
 
@@ -163,7 +165,7 @@ async function loadConversation(id, { pushHistory = true } = {}) {
   try {
     const msgs = await msgApi.list(id);
     activeHasMessages = msgs.length > 0;
-    const conv = sidebar.getConversation(id);
+    const conv = sidebar.getItem(id);
     header.setConversation(id, conv?.title ?? null);
     if (conv) header.setSelection(conv);
     applyAvatarContext(conv?.character_id ?? null);
@@ -183,7 +185,7 @@ async function sendMessage(content) {
     const model = sel?.type === 'model' ? sel.name : null;
     const charId = sel?.type === 'character' ? sel.id : null;
     const conv = await convApi.create(null, model, charId);
-    sidebar.addConversation(conv);
+    sidebar.addItem(conv);
     activeConversationId = conv.id;
     thread.setConversationId(conv.id);
     activeHasMessages = false;
@@ -210,7 +212,7 @@ async function sendMessage(content) {
       stream.finish();
       composer.setStreaming(false);
       currentAbort = null;
-      sidebar.updateConversation(convId, {
+      sidebar.updateItem(convId, {
         model: sel?.type === 'model' ? sel.name : null,
         character_id: sel?.type === 'character' ? sel.id : null,
       });
@@ -248,7 +250,7 @@ async function applyFirstMessage(convId, charId) {
     thread.appendMessage('assistant', msg.content, msg.name, msg.character_id);
     activeHasMessages = true;
     if (charId !== null) {
-      sidebar.updateConversation(convId, { character_id: charId, model: null });
+      sidebar.updateItem(convId, { character_id: charId, model: null });
     }
   } catch {
     // Character has no first message, or already has messages — silent

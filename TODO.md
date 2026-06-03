@@ -113,3 +113,6 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 - [ ] **`err.message` used as `innerHTML` without escaping** (`static/js/thread.js:518`)
   Error messages from the server may contain `<` or `>` characters. Escape before inserting into the DOM, or use `.textContent`.
+
+- [ ] **Sidebar footer invisible until first conversation is selected** (`static/js/app.js:93`)
+  `sidebar.init()` renders the sidebar before `preloadIcons()` resolves, so icon SVGs are empty strings and the footer buttons are invisible. A re-render only happens when `setActive()` is called after selecting a conversation. Fix by re-rendering the sidebar after the `Promise.all` resolves, or by awaiting icon preload before calling `sidebar.init()`.

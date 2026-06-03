@@ -1,4 +1,3 @@
-import { conversations as api } from './api.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './utils.js';
 
@@ -10,15 +9,17 @@ let state = {
   onSelect: null,
   onNew: null,
   username: '',
+  api: null,
+  newLabel: 'New',
 };
 
 // Body-level context menu — avoids overflow clipping from the scrollable list
 let _menuEl = null;
-let _menuConvId = null;
+let _menuItemId = null;
 
-function openConvMenu(id, anchorEl) {
-  if (_menuConvId === id) { closeConvMenu(); return; }
-  closeConvMenu();
+function openItemMenu(id, anchorEl) {
+  if (_menuItemId === id) { closeItemMenu(); return; }
+  closeItemMenu();
   const rect = anchorEl.getBoundingClientRect();
   const menu = document.createElement('div');
   menu.className = 'menu conv-context-menu';
@@ -37,32 +38,32 @@ function openConvMenu(id, anchorEl) {
   `;
   document.body.appendChild(menu);
   _menuEl = menu;
-  _menuConvId = id;
+  _menuItemId = id;
 
   menu.querySelector('[data-action="edit-title"]').addEventListener('click', (e) => {
     e.stopPropagation();
-    closeConvMenu();
+    closeItemMenu();
     startInlineEdit(id);
   });
 
   menu.querySelector('[data-action="regen"]').addEventListener('click', async (e) => {
     e.stopPropagation();
-    closeConvMenu();
-    await api.regenerateTitle(id);
+    closeItemMenu();
+    await state.api.regenerateTitle(id);
   });
 
   menu.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
     e.stopPropagation();
-    closeConvMenu();
+    closeItemMenu();
     showDeleteConfirm(id);
   });
 }
 
-function closeConvMenu() {
+function closeItemMenu() {
   if (_menuEl) {
     _menuEl.remove();
     _menuEl = null;
-    _menuConvId = null;
+    _menuItemId = null;
   }
 }
 
@@ -72,8 +73,8 @@ function startInlineEdit(id) {
   const titleEl = itemEl.querySelector('.sidebar-item-title');
   if (!titleEl) return;
 
-  const conv = state.items.find(c => c.id === id);
-  const current = conv?.title ?? '';
+  const item = state.items.find(c => c.id === id);
+  const current = item?.title ?? '';
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -87,7 +88,7 @@ function startInlineEdit(id) {
     input.replaceWith(titleEl);
     const trimmed = input.value.trim();
     if (trimmed && trimmed !== current) {
-      api.update(id, { title: trimmed }).then(() => updateTitle(id, trimmed));
+      state.api.update(id, { title: trimmed }).then(() => updateTitle(id, trimmed));
     }
   }
   function cancel() {
@@ -118,18 +119,18 @@ function getDeleteModal() {
   overlay.className = 'fork-modal';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', 'Delete conversation');
+  overlay.setAttribute('aria-label', 'Delete item');
 
   const dialog = document.createElement('div');
   dialog.className = 'fork-modal-dialog';
 
   const title = document.createElement('p');
   title.className = 'fork-modal-title';
-  title.textContent = 'Delete conversation';
+  title.textContent = 'Delete';
 
   const body = document.createElement('p');
   body.className = 'fork-modal-body';
-  body.textContent = 'This conversation and all its messages will be permanently deleted.';
+  body.textContent = 'This will be permanently deleted.';
 
   const actions = document.createElement('div');
   actions.className = 'fork-modal-actions';
@@ -170,8 +171,8 @@ function showDeleteConfirm(id) {
     confirmBtn.disabled = true;
     confirmBtn.textContent = 'Deleting…';
     try {
-      await api.delete(id);
-      removeConversation(id);
+      await state.api.delete(id);
+      removeItem(id);
       if (state.activeId === id) state.onSelect?.(null);
     } finally {
       closeDeleteModal();
@@ -186,19 +187,21 @@ function closeDeleteModal() {
 
 document.addEventListener('click', (e) => {
   if (_menuEl && !e.target.closest('.conv-context-menu') && !e.target.closest('.sidebar-item-menu')) {
-    closeConvMenu();
+    closeItemMenu();
   }
 });
 
-export function init({ onSelect, onNew, username }) {
+export function init({ onSelect, onNew, username, api, newLabel = 'New' }) {
   state.onSelect = onSelect;
   state.onNew = onNew;
   state.username = username;
+  state.api = api;
+  state.newLabel = newLabel;
   render();
 }
 
 export async function load() {
-  state.items = await api.list();
+  state.items = await state.api.list();
   render();
 }
 
@@ -207,23 +210,23 @@ export function setActive(id) {
   render();
 }
 
-export function addConversation(conv) {
-  state.items.unshift(conv);
-  state.activeId = conv.id;
+export function addItem(item) {
+  state.items.unshift(item);
+  state.activeId = item.id;
   render();
 }
 
-export function removeConversation(id) {
+export function removeItem(id) {
   state.items = state.items.filter(c => c.id !== id);
   if (state.activeId === id) state.activeId = null;
   render();
 }
 
-export function getConversation(id) {
+export function getItem(id) {
   return state.items.find(c => c.id === id) ?? null;
 }
 
-export function updateConversation(id, updates) {
+export function updateItem(id, updates) {
   const idx = state.items.findIndex(c => c.id === id);
   if (idx !== -1) state.items[idx] = { ...state.items[idx], ...updates };
 }
@@ -246,12 +249,12 @@ function render() {
         <img src="/assets/logo-mark.svg" alt="" class="sidebar-logo">
         <span class="sidebar-brand-name">lemon chat</span>
       </div>
-      <button class="btn btn-ghost btn-sm btn-icon" id="new-chat-btn" title="New conversation">
+      <button class="btn btn-ghost btn-sm btn-icon" id="new-item-btn" title="${escapeHtml(state.newLabel)}">
         ${icon('plus', 18)}
       </button>
     </div>
     <div class="sidebar-list" id="sidebar-list">
-      ${state.items.map(convItem).join('')}
+      ${state.items.map(listItem).join('')}
     </div>
     <div class="sidebar-footer">
       <span class="sidebar-user">${escapeHtml(state.username)}</span>
@@ -267,7 +270,7 @@ function render() {
     </div>
   `;
 
-  document.getElementById('new-chat-btn').addEventListener('click', () => state.onNew?.());
+  document.getElementById('new-item-btn').addEventListener('click', () => state.onNew?.());
   document.getElementById('menu-btn').addEventListener('click', () => { window.location.href = '/menu'; });
   document.getElementById('settings-btn').addEventListener('click', () => { window.location.href = '/settings/account'; });
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
@@ -282,18 +285,18 @@ function render() {
     el.querySelector('.sidebar-item-menu').addEventListener('click', (e) => {
       e.stopPropagation();
       e.preventDefault();
-      openConvMenu(id, e.currentTarget);
+      openItemMenu(id, e.currentTarget);
     });
   });
 }
 
-function convItem(conv) {
-  const active = conv.id === state.activeId ? ' active' : '';
-  const titleHtml = conv.title
-    ? `<span class="sidebar-item-title">${escapeHtml(conv.title)}</span>`
-    : `<span class="sidebar-item-title sidebar-item-title--empty">(new conversation)</span>`;
+function listItem(item) {
+  const active = item.id === state.activeId ? ' active' : '';
+  const titleHtml = item.title
+    ? `<span class="sidebar-item-title">${escapeHtml(item.title)}</span>`
+    : `<span class="sidebar-item-title sidebar-item-title--empty">(untitled)</span>`;
   return `
-    <a class="sidebar-item${active}" data-id="${conv.id}" href="/?c=${conv.id}">
+    <a class="sidebar-item${active}" data-id="${item.id}" href="?c=${item.id}">
       ${titleHtml}
       <button class="sidebar-item-menu" title="More options">${icon('ellipsis-vertical', 14)}</button>
     </a>
@@ -305,4 +308,3 @@ async function handleLogout() {
   await auth.logout();
   window.location.reload();
 }
-

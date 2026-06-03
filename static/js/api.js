@@ -121,6 +121,15 @@ export const characters = {
   deleteAvatar: (id)       => request('DELETE', `/api/characters/${id}/avatar`),
 };
 
+// Completions
+export const completions = {
+  list: () => request('GET', '/api/completions'),
+  create: (model) => request('POST', '/api/completions', { model }),
+  update: (id, data) => request('PATCH', `/api/completions/${id}`, data),
+  delete: (id) => request('DELETE', `/api/completions/${id}`),
+  regenerateTitle: (id) => request('POST', `/api/completions/${id}/regenerate-title`),
+};
+
 // Admin
 export const admin = {
   users: {

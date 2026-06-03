@@ -81,6 +81,13 @@ func (s *Server) Handler() http.Handler {
 	// WebSocket
 	mux.HandleFunc("GET /ws", s.handleWS)
 
+	// Completions
+	mux.HandleFunc("GET /api/completions", s.requireAuth(s.handleListCompletions))
+	mux.HandleFunc("POST /api/completions", s.requireAuth(s.handleCreateCompletion))
+	mux.HandleFunc("PATCH /api/completions/{id}", s.requireAuth(s.handleUpdateCompletion))
+	mux.HandleFunc("DELETE /api/completions/{id}", s.requireAuth(s.handleDeleteCompletion))
+	mux.HandleFunc("POST /api/completions/{id}/regenerate-title", s.requireAuth(s.handleRegenerateCompletionTitle))
+
 	// Menu and feature pages
 	mux.HandleFunc("GET /menu", serveFile("static/menu.html"))
 	mux.HandleFunc("GET /complete", serveFile("static/complete.html"))

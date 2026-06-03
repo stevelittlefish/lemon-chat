@@ -1,0 +1,18 @@
+/* Completions page — content area styles. */
+/* The sidebar, header, and app layout come from app.css. */
+
+.complete-main {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.complete-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-faint);
+  font-size: var(--fs-14);
+}

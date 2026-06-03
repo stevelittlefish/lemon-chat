@@ -252,6 +252,28 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v9 → v10 complete")
 	}
 
+	if version < 11 {
+		log.Println("store: migrating v10 → v11 (create completion table)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE IF NOT EXISTS completion (
+				id         INTEGER PRIMARY KEY,
+				user_id    INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+				model      TEXT    NOT NULL,
+				title      TEXT,
+				created_at TEXT    NOT NULL,
+				updated_at TEXT    NOT NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_completion_user_id ON completion(user_id);
+		`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (11, ?)`, now()); err != nil {
+			return err
+		}
+		version = 11
+		log.Println("store: migration v10 → v11 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }
