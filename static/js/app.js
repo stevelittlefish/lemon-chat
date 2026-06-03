@@ -185,7 +185,14 @@ async function sendMessage(content) {
   if (!activeConversationId) {
     const model = sel?.type === 'model' ? sel.name : null;
     const charId = sel?.type === 'character' ? sel.id : null;
-    const conv = await convApi.create(null, model, charId);
+    let conv;
+    try {
+      conv = await convApi.create(null, model, charId);
+    } catch (err) {
+      thread.appendMessage('user', content, currentUser.display_name || 'you');
+      thread.startStreaming().error('could not send — ' + err.message);
+      return;
+    }
     sidebar.addItem(conv);
     activeConversationId = conv.id;
     thread.setConversationId(conv.id);

@@ -99,7 +99,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`escHtml` vs `escapeHtml` — same function, two names** (`static/js/thread.js:112`, `static/js/sidebar.js:195`)
   Identical implementations with inconsistent names. Extract to a shared module or at least pick one name.
 
-- [ ] **`sendMessage` in `app.js` is missing a try/catch** (`static/js/app.js:185`)
+- [x] **`sendMessage` in `app.js` is missing a try/catch** (`static/js/app.js:185`)
   If `convApi.create()` throws, the exception propagates with no user feedback and the composer is left in a broken state.
 
 - [ ] **`initApp` does not handle `Promise.all` rejection** (`static/js/app.js:93`)
