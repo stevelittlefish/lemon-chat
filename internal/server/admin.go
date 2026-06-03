@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -134,11 +135,15 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdminDeleteOrphanedMessages(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	log.Printf("server: admin tool 'delete-orphaned-messages' triggered by user id=%d username=%q", user.ID, user.Username)
 	n, err := s.store.DeleteOrphanedMessages()
 	if err != nil {
+		log.Printf("server: admin tool 'delete-orphaned-messages' failed: %v", err)
 		internalError(w, err)
 		return
 	}
+	log.Printf("server: admin tool 'delete-orphaned-messages' complete — %d message(s) deleted", n)
 	writeJSON(w, http.StatusOK, map[string]int64{"deleted": n})
 }
 

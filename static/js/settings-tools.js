@@ -84,6 +84,8 @@ function renderPage() {
 }
 
 async function runDeleteOrphanedMessages() {
+  if (!confirm('Delete all messages whose conversation has been deleted?\n\nThis cannot be undone.')) return;
+
   const btn    = document.getElementById('btn-orphaned-messages');
   const result = document.getElementById('orphaned-messages-result');
 
