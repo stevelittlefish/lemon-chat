@@ -38,7 +38,7 @@ export const auth = {
 
 // Models
 export const models = {
-  list: () => request('GET', '/api/models'),
+  list: (mode) => request('GET', mode ? `/api/models?mode=${encodeURIComponent(mode)}` : '/api/models'),
 };
 
 // Conversations

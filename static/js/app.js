@@ -99,7 +99,7 @@ async function initApp() {
   });
 
   const [models, chars] = await Promise.all([
-    modelApi.list(),
+    modelApi.list('chat'),
     characterApi.list(),
     sidebar.load(),
     preloadIcons(),

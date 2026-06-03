@@ -39,6 +39,7 @@ api_base = "http://localhost:8000/v1"
 name         = "meta-llama/Llama-3.2-8B-Instruct"
 display_name = "Llama 3.2 8B"
 model_server = "local"
+# modes = ["chat", "complete"]   # omit to allow in both; restrict with ["chat"] or ["complete"]
 
 [[model]]
 name         = "mistralai/Mistral-7B-Instruct-v0.3"

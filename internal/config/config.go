@@ -37,9 +37,24 @@ type ModelServer struct {
 }
 
 type Model struct {
-	Name        string `toml:"name"`
-	DisplayName string `toml:"display_name"`
-	ModelServer string `toml:"model_server"`
+	Name        string   `toml:"name"`
+	DisplayName string   `toml:"display_name"`
+	ModelServer string   `toml:"model_server"`
+	Modes       []string `toml:"modes"`
+}
+
+// AvailableIn reports whether the model is available in the given mode.
+// An empty Modes list means available in all modes.
+func (m *Model) AvailableIn(mode string) bool {
+	if len(m.Modes) == 0 {
+		return true
+	}
+	for _, v := range m.Modes {
+		if v == mode {
+			return true
+		}
+	}
+	return false
 }
 
 func Load(path string) (*Config, error) {

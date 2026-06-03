@@ -68,7 +68,7 @@ async function initApp() {
   });
 
   const [models] = await Promise.all([
-    modelApi.list(),
+    modelApi.list('complete'),
     sidebar.load(),
     preloadIcons(),
   ]);
