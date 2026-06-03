@@ -163,6 +163,29 @@ if version < N {
 - Ask the user before doing anything destructive (dropping columns, dropping tables, data transforms)
 - Never delete or edit old migrations unless the user has specifically requested it
 
+## Logging conventions
+
+Use Go's standard `log` package throughout the backend. Follow these rules:
+
+**Single log line for non-frequent request handlers.** Any handler that isn't called on a hot path should emit one `log.Printf` line when it runs. This includes: creating or deleting a conversation, sending a message, creating/updating/deleting a character, login/logout, any admin action, forking a conversation. Do not log: individual SSE token chunks, WebSocket pings, static file serving, or the `/api/models` poll.
+
+Start with a capital letter and use a gerund (present participle). No "server:" prefix — it's redundant. Key IDs and usernames follow inline:
+```
+Deleting conversation id=12 user_id=3
+Creating conversation user_id=3
+Sending message conversation_id=5 user_id=3
+Login attempt username="alice"
+```
+
+**Verbose logging for infrequent tools and admin operations.** Any endpoint or store function that runs rarely (admin tools, migrations, one-off maintenance) should log every significant step — what it found, what it's about to do, and what it did. Individual records being affected should each get their own log line.
+
+Format: `<package>: <function> — <detail>` — e.g.:
+```
+store: DeleteOrphanedMessages — found 3 orphaned message(s)
+store:   message id=42 conversation_id=7 role=assistant content="..."
+store: DeleteOrphanedMessages — deleted 3 message(s) successfully
+```
+
 ## Keeping TODO.md current
 
 Update `TODO.md` as work progresses — mark items `[~]` when started and `[x]` when done. When adding new work that isn't already listed, add it to the relevant section before starting. Don't leave TODO.md stale.

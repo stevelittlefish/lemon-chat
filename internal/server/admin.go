@@ -136,14 +136,14 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAdminDeleteOrphanedMessages(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	log.Printf("server: admin tool 'delete-orphaned-messages' triggered by user id=%d username=%q", user.ID, user.Username)
+	log.Printf("Running tool: delete-orphaned-messages user_id=%d username=%q", user.ID, user.Username)
 	n, err := s.store.DeleteOrphanedMessages()
 	if err != nil {
-		log.Printf("server: admin tool 'delete-orphaned-messages' failed: %v", err)
+		log.Printf("Tool delete-orphaned-messages failed: %v", err)
 		internalError(w, err)
 		return
 	}
-	log.Printf("server: admin tool 'delete-orphaned-messages' complete — %d message(s) deleted", n)
+	log.Printf("Tool delete-orphaned-messages complete: deleted %d message(s)", n)
 	writeJSON(w, http.StatusOK, map[string]int64{"deleted": n})
 }
 

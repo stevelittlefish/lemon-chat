@@ -1,5 +1,7 @@
 lemon.toml
 lemon.db
+lemon.db-shm
+lemon.db-wal
 /lemon-chat
 docker-compose.override.yml
 data/

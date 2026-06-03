@@ -120,5 +120,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] **`err.message` used as `innerHTML` without escaping** (`static/js/thread.js:518`)
   Error messages from the server may contain `<` or `>` characters. Escape before inserting into the DOM, or use `.textContent`.
 
+- [ ] **Add request-level logging to all non-frequent handlers** (`internal/server/conversations.go`, `internal/server/messages.go`, `internal/server/auth.go`)
+  Most handlers (create/delete conversation, send message, logout, update profile, change password, fork, first-message, etc.) emit no log line. Per the logging conventions in CLAUDE.md, each should log one `log.Printf` line on entry with the relevant IDs and username.
+
 - [ ] **Sidebar footer invisible until first conversation is selected** (`static/js/app.js:93`)
   `sidebar.init()` renders the sidebar before `preloadIcons()` resolves, so icon SVGs are empty strings and the footer buttons are invisible. A re-render only happens when `setActive()` is called after selecting a conversation. Fix by re-rendering the sidebar after the `Promise.all` resolves, or by awaiting icon preload before calling `sidebar.init()`.

@@ -70,14 +70,20 @@ func (s *Store) DeleteConversation(id, userID int64) error {
 	}
 	defer tx.Rollback()
 
-	res, err := tx.Exec(`DELETE FROM conversation WHERE id = ? AND user_id = ?`, id, userID)
-	if err != nil {
+	// Check ownership before touching anything.
+	var count int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM conversation WHERE id = ? AND user_id = ?`, id, userID).Scan(&count); err != nil {
 		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	if count == 0 {
 		return ErrNotFound
 	}
+
+	// Messages must go before the conversation to satisfy the FK constraint.
 	if _, err := tx.Exec(`DELETE FROM message WHERE conversation_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM conversation WHERE id = ?`, id); err != nil {
 		return err
 	}
 	return tx.Commit()

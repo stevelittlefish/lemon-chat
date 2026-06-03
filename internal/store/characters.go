@@ -104,8 +104,33 @@ func (s *Store) UpdateCharacter(id int64, name, model string, systemPrompt, firs
 }
 
 func (s *Store) DeleteCharacter(id int64) error {
-	_, err := s.db.Exec(`DELETE FROM character WHERE id = ?`, id)
-	return err
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Conversations that used this character revert to the character's model so
+	// they still satisfy the CHECK (model IS NOT NULL) != (character_id IS NOT NULL).
+	if _, err := tx.Exec(`
+		UPDATE conversation
+		SET model        = (SELECT model FROM character WHERE id = ?),
+		    character_id = NULL
+		WHERE character_id = ?`, id, id); err != nil {
+		return err
+	}
+
+	// Null out character attribution on individual messages (nullable FK).
+	if _, err := tx.Exec(`UPDATE message SET character_id = NULL WHERE character_id = ?`, id); err != nil {
+		return err
+	}
+
+	// character_hidden_message has ON DELETE CASCADE, so it cleans itself up.
+	if _, err := tx.Exec(`DELETE FROM character WHERE id = ?`, id); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (s *Store) SetCharacterAvatar(id int64, filename string) error {

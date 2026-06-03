@@ -196,6 +196,7 @@ func (s *Server) handleDeleteCharacter(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
+	log.Printf("Deleting character id=%d name=%q user_id=%d", existing.ID, existing.Name, user.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 

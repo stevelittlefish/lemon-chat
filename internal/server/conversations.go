@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -130,6 +131,7 @@ func (s *Server) handleDeleteConversation(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return
 	}
+	log.Printf("Deleting conversation id=%d user_id=%d", id, user.ID)
 	if err := s.store.DeleteConversation(id, user.ID); errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not found")
 		return
