@@ -27,6 +27,10 @@ let autoSaveTimer = null;
 let maxTokens = 512;
 let temperature = 0.7;
 
+// Token stats from last run
+let lastPromptTokens = null;
+let lastCompletionTokens = null;
+
 // Editor DOM refs (created once)
 let editorWrapEl = null;
 let editorScrollEl = null;
@@ -365,6 +369,8 @@ async function loadCompletion(id, { pushHistory = true } = {}) {
   currentText = '';
   genStart = null;
   prevContent = null;
+  lastPromptTokens = null;
+  lastCompletionTokens = null;
   settled = true;
   streaming = false;
   mode = 'write';
@@ -374,15 +380,21 @@ async function loadCompletion(id, { pushHistory = true } = {}) {
   readPromptEl.classList.add('hidden');
   readGenEl.classList.add('hidden');
   renderControls();
+  updateTokenStats();
 
   try {
     const comp = await completionsApi.get(id);
     if (comp.id !== activeCompletionId) return; // switched away
     currentText = comp.content ?? '';
+    prevContent = comp.prev_content ?? null;
+    lastPromptTokens = comp.prompt_tokens ?? null;
+    lastCompletionTokens = comp.completion_tokens ?? null;
     textareaEl.value = currentText;
     autoGrowTextarea();
     header.setSelection(comp);
     renderControls();
+    updateUndoBtn();
+    updateTokenStats();
   } catch (err) {
     console.error('failed to load completion:', err);
   }
@@ -448,11 +460,15 @@ async function finishStreaming() {
       const comp = await completionsApi.get(activeCompletionId);
       if (comp.id === activeCompletionId && comp.content != null) {
         currentText = comp.content;
+        prevContent = comp.prev_content ?? null;
+        lastPromptTokens = comp.prompt_tokens ?? null;
+        lastCompletionTokens = comp.completion_tokens ?? null;
         genStart = null;
         settled = true;
         textareaEl.value = currentText;
         autoGrowTextarea();
         updateReadView();
+        updateTokenStats();
         return;
       }
     } catch (err) {
@@ -484,21 +500,24 @@ function updateUndoBtn() {
 
 async function handleUndo() {
   if (prevContent == null) return;
-  const content = prevContent;
   prevContent = null;
-  currentText = content;
   genStart = null;
   settled = true;
   undoBtnEl.classList.add('hidden');
-  textareaEl.value = content;
+  try {
+    const result = await completionsApi.undo(activeCompletionId);
+    currentText = result.content;
+  } catch (err) {
+    console.error('failed to undo completion:', err);
+  }
+  textareaEl.value = currentText;
   setMode('write');
   autoGrowTextarea();
   renderControls();
-  try {
-    await completionsApi.update(activeCompletionId, { content });
-  } catch (err) {
-    console.error('failed to save undo content:', err);
-  }
+}
+
+function updateTokenStats() {
+  header.setTokenStats(lastPromptTokens, lastCompletionTokens);
 }
 
 start();

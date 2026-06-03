@@ -509,6 +509,17 @@ html, body {
   border-radius: var(--radius-sm);
 }
 
+.header-token-stats {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-faint);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  flex: 1;
+  text-align: right;
+  padding-right: 16px;
+}
+
 /* ── Model picker ───────────────────────────────────────── */
 
 .model-picker-wrap {

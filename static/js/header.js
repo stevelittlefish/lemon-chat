@@ -11,6 +11,7 @@ let state = {
   // { type: 'model', name: string } | { type: 'character', id: number }
   selection: null,
   onChange: null,
+  tokenStats: null, // { prompt: number, completion: number } | null
 };
 
 export function init({ models, characters, onChange = null }) {
@@ -48,6 +49,20 @@ export function setSelection(conv) {
   if (typeIcon) typeIcon.innerHTML = icon(selectionIcon(), 13);
 }
 
+export function setTokenStats(prompt, completion) {
+  state.tokenStats = (prompt != null && completion != null) ? { prompt, completion } : null;
+  const el = document.getElementById('header-token-stats');
+  if (el) {
+    if (state.tokenStats) {
+      const total = state.tokenStats.prompt + state.tokenStats.completion;
+      el.textContent = `${state.tokenStats.prompt.toLocaleString()} prompt · ${state.tokenStats.completion.toLocaleString()} generated · ${total.toLocaleString()} tokens`;
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+    }
+  }
+}
+
 // Returns { type: 'model', name } or { type: 'character', id }.
 export function getSelection() {
   return state.selection;
@@ -64,6 +79,14 @@ export function selectDirect(sel) {
 
 function render() {
   const hasConv = state.conversationId !== null;
+  const ts = state.tokenStats;
+  const tokenStatsHtml = ts
+    ? (() => {
+        const total = ts.prompt + ts.completion;
+        return `<span id="header-token-stats" class="header-token-stats">${ts.prompt.toLocaleString()} prompt · ${ts.completion.toLocaleString()} generated · ${total.toLocaleString()} tokens</span>`;
+      })()
+    : `<span id="header-token-stats" class="header-token-stats hidden"></span>`;
+
   headerEl.innerHTML = `
     <div class="chat-header-title-wrap">
       ${hasConv
@@ -71,6 +94,7 @@ function render() {
         : `<span class="chat-header-title chat-header-title--wordmark">lemon chat</span>`
       }
     </div>
+    ${tokenStatsHtml}
     <div class="model-picker-wrap" id="model-picker-wrap">
       <button class="model-picker-trigger" id="model-picker-trigger" type="button">
         <span id="model-type-icon">${icon(selectionIcon(), 13)}</span>

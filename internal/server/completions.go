@@ -128,6 +128,24 @@ func (s *Server) handleRegenerateCompletionTitle(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusAccepted)
 }
 
+func (s *Server) handleUndoCompletion(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	content, err := s.store.UndoCompletion(id, user.ID)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusConflict, "no snapshot to undo")
+		return
+	} else if err != nil {
+		internalError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"content": content})
+}
+
 func (s *Server) handleDeleteCompletion(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
@@ -169,6 +187,13 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
+	}
+
+	// Snapshot current content for undo before overwriting it.
+	if comp.Content != nil {
+		if err := s.store.SetPrevContent(id, user.ID, *comp.Content); err != nil {
+			log.Printf("completions: failed to set prev_content for %d: %v", id, err)
+		}
 	}
 
 	// Save the prompt content before running.
@@ -231,6 +256,7 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 
 	var generated strings.Builder
 	var chunkCount int
+	var promptTokens, completionTokens int64
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 1<<20), 1<<20)
 	for scanner.Scan() {
@@ -248,13 +274,21 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 				Text         string  `json:"text"`
 				FinishReason *string `json:"finish_reason"`
 			} `json:"choices"`
+			Usage *struct {
+				PromptTokens     int64 `json:"prompt_tokens"`
+				CompletionTokens int64 `json:"completion_tokens"`
+			} `json:"usage"`
 		}
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			debug.Log("completions: failed to parse chunk: %v — raw: %q", err, data)
 			continue
 		}
+		if chunk.Usage != nil {
+			promptTokens = chunk.Usage.PromptTokens
+			completionTokens = chunk.Usage.CompletionTokens
+			debug.Log("completions: usage: prompt=%d completion=%d", promptTokens, completionTokens)
+		}
 		if len(chunk.Choices) == 0 {
-			debug.Log("completions: chunk with no choices: %q", data)
 			continue
 		}
 		if text := chunk.Choices[0].Text; text != "" {
@@ -275,6 +309,12 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 		debug.Log("completions: saving final content (%d prompt + %d generated = %d total chars)", len(req.Content), generated.Len(), len(finalContent))
 		if err := s.store.UpdateCompletionContent(id, user.ID, finalContent); err != nil {
 			log.Printf("completions: failed to save final content for %d: %v", id, err)
+		}
+	}
+
+	if promptTokens > 0 || completionTokens > 0 {
+		if err := s.store.UpdateTokenCounts(id, user.ID, promptTokens, completionTokens); err != nil {
+			log.Printf("completions: failed to save token counts for %d: %v", id, err)
 		}
 	}
 

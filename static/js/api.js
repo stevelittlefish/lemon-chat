@@ -129,6 +129,7 @@ export const completions = {
   update: (id, data) => request('PATCH', `/api/completions/${id}`, data),
   delete: (id) => request('DELETE', `/api/completions/${id}`),
   regenerateTitle: (id) => request('POST', `/api/completions/${id}/regenerate-title`),
+  undo: (id) => request('POST', `/api/completions/${id}/undo`),
   run: (id, content, { onDelta, onDone, onError, maxTokens, temperature } = {}) => {
     const ctrl = new AbortController();
     const body = { content };
