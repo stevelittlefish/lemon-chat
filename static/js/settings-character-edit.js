@@ -69,6 +69,10 @@ function renderNav() {
       ${svgUsers}
       Users
     </a>
+    <a href="/settings/tools" class="snav-item">
+      ${icon('sliders', 16)}
+      Tools
+    </a>
   ` : '';
 
   document.getElementById('snav').innerHTML = `

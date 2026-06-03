@@ -60,6 +60,10 @@ function renderNav() {
       ${svgUsers}
       Users
     </a>
+    <a href="/settings/tools" class="snav-item${path === '/settings/tools' ? ' active' : ''}">
+      ${icon('sliders', 16)}
+      Tools
+    </a>
   `;
 }
 

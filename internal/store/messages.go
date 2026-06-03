@@ -19,6 +19,15 @@ type MessageStats struct {
 	TotalTimeMS      int64
 }
 
+func (s *Store) DeleteOrphanedMessages() (int64, error) {
+	res, err := s.db.Exec(`DELETE FROM message WHERE conversation_id NOT IN (SELECT id FROM conversation)`)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
 func (s *Store) ListMessages(conversationID int64) ([]Message, error) {
 	rows, err := s.db.Query(
 		`SELECT id, conversation_id, role, content, name, character_id, created_at,

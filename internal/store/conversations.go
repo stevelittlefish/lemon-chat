@@ -64,14 +64,23 @@ func (s *Store) CreateConversation(userID int64, title *string, model *string, c
 }
 
 func (s *Store) DeleteConversation(id, userID int64) error {
-	res, err := s.db.Exec(`DELETE FROM conversation WHERE id = ? AND user_id = ?`, id, userID)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	res, err := tx.Exec(`DELETE FROM conversation WHERE id = ? AND user_id = ?`, id, userID)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
-	return nil
+	if _, err := tx.Exec(`DELETE FROM message WHERE conversation_id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) TouchConversation(id int64) error {

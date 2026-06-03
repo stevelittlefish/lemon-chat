@@ -77,6 +77,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/admin/users", s.requireAdmin(s.handleAdminCreateUser))
 	mux.HandleFunc("PATCH /api/admin/users/{id}", s.requireAdmin(s.handleAdminUpdateUser))
 	mux.HandleFunc("DELETE /api/admin/users/{id}", s.requireAdmin(s.handleAdminDeleteUser))
+	mux.HandleFunc("POST /api/admin/tools/delete-orphaned-messages", s.requireAdmin(s.handleAdminDeleteOrphanedMessages))
 
 	// WebSocket
 	mux.HandleFunc("GET /ws", s.handleWS)
@@ -111,6 +112,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings/characters/new", serveFile("static/settings/character-edit.html"))
 	mux.HandleFunc("GET /settings/characters/{id}/edit", serveFile("static/settings/character-edit.html"))
 	mux.HandleFunc("GET /settings/users", serveFile("static/settings/users.html"))
+	mux.HandleFunc("GET /settings/tools", serveFile("static/settings/tools.html"))
 
 	// Static files — no forced no-cache; ETags handle revalidation naturally
 	mux.Handle("/", http.FileServer(http.Dir("static")))

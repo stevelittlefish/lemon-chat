@@ -133,6 +133,15 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) handleAdminDeleteOrphanedMessages(w http.ResponseWriter, r *http.Request) {
+	n, err := s.store.DeleteOrphanedMessages()
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int64{"deleted": n})
+}
+
 func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
