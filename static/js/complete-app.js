@@ -179,7 +179,7 @@ function createEditorDOM() {
 
   const hintEl = document.createElement('span');
   hintEl.className = 'run-hint';
-  hintEl.innerHTML = '<kbd>⌘</kbd><kbd>↵</kbd> to run';
+  hintEl.innerHTML = '<kbd>ctrl</kbd><kbd>↵</kbd> to run';
 
   const rwToggleEl = document.createElement('div');
   rwToggleEl.className = 'rw-toggle';
@@ -188,7 +188,7 @@ function createEditorDOM() {
   modeReadBtnEl = document.createElement('button');
 
   rwToggleEl.append(modeWriteBtnEl, modeReadBtnEl);
-  actionbarEl.append(undoBtnEl, growEl, saveBtnEl, hintEl, rwToggleEl, runBtnEl);
+  actionbarEl.append(undoBtnEl, growEl, saveBtnEl, rwToggleEl, hintEl, runBtnEl);
   editorColEl.append(editorScrollEl, actionbarEl);
 
   // Right rail: params
@@ -277,6 +277,7 @@ function onTextareaInput() {
   prevContent = null;
   undone = false;
   undoBtnEl.classList.add('hidden');
+  renderControls();
   scheduleAutoSave();
 }
 
@@ -420,7 +421,8 @@ async function loadCompletion(id, { pushHistory = true } = {}) {
     textareaEl.value = currentText;
     autoGrowTextarea();
     header.setSelection(comp);
-    renderControls();
+    if (currentText.trim().length > 0) setMode('read');
+    else renderControls();
     updateUndoBtn();
     updateTokenStats();
   } catch (err) {

@@ -172,8 +172,9 @@ function showDeleteConfirm(id) {
     confirmBtn.textContent = 'Deleting…';
     try {
       await state.api.delete(id);
+      const wasActive = state.activeId === id;
       removeItem(id);
-      if (state.activeId === id) state.onSelect?.(null);
+      if (wasActive) state.onSelect?.(null);
     } finally {
       closeDeleteModal();
     }
