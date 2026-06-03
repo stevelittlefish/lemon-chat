@@ -93,7 +93,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`prompt()` / `confirm()` dialogs in sidebar** (`static/js/sidebar.js:47, 62`)
   Native browser dialogs are blocking and visually inconsistent with the rest of the UI. The title edit would be better as an inline editable field; the delete confirm should use the same modal pattern as the fork dialog.
 
-- [ ] **Full `innerHTML` re-render of sidebar on every state change** (`static/js/sidebar.js:132`)
+- [x] **Full `innerHTML` re-render of sidebar on every state change** (`static/js/sidebar.js:132`)
   `render()` rebuilds the entire sidebar and re-attaches all event listeners on `setActive()`, `addConversation()`, etc. Targeted DOM updates (as already done in `updateTitle()`) would be better.
 
 - [x] **`escHtml` vs `escapeHtml` — same function, two names** (`static/js/thread.js:112`, `static/js/sidebar.js:195`)

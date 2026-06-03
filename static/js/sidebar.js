@@ -225,29 +225,70 @@ export function init({ onSelect, onNew, username, api, newLabel = 'New' }) {
   state.username = username;
   state.api = api;
   state.newLabel = newLabel;
-  render();
+
+  sidebarEl.innerHTML = `
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <img src="/assets/logo-mark.svg" alt="" class="sidebar-logo">
+        <span class="sidebar-brand-name">lemon chat</span>
+      </div>
+      <button class="btn btn-ghost btn-sm btn-icon" id="new-item-btn" title="${escapeHtml(state.newLabel)}">
+        ${icon('plus', 18)}
+      </button>
+    </div>
+    <div class="sidebar-list" id="sidebar-list"></div>
+    <div class="sidebar-footer">
+      <span class="sidebar-user">${escapeHtml(state.username)}</span>
+      <button class="btn btn-ghost btn-sm btn-icon" id="menu-btn" title="Menu">
+        ${icon('layout-grid', 16)}
+      </button>
+      <button class="btn btn-ghost btn-sm btn-icon" id="settings-btn" title="Settings">
+        ${icon('settings', 16)}
+      </button>
+      <button class="btn btn-ghost btn-sm btn-icon" id="logout-btn" title="Sign out">
+        ${icon('log-out', 16)}
+      </button>
+    </div>
+  `;
+
+  document.getElementById('new-item-btn').addEventListener('click', () => state.onNew?.());
+  document.getElementById('menu-btn').addEventListener('click', () => { window.location.href = '/menu'; });
+  document.getElementById('settings-btn').addEventListener('click', () => { window.location.href = '/settings/account'; });
+  document.getElementById('logout-btn').addEventListener('click', handleLogout);
+
+  renderList();
 }
 
 export async function load() {
   state.items = await state.api.list();
-  render();
+  renderList();
 }
 
 export function setActive(id) {
+  sidebarEl.querySelector('.sidebar-item.active')?.classList.remove('active');
   state.activeId = id;
-  render();
+  if (id != null) {
+    sidebarEl.querySelector(`.sidebar-item[data-id="${id}"]`)?.classList.add('active');
+  }
 }
 
 export function addItem(item) {
   state.items.unshift(item);
+  sidebarEl.querySelector('.sidebar-item.active')?.classList.remove('active');
   state.activeId = item.id;
-  render();
+  const listEl = document.getElementById('sidebar-list');
+  if (!listEl) return;
+  const tmpl = document.createElement('template');
+  tmpl.innerHTML = listItem(item).trim();
+  const el = tmpl.content.firstElementChild;
+  listEl.prepend(el);
+  attachItemListeners(el, item.id);
 }
 
 export function removeItem(id) {
   state.items = state.items.filter(c => c.id !== id);
   if (state.activeId === id) state.activeId = null;
-  render();
+  sidebarEl.querySelector(`.sidebar-item[data-id="${id}"]`)?.remove();
 }
 
 export function getItem(id) {
@@ -270,51 +311,25 @@ export function updateTitle(id, title) {
   }
 }
 
-function render() {
-  sidebarEl.innerHTML = `
-    <div class="sidebar-header">
-      <div class="sidebar-brand">
-        <img src="/assets/logo-mark.svg" alt="" class="sidebar-logo">
-        <span class="sidebar-brand-name">lemon chat</span>
-      </div>
-      <button class="btn btn-ghost btn-sm btn-icon" id="new-item-btn" title="${escapeHtml(state.newLabel)}">
-        ${icon('plus', 18)}
-      </button>
-    </div>
-    <div class="sidebar-list" id="sidebar-list">
-      ${state.items.map(listItem).join('')}
-    </div>
-    <div class="sidebar-footer">
-      <span class="sidebar-user">${escapeHtml(state.username)}</span>
-      <button class="btn btn-ghost btn-sm btn-icon" id="menu-btn" title="Menu">
-        ${icon('layout-grid', 16)}
-      </button>
-      <button class="btn btn-ghost btn-sm btn-icon" id="settings-btn" title="Settings">
-        ${icon('settings', 16)}
-      </button>
-      <button class="btn btn-ghost btn-sm btn-icon" id="logout-btn" title="Sign out">
-        ${icon('log-out', 16)}
-      </button>
-    </div>
-  `;
+function attachItemListeners(el, id) {
+  el.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (e.target.closest('.sidebar-item-menu')) return;
+    state.onSelect?.(id);
+  });
+  el.querySelector('.sidebar-item-menu')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    openItemMenu(id, e.currentTarget);
+  });
+}
 
-  document.getElementById('new-item-btn').addEventListener('click', () => state.onNew?.());
-  document.getElementById('menu-btn').addEventListener('click', () => { window.location.href = '/menu'; });
-  document.getElementById('settings-btn').addEventListener('click', () => { window.location.href = '/settings/account'; });
-  document.getElementById('logout-btn').addEventListener('click', handleLogout);
-
-  sidebarEl.querySelectorAll('.sidebar-item').forEach(el => {
-    const id = Number(el.dataset.id);
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (e.target.closest('.sidebar-item-menu')) return;
-      state.onSelect?.(id);
-    });
-    el.querySelector('.sidebar-item-menu').addEventListener('click', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      openItemMenu(id, e.currentTarget);
-    });
+function renderList() {
+  const listEl = document.getElementById('sidebar-list');
+  if (!listEl) return;
+  listEl.innerHTML = state.items.map(listItem).join('');
+  listEl.querySelectorAll('.sidebar-item').forEach(el => {
+    attachItemListeners(el, Number(el.dataset.id));
   });
 }
 

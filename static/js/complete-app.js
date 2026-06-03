@@ -59,6 +59,8 @@ async function start() {
 }
 
 async function initApp() {
+  await preloadIcons();
+
   sidebar.init({
     username: currentUser.username,
     onSelect: loadCompletion,
@@ -70,7 +72,6 @@ async function initApp() {
   const [models] = await Promise.all([
     modelApi.list('complete'),
     sidebar.load(),
-    preloadIcons(),
   ]);
   modelList = models;
 

@@ -90,6 +90,8 @@ async function handlePickerSelect(sel) {
 }
 
 async function initApp() {
+  await preloadIcons();
+
   sidebar.init({
     username: currentUser.username,
     onSelect: loadConversation,
@@ -102,7 +104,6 @@ async function initApp() {
     modelApi.list('chat'),
     characterApi.list(),
     sidebar.load(),
-    preloadIcons(),
   ]);
   modelList = models;
   characterList = chars;
