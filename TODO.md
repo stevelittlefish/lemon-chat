@@ -41,7 +41,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **Finish completions UI: auto-save content and sync model picker on load** (`static/js/complete-app.js:244,352`)
   Typed content is never saved unless Run is pressed — navigating away discards it. `loadCompletion` also never calls `header.setSelection()` with the fetched `comp.model`, so the header picker always shows the default model rather than the completion's stored model.
 
-- [ ] **Inline title edit exits immediately when clicking to reposition the cursor** (`static/js/sidebar.js`)
+- [x] **Inline title edit exits immediately when clicking to reposition the cursor** (`static/js/sidebar.js`)
   The `blur` event fires (or the page navigates) when the user clicks inside the inline title input to move the cursor. `stopPropagation` on `mousedown` and `click` did not fix it. The input lives inside an `<a>` element with an `href`; the browser may be following the link before the input can intercept the event. Needs proper investigation — browser devtools event breakpoints recommended.
 
 ## Medium priority

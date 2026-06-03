@@ -68,13 +68,20 @@ function closeItemMenu() {
 }
 
 function startInlineEdit(id) {
-  const itemEl = sidebarEl.querySelector(`.sidebar-item[data-id="${id}"]`);
-  if (!itemEl) return;
-  const titleEl = itemEl.querySelector('.sidebar-item-title');
+  const anchorEl = sidebarEl.querySelector(`.sidebar-item[data-id="${id}"]`);
+  if (!anchorEl) return;
+  const titleEl = anchorEl.querySelector('.sidebar-item-title');
   if (!titleEl) return;
 
   const item = state.items.find(c => c.id === id);
   const current = item?.title ?? '';
+
+  // Swap <a> → <div> so the href cannot interfere with click-to-reposition
+  const div = document.createElement('div');
+  div.className = anchorEl.className;
+  div.dataset.id = anchorEl.dataset.id;
+  while (anchorEl.firstChild) div.appendChild(anchorEl.firstChild);
+  anchorEl.replaceWith(div);
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -82,19 +89,41 @@ function startInlineEdit(id) {
   input.value = current;
 
   let committed = false;
+
+  function restoreAnchor() {
+    input.replaceWith(titleEl);
+    const a = document.createElement('a');
+    a.className = div.className;
+    a.dataset.id = id;
+    a.href = `?c=${id}`;
+    while (div.firstChild) a.appendChild(div.firstChild);
+    div.replaceWith(a);
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (e.target.closest('.sidebar-item-menu')) return;
+      state.onSelect?.(id);
+    });
+    a.querySelector('.sidebar-item-menu')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      openItemMenu(id, e.currentTarget);
+    });
+  }
+
   function commit() {
     if (committed) return;
     committed = true;
-    input.replaceWith(titleEl);
     const trimmed = input.value.trim();
+    restoreAnchor();
     if (trimmed && trimmed !== current) {
       state.api.update(id, { title: trimmed }).then(() => updateTitle(id, trimmed));
     }
   }
+
   function cancel() {
     if (committed) return;
     committed = true;
-    input.replaceWith(titleEl);
+    restoreAnchor();
   }
 
   input.addEventListener('keydown', (e) => {
@@ -102,8 +131,6 @@ function startInlineEdit(id) {
     if (e.key === 'Escape') { e.preventDefault(); cancel(); }
   });
   input.addEventListener('blur', commit);
-  input.addEventListener('mousedown', (e) => e.stopPropagation());
-  input.addEventListener('click', (e) => e.stopPropagation());
 
   titleEl.replaceWith(input);
   input.focus();
