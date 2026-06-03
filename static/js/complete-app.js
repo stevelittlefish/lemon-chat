@@ -70,7 +70,14 @@ async function initApp() {
   header.init({
     models: modelList,
     characters: [],
-    onChange: null,
+    onChange: async (sel) => {
+      if (!activeCompletionId || sel?.type !== 'model') return;
+      try {
+        await completionsApi.update(activeCompletionId, { model: sel.name });
+      } catch (err) {
+        console.error('failed to save model change:', err);
+      }
+    },
   });
 
   createEditorDOM();
@@ -142,7 +149,7 @@ function createEditorDOM() {
 
   undoBtnEl = document.createElement('button');
   undoBtnEl.className = 'cmp-undo-btn';
-  undoBtnEl.setAttribute('hidden', '');
+  undoBtnEl.classList.add('hidden');
 
   runBtnEl = document.createElement('button');
   runBtnEl.className = 'run-btn';
@@ -247,7 +254,7 @@ function onTextareaInput() {
   autoGrowTextarea();
   genStart = null;
   prevContent = null;
-  undoBtnEl.hidden = true;
+  undoBtnEl.classList.add('hidden');
   scheduleAutoSave();
 }
 
@@ -298,14 +305,14 @@ function setMode(newMode) {
   mode = newMode;
   if (mode === 'write') {
     genStart = null;
-    textareaEl.hidden = false;
-    readPromptEl.hidden = true;
-    readGenEl.hidden = true;
+    textareaEl.classList.remove('hidden');
+    readPromptEl.classList.add('hidden');
+    readGenEl.classList.add('hidden');
     setTimeout(() => { textareaEl.focus(); autoGrowTextarea(); }, 0);
   } else {
-    textareaEl.hidden = true;
-    readPromptEl.hidden = false;
-    readGenEl.hidden = genStart == null;
+    textareaEl.classList.add('hidden');
+    readPromptEl.classList.remove('hidden');
+    readGenEl.classList.toggle('hidden', genStart == null);
     updateReadView();
   }
   renderControls();
@@ -317,10 +324,10 @@ function updateReadView() {
     readGenEl.innerHTML = renderMarkdown(currentText.slice(genStart));
     if (streaming) readGenEl.appendChild(caretEl);
     readGenEl.classList.toggle('settled', settled);
-    readGenEl.hidden = false;
+    readGenEl.classList.remove('hidden');
   } else {
     readPromptEl.innerHTML = renderMarkdown(currentText);
-    readGenEl.hidden = true;
+    readGenEl.classList.add('hidden');
     readGenEl.classList.remove('settled');
   }
 }
@@ -361,11 +368,11 @@ async function loadCompletion(id, { pushHistory = true } = {}) {
   settled = true;
   streaming = false;
   mode = 'write';
-  undoBtnEl.hidden = true;
+  undoBtnEl.classList.add('hidden');
   textareaEl.value = '';
-  textareaEl.hidden = false;
-  readPromptEl.hidden = true;
-  readGenEl.hidden = true;
+  textareaEl.classList.remove('hidden');
+  readPromptEl.classList.add('hidden');
+  readGenEl.classList.add('hidden');
   renderControls();
 
   try {
@@ -399,7 +406,7 @@ function handleRun() {
   if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
 
   prevContent = currentText;
-  undoBtnEl.hidden = true;
+  undoBtnEl.classList.add('hidden');
 
   const promptText = currentText;
   genStart = promptText.length;
@@ -450,9 +457,9 @@ function handleStop() {
 function updateUndoBtn() {
   if (prevContent != null && !streaming) {
     undoBtnEl.innerHTML = icon('rotate-ccw', 14) + ' Undo run';
-    undoBtnEl.hidden = false;
+    undoBtnEl.classList.remove('hidden');
   } else {
-    undoBtnEl.hidden = true;
+    undoBtnEl.classList.add('hidden');
   }
 }
 
@@ -463,7 +470,7 @@ async function handleUndo() {
   currentText = content;
   genStart = null;
   settled = true;
-  undoBtnEl.hidden = true;
+  undoBtnEl.classList.add('hidden');
   textareaEl.value = content;
   setMode('write');
   autoGrowTextarea();

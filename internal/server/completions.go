@@ -79,13 +79,14 @@ func (s *Server) handleUpdateCompletion(w http.ResponseWriter, r *http.Request) 
 	var req struct {
 		Title   *string `json:"title"`
 		Content *string `json:"content"`
+		Model   *string `json:"model"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	if req.Title == nil && req.Content == nil {
-		writeError(w, http.StatusBadRequest, "title or content required")
+	if req.Title == nil && req.Content == nil && req.Model == nil {
+		writeError(w, http.StatusBadRequest, "title, content, or model required")
 		return
 	}
 	if req.Title != nil {
@@ -99,6 +100,19 @@ func (s *Server) handleUpdateCompletion(w http.ResponseWriter, r *http.Request) 
 	}
 	if req.Content != nil {
 		if err := s.store.UpdateCompletionContent(id, user.ID, *req.Content); errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		} else if err != nil {
+			internalError(w, err)
+			return
+		}
+	}
+	if req.Model != nil {
+		if *req.Model == "" {
+			writeError(w, http.StatusBadRequest, "model cannot be empty")
+			return
+		}
+		if err := s.store.UpdateCompletionModel(id, user.ID, *req.Model); errors.Is(err, store.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "not found")
 			return
 		} else if err != nil {

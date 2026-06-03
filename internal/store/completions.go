@@ -85,6 +85,20 @@ func (s *Store) UpdateCompletionContent(id, userID int64, content string) error 
 	return nil
 }
 
+func (s *Store) UpdateCompletionModel(id, userID int64, model string) error {
+	res, err := s.db.Exec(
+		`UPDATE completion SET model = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+		model, now(), id, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) DeleteCompletion(id, userID int64) error {
 	res, err := s.db.Exec(`DELETE FROM completion WHERE id = ? AND user_id = ?`, id, userID)
 	if err != nil {
