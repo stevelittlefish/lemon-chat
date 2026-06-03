@@ -436,17 +436,36 @@ function handleRun() {
   });
 }
 
-function finishStreaming() {
+async function finishStreaming() {
   streaming = false;
   abortRun = null;
+  renderControls();
+  updateReadView();
+  updateUndoBtn();
+
+  if (activeCompletionId) {
+    try {
+      const comp = await completionsApi.get(activeCompletionId);
+      if (comp.id === activeCompletionId && comp.content != null) {
+        currentText = comp.content;
+        genStart = null;
+        settled = true;
+        textareaEl.value = currentText;
+        autoGrowTextarea();
+        updateReadView();
+        return;
+      }
+    } catch (err) {
+      console.error('failed to reload completion after run:', err);
+    }
+  }
+
+  // Fallback if reload failed: fade the split view after a short delay.
   settleTimer = setTimeout(() => {
     settled = true;
     updateReadView();
     settleTimer = null;
   }, 900);
-  renderControls();
-  updateReadView();
-  updateUndoBtn();
 }
 
 function handleStop() {

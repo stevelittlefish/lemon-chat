@@ -236,7 +236,6 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, "data: ") {
-			debug.Log("completions: non-data line: %q", line)
 			continue
 		}
 		data := line[6:]
@@ -261,9 +260,6 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 		if text := chunk.Choices[0].Text; text != "" {
 			chunkCount++
 			generated.WriteString(text)
-			if chunkCount <= 5 {
-				debug.Log("completions: chunk #%d text=%q", chunkCount, text)
-			}
 			delta, _ := json.Marshal(map[string]string{"delta": text})
 			fmt.Fprintf(w, "data: %s\n\n", delta)
 			flusher.Flush()
