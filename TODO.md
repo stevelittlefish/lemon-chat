@@ -117,7 +117,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`noCacheMiddleware` applied to all static assets including vendored libraries** (`internal/server/server.go:87`)
   Vendored files like `marked.esm.js` and `katex.min.css` never change between requests and should be cached aggressively. Apply `no-cache` only to HTML pages; serve static assets with `Cache-Control: max-age=…` or at least conditionally by path.
 
-- [ ] **`err.message` used as `innerHTML` without escaping** (`static/js/thread.js:518`)
+- [x] **`err.message` used as `innerHTML` without escaping** (`static/js/thread.js:518`)
   Error messages from the server may contain `<` or `>` characters. Escape before inserting into the DOM, or use `.textContent`.
 
 - [ ] **Add request-level logging to all non-frequent handlers** (`internal/server/conversations.go`, `internal/server/messages.go`, `internal/server/auth.go`)

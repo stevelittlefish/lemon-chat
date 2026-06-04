@@ -522,7 +522,7 @@ async function openCtxModal(convId, msgId) {
       modal.body.appendChild(block);
     }
   } catch (err) {
-    modal.body.innerHTML = `<p class="ctx-modal-loading">Failed to load context: ${err.message}</p>`;
+    modal.body.innerHTML = `<p class="ctx-modal-loading">Failed to load context: ${escapeHtml(err.message)}</p>`;
   }
 }
 
