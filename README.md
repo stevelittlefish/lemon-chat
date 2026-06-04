@@ -68,4 +68,4 @@ All configuration lives in `lemon.toml`. See `lemon.toml.example` for the full r
 
 ## License
 
-MIT
+Apache 2.0
