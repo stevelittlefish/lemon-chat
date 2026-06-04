@@ -52,6 +52,28 @@ Icons are Lucide SVGs served from `static/assets/icons/` and loaded by `static/j
 
 **Whenever you use a new icon name, you must add it to the `ICONS` array in `icons.js`.** Icons not in that list are preloaded at startup; any name missing from the list will return an empty string from `icon()` and render as nothing.
 
+## Model modes
+
+Each `[[model]]` in `lemon.toml` has an optional `modes` array that restricts which interface it appears in:
+
+```toml
+[[model]]
+name         = "llama3.2"
+model_server = "local"
+modes        = ["chat"]     # only appears in chat, not completions
+```
+
+Valid values are `"chat"` and `"complete"`. Omit `modes` entirely to allow the model in both. The frontend fetches `GET /api/models?mode=chat` or `?mode=complete` and only shows the filtered list. When adding a new interface or model picker, pass the correct `mode` parameter.
+
+## Character variable substitution
+
+Character system prompts and first messages support two placeholders that are substituted at runtime:
+
+- `{{char}}` — replaced with the character's name
+- `{{user}}` — replaced with the logged-in user's display name
+
+Apply this substitution wherever character text is rendered or sent to the model. The substitution logic lives in `internal/server/messages.go`.
+
 ## Code layout
 
 ```
@@ -60,13 +82,17 @@ cmd/lemon-chat/
 internal/
   config/
     config.go          # TOML struct definitions and loading
+  debug/
+    debug.go           # debug logging flag (debug.Enabled, debug.Log)
   server/
     server.go          # router setup, static serving
-    auth.go            # login / logout / me handlers
+    auth.go            # login / logout / me / profile / password handlers
+    avatars.go         # avatar upload and serve handlers (users + characters)
     conversations.go   # conversation CRUD handlers
     messages.go        # message list + SSE streaming handler
     models.go          # model list handler
     characters.go      # character CRUD handlers
+    completions.go     # completions CRUD + streaming handlers
     admin.go           # admin user-management handlers
     middleware.go      # session, auth, admin middleware
     ws.go              # WebSocket hub, upgrade handler, broadcast
@@ -77,11 +103,14 @@ internal/
     conversations.go   # conversation queries
     messages.go        # message queries
     characters.go      # character queries
+    completions.go     # completion queries
   tasks/
     titles.go          # background title-generation worker
+    cleanup.go         # background stale-conversation cleanup worker
 static/
-  index.html           # main app shell
-  settings.html        # settings page shell
+  index.html           # main chat app shell
+  complete.html        # completions app shell
+  menu.html            # mobile/navigation menu shell
   js/
     app.js             # entry, wires modules together
     api.js             # fetch wrappers for the REST API
@@ -91,15 +120,32 @@ static/
     markdown.js        # lightweight message rendering
     header.js          # chat header: title display + model/character picker
     icons.js           # SVG icon loader/cache (fetches from /assets/icons/)
-    settings.js        # settings page: account, characters, admin panels
+    utils.js           # shared frontend utilities (e.g. escapeHtml)
     ws.js              # WebSocket client, auto-reconnect, event dispatch
+    complete-app.js    # completions page entry
+    settings-account.js       # account settings page
+    settings-avatar.js        # shared avatar upload UI component
+    settings-character-edit.js # character edit page
+    settings-characters.js    # characters list page
+    settings-tools.js         # admin tools page
+    settings-users.js         # user management page
     vendor/
       marked.esm.js    # marked.js (vendored, no build step)
+      katex.esm.js     # KaTeX math rendering (vendored, no build step)
   css/
     colors_and_type.css   # copied from design system
     components.css        # copied from design system
     app.css               # layout and app-specific overrides
-    settings.css          # settings page layout and overrides
+    complete.css          # completions page layout and overrides
+    menu.css              # menu page styles
+    settings.css          # settings pages layout and overrides
+    katex.min.css         # KaTeX math rendering CSS (vendored)
+  settings/
+    account.html          # account settings page
+    character-edit.html   # character edit page
+    characters.html       # characters list page
+    tools.html            # admin tools page
+    users.html            # user management page
   assets/
     icons/             # Lucide SVGs served individually (fetched by icons.js)
     *.svg              # brand SVGs copied from design system
@@ -119,14 +165,15 @@ CLAUDE.md
 
 ## Not yet implemented
 
-The following are in `SPEC.md` but not built. Stub them out rather than building them:
+The following are not yet built. Stub them out rather than building them:
 
 - User profiles / profile switcher — auth is done; only one active user at a time, no switcher UI
-- Personas — API endpoints stubbed (`501 Not Implemented`), no UI
 - File attachments
 - Model management UI — config file only, no settings panel for it
 - Message editing and regeneration
 - Conversation search
+
+Note: `SPEC.md` uses the term "personas" — these were redesigned and implemented as **characters** (`internal/server/characters.go`, `internal/store/characters.go`). Ignore the personas section of `SPEC.md`.
 
 When something is stubbed, return a `501 Not Implemented` from the API endpoint and leave a `// TODO` comment. Don't build placeholder UI for features that don't exist yet.
 
@@ -158,7 +205,7 @@ if version < N {
 }
 ```
 
-- Increment the version number (next is **4**)
+- Increment the version number (check `store.go` for the current highest version)
 - Always insert a row into `schema_version` with the new version and `now()` as the timestamp
 - Ask the user before doing anything destructive (dropping columns, dropping tables, data transforms)
 - Never delete or edit old migrations unless the user has specifically requested it
@@ -185,6 +232,8 @@ store: DeleteOrphanedMessages — found 3 orphaned message(s)
 store:   message id=42 conversation_id=7 role=assistant content="..."
 store: DeleteOrphanedMessages — deleted 3 message(s) successfully
 ```
+
+**Debug logging.** Use `debug.Log()` from `internal/debug` for output that is only useful during development (e.g. title-worker trigger conditions, raw HTTP responses from model servers). `debug.Log` is a no-op unless `debug = true` is set in `lemon.toml`. Never use `debug.Log` for things that should always be visible — use `log.Printf` for those.
 
 ## Keeping TODO.md current
 

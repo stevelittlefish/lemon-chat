@@ -4,9 +4,19 @@ A local, open-source AI chat UI. Think self-hosted claude.ai or ChatGPT — mini
 
 Talks to locally-running models via HTTP API (tested with [Ollama](https://ollama.com)). Persists conversations in a local SQLite database.
 
+## Features
+
+**Chat** — multi-conversation chat with locally-running models. Responses stream via SSE. Messages render markdown, code blocks, and math (KaTeX). Conversations get auto-generated titles in the background, which can also be regenerated on demand. Conversations can be forked at any point.
+
+**Completions** — a separate raw-text completion mode for open-ended generation. Write a prompt, run it against a model, and iterate with undo/redo. Completions are saved and titled the same way as conversations.
+
+**Characters** — define AI personas with a system prompt, a first message, hidden context messages, a custom avatar, and per-character model and title-generation settings. Characters can be private or shared with all users. SillyTavern character card PNG files can be imported directly.
+
+**Multi-user** — admin users can create accounts, reset passwords, and grant or revoke admin access. Each user's conversations and completions are private to them.
+
 ## Requirements
 
-- Go 1.22+ **or** Docker
+- Go 1.26+ **or** Docker
 - A running Ollama instance (or any OpenAI-compatible API)
 
 ## Quick start
