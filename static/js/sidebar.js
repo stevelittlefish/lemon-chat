@@ -349,5 +349,5 @@ function listItem(item) {
 async function handleLogout() {
   const { auth } = await import('./api.js');
   await auth.logout();
-  window.location.reload();
+  window.location.href = '/';
 }
