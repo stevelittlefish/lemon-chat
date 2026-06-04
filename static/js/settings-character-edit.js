@@ -146,6 +146,7 @@ function renderForm(character, modelsData) {
         <div class="character-form-row">
           <label class="character-form-lbl" for="char-system-prompt">System prompt</label>
           <textarea id="char-system-prompt" class="input" rows="6" placeholder="Optional system prompt…">${escapeHtml(systemPrompt)}</textarea>
+          <div class="character-form-hint">Template placeholders: <code>{{char}}</code> expands to the character's name, <code>{{user}}</code> to the user's name. Both work in the system prompt, hidden messages, and first message.</div>
         </div>
         <div class="character-form-row">
           <div class="character-form-lbl-row">

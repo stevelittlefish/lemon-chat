@@ -23,6 +23,19 @@ type chatMsg struct {
 	Content string `json:"content"`
 }
 
+func resolveUserName(user *store.User) string {
+	if user.DisplayName != nil && *user.DisplayName != "" {
+		return *user.DisplayName
+	}
+	return user.Username
+}
+
+func substituteVars(s, charName, userName string) string {
+	s = strings.ReplaceAll(s, "{{char}}", charName)
+	s = strings.ReplaceAll(s, "{{user}}", userName)
+	return s
+}
+
 // resolveCharacter fetches a character, checks visibility for the given user,
 // and prepends its system prompt and hidden messages to msgs.
 // Returns nil, nil after writing the HTTP error if anything fails.
@@ -36,8 +49,9 @@ func (s *Server) resolveCharacter(w http.ResponseWriter, user *store.User, charI
 		writeError(w, http.StatusForbidden, "forbidden")
 		return nil, nil
 	}
+	userName := resolveUserName(user)
 	if char.SystemPrompt != nil {
-		msgs = append(msgs, chatMsg{Role: "system", Content: *char.SystemPrompt})
+		msgs = append(msgs, chatMsg{Role: "system", Content: substituteVars(*char.SystemPrompt, char.Name, userName)})
 	}
 	hiddenMsgs, err := s.store.ListCharacterHiddenMessages(char.ID)
 	if err != nil {
@@ -45,7 +59,7 @@ func (s *Server) resolveCharacter(w http.ResponseWriter, user *store.User, charI
 		return nil, nil
 	}
 	for _, hm := range hiddenMsgs {
-		msgs = append(msgs, chatMsg{Role: hm.Role, Content: hm.Content})
+		msgs = append(msgs, chatMsg{Role: hm.Role, Content: substituteVars(hm.Content, char.Name, userName)})
 	}
 	return char, msgs
 }
@@ -452,7 +466,8 @@ func (s *Server) handleFirstMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	msg, err := s.store.CreateMessage(convID, "assistant", *char.FirstMessage, charID, &char.Name, nil)
+	content := substituteVars(*char.FirstMessage, char.Name, resolveUserName(user))
+	msg, err := s.store.CreateMessage(convID, "assistant", content, charID, &char.Name, nil)
 	if err != nil {
 		internalError(w, err)
 		return
