@@ -2,7 +2,7 @@
 
 A local, open-source AI chat UI. Think self-hosted claude.ai or ChatGPT — minimal, fast, no telemetry.
 
-Talks to locally-running models via HTTP API (tested with [Ollama](https://ollama.com)). Persists conversations in a local SQLite database.
+Talks to locally-running models via HTTP API (tested with [Ollama](https://ollama.com), [vLLM](https://docs.vllm.ai), and [OpenRouter](https://openrouter.ai)). Persists conversations in a local SQLite database.
 
 ## Features
 
