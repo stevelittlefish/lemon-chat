@@ -310,7 +310,10 @@ function parseSillyTavernPng(buffer) {
         const keyword = new TextDecoder('latin1').decode(bytes.slice(0, nullIdx));
         if (keyword === 'chara') {
           const value = new TextDecoder('latin1').decode(bytes.slice(nullIdx + 1));
-          return JSON.parse(atob(value));
+          const bin = atob(value.trim());
+          const utf8 = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) utf8[i] = bin.charCodeAt(i);
+          return JSON.parse(new TextDecoder('utf-8').decode(utf8));
         }
       }
     }
