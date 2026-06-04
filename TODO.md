@@ -108,6 +108,9 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`applyFirstMessage` swallows all errors** (`static/js/app.js:254`)
   The catch block is intentionally silent for expected 409/400 responses, but also hides network errors and server errors. Narrow the suppression to expected status codes.
 
+- [ ] **Improve auto-scroll stop sensitivity during streaming** (`static/js/thread.js:52-58`)
+  The `scroll` listener only sets `userScrolledDuringStream` when the user is more than 40 px from the bottom, and the `programmaticScroll` flag is cleared only after a `requestAnimationFrame` — so a user scroll that lands during that window is silently ignored and the auto-scroll fights back. Consider using a `wheel` or `pointerdown` event to detect intent before the position changes, and raise or remove the `isNearBottom` threshold guard.
+
 - [ ] **Show per-message timestamps in the thread** (`static/js/thread.js:116,252,535`)
   Add a subtle timestamp (e.g. "2:34 pm") to each message using `msg.created_at`. When the date changes mid-conversation, insert a date separator (e.g. "Tuesday 3 June") between messages so the day boundary is visible. Should be unobtrusive — small, muted text — but legible without hovering.
 
