@@ -189,7 +189,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
-	responseTimeout := time.Duration(s.cfg.ResponseTimeoutSeconds) * time.Second
+	responseTimeout := time.Duration(s.cfg.Server.ResponseTimeoutSeconds) * time.Second
 	ctx, cancelResp := context.WithTimeout(r.Context(), responseTimeout)
 	defer cancelResp()
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))

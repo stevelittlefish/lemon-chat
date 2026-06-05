@@ -40,7 +40,7 @@ func StartTitleWorker(st *store.Store, cfg *config.Config, onConvTitled func(int
 func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID int64, onTitled func(int64, string)) {
 	debug.Log("title: GenerateTitleForConversation triggered for conversation %d", convID)
 	go func() {
-		modelName := cfg.DefaultModel
+		modelName := cfg.Server.DefaultModel
 		if modelName == "" {
 			log.Printf("title worker: no default_model configured, skipping conversation %d", convID)
 			return
@@ -52,7 +52,7 @@ func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID in
 		}
 		chatURL := srv.APIBase + "/chat/completions"
 		debug.Log("title: generating title for conversation %d using model %q at %s", convID, modelName, chatURL)
-		responseTimeout := time.Duration(cfg.ResponseTimeoutSeconds) * time.Second
+		responseTimeout := time.Duration(cfg.Server.ResponseTimeoutSeconds) * time.Second
 		title, err := generateTitle(st, chatURL, modelName, srv.APIKey, convID, responseTimeout)
 		if err != nil {
 			log.Printf("title worker: conversation %d: %v", convID, err)
@@ -75,7 +75,7 @@ func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID in
 func GenerateTitleForCompletion(st *store.Store, cfg *config.Config, compID int64, onTitled func(int64, string)) {
 	debug.Log("title: GenerateTitleForCompletion triggered for completion %d", compID)
 	go func() {
-		modelName := cfg.DefaultModel
+		modelName := cfg.Server.DefaultModel
 		if modelName == "" {
 			log.Printf("title worker: no default_model configured, skipping completion %d", compID)
 			return
@@ -86,7 +86,7 @@ func GenerateTitleForCompletion(st *store.Store, cfg *config.Config, compID int6
 			return
 		}
 		chatURL := srv.APIBase + "/chat/completions"
-		responseTimeout := time.Duration(cfg.ResponseTimeoutSeconds) * time.Second
+		responseTimeout := time.Duration(cfg.Server.ResponseTimeoutSeconds) * time.Second
 
 		userID, content, err := st.GetCompletionForTitle(compID)
 		if err != nil {
@@ -115,7 +115,7 @@ func GenerateTitleForCompletion(st *store.Store, cfg *config.Config, compID int6
 
 func generateCompletionTitles(st *store.Store, cfg *config.Config, onTitled func(int64, string)) {
 	debug.Log("title: running completion title job")
-	modelName := cfg.DefaultModel
+	modelName := cfg.Server.DefaultModel
 	if modelName == "" {
 		return
 	}
@@ -125,7 +125,7 @@ func generateCompletionTitles(st *store.Store, cfg *config.Config, onTitled func
 		return
 	}
 	chatURL := srv.APIBase + "/chat/completions"
-	responseTimeout := time.Duration(cfg.ResponseTimeoutSeconds) * time.Second
+	responseTimeout := time.Duration(cfg.Server.ResponseTimeoutSeconds) * time.Second
 
 	ids, err := st.ListUntitledEligibleCompletions(CompletionAutoTitleMinTokens)
 	if err != nil {
@@ -231,7 +231,7 @@ func generateCompletionTitle(content, chatURL, modelName, apiKey string, respons
 
 func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, string)) {
 	debug.Log("title: running conversation title job")
-	modelName := cfg.DefaultModel
+	modelName := cfg.Server.DefaultModel
 	if modelName == "" {
 		return
 	}
@@ -241,7 +241,7 @@ func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, st
 		return
 	}
 	chatURL := srv.APIBase + "/chat/completions"
-	responseTimeout := time.Duration(cfg.ResponseTimeoutSeconds) * time.Second
+	responseTimeout := time.Duration(cfg.Server.ResponseTimeoutSeconds) * time.Second
 
 	ids, err := st.ListUntitledEligible()
 	if err != nil {

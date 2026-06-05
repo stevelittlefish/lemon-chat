@@ -19,7 +19,7 @@ type Server struct {
 }
 
 func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
-	dialTimeout := time.Duration(cfg.DialTimeoutSeconds) * time.Second
+	dialTimeout := time.Duration(cfg.Server.DialTimeoutSeconds) * time.Second
 	client := &http.Client{
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{

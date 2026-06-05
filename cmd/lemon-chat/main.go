@@ -29,7 +29,7 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	debug.Enabled = cfg.Debug || *debugFlag
+	debug.Enabled = cfg.Server.Debug || *debugFlag
 
 	if *listModelsFlag {
 		listModels(cfg)

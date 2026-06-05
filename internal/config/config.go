@@ -10,19 +10,19 @@ import (
 )
 
 type Config struct {
-	Server                 Server        `toml:"server"`
-	Bootstrap              Bootstrap     `toml:"bootstrap"`
-	Debug                  bool          `toml:"debug"`
-	DefaultModel           string        `toml:"default_model"`
-	DialTimeoutSeconds     int           `toml:"dial_timeout_seconds"`
-	ResponseTimeoutSeconds int           `toml:"response_timeout_seconds"`
-	ModelServers           []ModelServer `toml:"model_server"`
-	Models                 []Model       `toml:"model"`
+	Server       Server        `toml:"server"`
+	Bootstrap    Bootstrap     `toml:"bootstrap"`
+	ModelServers []ModelServer `toml:"model_server"`
+	Models       []Model       `toml:"model"`
 }
 
 type Server struct {
-	Port   int    `toml:"port"`
-	DBPath string `toml:"db_path"`
+	Port                   int    `toml:"port"`
+	DBPath                 string `toml:"db_path"`
+	Debug                  bool   `toml:"debug"`
+	DefaultModel           string `toml:"default_model"`
+	DialTimeoutSeconds     int    `toml:"dial_timeout_seconds"`
+	ResponseTimeoutSeconds int    `toml:"response_timeout_seconds"`
 }
 
 type Bootstrap struct {
@@ -60,14 +60,14 @@ func (m *Model) AvailableIn(mode string) bool {
 func Load(path string) (*Config, error) {
 	cfg := &Config{
 		Server: Server{
-			Port:   8080,
-			DBPath: "lemon.db",
+			Port:                   8080,
+			DBPath:                 "lemon.db",
+			DialTimeoutSeconds:     10,
+			ResponseTimeoutSeconds: 600,
 		},
 		Bootstrap: Bootstrap{
 			AdminUsername: "admin",
 		},
-		DialTimeoutSeconds:     10,
-		ResponseTimeoutSeconds: 600,
 	}
 
 	meta, err := toml.DecodeFile(path, cfg)

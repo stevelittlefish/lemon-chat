@@ -9,7 +9,7 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 		Default     bool   `json:"default"`
 	}
 	mode := r.URL.Query().Get("mode")
-	defaultName := s.cfg.DefaultModel
+	defaultName := s.cfg.Server.DefaultModel
 	var models []modelResponse
 	for _, m := range s.cfg.Models {
 		if mode != "" && !m.AvailableIn(mode) {

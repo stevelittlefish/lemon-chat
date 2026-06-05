@@ -261,7 +261,7 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 	debug.Log("completions: POST %s", completionURL)
 	debug.Log("completions: payload %s", payload)
 
-	responseTimeout := time.Duration(s.cfg.ResponseTimeoutSeconds) * time.Second
+	responseTimeout := time.Duration(s.cfg.Server.ResponseTimeoutSeconds) * time.Second
 	ctx, cancelResp := context.WithTimeout(r.Context(), responseTimeout)
 	defer cancelResp()
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", completionURL, bytes.NewReader(payload))

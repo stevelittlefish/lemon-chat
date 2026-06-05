@@ -1,5 +1,6 @@
-# Enable verbose debug logging (title worker, trigger conditions, HTTP responses).
-# debug = true
+[server]
+port    = 8080
+db_path = "lemon.db"
 
 # The model used for background tasks (e.g. auto-title generation).
 # Must match the name of one of the [[model]] entries below.
@@ -11,9 +12,8 @@ dial_timeout_seconds = 10
 # Maximum total time allowed for a single model response, streaming or otherwise (seconds).
 response_timeout_seconds = 600
 
-[server]
-port    = 8080
-db_path = "lemon.db"
+# Enable verbose debug logging (title worker, trigger conditions, HTTP responses).
+# debug = true
 
 # Bootstrap: runs once on first start when the DB has no users.
 # Ignored once any user exists in the database.
