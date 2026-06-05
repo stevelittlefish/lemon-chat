@@ -185,7 +185,7 @@ function renderForm(character, modelsData) {
               <label class="char-tool-row">
                 <input type="checkbox" class="char-tool-checkbox" data-id="${escapeHtml(t.id)}" ${enabledTools.includes(t.id) ? 'checked' : ''}>
                 <div class="char-tool-info">
-                  <span class="char-tool-name">${escapeHtml(t.display_name)}</span>
+                  <span class="char-tool-name">${escapeHtml(t.display_name)} <code class="char-tool-code">${escapeHtml(t.id)}</code></span>
                   <span class="char-tool-desc">${escapeHtml(t.description)}</span>
                 </div>
               </label>

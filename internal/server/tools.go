@@ -47,7 +47,8 @@ func ToolDefsForCharacter(toolIDs []string) []toolDef {
 
 var executors = map[string]func(string) (string, error){
 	"get_time": func(_ string) (string, error) {
-		return time.Now().UTC().Format(time.RFC3339), nil
+		now := time.Now().UTC()
+		return now.Weekday().String() + ", " + now.Format(time.RFC3339), nil
 	},
 }
 
