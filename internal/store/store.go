@@ -316,6 +316,24 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v13 → v14 complete")
 	}
 
+	if version < 15 {
+		log.Println("store: migrating v14 → v15 (add tools to character, tool_calls and tool_call_id to message)")
+		for _, stmt := range []string{
+			`ALTER TABLE character ADD COLUMN tools TEXT`,
+			`ALTER TABLE message ADD COLUMN tool_calls TEXT`,
+			`ALTER TABLE message ADD COLUMN tool_call_id TEXT`,
+		} {
+			if _, err := s.db.Exec(stmt); err != nil {
+				return err
+			}
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (15, ?)`, now()); err != nil {
+			return err
+		}
+		version = 15
+		log.Println("store: migration v14 → v15 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

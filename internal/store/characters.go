@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 )
 
@@ -15,26 +16,27 @@ type CharacterHiddenMessage struct {
 }
 
 type Character struct {
-	ID             int64   `json:"id"`
-	Name           string  `json:"name"`
-	Model          string  `json:"model"`
-	SystemPrompt   *string `json:"system_prompt"`
-	FirstMessage   *string `json:"first_message"`
-	TitlePrompt    *string `json:"title_prompt"`
-	CreatedBy      int64   `json:"created_by"`
-	Visibility     string  `json:"visibility"`
-	AutoTitle      bool    `json:"auto_title"`
-	AvatarFilename *string `json:"-"`
-	HasAvatar      bool    `json:"has_avatar"`
-	CreatedAt      string  `json:"created_at"`
-	UpdatedAt      string  `json:"updated_at"`
+	ID             int64    `json:"id"`
+	Name           string   `json:"name"`
+	Model          string   `json:"model"`
+	SystemPrompt   *string  `json:"system_prompt"`
+	FirstMessage   *string  `json:"first_message"`
+	TitlePrompt    *string  `json:"title_prompt"`
+	CreatedBy      int64    `json:"created_by"`
+	Visibility     string   `json:"visibility"`
+	AutoTitle      bool     `json:"auto_title"`
+	Tools          []string `json:"tools"`
+	AvatarFilename *string  `json:"-"`
+	HasAvatar      bool     `json:"has_avatar"`
+	CreatedAt      string   `json:"created_at"`
+	UpdatedAt      string   `json:"updated_at"`
 }
 
 // ListCharacters returns all characters visible to the given user.
 // Private characters created by other users are excluded unless the user is an admin.
 func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, avatar_filename, created_at, updated_at
+		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, tools, avatar_filename, created_at, updated_at
 		 FROM character
 		 WHERE visibility != 'private' OR created_by = ? OR ?
 		 ORDER BY name`,
@@ -48,11 +50,18 @@ func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) 
 	for rows.Next() {
 		var c Character
 		var autoTitle int
-		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		var toolsJSON sql.NullString
+		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		c.AutoTitle = autoTitle != 0
 		c.HasAvatar = c.AvatarFilename != nil
+		if toolsJSON.Valid && toolsJSON.String != "" {
+			json.Unmarshal([]byte(toolsJSON.String), &c.Tools) //nolint:errcheck
+		}
+		if c.Tools == nil {
+			c.Tools = []string{}
+		}
 		chars = append(chars, c)
 	}
 	return chars, rows.Err()
@@ -61,10 +70,11 @@ func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) 
 func (s *Store) GetCharacter(id int64) (*Character, error) {
 	c := &Character{}
 	var autoTitle int
+	var toolsJSON sql.NullString
 	err := s.db.QueryRow(
-		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, avatar_filename, created_at, updated_at
+		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, tools, avatar_filename, created_at, updated_at
 		 FROM character WHERE id = ?`, id,
-	).Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -73,32 +83,53 @@ func (s *Store) GetCharacter(id int64) (*Character, error) {
 	}
 	c.AutoTitle = autoTitle != 0
 	c.HasAvatar = c.AvatarFilename != nil
+	if toolsJSON.Valid && toolsJSON.String != "" {
+		json.Unmarshal([]byte(toolsJSON.String), &c.Tools) //nolint:errcheck
+	}
+	if c.Tools == nil {
+		c.Tools = []string{}
+	}
 	return c, nil
 }
 
-func (s *Store) CreateCharacter(name, model string, systemPrompt, firstMessage, titlePrompt *string, createdBy int64, visibility string, autoTitle bool) (*Character, error) {
+func (s *Store) CreateCharacter(name, model string, systemPrompt, firstMessage, titlePrompt *string, createdBy int64, visibility string, autoTitle bool, tools []string) (*Character, error) {
 	t := now()
+	var toolsJSON *string
+	if len(tools) > 0 {
+		b, _ := json.Marshal(tools)
+		s := string(b)
+		toolsJSON = &s
+	}
 	res, err := s.db.Exec(
-		`INSERT INTO character (name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		name, model, systemPrompt, firstMessage, titlePrompt, createdBy, visibility, boolToInt(autoTitle), t, t,
+		`INSERT INTO character (name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, tools, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		name, model, systemPrompt, firstMessage, titlePrompt, createdBy, visibility, boolToInt(autoTitle), toolsJSON, t, t,
 	)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
+	if tools == nil {
+		tools = []string{}
+	}
 	return &Character{
 		ID: id, Name: name, Model: model, SystemPrompt: systemPrompt, FirstMessage: firstMessage,
 		TitlePrompt: titlePrompt, CreatedBy: createdBy, Visibility: visibility, AutoTitle: autoTitle,
-		CreatedAt: t, UpdatedAt: t,
+		Tools: tools, CreatedAt: t, UpdatedAt: t,
 	}, nil
 }
 
-func (s *Store) UpdateCharacter(id int64, name, model string, systemPrompt, firstMessage, titlePrompt *string, visibility string, autoTitle bool) error {
+func (s *Store) UpdateCharacter(id int64, name, model string, systemPrompt, firstMessage, titlePrompt *string, visibility string, autoTitle bool, tools []string) error {
+	var toolsJSON *string
+	if len(tools) > 0 {
+		b, _ := json.Marshal(tools)
+		s := string(b)
+		toolsJSON = &s
+	}
 	_, err := s.db.Exec(
-		`UPDATE character SET name = ?, model = ?, system_prompt = ?, first_message = ?, title_prompt = ?, visibility = ?, auto_title = ?, updated_at = ?
+		`UPDATE character SET name = ?, model = ?, system_prompt = ?, first_message = ?, title_prompt = ?, visibility = ?, auto_title = ?, tools = ?, updated_at = ?
 		 WHERE id = ?`,
-		name, model, systemPrompt, firstMessage, titlePrompt, visibility, boolToInt(autoTitle), now(), id,
+		name, model, systemPrompt, firstMessage, titlePrompt, visibility, boolToInt(autoTitle), toolsJSON, now(), id,
 	)
 	return err
 }

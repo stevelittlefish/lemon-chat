@@ -45,6 +45,11 @@ export const models = {
   list: (mode) => request('GET', mode ? `/api/models?mode=${encodeURIComponent(mode)}` : '/api/models'),
 };
 
+// Tools
+export const tools = {
+  list: () => request('GET', '/api/tools'),
+};
+
 // Conversations
 export const conversations = {
   list: () => request('GET', '/api/conversations'),
@@ -65,7 +70,7 @@ export const messages = {
   },
   // selection: { type: 'model', name } | { type: 'character', id } | null
   // Returns an abort() function that cancels the in-flight request.
-  send: (conversationId, content, selection, { onName, onDelta, onDone, onAborted, onError, onStats, onMessageId }) => {
+  send: (conversationId, content, selection, { onName, onDelta, onDone, onAborted, onError, onStats, onMessageId, onToolCall }) => {
     const url = `/api/conversations/${conversationId}/messages`;
     const body = { content };
     if (selection?.type === 'model') body.model = selection.name;
@@ -96,12 +101,13 @@ export const messages = {
           const payload = line.slice(6);
           if (payload === '[DONE]') { onDone?.(); return; }
           try {
-            const { delta, error, name, stats, message_id } = JSON.parse(payload);
+            const { delta, error, name, stats, message_id, tool_call } = JSON.parse(payload);
             if (error) { onError?.(new Error(error)); return; }
             if (name) onName?.(name);
             if (delta) onDelta?.(delta);
             if (stats) onStats?.(stats);
             if (message_id) onMessageId?.(message_id);
+            if (tool_call) onToolCall?.(tool_call);
           } catch { /* malformed chunk, skip */ }
         }
       }

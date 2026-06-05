@@ -226,6 +226,7 @@ async function sendMessage(content) {
     onDelta: (delta) => stream.append(delta),
     onStats: (stats) => stream.setStats(stats),
     onMessageId: (id) => stream.setMessageId(id),
+    onToolCall: (tc) => stream.addToolCall(tc),
     onDone: () => {
       stream.finish();
       composer.setStreaming(false);

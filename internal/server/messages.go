@@ -19,8 +19,16 @@ import (
 )
 
 type chatMsg struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string `json:"role"`
+	Content    string `json:"content,omitempty"`
+	ToolCalls  []any  `json:"tool_calls,omitempty"`
+	ToolCallID string `json:"tool_call_id,omitempty"`
+}
+
+type streamToolCall struct {
+	id       string
+	name     string
+	argsJSON strings.Builder
 }
 
 func resolveUserName(user *store.User) string {
@@ -76,13 +84,22 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
-	msgs, err := s.store.ListMessages(id)
+	all, err := s.store.ListMessages(id)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	if msgs == nil {
-		msgs = []store.Message{}
+	// Filter out tool-related messages (role="tool" and assistant messages that only have
+	// tool_calls with no content) — these are internal protocol messages, not chat turns.
+	msgs := make([]store.Message, 0, len(all))
+	for _, m := range all {
+		if m.Role == "tool" {
+			continue
+		}
+		if m.Role == "assistant" && m.Content == "" && m.ToolCalls != nil {
+			continue
+		}
+		msgs = append(msgs, m)
 	}
 	writeJSON(w, http.StatusOK, msgs)
 }
@@ -164,7 +181,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	chatURL := modelServer.APIBase + "/chat/completions"
 
 	// Persist user message.
-	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil, user.DisplayName, nil); err != nil {
+	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil, user.DisplayName, nil, nil, ""); err != nil {
 		internalError(w, err)
 		return
 	}
@@ -177,39 +194,65 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, m := range history {
-		chatMsgs = append(chatMsgs, chatMsg{Role: m.Role, Content: m.Content})
+		msg := chatMsg{Role: m.Role, Content: m.Content}
+		if m.ToolCalls != nil {
+			var tc []any
+			if jsonErr := json.Unmarshal([]byte(*m.ToolCalls), &tc); jsonErr == nil {
+				msg.ToolCalls = tc
+				msg.Content = ""
+			}
+		}
+		if m.ToolCallID != "" {
+			msg.ToolCallID = m.ToolCallID
+		}
+		chatMsgs = append(chatMsgs, msg)
 	}
 
-	payload, _ := json.Marshal(map[string]any{
-		"model":    modelName,
-		"messages": chatMsgs,
-		"stream":   true,
-		"stream_options": map[string]any{
-			"include_usage": true,
-		},
-	})
+	// Determine tool definitions for this character.
+	var activeToolDefs []toolDef
+	if usedCharacter != nil && len(usedCharacter.Tools) > 0 {
+		activeToolDefs = ToolDefsForCharacter(usedCharacter.Tools)
+	}
 
 	responseTimeout := time.Duration(s.cfg.Server.ResponseTimeoutSeconds) * time.Second
+
+	// payloadMap is rebuilt each loop iteration when chatMsgs grows.
+	payloadMap := map[string]any{
+		"model":          modelName,
+		"messages":       chatMsgs,
+		"stream":         true,
+		"stream_options": map[string]any{"include_usage": true},
+	}
+	if len(activeToolDefs) > 0 {
+		payloadMap["tools"] = activeToolDefs
+	}
+
+	// Single timeout context spanning all iterations.
 	ctx, cancelResp := context.WithTimeout(r.Context(), responseTimeout)
 	defer cancelResp()
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
-	if err != nil {
-		writeError(w, http.StatusBadGateway, "model unreachable")
-		return
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if modelServer.APIKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+modelServer.APIKey)
-	}
-	startTime := time.Now()
-	resp, err := s.modelClient.Do(httpReq)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, "model unreachable")
-		return
-	}
-	defer resp.Body.Close()
 
-	// Stream response back to client via SSE.
+	doRequest := func() (*http.Response, error) {
+		payloadMap["messages"] = chatMsgs
+		p, _ := json.Marshal(payloadMap)
+		hreq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(p))
+		if err != nil {
+			return nil, err
+		}
+		hreq.Header.Set("Content-Type", "application/json")
+		if modelServer.APIKey != "" {
+			hreq.Header.Set("Authorization", "Bearer "+modelServer.APIKey)
+		}
+		return s.modelClient.Do(hreq)
+	}
+
+	startTime := time.Now()
+	resp, err := doRequest()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "model unreachable")
+		return
+	}
+
+	// Committed to SSE from this point.
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("X-Accel-Buffering", "no")
@@ -219,62 +262,156 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "data: %s\n\n", nameJSON)
 	flusher.Flush()
 
-	// OpenAI-compatible streaming: each line is "data: <json>" or "data: [DONE]"
-	var fullContent strings.Builder
-	var usageStats *store.MessageStats
-	scanner := bufio.NewScanner(resp.Body)
-	scanner.Buffer(make([]byte, 1<<20), 1<<20)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "data: ") {
-			continue
-		}
-		data := line[6:]
-		if data == "[DONE]" {
-			break
-		}
-		var chunk struct {
-			Choices []struct {
-				Delta struct {
-					Content string `json:"content"`
-				} `json:"delta"`
-				FinishReason *string `json:"finish_reason"`
-			} `json:"choices"`
-			Usage *struct {
-				PromptTokens     int64 `json:"prompt_tokens"`
-				CompletionTokens int64 `json:"completion_tokens"`
-			} `json:"usage"`
-		}
-		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-			continue
-		}
-		if chunk.Usage != nil {
-			usageStats = &store.MessageStats{
-				PromptTokens:     chunk.Usage.PromptTokens,
-				CompletionTokens: chunk.Usage.CompletionTokens,
-				TotalTimeMS:      time.Since(startTime).Milliseconds(),
+	const maxToolLoops = 5
+	var finalContent string
+	var finalStats *store.MessageStats
+
+	for loop := 0; loop < maxToolLoops; loop++ {
+		if loop > 0 {
+			resp, err = doRequest()
+			if err != nil {
+				writeSSEError(w, "model unreachable")
+				flusher.Flush()
+				break
 			}
 		}
-		if len(chunk.Choices) == 0 {
-			continue
+
+		var fullContent strings.Builder
+		var usageStats *store.MessageStats
+		var pendingCalls []*streamToolCall
+		var finishReason string
+
+		scanner := bufio.NewScanner(resp.Body)
+		scanner.Buffer(make([]byte, 1<<20), 1<<20)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+			data := line[6:]
+			if data == "[DONE]" {
+				break
+			}
+			var chunk struct {
+				Choices []struct {
+					Delta struct {
+						Content   string `json:"content"`
+						ToolCalls []struct {
+							Index    int    `json:"index"`
+							ID       string `json:"id"`
+							Function struct {
+								Name      string `json:"name"`
+								Arguments string `json:"arguments"`
+							} `json:"function"`
+						} `json:"tool_calls"`
+					} `json:"delta"`
+					FinishReason *string `json:"finish_reason"`
+				} `json:"choices"`
+				Usage *struct {
+					PromptTokens     int64 `json:"prompt_tokens"`
+					CompletionTokens int64 `json:"completion_tokens"`
+				} `json:"usage"`
+			}
+			if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+				continue
+			}
+			if chunk.Usage != nil {
+				usageStats = &store.MessageStats{
+					PromptTokens:     chunk.Usage.PromptTokens,
+					CompletionTokens: chunk.Usage.CompletionTokens,
+					TotalTimeMS:      time.Since(startTime).Milliseconds(),
+				}
+			}
+			if len(chunk.Choices) == 0 {
+				continue
+			}
+			choice := chunk.Choices[0]
+			if choice.FinishReason != nil {
+				finishReason = *choice.FinishReason
+			}
+			if text := choice.Delta.Content; text != "" {
+				fullContent.WriteString(text)
+				delta, _ := json.Marshal(map[string]string{"delta": text})
+				fmt.Fprintf(w, "data: %s\n\n", delta)
+				flusher.Flush()
+			}
+			for _, tc := range choice.Delta.ToolCalls {
+				for len(pendingCalls) <= tc.Index {
+					pendingCalls = append(pendingCalls, &streamToolCall{})
+				}
+				if tc.ID != "" {
+					pendingCalls[tc.Index].id = tc.ID
+				}
+				if tc.Function.Name != "" {
+					pendingCalls[tc.Index].name = tc.Function.Name
+				}
+				pendingCalls[tc.Index].argsJSON.WriteString(tc.Function.Arguments)
+			}
 		}
-		if text := chunk.Choices[0].Delta.Content; text != "" {
-			fullContent.WriteString(text)
-			delta, _ := json.Marshal(map[string]string{"delta": text})
-			fmt.Fprintf(w, "data: %s\n\n", delta)
-			flusher.Flush()
+		if scanErr := scanner.Err(); scanErr != nil {
+			log.Printf("messages: SSE scanner error for conv %d: %v", convID, scanErr)
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		log.Printf("messages: SSE scanner error for conv %d: %v", convID, err)
+		resp.Body.Close()
+
+		if finishReason == "tool_calls" && len(pendingCalls) > 0 {
+			// Persist the assistant tool-call message (role=assistant, content="").
+			type tcRecord struct {
+				ID       string `json:"id"`
+				Type     string `json:"type"`
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			}
+			records := make([]tcRecord, len(pendingCalls))
+			for i, tc := range pendingCalls {
+				records[i].ID = tc.id
+				records[i].Type = "function"
+				records[i].Function.Name = tc.name
+				records[i].Function.Arguments = tc.argsJSON.String()
+			}
+			toolCallsJSON, _ := json.Marshal(records)
+			toolCallsStr := string(toolCallsJSON)
+			if _, err := s.store.CreateMessage(convID, "assistant", "", usedCharacterID, &assistantName, nil, &toolCallsStr, ""); err != nil {
+				log.Printf("messages: failed to persist tool-call message for conv %d: %v", convID, err)
+			}
+			var tc2 []any
+			json.Unmarshal(toolCallsJSON, &tc2) //nolint:errcheck
+			chatMsgs = append(chatMsgs, chatMsg{Role: "assistant", ToolCalls: tc2})
+
+			// Execute each tool and persist the result.
+			for _, tc := range pendingCalls {
+				evtJSON, _ := json.Marshal(map[string]any{"tool_call": map[string]string{"name": tc.name}})
+				fmt.Fprintf(w, "data: %s\n\n", evtJSON)
+				flusher.Flush()
+
+				result, execErr := ExecuteTool(tc.name, tc.argsJSON.String())
+				if execErr != nil {
+					result = "error: " + execErr.Error()
+				}
+				if _, err := s.store.CreateMessage(convID, "tool", result, nil, nil, nil, nil, tc.id); err != nil {
+					log.Printf("messages: failed to persist tool result for conv %d: %v", convID, err)
+				}
+				chatMsgs = append(chatMsgs, chatMsg{Role: "tool", Content: result, ToolCallID: tc.id})
+			}
+
+			if loop < maxToolLoops-1 {
+				continue
+			}
+			log.Printf("messages: tool call loop limit reached for conv %d", convID)
+		}
+
+		finalContent = fullContent.String()
+		finalStats = usageStats
+		break
 	}
 
-	if usageStats != nil {
+	if finalStats != nil {
 		statsJSON, _ := json.Marshal(map[string]any{
 			"stats": map[string]int64{
-				"prompt_tokens":     usageStats.PromptTokens,
-				"completion_tokens": usageStats.CompletionTokens,
-				"total_time_ms":     usageStats.TotalTimeMS,
+				"prompt_tokens":     finalStats.PromptTokens,
+				"completion_tokens": finalStats.CompletionTokens,
+				"total_time_ms":     finalStats.TotalTimeMS,
 			},
 		})
 		fmt.Fprintf(w, "data: %s\n\n", statsJSON)
@@ -282,14 +419,14 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Persist completed assistant message and update conversation model/character.
-	if fullContent.Len() > 0 {
+	if finalContent != "" {
 		prevUpdatedAt, parseErr := time.Parse(time.RFC3339, conv.UpdatedAt)
 		if parseErr != nil {
 			log.Printf("messages: conv %d: failed to parse updated_at %q: %v", convID, conv.UpdatedAt, parseErr)
 		}
-		msg, err := s.store.CreateMessage(convID, "assistant", fullContent.String(), usedCharacterID, &assistantName, usageStats)
-		if err := s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID); err != nil {
-			log.Printf("messages: failed to update conversation %d after message: %v", convID, err)
+		msg, err := s.store.CreateMessage(convID, "assistant", finalContent, usedCharacterID, &assistantName, finalStats, nil, "")
+		if err2 := s.store.UpdateConversationAfterMessage(convID, usedModel, usedCharacterID); err2 != nil {
+			log.Printf("messages: failed to update conversation %d after message: %v", convID, err2)
 		}
 		if time.Since(prevUpdatedAt) > 2*time.Minute {
 			s.hub.BroadcastConversationListChanged()
@@ -303,7 +440,6 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		titleTriggered := false
 
 		// Trigger auto-title on the first completed exchange when the character requests it.
-		// Count user messages in history — if this is the only one, it's the first exchange.
 		if usedCharacter != nil && usedCharacter.AutoTitle && conv.Title == nil {
 			userMsgCount := 0
 			for _, m := range history {
@@ -394,7 +530,18 @@ func (s *Server) handleGetMessageContext(w http.ResponseWriter, r *http.Request)
 	}
 
 	for _, m := range history {
-		chatMsgs = append(chatMsgs, chatMsg{Role: m.Role, Content: m.Content})
+		msg := chatMsg{Role: m.Role, Content: m.Content}
+		if m.ToolCalls != nil {
+			var tc []any
+			if jsonErr := json.Unmarshal([]byte(*m.ToolCalls), &tc); jsonErr == nil {
+				msg.ToolCalls = tc
+				msg.Content = ""
+			}
+		}
+		if m.ToolCallID != "" {
+			msg.ToolCallID = m.ToolCallID
+		}
+		chatMsgs = append(chatMsgs, msg)
 	}
 	if chatMsgs == nil {
 		chatMsgs = []chatMsg{}
@@ -468,7 +615,7 @@ func (s *Server) handleFirstMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	content := substituteVars(*char.FirstMessage, char.Name, resolveUserName(user))
-	msg, err := s.store.CreateMessage(convID, "assistant", content, charID, &char.Name, nil)
+	msg, err := s.store.CreateMessage(convID, "assistant", content, charID, &char.Name, nil, nil, "")
 	if err != nil {
 		internalError(w, err)
 		return

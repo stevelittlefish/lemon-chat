@@ -48,6 +48,9 @@ func (s *Server) Handler() http.Handler {
 	// Models
 	mux.HandleFunc("GET /api/models", s.requireAuth(s.handleModels))
 
+	// Tools
+	mux.HandleFunc("GET /api/tools", s.requireAuth(s.handleGetTools))
+
 	// Conversations
 	mux.HandleFunc("GET /api/conversations", s.requireAuth(s.handleListConversations))
 	mux.HandleFunc("POST /api/conversations", s.requireAuth(s.handleCreateConversation))

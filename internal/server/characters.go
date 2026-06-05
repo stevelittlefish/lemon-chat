@@ -70,6 +70,7 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 		TitlePrompt    *string                        `json:"title_prompt"`
 		Visibility     string                         `json:"visibility"`
 		AutoTitle      bool                           `json:"auto_title"`
+		Tools          []string                       `json:"tools"`
 		HiddenMessages []store.CharacterHiddenMessage `json:"hidden_messages"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -83,7 +84,7 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 	if !validVisibility(req.Visibility) {
 		req.Visibility = "private"
 	}
-	char, err := s.store.CreateCharacter(req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.TitlePrompt, user.ID, req.Visibility, req.AutoTitle)
+	char, err := s.store.CreateCharacter(req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.TitlePrompt, user.ID, req.Visibility, req.AutoTitle, req.Tools)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -131,6 +132,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		TitlePrompt    *string                         `json:"title_prompt"`
 		Visibility     string                          `json:"visibility"`
 		AutoTitle      bool                            `json:"auto_title"`
+		Tools          []string                        `json:"tools"`
 		HiddenMessages *[]store.CharacterHiddenMessage `json:"hidden_messages"`
 	}{
 		Name:         existing.Name,
@@ -140,6 +142,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		TitlePrompt:  existing.TitlePrompt,
 		Visibility:   existing.Visibility,
 		AutoTitle:    existing.AutoTitle,
+		Tools:        existing.Tools,
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -155,7 +158,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 	} else if !validVisibility(req.Visibility) {
 		req.Visibility = existing.Visibility
 	}
-	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.TitlePrompt, req.Visibility, req.AutoTitle); err != nil {
+	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.TitlePrompt, req.Visibility, req.AutoTitle, req.Tools); err != nil {
 		internalError(w, err)
 		return
 	}

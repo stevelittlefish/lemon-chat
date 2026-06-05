@@ -1108,6 +1108,27 @@ html, body {
   word-break: break-word;
 }
 
+/* ── Tool call annotations ──────────────────────────────────── */
+
+.tool-calls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.tool-call-note {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-faint);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px var(--space-2);
+}
+
 /* ── Stopped message indicator ──────────────────────────────── */
 
 .message-stopped {

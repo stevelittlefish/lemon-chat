@@ -1,4 +1,4 @@
-import { auth, characters as charactersApi, models as modelsApi } from './api.js';
+import { auth, characters as charactersApi, models as modelsApi, tools as toolsApi } from './api.js';
 import { preload as preloadIcons, icon } from './icons.js';
 import { renderAvatarSection, attachAvatarSection } from './settings-avatar.js';
 import { escapeHtml } from './utils.js';
@@ -14,6 +14,10 @@ const editId    = editMatch ? Number(editMatch[1]) : null;
 // In-memory state for the hidden messages editor.
 let hiddenMessages = [];
 let dragSrcIndex   = null;
+
+// In-memory state for the tools section.
+let allTools    = [];
+let enabledTools = [];
 
 async function init() {
   try {
@@ -43,10 +47,13 @@ async function init() {
 
   try {
     if (isNew) {
-      modelsData = await modelsApi.list();
+      [modelsData, allTools] = await Promise.all([modelsApi.list(), toolsApi.list()]);
     } else {
-      const [char, models] = await Promise.all([charactersApi.get(editId), modelsApi.list()]);
+      const [char, models, toolList] = await Promise.all([
+        charactersApi.get(editId), modelsApi.list(), toolsApi.list(),
+      ]);
       modelsData = models;
+      allTools   = toolList;
       character  = char ?? null;
     }
   } catch {
@@ -125,6 +132,8 @@ function renderForm(character, modelsData) {
   const visibility   = character ? character.visibility                : 'private';
   const autoTitle    = character ? !!character.auto_title              : false;
 
+  enabledTools = character?.tools ?? [];
+
   document.title = `${isNew ? 'New character' : 'Edit character'} — Settings — lemon chat`;
 
   document.getElementById('smain').innerHTML = `
@@ -167,6 +176,22 @@ function renderForm(character, modelsData) {
             Generate title after first reply
           </label>
         </div>
+        ${allTools.length > 0 ? `
+        <div class="character-form-row">
+          <span class="character-form-lbl">Tools</span>
+          <div class="character-form-hint" style="margin-bottom:8px">Tools this character is allowed to call.</div>
+          <div id="char-tools-list">
+            ${allTools.map(t => `
+              <label class="char-tool-row">
+                <input type="checkbox" class="char-tool-checkbox" data-id="${escapeHtml(t.id)}" ${enabledTools.includes(t.id) ? 'checked' : ''}>
+                <div class="char-tool-info">
+                  <span class="char-tool-name">${escapeHtml(t.display_name)}</span>
+                  <span class="char-tool-desc">${escapeHtml(t.description)}</span>
+                </div>
+              </label>
+            `).join('')}
+          </div>
+        </div>` : ''}
         <div class="character-form-row">
           <label class="character-form-lbl" for="char-title-prompt">Title generation prompt</label>
           <textarea id="char-title-prompt" class="input" rows="3" placeholder="Leave empty to use the default prompt…">${escapeHtml(titlePrompt)}</textarea>
@@ -336,6 +361,10 @@ function handleDragEnd() {
 }
 
 function readForm(isOwnerOrAdmin) {
+  const toolCheckboxes = document.querySelectorAll('.char-tool-checkbox');
+  const tools = Array.from(toolCheckboxes)
+    .filter(cb => cb.checked)
+    .map(cb => cb.dataset.id);
   return {
     name:            document.getElementById('char-name')?.value.trim()          ?? '',
     model:           document.getElementById('char-model')?.value                ?? '',
@@ -344,6 +373,7 @@ function readForm(isOwnerOrAdmin) {
     title_prompt:    document.getElementById('char-title-prompt')?.value.trim()  || null,
     visibility:      isOwnerOrAdmin ? (document.getElementById('char-visibility')?.value ?? undefined) : undefined,
     auto_title:      document.getElementById('char-auto-title')?.classList.contains('on') ?? false,
+    tools,
     hidden_messages: hiddenMessages.map(m => ({ role: m.role, content: m.content })),
   };
 }
@@ -412,6 +442,7 @@ async function cloneChar(character) {
       title_prompt:    character.title_prompt  ?? null,
       visibility:      'private',
       auto_title:      character.auto_title,
+      tools:           character.tools ?? [],
       hidden_messages: hiddenMessages.map(m => ({ role: m.role, content: m.content })),
     };
     const created = await charactersApi.create(data);

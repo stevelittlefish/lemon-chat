@@ -115,11 +115,17 @@ export function showPicker(models, characters, onSelect) {
 
 export function renderMessages(msgs) {
   threadEl.innerHTML = '';
-  if (!msgs.length) {
+  // Skip tool-protocol messages (role="tool" and tool-call-only assistant messages).
+  const visible = msgs.filter(m => {
+    if (m.role === 'tool') return false;
+    if (m.role === 'assistant' && !m.content && m.tool_calls) return false;
+    return true;
+  });
+  if (!visible.length) {
     showEmpty();
     return;
   }
-  for (const msg of msgs) {
+  for (const msg of visible) {
     threadEl.appendChild(buildMessage(msg));
   }
   scrollToBottom();
@@ -164,6 +170,7 @@ export function startStreaming() {
   let accumulated = '';
   let streamStats = null;
   let streamMsgId = null;
+  let toolCallsEl = null; // lazy-created list of tool call annotations
 
   return {
     setName(name) {
@@ -179,6 +186,18 @@ export function startStreaming() {
     },
     setMessageId(id) {
       streamMsgId = id;
+    },
+    addToolCall(toolCall) {
+      if (!toolCallsEl) {
+        toolCallsEl = document.createElement('div');
+        toolCallsEl.className = 'tool-calls';
+        colEl.insertBefore(toolCallsEl, contentEl);
+      }
+      const note = document.createElement('span');
+      note.className = 'tool-call-note';
+      note.textContent = `called ${toolCall.name}`;
+      toolCallsEl.appendChild(note);
+      if (!userScrolledDuringStream) scrollToBottom();
     },
     finish() {
       const shouldScroll = !userScrolledDuringStream;

@@ -13,6 +13,10 @@ type Message struct {
 	PromptTokens     *int64  `json:"prompt_tokens,omitempty"`
 	CompletionTokens *int64  `json:"completion_tokens,omitempty"`
 	TotalTimeMS      *int64  `json:"total_time_ms,omitempty"`
+	// Tool call support: ToolCalls is set on assistant messages that triggered tool calls (raw JSON array).
+	// ToolCallID is set on tool-result messages (role="tool").
+	ToolCalls  *string `json:"tool_calls,omitempty"`
+	ToolCallID string  `json:"tool_call_id,omitempty"`
 }
 
 type MessageStats struct {
@@ -74,7 +78,7 @@ func (s *Store) DeleteOrphanedMessages() (int64, error) {
 func (s *Store) ListMessages(conversationID int64) ([]Message, error) {
 	rows, err := s.db.Query(
 		`SELECT id, conversation_id, role, content, name, character_id, created_at,
-		        prompt_tokens, completion_tokens, total_time_ms
+		        prompt_tokens, completion_tokens, total_time_ms, tool_calls, tool_call_id
 		 FROM message WHERE conversation_id = ? ORDER BY created_at ASC`,
 		conversationID,
 	)
@@ -85,16 +89,20 @@ func (s *Store) ListMessages(conversationID int64) ([]Message, error) {
 	var msgs []Message
 	for rows.Next() {
 		var m Message
+		var toolCallID *string
 		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Content, &m.Name, &m.CharacterID, &m.CreatedAt,
-			&m.PromptTokens, &m.CompletionTokens, &m.TotalTimeMS); err != nil {
+			&m.PromptTokens, &m.CompletionTokens, &m.TotalTimeMS, &m.ToolCalls, &toolCallID); err != nil {
 			return nil, err
+		}
+		if toolCallID != nil {
+			m.ToolCallID = *toolCallID
 		}
 		msgs = append(msgs, m)
 	}
 	return msgs, rows.Err()
 }
 
-func (s *Store) CreateMessage(conversationID int64, role, content string, characterID *int64, assistantName *string, stats *MessageStats) (*Message, error) {
+func (s *Store) CreateMessage(conversationID int64, role, content string, characterID *int64, assistantName *string, stats *MessageStats, toolCalls *string, toolCallID string) (*Message, error) {
 	t := now()
 	var promptTokens, completionTokens, totalTimeMS *int64
 	if stats != nil {
@@ -102,12 +110,16 @@ func (s *Store) CreateMessage(conversationID int64, role, content string, charac
 		completionTokens = &stats.CompletionTokens
 		totalTimeMS = &stats.TotalTimeMS
 	}
+	var tcID *string
+	if toolCallID != "" {
+		tcID = &toolCallID
+	}
 	res, err := s.db.Exec(
 		`INSERT INTO message (conversation_id, role, content, character_id, name, created_at,
-		                      prompt_tokens, completion_tokens, total_time_ms)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		                      prompt_tokens, completion_tokens, total_time_ms, tool_calls, tool_call_id)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		conversationID, role, content, characterID, assistantName, t,
-		promptTokens, completionTokens, totalTimeMS,
+		promptTokens, completionTokens, totalTimeMS, toolCalls, tcID,
 	)
 	if err != nil {
 		return nil, err
@@ -117,5 +129,6 @@ func (s *Store) CreateMessage(conversationID int64, role, content string, charac
 		ID: id, ConversationID: conversationID, Role: role, Content: content,
 		CharacterID: characterID, Name: assistantName, CreatedAt: t,
 		PromptTokens: promptTokens, CompletionTokens: completionTokens, TotalTimeMS: totalTimeMS,
+		ToolCalls: toolCalls, ToolCallID: toolCallID,
 	}, nil
 }

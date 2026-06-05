@@ -564,6 +564,45 @@ a.snav-item { text-decoration: none; }
   border-bottom: 2px solid var(--lemon-500);
 }
 
+/* ── Tools section ──────────────────────────────────────── */
+
+.char-tool-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  cursor: pointer;
+}
+
+.char-tool-row:not(:last-child) {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.char-tool-row input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: var(--lemon-500);
+  width: 14px;
+  height: 14px;
+}
+
+.char-tool-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.char-tool-name {
+  font-size: var(--text-sm);
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.char-tool-desc {
+  font-size: var(--text-xs);
+  color: var(--fg-subtle);
+}
+
 /* ── Avatar upload ──────────────────────────────────────── */
 
 .avatar-section {
