@@ -28,7 +28,7 @@ var toolRegistry = map[string]toolDef{
 		Type: "function",
 		Function: toolFunction{
 			Name:        "get_time",
-			Description: "Returns the current UTC date and time.",
+			Description: "Returns the current local date and time.",
 			Parameters:  toolParam{Type: "object", Properties: map[string]any{}, Required: []string{}},
 		},
 	},
@@ -47,7 +47,7 @@ func ToolDefsForCharacter(toolIDs []string) []toolDef {
 
 var executors = map[string]func(string) (string, error){
 	"get_time": func(_ string) (string, error) {
-		now := time.Now().UTC()
+		now := time.Now()
 		return now.Weekday().String() + ", " + now.Format(time.RFC3339), nil
 	},
 }
@@ -70,7 +70,7 @@ type ToolMeta struct {
 
 // AllTools is the full list of available tools exposed to the frontend.
 var AllTools = []ToolMeta{
-	{"get_time", "Get current time", "Returns the current UTC date and time."},
+	{"get_time", "Get current time", "Returns the current local date and time."},
 }
 
 func (s *Server) handleGetTools(w http.ResponseWriter, r *http.Request) {
