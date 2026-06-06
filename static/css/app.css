@@ -1411,3 +1411,72 @@ html, body {
   font-size: var(--fs-14);
   padding: var(--space-4) 0;
 }
+
+/* ── Inline generated images ────────────────────────────────── */
+
+@keyframes image-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 320px;
+  height: 160px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-top: var(--space-2);
+  animation: image-pulse 1.6s ease-in-out infinite;
+}
+
+.image-placeholder-label {
+  font-size: var(--fs-13);
+  color: var(--fg-faint);
+  font-style: italic;
+}
+
+.inline-image-wrap {
+  position: relative;
+  display: inline-block;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  line-height: 0;
+}
+
+.inline-image-img {
+  display: block;
+  max-width: 100%;
+  max-height: 512px;
+  border-radius: var(--radius-lg);
+}
+
+.inline-image-download {
+  position: absolute;
+  bottom: var(--space-2);
+  right: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-lifted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--fg-muted);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  text-decoration: none;
+}
+
+.inline-image-wrap:hover .inline-image-download {
+  opacity: 1;
+}
+
+.inline-image-download:hover {
+  color: var(--fg);
+  background: var(--bg-sunken);
+}

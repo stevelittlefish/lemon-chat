@@ -15,10 +15,16 @@ type Config struct {
 	ModelServers []ModelServer `toml:"model_server"`
 	Models       []Model       `toml:"model"`
 	SearXNG      SearXNG       `toml:"searxng"`
+	ComfyUI      ComfyUI       `toml:"comfyui"`
 }
 
 type SearXNG struct {
 	URL string `toml:"url"`
+}
+
+type ComfyUI struct {
+	URL      string `toml:"url"`
+	Workflow string `toml:"workflow"`
 }
 
 type Server struct {

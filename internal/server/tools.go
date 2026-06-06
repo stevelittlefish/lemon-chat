@@ -46,6 +46,8 @@ type ToolContext struct {
 	ModelServer     *config.ModelServer
 	ResponseTimeout time.Duration
 	SearXNGURL      string
+	ComfyUIURL      string
+	ComfyUIWorkflow string
 	// for tools that create attachments
 	ToolCallID     string
 	ConversationID int64
@@ -142,6 +144,27 @@ var toolRegistry = map[string]toolDef{
 					},
 				},
 				Required: []string{"url"},
+			},
+		},
+	},
+	"generate_image": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "generate_image",
+			Description: "Generates an image using Stable Diffusion. Use to illustrate scenes, characters, or objects described in the story. Be descriptive — include art style, lighting, and mood.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"prompt": map[string]any{
+						"type":        "string",
+						"description": "Detailed visual description of the image. Include subject, setting, art style, lighting, mood.",
+					},
+					"negative_prompt": map[string]any{
+						"type":        "string",
+						"description": "Things to exclude from the image (optional).",
+					},
+				},
+				Required: []string{"prompt"},
 			},
 		},
 	},
@@ -436,6 +459,167 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		}
 		return strings.TrimSpace(sb.String()), nil
 	},
+	"generate_image": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Prompt         string `json:"prompt"`
+			NegativePrompt string `json:"negative_prompt"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Prompt == "" {
+			return "", fmt.Errorf("prompt is required")
+		}
+		if tctx.ComfyUIURL == "" {
+			return "", fmt.Errorf("generate_image is not configured (add [comfyui] url to lemon.toml)")
+		}
+
+		workflowData, err := os.ReadFile(tctx.ComfyUIWorkflow)
+		if err != nil {
+			return "", fmt.Errorf("read workflow: %w", err)
+		}
+
+		// Replace placeholders: prompts use JSON-encoded strings; seed is a bare integer.
+		promptJSON, _ := json.Marshal(args.Prompt)
+		negJSON, _ := json.Marshal(args.NegativePrompt)
+		seed := rand.Int63()
+		workflowStr := strings.ReplaceAll(string(workflowData), `"__PROMPT__"`, string(promptJSON))
+		workflowStr = strings.ReplaceAll(workflowStr, `"__NEGATIVE_PROMPT__"`, string(negJSON))
+		workflowStr = strings.ReplaceAll(workflowStr, `__SEED__`, strconv.FormatInt(seed, 10))
+
+		var workflow map[string]any
+		if err := json.Unmarshal([]byte(workflowStr), &workflow); err != nil {
+			return "", fmt.Errorf("parse workflow after substitution: %w", err)
+		}
+
+		clientID := randomID()
+		promptPayload, _ := json.Marshal(map[string]any{
+			"prompt":    workflow,
+			"client_id": clientID,
+		})
+
+		log.Printf("Generating image prompt=%q conversation_id=%d", args.Prompt, tctx.ConversationID)
+
+		comfyBase := strings.TrimRight(tctx.ComfyUIURL, "/")
+
+		submitCtx, submitCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer submitCancel()
+
+		req, err := http.NewRequestWithContext(submitCtx, "POST", comfyBase+"/prompt", bytes.NewReader(promptPayload))
+		if err != nil {
+			return "", fmt.Errorf("build prompt request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("submit prompt to ComfyUI: %w", err)
+		}
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("ComfyUI returned %d: %s", resp.StatusCode, respBody)
+		}
+
+		var promptResp struct {
+			PromptID string `json:"prompt_id"`
+		}
+		if err := json.Unmarshal(respBody, &promptResp); err != nil || promptResp.PromptID == "" {
+			return "", fmt.Errorf("parse ComfyUI prompt response: %w", err)
+		}
+
+		// Poll /history/{prompt_id} until the job completes or we time out.
+		type comfyImage struct {
+			Filename  string `json:"filename"`
+			Subfolder string `json:"subfolder"`
+			Type      string `json:"type"`
+		}
+		type comfyOutput struct {
+			Images []comfyImage `json:"images"`
+		}
+		type comfyJob struct {
+			Outputs map[string]comfyOutput `json:"outputs"`
+		}
+
+		deadline := time.Now().Add(120 * time.Second)
+		var found *comfyImage
+		for time.Now().Before(deadline) {
+			time.Sleep(1 * time.Second)
+
+			pollCtx, pollCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			pollReq, _ := http.NewRequestWithContext(pollCtx, "GET", comfyBase+"/history/"+promptResp.PromptID, nil)
+			pollResp, pollErr := http.DefaultClient.Do(pollReq)
+			pollCancel()
+			if pollErr != nil {
+				continue
+			}
+			pollBody, _ := io.ReadAll(pollResp.Body)
+			pollResp.Body.Close()
+
+			var history map[string]comfyJob
+			if jsonErr := json.Unmarshal(pollBody, &history); jsonErr != nil {
+				continue
+			}
+			if job, ok := history[promptResp.PromptID]; ok {
+				for _, output := range job.Outputs {
+					if len(output.Images) > 0 {
+						img := output.Images[0]
+						found = &img
+						break
+					}
+				}
+				if found != nil {
+					break
+				}
+			}
+		}
+
+		if found == nil {
+			return "", fmt.Errorf("image generation timed out after 120 seconds")
+		}
+
+		// Download the generated image.
+		viewURL := comfyBase + "/view?filename=" + url.QueryEscape(found.Filename) +
+			"&subfolder=" + url.QueryEscape(found.Subfolder) +
+			"&type=" + url.QueryEscape(found.Type)
+
+		dlCtx, dlCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer dlCancel()
+
+		dlReq, err := http.NewRequestWithContext(dlCtx, "GET", viewURL, nil)
+		if err != nil {
+			return "", fmt.Errorf("build download request: %w", err)
+		}
+		dlResp, err := http.DefaultClient.Do(dlReq)
+		if err != nil {
+			return "", fmt.Errorf("download image from ComfyUI: %w", err)
+		}
+		imgData, _ := io.ReadAll(dlResp.Body)
+		dlResp.Body.Close()
+
+		dir := filepath.Join("data", "attachments", randomID())
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return "", fmt.Errorf("create attachment dir: %w", err)
+		}
+		diskPath := filepath.Join(dir, "image.png")
+		if err := os.WriteFile(diskPath, imgData, 0644); err != nil {
+			return "", fmt.Errorf("write image: %w", err)
+		}
+
+		att, err := tctx.Store.CreateAttachment(tctx.ToolCallID, tctx.ConversationID, "Generated image", "image.png", "image/png", diskPath)
+		if err != nil {
+			return "", fmt.Errorf("store attachment: %w", err)
+		}
+
+		result := AttachmentResult{
+			AttachmentID: att.ID,
+			Title:        "Generated image",
+			Filename:     "image.png",
+			MimeType:     "image/png",
+		}
+		out, _ := json.Marshal(result)
+		return string(out), nil
+	},
 }
 
 type searxngResponse struct {
@@ -541,6 +725,7 @@ var allTools []ToolMeta
 
 // InitTools builds the available tools list. Call once at server startup.
 // web_search is included only when cfg.SearXNG.URL is non-empty.
+// generate_image is included only when cfg.ComfyUI.URL is non-empty.
 func InitTools(cfg *config.Config) {
 	allTools = []ToolMeta{
 		{"get_time", "Get current time", "Returns the current local date and time."},
@@ -550,6 +735,9 @@ func InitTools(cfg *config.Config) {
 	}
 	if cfg.SearXNG.URL != "" {
 		allTools = append(allTools, ToolMeta{"web_search", "Web search", "Searches the web using SearXNG and returns the top results."})
+	}
+	if cfg.ComfyUI.URL != "" {
+		allTools = append(allTools, ToolMeta{"generate_image", "Generate image", "Generates an image using Stable Diffusion via ComfyUI."})
 	}
 }
 

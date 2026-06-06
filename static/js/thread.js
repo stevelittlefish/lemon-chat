@@ -59,6 +59,38 @@ function fileIconName(mimeType, filename) {
   return 'file';
 }
 
+function buildImagePlaceholder() {
+  const div = document.createElement('div');
+  div.className = 'image-placeholder';
+  const label = document.createElement('span');
+  label.className = 'image-placeholder-label';
+  label.textContent = 'Generating image…';
+  div.appendChild(label);
+  return div;
+}
+
+function buildInlineImage(att) {
+  const wrap = document.createElement('div');
+  wrap.className = 'inline-image-wrap';
+
+  const img = withRetry(document.createElement('img'));
+  img.className = 'inline-image-img';
+  img.src = `/api/attachments/${att.id}`;
+  img.alt = att.title || 'Generated image';
+  img.loading = 'lazy';
+
+  const dlBtn = document.createElement('a');
+  dlBtn.className = 'inline-image-download';
+  dlBtn.href = `/api/attachments/${att.id}?download=1`;
+  dlBtn.setAttribute('download', att.filename || 'image.png');
+  dlBtn.setAttribute('aria-label', 'Download image');
+  dlBtn.innerHTML = icon('download', 14);
+
+  wrap.appendChild(img);
+  wrap.appendChild(dlBtn);
+  return wrap;
+}
+
 function buildAttachmentCard(att) {
   const card = document.createElement('div');
   card.className = 'attachment-card';
@@ -258,6 +290,8 @@ export function startStreaming() {
   let streamMsgId = null;
   let toolCallsEl = null; // lazy-created container for tool call entries
   const toolCallEls = new Map(); // id → .tool-call element for result updates
+  const pendingImages = new Map(); // tool call id → placeholder element
+  let hasImages = false; // true once any inline image is committed
 
   return {
     setName(name) {
@@ -283,6 +317,11 @@ export function startStreaming() {
       const el = buildToolCallEl(toolCall.name, toolCall.args ?? null, null);
       if (toolCall.id) toolCallEls.set(toolCall.id, el);
       toolCallsEl.appendChild(el);
+      if (toolCall.name === 'generate_image' && toolCall.id) {
+        const placeholder = buildImagePlaceholder();
+        colEl.insertBefore(placeholder, contentEl);
+        pendingImages.set(toolCall.id, placeholder);
+      }
       if (!userScrolledDuringStream) scrollToBottom();
     },
     updateToolCallResult({ id, result }) {
@@ -292,33 +331,52 @@ export function startStreaming() {
       if (details) details.appendChild(buildToolCallSection('result', result));
     },
     addAttachment(att) {
-      const card = buildAttachmentCard(att);
-      colEl.appendChild(card);
+      if (att.mime_type?.startsWith('image/') && att.tool_call_id) {
+        const placeholder = pendingImages.get(att.tool_call_id);
+        if (placeholder) {
+          placeholder.replaceWith(buildInlineImage(att));
+          pendingImages.delete(att.tool_call_id);
+        } else {
+          colEl.insertBefore(buildInlineImage(att), contentEl);
+        }
+        hasImages = true;
+      } else {
+        colEl.appendChild(buildAttachmentCard(att));
+      }
       if (!userScrolledDuringStream) scrollToBottom();
     },
     finish() {
       const shouldScroll = !userScrolledDuringStream;
       userScrolledDuringStream = false;
-      if (!accumulated) {
-        wrapper.remove();
-      } else {
-        contentEl.innerHTML = renderMarkdown(accumulated);
-        colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId }, accumulated));
-        if (shouldScroll) scrollToBottom();
-      }
-    },
-    truncate() {
-      userScrolledDuringStream = false;
-      if (!accumulated) {
+      if (!accumulated && !hasImages) {
         wrapper.remove();
         return;
       }
-      contentEl.innerHTML = renderMarkdown(accumulated);
-      const stopNote = document.createElement('p');
-      stopNote.className = 'message-stopped';
-      stopNote.textContent = 'stopped';
-      colEl.appendChild(stopNote);
-      colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId }, accumulated));
+      if (accumulated) {
+        contentEl.innerHTML = renderMarkdown(accumulated);
+        colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId }, accumulated));
+      } else {
+        // Images only — remove the empty typing-indicator contentEl, no footer needed.
+        contentEl.remove();
+      }
+      if (shouldScroll) scrollToBottom();
+    },
+    truncate() {
+      userScrolledDuringStream = false;
+      if (!accumulated && !hasImages) {
+        wrapper.remove();
+        return;
+      }
+      if (accumulated) {
+        contentEl.innerHTML = renderMarkdown(accumulated);
+        const stopNote = document.createElement('p');
+        stopNote.className = 'message-stopped';
+        stopNote.textContent = 'stopped';
+        colEl.appendChild(stopNote);
+        colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId }, accumulated));
+      } else {
+        contentEl.remove();
+      }
     },
     error(msg) {
       userScrolledDuringStream = false;
@@ -477,7 +535,12 @@ function buildMessage(msg) {
 
   if (msg.tool_interactions?.length) {
     for (const ti of msg.tool_interactions) {
-      if (ti.attachment) colEl.appendChild(buildAttachmentCard(ti.attachment));
+      if (!ti.attachment) continue;
+      if (ti.attachment.mime_type?.startsWith('image/')) {
+        colEl.appendChild(buildInlineImage(ti.attachment));
+      } else {
+        colEl.appendChild(buildAttachmentCard(ti.attachment));
+      }
     }
   }
 

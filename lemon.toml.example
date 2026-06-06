@@ -50,3 +50,11 @@ model_server = "local"
 # When set, the web_search tool becomes available to characters.
 # [searxng]
 # url = "http://localhost:8181"
+
+# Optional: ComfyUI image generation integration.
+# When set, the generate_image tool becomes available to characters.
+# workflow points to a ComfyUI workflow JSON file with "__PROMPT__" and
+# "__NEGATIVE_PROMPT__" as placeholder strings on the text input nodes.
+# [comfyui]
+# url      = "http://localhost:8188"
+# workflow = "data/comfyui/sdxl.json"
