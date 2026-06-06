@@ -13,7 +13,7 @@ import (
 )
 
 func isDuplicateUsername(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: users.username")
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: user.username")
 }
 
 func (s *Server) handleAdminListUsers(w http.ResponseWriter, r *http.Request) {

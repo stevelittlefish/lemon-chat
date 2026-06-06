@@ -6,7 +6,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Critical bugs
 
-- [ ] **`isDuplicateUsername` checks the wrong table name** (`internal/server/admin.go:15`)
+- [x] **`isDuplicateUsername` checks the wrong table name** (`internal/server/admin.go:15`)
   The unique-constraint string is `"UNIQUE constraint failed: users.username"` but the table is named `user` (singular). SQLite emits `user.username`, so the check always returns `false`. Creating a duplicate username via the admin API returns 500 instead of 409.
 
 - [ ] **`onNewTurn` is missing from `api.js:send()` destructured params** (`static/js/api.js:73`)
