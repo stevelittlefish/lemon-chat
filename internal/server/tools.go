@@ -151,7 +151,7 @@ var toolRegistry = map[string]toolDef{
 		Type: "function",
 		Function: toolFunction{
 			Name:        "generate_image",
-			Description: "Generates an image using Stable Diffusion. Use to illustrate scenes, characters, or objects described in the story. Be descriptive — include art style, lighting, and mood.",
+			Description: "Generates an image using Stable Diffusion. Use to illustrate scenes, characters, or objects described in the story. Be descriptive — include art style, lighting, and mood. The generated image is automatically displayed in the chat — do not describe or embed the image in your text response.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
