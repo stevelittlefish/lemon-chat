@@ -12,6 +12,9 @@ dial_timeout_seconds = 10
 # Maximum total time allowed for a single model response, streaming or otherwise (seconds).
 response_timeout_seconds = 600
 
+# Maximum number of tool-call rounds per message before the loop is cut off.
+max_tool_loops = 5
+
 # Enable verbose debug logging (title worker, trigger conditions, HTTP responses).
 # debug = true
 

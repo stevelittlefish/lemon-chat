@@ -326,7 +326,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "data: %s\n\n", nameJSON)
 	flusher.Flush()
 
-	const maxToolLoops = 5
+	maxToolLoops := s.cfg.Server.MaxToolLoops
 	var finalContent string
 	var finalStats *store.MessageStats
 

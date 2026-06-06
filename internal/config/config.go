@@ -34,6 +34,7 @@ type Server struct {
 	DefaultModel           string `toml:"default_model"`
 	DialTimeoutSeconds     int    `toml:"dial_timeout_seconds"`
 	ResponseTimeoutSeconds int    `toml:"response_timeout_seconds"`
+	MaxToolLoops           int    `toml:"max_tool_loops"`
 }
 
 type Bootstrap struct {
@@ -75,6 +76,7 @@ func Load(path string) (*Config, error) {
 			DBPath:                 "lemon.db",
 			DialTimeoutSeconds:     10,
 			ResponseTimeoutSeconds: 600,
+			MaxToolLoops:           5,
 		},
 		Bootstrap: Bootstrap{
 			AdminUsername: "admin",
