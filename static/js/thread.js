@@ -69,6 +69,61 @@ function buildImagePlaceholder() {
   return div;
 }
 
+let lightbox = null;
+let savedHistoryState = null;
+
+function isLightboxOpen() {
+  return lightbox !== null && lightbox.classList.contains('is-open');
+}
+
+export function closeLightboxIfOpen() {
+  if (!isLightboxOpen()) return false;
+  lightbox.classList.remove('is-open');
+  return true;
+}
+
+function openLightbox(src, alt) {
+  if (!lightbox) {
+    lightbox = document.createElement('div');
+    lightbox.className = 'image-lightbox';
+    lightbox.setAttribute('role', 'dialog');
+    lightbox.setAttribute('aria-modal', 'true');
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'image-lightbox-close';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.innerHTML = icon('x', 18);
+    closeBtn.addEventListener('click', e => { e.stopPropagation(); closeLightbox(); });
+
+    const lbImg = document.createElement('img');
+    lbImg.addEventListener('click', e => e.stopPropagation());
+
+    lightbox.appendChild(closeBtn);
+    lightbox.appendChild(lbImg);
+    lightbox.addEventListener('click', closeLightbox);
+    document.body.appendChild(lightbox);
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeLightbox();
+    });
+  }
+
+  lightbox.querySelector('img').src = src;
+  lightbox.querySelector('img').alt = alt;
+  savedHistoryState = history.state;
+  lightbox.classList.add('is-open');
+  history.pushState({ lightbox: true }, '');
+}
+
+function closeLightbox() {
+  if (!isLightboxOpen()) return;
+  lightbox.classList.remove('is-open');
+  if (history.state?.lightbox) {
+    history.replaceState(savedHistoryState, '');
+    savedHistoryState = null;
+  }
+}
+
 function buildInlineImage(att) {
   const wrap = document.createElement('div');
   wrap.className = 'inline-image-wrap';
@@ -78,6 +133,7 @@ function buildInlineImage(att) {
   img.src = `/api/attachments/${att.id}`;
   img.alt = att.title || 'Generated image';
   img.loading = 'lazy';
+  img.addEventListener('click', () => openLightbox(img.src, img.alt));
 
   const dlBtn = document.createElement('a');
   dlBtn.className = 'inline-image-download';

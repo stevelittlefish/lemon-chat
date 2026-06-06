@@ -45,6 +45,7 @@ function showApp() {
   });
   ws.connect();
   window.addEventListener('popstate', (e) => {
+    if (thread.closeLightboxIfOpen()) return;
     const id = e.state?.conversationId ?? null;
     loadConversation(id, { pushHistory: false });
   });
