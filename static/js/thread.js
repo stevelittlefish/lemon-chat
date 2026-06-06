@@ -170,7 +170,8 @@ export function startStreaming() {
   let accumulated = '';
   let streamStats = null;
   let streamMsgId = null;
-  let toolCallsEl = null; // lazy-created list of tool call annotations
+  let toolCallsEl = null; // lazy-created container for tool call entries
+  const toolCallEls = new Map(); // id → .tool-call element for result updates
 
   return {
     setName(name) {
@@ -193,11 +194,16 @@ export function startStreaming() {
         toolCallsEl.className = 'tool-calls';
         colEl.insertBefore(toolCallsEl, contentEl);
       }
-      const note = document.createElement('span');
-      note.className = 'tool-call-note';
-      note.textContent = `called ${toolCall.name}`;
-      toolCallsEl.appendChild(note);
+      const el = buildToolCallEl(toolCall.name, toolCall.args ?? null, null);
+      if (toolCall.id) toolCallEls.set(toolCall.id, el);
+      toolCallsEl.appendChild(el);
       if (!userScrolledDuringStream) scrollToBottom();
+    },
+    updateToolCallResult({ id, result }) {
+      const el = toolCallEls.get(id);
+      if (!el) return;
+      const details = el.querySelector('.tool-call-details');
+      if (details) details.appendChild(buildToolCallSection('result', result));
     },
     finish() {
       const shouldScroll = !userScrolledDuringStream;
@@ -268,6 +274,68 @@ function buildAvatar(role, msgCharacterId) {
   return el;
 }
 
+function buildToolCallSection(label, text) {
+  const section = document.createElement('div');
+  section.className = 'tool-call-section';
+  const labelEl = document.createElement('div');
+  labelEl.className = 'tool-call-section-label';
+  labelEl.textContent = label;
+  const pre = document.createElement('pre');
+  pre.className = 'tool-call-code';
+  pre.textContent = text;
+  section.appendChild(labelEl);
+  section.appendChild(pre);
+  return section;
+}
+
+function buildToolCallEl(name, args, result) {
+  const container = document.createElement('div');
+  container.className = 'tool-call';
+
+  const toggle = document.createElement('button');
+  toggle.className = 'tool-call-toggle';
+  toggle.setAttribute('aria-expanded', 'false');
+
+  const iconEl = document.createElement('span');
+  iconEl.className = 'tool-call-icon';
+  iconEl.innerHTML = icon('settings', 12);
+
+  const nameEl = document.createElement('span');
+  nameEl.className = 'tool-call-name';
+  nameEl.textContent = name;
+
+  const chevron = document.createElement('span');
+  chevron.className = 'tool-call-chevron';
+  chevron.innerHTML = icon('chevron-down', 12);
+
+  toggle.appendChild(iconEl);
+  toggle.appendChild(nameEl);
+  toggle.appendChild(chevron);
+
+  const details = document.createElement('div');
+  details.className = 'tool-call-details';
+  details.hidden = true;
+
+  if (args !== null && args !== undefined) {
+    const argsText = typeof args === 'string' ? args : JSON.stringify(args, null, 2);
+    details.appendChild(buildToolCallSection('args', argsText));
+  }
+
+  if (result !== null && result !== undefined) {
+    details.appendChild(buildToolCallSection('result', result));
+  }
+
+  toggle.addEventListener('click', () => {
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', String(!expanded));
+    details.hidden = expanded;
+  });
+
+  container.appendChild(toggle);
+  container.appendChild(details);
+  return container;
+}
+
 function buildMessage(msg) {
   const wrapper = document.createElement('div');
   wrapper.className = `message ${msg.role}`;
@@ -282,6 +350,16 @@ function buildMessage(msg) {
   roleEl.className = 'message-role';
   roleEl.textContent = msg.role === 'user' ? (msg.name || 'you') : (msg.name || msg.role);
   colEl.appendChild(roleEl);
+
+  if (msg.tool_interactions?.length) {
+    const tcEl = document.createElement('div');
+    tcEl.className = 'tool-calls';
+    for (const ti of msg.tool_interactions) {
+      const argsText = ti.args != null ? JSON.stringify(ti.args, null, 2) : null;
+      tcEl.appendChild(buildToolCallEl(ti.name, argsText, ti.result || null));
+    }
+    colEl.appendChild(tcEl);
+  }
 
   const contentEl = document.createElement('div');
   contentEl.className = 'message-content';

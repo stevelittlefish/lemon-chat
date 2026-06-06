@@ -227,6 +227,7 @@ async function sendMessage(content) {
     onStats: (stats) => stream.setStats(stats),
     onMessageId: (id) => stream.setMessageId(id),
     onToolCall: (tc) => stream.addToolCall(tc),
+    onToolResult: (tr) => stream.updateToolCallResult(tr),
     onDone: () => {
       stream.finish();
       composer.setStreaming(false);

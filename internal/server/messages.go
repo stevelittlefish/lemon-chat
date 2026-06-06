@@ -89,19 +89,59 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	// Filter out tool-related messages (role="tool" and assistant messages that only have
-	// tool_calls with no content) — these are internal protocol messages, not chat turns.
-	msgs := make([]store.Message, 0, len(all))
-	for _, m := range all {
+
+	type toolInteraction struct {
+		Name   string `json:"name"`
+		Args   any    `json:"args,omitempty"`
+		Result string `json:"result,omitempty"`
+	}
+	type msgView struct {
+		store.Message
+		ToolInteractions []toolInteraction `json:"tool_interactions,omitempty"`
+	}
+
+	// Walk all messages, collecting tool interactions and attaching them to the
+	// visible assistant message that consumed them.
+	var pending []toolInteraction
+	pendingByID := map[string]*toolInteraction{}
+	views := make([]msgView, 0, len(all))
+
+	for i := range all {
+		m := all[i]
 		if m.Role == "tool" {
+			if ti, ok := pendingByID[m.ToolCallID]; ok {
+				ti.Result = m.Content
+			}
 			continue
 		}
 		if m.Role == "assistant" && m.Content == "" && m.ToolCalls != nil {
+			var tc []struct {
+				ID       string `json:"id"`
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			}
+			if jsonErr := json.Unmarshal([]byte(*m.ToolCalls), &tc); jsonErr == nil {
+				for _, c := range tc {
+					var argsVal any
+					json.Unmarshal([]byte(c.Function.Arguments), &argsVal) //nolint:errcheck
+					pending = append(pending, toolInteraction{Name: c.Function.Name, Args: argsVal})
+					pendingByID[c.ID] = &pending[len(pending)-1]
+				}
+			}
 			continue
 		}
-		msgs = append(msgs, m)
+		mv := msgView{Message: m}
+		if len(pending) > 0 {
+			mv.ToolInteractions = pending
+			pending = nil
+			pendingByID = map[string]*toolInteraction{}
+		}
+		views = append(views, mv)
 	}
-	writeJSON(w, http.StatusOK, msgs)
+
+	writeJSON(w, http.StatusOK, views)
 }
 
 func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
@@ -381,7 +421,13 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 			// Execute each tool and persist the result.
 			for _, tc := range pendingCalls {
-				evtJSON, _ := json.Marshal(map[string]any{"tool_call": map[string]string{"name": tc.name}})
+				var argsVal any
+				json.Unmarshal([]byte(tc.argsJSON.String()), &argsVal) //nolint:errcheck
+				evtJSON, _ := json.Marshal(map[string]any{"tool_call": map[string]any{
+					"id":   tc.id,
+					"name": tc.name,
+					"args": argsVal,
+				}})
 				fmt.Fprintf(w, "data: %s\n\n", evtJSON)
 				flusher.Flush()
 
@@ -389,6 +435,14 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				if execErr != nil {
 					result = "error: " + execErr.Error()
 				}
+
+				resultEvt, _ := json.Marshal(map[string]any{"tool_result": map[string]any{
+					"id":     tc.id,
+					"result": result,
+				}})
+				fmt.Fprintf(w, "data: %s\n\n", resultEvt)
+				flusher.Flush()
+
 				if _, err := s.store.CreateMessage(convID, "tool", result, nil, nil, nil, nil, tc.id); err != nil {
 					log.Printf("messages: failed to persist tool result for conv %d: %v", convID, err)
 				}
