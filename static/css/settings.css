@@ -610,6 +610,17 @@ a.snav-item { text-decoration: none; }
   font-weight: 400;
 }
 
+.char-tool-config-hint {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: var(--fs-12);
+  color: var(--lemon-900);
+  background: var(--lemon-50);
+  border: 1px solid var(--lemon-100);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
 /* ── Avatar upload ──────────────────────────────────────── */
 
 .avatar-section {

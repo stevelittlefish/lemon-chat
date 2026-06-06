@@ -187,6 +187,7 @@ function renderForm(character, modelsData) {
                 <div class="char-tool-info">
                   <span class="char-tool-name">${escapeHtml(t.display_name)} <code class="char-tool-code">${escapeHtml(t.id)}</code></span>
                   <span class="char-tool-desc">${escapeHtml(t.description)}</span>
+                  ${!t.configured ? `<span class="char-tool-config-hint">Not configured — ${escapeHtml(t.config_hint)}</span>` : ''}
                 </div>
               </label>
             `).join('')}

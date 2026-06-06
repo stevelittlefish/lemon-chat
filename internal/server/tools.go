@@ -234,18 +234,18 @@ var executors = map[string]func(string, ToolContext) (string, error){
 			return "", fmt.Errorf("invalid args: %w", err)
 		}
 		if args.Title == "" || args.Filename == "" || args.Content == "" {
-			return "", fmt.Errorf("title, filename, and content are required")
+			return "", fmt.Errorf("title, filename, and content are all required and must be non-empty")
 		}
 		// Sanitise filename: strip any path components.
 		args.Filename = filepath.Base(args.Filename)
 
 		dir := filepath.Join("data", "attachments", randomID())
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return "", fmt.Errorf("create attachment dir: %w", err)
+			return "", fmt.Errorf("server error: could not create storage directory (%w) — tell the user the document could not be saved due to a server storage problem", err)
 		}
 		diskPath := filepath.Join(dir, args.Filename)
 		if err := os.WriteFile(diskPath, []byte(args.Content), 0644); err != nil {
-			return "", fmt.Errorf("write attachment: %w", err)
+			return "", fmt.Errorf("server error: could not write document to disk (%w) — tell the user the document could not be saved due to a server storage problem", err)
 		}
 
 		mimeType := mimeTypeForFilename(args.Filename)
@@ -253,7 +253,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 
 		att, err := tctx.Store.CreateAttachment(tctx.ToolCallID, tctx.ConversationID, args.Title, args.Filename, mimeType, diskPath)
 		if err != nil {
-			return "", fmt.Errorf("store attachment: %w", err)
+			return "", fmt.Errorf("server error: could not record document in database (%w) — tell the user the document could not be saved due to a server error", err)
 		}
 
 		result := AttachmentResult{
@@ -287,7 +287,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 			var err error
 			count, err = strconv.Atoi(halves[0])
 			if err != nil || count < 1 || count > 100 {
-				return "", fmt.Errorf("invalid dice count: %q", halves[0])
+				return "", fmt.Errorf("invalid dice count %q: must be a whole number between 1 and 100", halves[0])
 			}
 		}
 
@@ -305,7 +305,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		}
 		sides, err := strconv.Atoi(sidesStr)
 		if err != nil || sides < 2 || sides > 10000 {
-			return "", fmt.Errorf("invalid die sides: %q", sidesStr)
+			return "", fmt.Errorf("invalid die sides %q: must be a whole number between 2 and 10000", sidesStr)
 		}
 
 		rolls := make([]int, count)
@@ -350,20 +350,24 @@ var executors = map[string]func(string, ToolContext) (string, error){
 
 		req, err := http.NewRequestWithContext(fetchCtx, "GET", args.URL, nil)
 		if err != nil {
-			return "", fmt.Errorf("invalid URL: %w", err)
+			return "", fmt.Errorf("invalid URL %q: %w", args.URL, err)
 		}
 		req.Header.Set("User-Agent", "lemon-chat/1.0")
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return "", fmt.Errorf("fetch failed: %w", err)
+			return "", fmt.Errorf("could not fetch %q: %w — tell the user the page could not be retrieved and suggest checking the URL", args.URL, err)
 		}
 		defer resp.Body.Close()
+
+		if resp.StatusCode >= 400 {
+			return "", fmt.Errorf("server returned HTTP %d for %q — tell the user the page could not be retrieved (HTTP %d)", resp.StatusCode, args.URL, resp.StatusCode)
+		}
 
 		const maxBody = 5 * 1024 * 1024
 		body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
 		if err != nil {
-			return "", fmt.Errorf("read response: %w", err)
+			return "", fmt.Errorf("could not read response from %q: %w", args.URL, err)
 		}
 
 		content := string(body)
@@ -417,27 +421,27 @@ var executors = map[string]func(string, ToolContext) (string, error){
 
 		req, err := http.NewRequestWithContext(fetchCtx, "GET", searchURL, nil)
 		if err != nil {
-			return "", fmt.Errorf("build search request: %w", err)
+			return "", fmt.Errorf("the SearXNG URL in lemon.toml appears to be malformed: %w", err)
 		}
 		req.Header.Set("User-Agent", "lemon-chat/1.0")
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return "", fmt.Errorf("search request failed: %w", err)
+			return "", fmt.Errorf("could not reach SearXNG at %q: %w — tell the user that the search service is currently unreachable and they may want to check that SearXNG is running", tctx.SearXNGURL, err)
 		}
 		defer resp.Body.Close()
 
 		body, err := io.ReadAll(io.LimitReader(resp.Body, 1*1024*1024))
 		if err != nil {
-			return "", fmt.Errorf("read search response: %w", err)
+			return "", fmt.Errorf("could not read response from SearXNG: %w", err)
 		}
 		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("SearXNG returned %d", resp.StatusCode)
+			return "", fmt.Errorf("SearXNG returned HTTP %d — tell the user the search service returned an error", resp.StatusCode)
 		}
 
 		var data searxngResponse
 		if err := json.Unmarshal(body, &data); err != nil {
-			return "", fmt.Errorf("decode search response: %w", err)
+			return "", fmt.Errorf("SearXNG response was not valid JSON (got: %.200s): %w — SearXNG may need to have the JSON format enabled", string(body), err)
 		}
 
 		if len(data.Results) == 0 {
@@ -473,10 +477,13 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		if tctx.ComfyUIURL == "" {
 			return "", fmt.Errorf("generate_image is not configured (add [comfyui] url to lemon.toml)")
 		}
+		if tctx.ComfyUIWorkflow == "" {
+			return "", fmt.Errorf("generate_image is not configured: add workflow = \"/path/to/workflow.json\" under [comfyui] in lemon.toml")
+		}
 
 		workflowData, err := os.ReadFile(tctx.ComfyUIWorkflow)
 		if err != nil {
-			return "", fmt.Errorf("read workflow: %w", err)
+			return "", fmt.Errorf("generate_image: cannot read workflow file %q — check the workflow path in lemon.toml: %w", tctx.ComfyUIWorkflow, err)
 		}
 
 		// Replace placeholders: prompts use JSON-encoded strings; seed is a bare integer.
@@ -489,7 +496,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 
 		var workflow map[string]any
 		if err := json.Unmarshal([]byte(workflowStr), &workflow); err != nil {
-			return "", fmt.Errorf("parse workflow after substitution: %w", err)
+			return "", fmt.Errorf("workflow file %q contains invalid JSON: %w — tell the user the image could not be generated due to an invalid workflow file", tctx.ComfyUIWorkflow, err)
 		}
 
 		clientID := randomID()
@@ -513,19 +520,19 @@ var executors = map[string]func(string, ToolContext) (string, error){
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return "", fmt.Errorf("submit prompt to ComfyUI: %w", err)
+			return "", fmt.Errorf("could not reach ComfyUI at %q: %w — tell the user the image could not be generated because ComfyUI is unreachable and they should check that it is running", tctx.ComfyUIURL, err)
 		}
 		respBody, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("ComfyUI returned %d: %s", resp.StatusCode, respBody)
+			return "", fmt.Errorf("ComfyUI returned HTTP %d: %s — tell the user the image could not be generated because ComfyUI returned an error", resp.StatusCode, respBody)
 		}
 
 		var promptResp struct {
 			PromptID string `json:"prompt_id"`
 		}
 		if err := json.Unmarshal(respBody, &promptResp); err != nil || promptResp.PromptID == "" {
-			return "", fmt.Errorf("parse ComfyUI prompt response: %w", err)
+			return "", fmt.Errorf("ComfyUI returned an unexpected response (expected a prompt_id): %s — tell the user image generation failed due to an unexpected ComfyUI response", string(respBody))
 		}
 
 		// Poll /history/{prompt_id} until the job completes or we time out.
@@ -575,7 +582,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		}
 
 		if found == nil {
-			return "", fmt.Errorf("image generation timed out after 120 seconds")
+			return "", fmt.Errorf("image generation timed out after 120 seconds — tell the user the image was not produced in time and suggest checking that ComfyUI is processing jobs correctly")
 		}
 
 		// Download the generated image.
@@ -592,23 +599,23 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		}
 		dlResp, err := http.DefaultClient.Do(dlReq)
 		if err != nil {
-			return "", fmt.Errorf("download image from ComfyUI: %w", err)
+			return "", fmt.Errorf("image was generated but could not be downloaded from ComfyUI: %w — tell the user the image was produced but could not be retrieved", err)
 		}
 		imgData, _ := io.ReadAll(dlResp.Body)
 		dlResp.Body.Close()
 
 		dir := filepath.Join("data", "attachments", randomID())
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return "", fmt.Errorf("create attachment dir: %w", err)
+			return "", fmt.Errorf("server error: could not create storage directory (%w) — tell the user the image was generated but could not be saved due to a server storage problem", err)
 		}
 		diskPath := filepath.Join(dir, "image.png")
 		if err := os.WriteFile(diskPath, imgData, 0644); err != nil {
-			return "", fmt.Errorf("write image: %w", err)
+			return "", fmt.Errorf("server error: could not write image to disk (%w) — tell the user the image was generated but could not be saved due to a server storage problem", err)
 		}
 
 		att, err := tctx.Store.CreateAttachment(tctx.ToolCallID, tctx.ConversationID, "Generated image", "image.png", "image/png", diskPath)
 		if err != nil {
-			return "", fmt.Errorf("store attachment: %w", err)
+			return "", fmt.Errorf("server error: could not record image in database (%w) — tell the user the image was generated but could not be saved due to a server error", err)
 		}
 
 		result := AttachmentResult{
@@ -719,26 +726,35 @@ type ToolMeta struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
 	Description string `json:"description"`
+	Configured  bool   `json:"configured"`
+	ConfigHint  string `json:"config_hint,omitempty"`
 }
 
 var allTools []ToolMeta
 
 // InitTools builds the available tools list. Call once at server startup.
-// web_search is included only when cfg.SearXNG.URL is non-empty.
-// generate_image is included only when cfg.ComfyUI.URL is non-empty.
+// web_search and generate_image are always included; Configured is false when
+// the required config is missing, and ConfigHint tells the user what to add.
 func InitTools(cfg *config.Config) {
 	allTools = []ToolMeta{
-		{"get_time", "Get current time", "Returns the current local date and time."},
-		{"roll_dice", "Roll dice", "Rolls dice using standard notation (e.g. 2d6, 1d20)."},
-		{"fetch_url", "Fetch URL", "Fetches a URL and returns its content as markdown, or raw HTML if source is true."},
-		{"create_document", "Create document", "Saves a file (report, script, notes, etc.) the user can download."},
+		{"get_time", "Get current time", "Returns the current local date and time.", true, ""},
+		{"roll_dice", "Roll dice", "Rolls dice using standard notation (e.g. 2d6, 1d20).", true, ""},
+		{"fetch_url", "Fetch URL", "Fetches a URL and returns its content as markdown, or raw HTML if source is true.", true, ""},
+		{"create_document", "Create document", "Saves a file (report, script, notes, etc.) the user can download.", true, ""},
 	}
-	if cfg.SearXNG.URL != "" {
-		allTools = append(allTools, ToolMeta{"web_search", "Web search", "Searches the web using SearXNG and returns the top results."})
+	searxngConfigured := cfg.SearXNG.URL != ""
+	searxngHint := ""
+	if !searxngConfigured {
+		searxngHint = "Add [searxng] url = \"http://…\" to lemon.toml to enable web search."
 	}
-	if cfg.ComfyUI.URL != "" {
-		allTools = append(allTools, ToolMeta{"generate_image", "Generate image", "Generates an image using Stable Diffusion via ComfyUI."})
+	allTools = append(allTools, ToolMeta{"web_search", "Web search", "Searches the web using SearXNG and returns the top results.", searxngConfigured, searxngHint})
+
+	comfyConfigured := cfg.ComfyUI.URL != "" && cfg.ComfyUI.Workflow != ""
+	comfyHint := ""
+	if !comfyConfigured {
+		comfyHint = "Add [comfyui] url = \"http://…\" and workflow = \"/path/to/workflow.json\" to lemon.toml to enable image generation."
 	}
+	allTools = append(allTools, ToolMeta{"generate_image", "Generate image", "Generates an image using Stable Diffusion via ComfyUI.", comfyConfigured, comfyHint})
 }
 
 func (s *Server) handleGetTools(w http.ResponseWriter, r *http.Request) {
