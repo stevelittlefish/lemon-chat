@@ -126,14 +126,14 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	// Walk all messages, collecting tool interactions and attaching them to the
 	// visible assistant message that consumed them.
 	var pending []toolInteraction
-	pendingByID := map[string]*toolInteraction{}
+	pendingIdxByID := map[string]int{} // tool call ID → index in pending
 	views := make([]msgView, 0, len(all))
 
 	for i := range all {
 		m := all[i]
 		if m.Role == "tool" {
-			if ti, ok := pendingByID[m.ToolCallID]; ok {
-				ti.Result = m.Content
+			if idx, ok := pendingIdxByID[m.ToolCallID]; ok {
+				pending[idx].Result = m.Content
 			}
 			continue
 		}
@@ -155,8 +155,8 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 						Args:       argsVal,
 						Attachment: attByCallID[c.ID],
 					}
+					pendingIdxByID[c.ID] = len(pending)
 					pending = append(pending, ti)
-					pendingByID[c.ID] = &pending[len(pending)-1]
 				}
 			}
 			continue
@@ -165,7 +165,7 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 		if len(pending) > 0 {
 			mv.ToolInteractions = pending
 			pending = nil
-			pendingByID = map[string]*toolInteraction{}
+			pendingIdxByID = map[string]int{}
 		}
 		views = append(views, mv)
 	}

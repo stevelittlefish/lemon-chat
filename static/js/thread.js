@@ -423,20 +423,6 @@ function buildAvatar(role, msgCharacterId) {
   return el;
 }
 
-function truncateArgs(args) {
-  if (args === null || args === undefined) return args;
-  if (typeof args === 'string') {
-    return args.length > 200 ? args.slice(0, 200) + '…' : args;
-  }
-  if (typeof args === 'object' && !Array.isArray(args)) {
-    const out = {};
-    for (const [k, v] of Object.entries(args)) {
-      out[k] = typeof v === 'string' && v.length > 200 ? v.slice(0, 200) + '…' : v;
-    }
-    return out;
-  }
-  return args;
-}
 
 function buildToolCallSection(label, text) {
   const section = document.createElement('div');
@@ -481,14 +467,12 @@ function buildToolCallEl(name, args, result) {
   details.hidden = true;
 
   if (args !== null && args !== undefined) {
-    const truncated = truncateArgs(args);
-    const argsText = typeof truncated === 'string' ? truncated : JSON.stringify(truncated, null, 2);
+    const argsText = typeof args === 'string' ? args : JSON.stringify(args, null, 2);
     details.appendChild(buildToolCallSection('args', argsText));
   }
 
   if (result !== null && result !== undefined) {
-    const resultText = result.length > 500 ? result.slice(0, 500) + '…' : result;
-    details.appendChild(buildToolCallSection('result', resultText));
+    details.appendChild(buildToolCallSection('result', result));
   }
 
   toggle.addEventListener('click', () => {
@@ -521,8 +505,8 @@ function buildMessage(msg) {
     const tcEl = document.createElement('div');
     tcEl.className = 'tool-calls';
     for (const ti of msg.tool_interactions) {
-      const truncated = truncateArgs(ti.args ?? null);
-      const argsText = truncated != null ? JSON.stringify(truncated, null, 2) : null;
+      const args = ti.args ?? null;
+      const argsText = args != null ? JSON.stringify(args, null, 2) : null;
       tcEl.appendChild(buildToolCallEl(ti.name, argsText, ti.result || null));
     }
     colEl.appendChild(tcEl);
