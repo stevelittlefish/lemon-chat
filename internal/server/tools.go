@@ -152,17 +152,37 @@ var toolRegistry = map[string]toolDef{
 		Type: "function",
 		Function: toolFunction{
 			Name:        "generate_image",
-			Description: "Generates an image using Stable Diffusion. Use to illustrate scenes, characters, or objects described in the story. Be descriptive — include art style, lighting, and mood. The generated image is automatically displayed in the chat — do not describe or embed the image in your text response.",
+			Description: "Generates an image using Stable Diffusion XL via ComfyUI. Use to illustrate scenes, characters, or objects. Be descriptive — include art style, lighting, and mood. The generated image is automatically displayed in the chat — do not describe or embed it in your text response.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
 					"prompt": map[string]any{
 						"type":        "string",
-						"description": "Detailed visual description of the image. Include subject, setting, art style, lighting, mood.",
+						"description": "Detailed visual description of the image. Include subject, setting, art style, lighting, and mood.",
 					},
 					"negative_prompt": map[string]any{
 						"type":        "string",
-						"description": "Things to exclude from the image (optional).",
+						"description": "Things to exclude from the image (e.g. 'blurry, low quality, extra limbs').",
+					},
+					"seed": map[string]any{
+						"type":        "integer",
+						"description": "Seed for reproducible results. Omit or set to 0 for a random seed.",
+					},
+					"cfg": map[string]any{
+						"type":        "number",
+						"description": "Classifier-free guidance scale. Higher values follow the prompt more strictly. Default: 7.0. Typical range: 5–12.",
+					},
+					"width": map[string]any{
+						"type":        "integer",
+						"description": "Image width in pixels. Default: 1024. Must be a multiple of 64. SDXL works best at ~1 megapixel total — recommended sizes: 1024×1024 (square), 1344×768 (16:9), 768×1344 (9:16), 1216×832 (3:2), 832×1216 (2:3), 1152×896 (4:3), 896×1152 (3:4).",
+					},
+					"height": map[string]any{
+						"type":        "integer",
+						"description": "Image height in pixels. Default: 1024. Must be a multiple of 64. See width description for recommended size combinations.",
+					},
+					"steps": map[string]any{
+						"type":        "integer",
+						"description": "Number of diffusion steps. Default: 25. More steps can improve quality but take longer. Typical range: 20–50.",
 					},
 				},
 				Required: []string{"prompt"},
@@ -467,8 +487,13 @@ var executors = map[string]func(string, ToolContext) (string, error){
 	},
 	"generate_image": func(argsJSON string, tctx ToolContext) (string, error) {
 		var args struct {
-			Prompt         string `json:"prompt"`
-			NegativePrompt string `json:"negative_prompt"`
+			Prompt         string  `json:"prompt"`
+			NegativePrompt string  `json:"negative_prompt"`
+			Seed           int64   `json:"seed"`
+			CFG            float64 `json:"cfg"`
+			Width          int     `json:"width"`
+			Height         int     `json:"height"`
+			Steps          int     `json:"steps"`
 		}
 		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 			return "", fmt.Errorf("invalid args: %w", err)
@@ -483,18 +508,43 @@ var executors = map[string]func(string, ToolContext) (string, error){
 			return "", fmt.Errorf("generate_image is not configured: add workflow = \"/path/to/workflow.json\" under [comfyui] in lemon.toml")
 		}
 
+		// Apply defaults.
+		seed := args.Seed
+		if seed <= 0 {
+			seed = rand.Int63()
+		}
+		cfg := args.CFG
+		if cfg <= 0 {
+			cfg = 7.0
+		}
+		width := args.Width
+		if width <= 0 {
+			width = 1024
+		}
+		height := args.Height
+		if height <= 0 {
+			height = 1024
+		}
+		steps := args.Steps
+		if steps <= 0 {
+			steps = 25
+		}
+
 		workflowData, err := os.ReadFile(tctx.ComfyUIWorkflow)
 		if err != nil {
 			return "", fmt.Errorf("generate_image: cannot read workflow file %q — check the workflow path in lemon.toml: %w", tctx.ComfyUIWorkflow, err)
 		}
 
-		// Replace placeholders: prompts use JSON-encoded strings; seed is a bare integer.
+		// Replace placeholders: prompts use JSON-encoded strings; numeric values are bare.
 		promptJSON, _ := json.Marshal(args.Prompt)
 		negJSON, _ := json.Marshal(args.NegativePrompt)
-		seed := rand.Int63()
 		workflowStr := strings.ReplaceAll(string(workflowData), `"__PROMPT__"`, string(promptJSON))
 		workflowStr = strings.ReplaceAll(workflowStr, `"__NEGATIVE_PROMPT__"`, string(negJSON))
 		workflowStr = strings.ReplaceAll(workflowStr, `__SEED__`, strconv.FormatInt(seed, 10))
+		workflowStr = strings.ReplaceAll(workflowStr, `__CFG__`, strconv.FormatFloat(cfg, 'f', -1, 64))
+		workflowStr = strings.ReplaceAll(workflowStr, `__WIDTH__`, strconv.Itoa(width))
+		workflowStr = strings.ReplaceAll(workflowStr, `__HEIGHT__`, strconv.Itoa(height))
+		workflowStr = strings.ReplaceAll(workflowStr, `__STEPS__`, strconv.Itoa(steps))
 
 		var workflow map[string]any
 		if err := json.Unmarshal([]byte(workflowStr), &workflow); err != nil {

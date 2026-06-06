@@ -22,8 +22,8 @@
   "4": {
     "class_type": "EmptyLatentImage",
     "inputs": {
-      "width": 1024,
-      "height": 1024,
+      "width": __WIDTH__,
+      "height": __HEIGHT__,
       "batch_size": 1
     }
   },
@@ -31,8 +31,8 @@
     "class_type": "KSampler",
     "inputs": {
       "seed": __SEED__,
-      "steps": 25,
-      "cfg": 7.0,
+      "steps": __STEPS__,
+      "cfg": __CFG__,
       "sampler_name": "euler",
       "scheduler": "karras",
       "denoise": 1.0,
