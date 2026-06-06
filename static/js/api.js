@@ -101,7 +101,7 @@ export const messages = {
           const payload = line.slice(6);
           if (payload === '[DONE]') { onDone?.(); return; }
           try {
-            const { delta, error, name, stats, message_id, tool_call, tool_result, attachment } = JSON.parse(payload);
+            const { delta, error, name, stats, message_id, tool_call, tool_result, attachment, new_turn } = JSON.parse(payload);
             if (error) { onError?.(new Error(error)); return; }
             if (name) onName?.(name);
             if (delta) onDelta?.(delta);
@@ -110,6 +110,7 @@ export const messages = {
             if (tool_call) onToolCall?.(tool_call);
             if (tool_result) onToolResult?.(tool_result);
             if (attachment) onAttachment?.(attachment);
+            if (new_turn) onNewTurn?.(new_turn);
           } catch { /* malformed chunk, skip */ }
         }
       }

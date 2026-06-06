@@ -123,21 +123,23 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Walk all messages, collecting tool interactions and attaching them to the
-	// visible assistant message that consumed them.
-	var pending []toolInteraction
-	pendingIdxByID := map[string]int{} // tool call ID → index in pending
+	// Walk messages: tool-result messages (role="tool") are hidden but their content
+	// is attached to the preceding assistant tool-call message. All other messages
+	// are shown as-is.
+	type pendingResult struct{ viewIdx, tiIdx int }
+	pendingByCallID := map[string]pendingResult{}
 	views := make([]msgView, 0, len(all))
 
 	for i := range all {
 		m := all[i]
 		if m.Role == "tool" {
-			if idx, ok := pendingIdxByID[m.ToolCallID]; ok {
-				pending[idx].Result = m.Content
+			if p, ok := pendingByCallID[m.ToolCallID]; ok {
+				views[p.viewIdx].ToolInteractions[p.tiIdx].Result = m.Content
 			}
 			continue
 		}
-		if m.Role == "assistant" && m.Content == "" && m.ToolCalls != nil {
+		mv := msgView{Message: m}
+		if m.ToolCalls != nil {
 			var tc []struct {
 				ID       string `json:"id"`
 				Function struct {
@@ -146,26 +148,19 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 				} `json:"function"`
 			}
 			if jsonErr := json.Unmarshal([]byte(*m.ToolCalls), &tc); jsonErr == nil {
-				for _, c := range tc {
+				viewIdx := len(views)
+				for tiIdx, c := range tc {
 					var argsVal any
 					json.Unmarshal([]byte(c.Function.Arguments), &argsVal) //nolint:errcheck
-					ti := toolInteraction{
+					mv.ToolInteractions = append(mv.ToolInteractions, toolInteraction{
 						ID:         c.ID,
 						Name:       c.Function.Name,
 						Args:       argsVal,
 						Attachment: attByCallID[c.ID],
-					}
-					pendingIdxByID[c.ID] = len(pending)
-					pending = append(pending, ti)
+					})
+					pendingByCallID[c.ID] = pendingResult{viewIdx, tiIdx}
 				}
 			}
-			continue
-		}
-		mv := msgView{Message: m}
-		if len(pending) > 0 {
-			mv.ToolInteractions = pending
-			pending = nil
-			pendingIdxByID = map[string]int{}
 		}
 		views = append(views, mv)
 	}
@@ -512,6 +507,11 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				}
 				chatMsgs = append(chatMsgs, chatMsg{Role: "tool", Content: result, ToolCallID: tc.id})
 			}
+
+			// Signal the frontend to start a new message bubble for the upcoming response.
+			newTurnEvt, _ := json.Marshal(map[string]any{"new_turn": map[string]any{"name": assistantName}})
+			fmt.Fprintf(w, "data: %s\n\n", newTurnEvt)
+			flusher.Flush()
 
 			if loop < maxToolLoops-1 {
 				continue

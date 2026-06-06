@@ -234,11 +234,7 @@ export function showPicker(models, characters, onSelect) {
 export function renderMessages(msgs) {
   threadEl.innerHTML = '';
   // Skip tool-protocol messages (role="tool" and tool-call-only assistant messages).
-  const visible = msgs.filter(m => {
-    if (m.role === 'tool') return false;
-    if (m.role === 'assistant' && !m.content && m.tool_calls) return false;
-    return true;
-  });
+  const visible = msgs.filter(m => m.role !== 'tool');
   if (!visible.length) {
     showEmpty();
     return;
@@ -348,7 +344,7 @@ export function startStreaming() {
     finish() {
       const shouldScroll = !userScrolledDuringStream;
       userScrolledDuringStream = false;
-      if (!accumulated && !hasImages) {
+      if (!accumulated && !hasImages && !toolCallsEl) {
         wrapper.remove();
         return;
       }
@@ -356,7 +352,7 @@ export function startStreaming() {
         contentEl.innerHTML = renderMarkdown(accumulated);
         colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId }, accumulated));
       } else {
-        // Images only — remove the empty typing-indicator contentEl, no footer needed.
+        // Tool calls / images only — remove the empty typing-indicator contentEl.
         contentEl.remove();
       }
       if (shouldScroll) scrollToBottom();
@@ -510,14 +506,6 @@ function buildMessage(msg) {
       tcEl.appendChild(buildToolCallEl(ti.name, argsText, ti.result || null));
     }
     colEl.appendChild(tcEl);
-  }
-
-  const contentEl = document.createElement('div');
-  contentEl.className = 'message-content';
-  contentEl.innerHTML = renderMarkdown(msg.content);
-  colEl.appendChild(contentEl);
-
-  if (msg.tool_interactions?.length) {
     for (const ti of msg.tool_interactions) {
       if (!ti.attachment) continue;
       if (ti.attachment.mime_type?.startsWith('image/')) {
@@ -526,6 +514,13 @@ function buildMessage(msg) {
         colEl.appendChild(buildAttachmentCard(ti.attachment));
       }
     }
+  }
+
+  if (msg.content) {
+    const contentEl = document.createElement('div');
+    contentEl.className = 'message-content';
+    contentEl.innerHTML = renderMarkdown(msg.content);
+    colEl.appendChild(contentEl);
   }
 
   colEl.appendChild(buildFooter(msg, msg.content));

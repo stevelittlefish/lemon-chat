@@ -219,7 +219,7 @@ async function sendMessage(content) {
   const convId = activeConversationId;
   activeHasMessages = true;
   thread.appendMessage('user', content, currentUser.display_name || 'you');
-  const stream = thread.startStreaming();
+  let stream = thread.startStreaming();
   composer.setStreaming(true);
 
   currentAbort = msgApi.send(convId, content, sel, {
@@ -230,6 +230,11 @@ async function sendMessage(content) {
     onToolCall: (tc) => stream.addToolCall(tc),
     onToolResult: (tr) => stream.updateToolCallResult(tr),
     onAttachment: (att) => stream.addAttachment(att),
+    onNewTurn: (info) => {
+      stream.finish();
+      stream = thread.startStreaming();
+      if (info?.name) stream.setName(info.name);
+    },
     onDone: () => {
       stream.finish();
       composer.setStreaming(false);
