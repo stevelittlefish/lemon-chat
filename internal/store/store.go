@@ -2,6 +2,8 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -366,6 +368,50 @@ func (s *Store) migrate() error {
 		}
 		version = 16
 		log.Println("store: migration v15 → v16 complete")
+	}
+
+	if version < 17 {
+		log.Println("store: migrating v16 → v17 (rename web_search to searxng in character tools)")
+		rows, err := s.db.Query(`SELECT id, tools FROM character WHERE tools IS NOT NULL AND tools LIKE '%web_search%'`)
+		if err != nil {
+			return err
+		}
+		type row struct {
+			id    int64
+			tools string
+		}
+		var toUpdate []row
+		for rows.Next() {
+			var r row
+			if err := rows.Scan(&r.id, &r.tools); err != nil {
+				rows.Close()
+				return err
+			}
+			toUpdate = append(toUpdate, r)
+		}
+		rows.Close()
+		log.Printf("store: migrating v16 → v17 — found %d character(s) with web_search in tools", len(toUpdate))
+		for _, r := range toUpdate {
+			var tools []string
+			if err := json.Unmarshal([]byte(r.tools), &tools); err != nil {
+				return fmt.Errorf("store: character id=%d has invalid tools JSON: %w", r.id, err)
+			}
+			for i, t := range tools {
+				if t == "web_search" {
+					tools[i] = "searxng"
+				}
+			}
+			b, _ := json.Marshal(tools)
+			if _, err := s.db.Exec(`UPDATE character SET tools = ? WHERE id = ?`, string(b), r.id); err != nil {
+				return err
+			}
+			log.Printf("store:   character id=%d tools updated to %s", r.id, string(b))
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (17, ?)`, now()); err != nil {
+			return err
+		}
+		version = 17
+		log.Println("store: migration v16 → v17 complete")
 	}
 
 	log.Printf("store: schema ready at version %d", version)

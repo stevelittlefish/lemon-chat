@@ -81,11 +81,11 @@ var toolRegistry = map[string]toolDef{
 			},
 		},
 	},
-	"web_search": {
+	"searxng": {
 		Type: "function",
 		Function: toolFunction{
-			Name:        "web_search",
-			Description: "Search the web using SearXNG and return the top results.",
+			Name:        "searxng",
+			Description: "Search the web via SearXNG and return the top results.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
@@ -413,7 +413,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		}
 		return summariseHTML(stripped, tctx.ModelName, tctx.ModelServer, tctx.ResponseTimeout)
 	},
-	"web_search": func(argsJSON string, tctx ToolContext) (string, error) {
+	"searxng": func(argsJSON string, tctx ToolContext) (string, error) {
 		var args struct {
 			Query      string `json:"query"`
 			MaxResults int    `json:"max_results"`
@@ -425,7 +425,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 			return "", fmt.Errorf("query is required")
 		}
 		if tctx.SearXNGURL == "" {
-			return "", fmt.Errorf("web_search is not configured (add [searxng] url to lemon.toml)")
+			return "", fmt.Errorf("searxng is not configured (add [searxng] url to lemon.toml)")
 		}
 		n := args.MaxResults
 		if n <= 0 {
@@ -786,7 +786,7 @@ type ToolMeta struct {
 var allTools []ToolMeta
 
 // InitTools builds the available tools list. Call once at server startup.
-// web_search and generate_image are always included; Configured is false when
+// searxng and generate_image are always included; Configured is false when
 // the required config is missing, and ConfigHint tells the user what to add.
 func InitTools(cfg *config.Config) {
 	allTools = []ToolMeta{
@@ -798,9 +798,9 @@ func InitTools(cfg *config.Config) {
 	searxngConfigured := cfg.SearXNG.URL != ""
 	searxngHint := ""
 	if !searxngConfigured {
-		searxngHint = "Add [searxng] url = \"http://…\" to lemon.toml to enable web search."
+		searxngHint = "Add [searxng] url = \"http://…\" to lemon.toml to enable SearXNG search."
 	}
-	allTools = append(allTools, ToolMeta{"web_search", "Web search", "Searches the web using SearXNG and returns the top results.", searxngConfigured, searxngHint})
+	allTools = append(allTools, ToolMeta{"searxng", "SearXNG", "Searches the web via SearXNG and returns the top results.", searxngConfigured, searxngHint})
 
 	comfyConfigured := cfg.ComfyUI.URL != "" && cfg.ComfyUI.Workflow != ""
 	comfyHint := ""
