@@ -470,6 +470,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 					ToolCallID:      tc.id,
 					ConversationID:  convID,
 					Store:           s.store,
+					DataDir:         s.cfg.Server.DataDir,
 				}
 				result, execErr := ExecuteTool(tc.name, tc.argsJSON.String(), tctx)
 				if execErr != nil {

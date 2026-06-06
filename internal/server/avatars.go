@@ -21,7 +21,7 @@ import (
 const avatarSize = 256
 
 func (s *Server) avatarDir() string {
-	return filepath.Join(filepath.Dir(s.cfg.Server.DBPath), "avatars")
+	return filepath.Join(s.cfg.Server.DataDir, "avatars")
 }
 
 // mimeFromFilename returns the MIME type for a filename. receiveAvatar always

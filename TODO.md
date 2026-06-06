@@ -47,10 +47,10 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] **`ForkConversation` drops `tool_calls` and `tool_call_id`** (`internal/store/conversations.go:162`)
   The fork SELECT and INSERT both omit `tool_calls` and `tool_call_id` columns. Forking a conversation that used tools produces messages where the assistant's tool-call fields are NULL and tool-result messages have no `tool_call_id`, making the forked history malformed when the model is asked to continue.
 
-- [ ] **`DeleteConversation` doesn't clean up attachments** (`internal/store/conversations.go:66`)
+- [x] **`DeleteConversation` doesn't clean up attachments** (`internal/store/conversations.go:66`)
   The transaction deletes messages then the conversation, but the `attachment` table references `conversation_id` with no `ON DELETE CASCADE`. Attachment DB rows and files in `data/attachments/` are never cleaned up when a conversation is deleted. This is a permanent disk and DB leak.
 
-- [ ] **Attachment directory is relative to working directory** (`internal/server/tools.go:242`)
+- [x] **Attachment directory is relative to working directory** (`internal/server/tools.go:242`)
   `filepath.Join("data", "attachments", randomID())` is resolved relative to the process working directory. The avatar directory correctly anchors to the DB path (`filepath.Join(filepath.Dir(s.cfg.Server.DBPath), "avatars")`). Attachment paths should use the same anchor, otherwise files are written to (and served from) the wrong place if the server is not started from the project root.
 
 - [x] **Finish completions UI: auto-save content and sync model picker on load** (`static/js/complete-app.js:244,352`)

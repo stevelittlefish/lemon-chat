@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
@@ -132,12 +134,16 @@ func (s *Server) handleDeleteConversation(w http.ResponseWriter, r *http.Request
 		return
 	}
 	log.Printf("Deleting conversation id=%d user_id=%d", id, user.ID)
-	if err := s.store.DeleteConversation(id, user.ID); errors.Is(err, store.ErrNotFound) {
+	attPaths, err := s.store.DeleteConversation(id, user.ID)
+	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	} else if err != nil {
 		internalError(w, err)
 		return
+	}
+	for _, p := range attPaths {
+		os.RemoveAll(filepath.Join(s.cfg.Server.DataDir, filepath.Dir(p)))
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

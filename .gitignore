@@ -5,4 +5,4 @@ lemon.db-wal
 /lemon-chat
 docker-compose.override.yml
 data/
-/avatars
+/docker_data

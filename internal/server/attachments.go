@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"path/filepath"
 	"strconv"
 )
 
@@ -30,5 +31,5 @@ func (s *Server) handleGetAttachment(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", `inline; filename="`+att.Filename+`"`)
 	}
 	w.Header().Set("Content-Type", att.MimeType)
-	http.ServeFile(w, r, att.DiskPath)
+	http.ServeFile(w, r, filepath.Join(s.cfg.Server.DataDir, att.DiskPath))
 }

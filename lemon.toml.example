@@ -1,6 +1,6 @@
 [server]
-port    = 8080
-db_path = "lemon.db"
+port     = 8080
+data_dir = "."    # directory for lemon.db, avatars, attachments (relative or absolute)
 
 # The model used for background tasks (e.g. auto-title generation).
 # Must match the name of one of the [[model]] entries below.

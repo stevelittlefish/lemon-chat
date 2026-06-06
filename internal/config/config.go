@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -29,6 +30,7 @@ type ComfyUI struct {
 
 type Server struct {
 	Port                   int    `toml:"port"`
+	DataDir                string `toml:"data_dir"`
 	DBPath                 string `toml:"db_path"`
 	Debug                  bool   `toml:"debug"`
 	DefaultModel           string `toml:"default_model"`
@@ -73,7 +75,7 @@ func Load(path string) (*Config, error) {
 	cfg := &Config{
 		Server: Server{
 			Port:                   8080,
-			DBPath:                 "lemon.db",
+			DataDir:                ".",
 			DialTimeoutSeconds:     10,
 			ResponseTimeoutSeconds: 600,
 			MaxToolLoops:           5,
@@ -92,6 +94,10 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyEnv(cfg)
+
+	if cfg.Server.DBPath == "" {
+		cfg.Server.DBPath = filepath.Join(cfg.Server.DataDir, "lemon.db")
+	}
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -141,6 +147,9 @@ func applyEnv(cfg *Config) {
 		if port, err := strconv.Atoi(v); err == nil {
 			cfg.Server.Port = port
 		}
+	}
+	if v := os.Getenv("LEMON_DATA_DIR"); v != "" {
+		cfg.Server.DataDir = v
 	}
 	if v := os.Getenv("LEMON_DB_PATH"); v != "" {
 		cfg.Server.DBPath = v

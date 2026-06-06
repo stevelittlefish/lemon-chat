@@ -63,30 +63,58 @@ func (s *Store) CreateConversation(userID int64, title *string, model *string, c
 	return &Conversation{ID: id, UserID: userID, Model: model, CharacterID: characterID, Title: title, CreatedAt: t, UpdatedAt: t}, nil
 }
 
-func (s *Store) DeleteConversation(id, userID int64) error {
+// DeleteConversation removes the conversation and all its messages and attachment
+// records. It returns the relative attachment disk paths (relative to DataDir) so
+// the caller can remove the files from disk after a successful return.
+func (s *Store) DeleteConversation(id, userID int64) (attachmentPaths []string, err error) {
 	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer tx.Rollback()
 
 	// Check ownership before touching anything.
 	var count int
 	if err := tx.QueryRow(`SELECT COUNT(*) FROM conversation WHERE id = ? AND user_id = ?`, id, userID).Scan(&count); err != nil {
-		return err
+		return nil, err
 	}
 	if count == 0 {
-		return ErrNotFound
+		return nil, ErrNotFound
 	}
 
+	// Collect attachment disk paths before deleting rows.
+	attRows, err := tx.Query(`SELECT disk_path FROM attachment WHERE conversation_id = ?`, id)
+	if err != nil {
+		return nil, err
+	}
+	for attRows.Next() {
+		var p string
+		if err := attRows.Scan(&p); err != nil {
+			attRows.Close()
+			return nil, err
+		}
+		attachmentPaths = append(attachmentPaths, p)
+	}
+	attRows.Close()
+	if err := attRows.Err(); err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.Exec(`DELETE FROM attachment WHERE conversation_id = ?`, id); err != nil {
+		return nil, err
+	}
 	// Messages must go before the conversation to satisfy the FK constraint.
 	if _, err := tx.Exec(`DELETE FROM message WHERE conversation_id = ?`, id); err != nil {
-		return err
+		return nil, err
 	}
 	if _, err := tx.Exec(`DELETE FROM conversation WHERE id = ?`, id); err != nil {
-		return err
+		return nil, err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return attachmentPaths, nil
 }
 
 func (s *Store) TouchConversation(id int64) error {

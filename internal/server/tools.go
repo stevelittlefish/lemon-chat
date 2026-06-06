@@ -52,6 +52,7 @@ type ToolContext struct {
 	ToolCallID     string
 	ConversationID int64
 	Store          *store.Store
+	DataDir        string
 }
 
 var toolRegistry = map[string]toolDef{
@@ -239,14 +240,15 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		// Sanitise filename: strip any path components.
 		args.Filename = filepath.Base(args.Filename)
 
-		dir := filepath.Join("data", "attachments", randomID())
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		relDir := filepath.Join("attachments", randomID())
+		absDir := filepath.Join(tctx.DataDir, relDir)
+		if err := os.MkdirAll(absDir, 0755); err != nil {
 			return "", fmt.Errorf("server error: could not create storage directory (%w) — tell the user the document could not be saved due to a server storage problem", err)
 		}
-		diskPath := filepath.Join(dir, args.Filename)
-		if err := os.WriteFile(diskPath, []byte(args.Content), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(absDir, args.Filename), []byte(args.Content), 0644); err != nil {
 			return "", fmt.Errorf("server error: could not write document to disk (%w) — tell the user the document could not be saved due to a server storage problem", err)
 		}
+		diskPath := filepath.Join(relDir, args.Filename)
 
 		mimeType := mimeTypeForFilename(args.Filename)
 		log.Printf("Creating document attachment title=%q filename=%q conversation_id=%d", args.Title, args.Filename, tctx.ConversationID)
@@ -604,14 +606,15 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		imgData, _ := io.ReadAll(dlResp.Body)
 		dlResp.Body.Close()
 
-		dir := filepath.Join("data", "attachments", randomID())
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		relDir := filepath.Join("attachments", randomID())
+		absDir := filepath.Join(tctx.DataDir, relDir)
+		if err := os.MkdirAll(absDir, 0755); err != nil {
 			return "", fmt.Errorf("server error: could not create storage directory (%w) — tell the user the image was generated but could not be saved due to a server storage problem", err)
 		}
-		diskPath := filepath.Join(dir, "image.png")
-		if err := os.WriteFile(diskPath, imgData, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(absDir, "image.png"), imgData, 0644); err != nil {
 			return "", fmt.Errorf("server error: could not write image to disk (%w) — tell the user the image was generated but could not be saved due to a server storage problem", err)
 		}
+		diskPath := filepath.Join(relDir, "image.png")
 
 		att, err := tctx.Store.CreateAttachment(tctx.ToolCallID, tctx.ConversationID, "Generated image", "image.png", "image/png", diskPath)
 		if err != nil {
