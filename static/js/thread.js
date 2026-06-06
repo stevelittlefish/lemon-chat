@@ -70,13 +70,17 @@ function buildImagePlaceholder() {
 }
 
 let lightbox = null;
-let savedHistoryState = null;
+let lightboxClosing = false;
 
 function isLightboxOpen() {
   return lightbox !== null && lightbox.classList.contains('is-open');
 }
 
 export function closeLightboxIfOpen() {
+  if (lightboxClosing) {
+    lightboxClosing = false;
+    return true;
+  }
   if (!isLightboxOpen()) return false;
   lightbox.classList.remove('is-open');
   return true;
@@ -110,7 +114,6 @@ function openLightbox(src, alt) {
 
   lightbox.querySelector('img').src = src;
   lightbox.querySelector('img').alt = alt;
-  savedHistoryState = history.state;
   lightbox.classList.add('is-open');
   history.pushState({ lightbox: true }, '');
 }
@@ -119,8 +122,8 @@ function closeLightbox() {
   if (!isLightboxOpen()) return;
   lightbox.classList.remove('is-open');
   if (history.state?.lightbox) {
-    history.replaceState(savedHistoryState, '');
-    savedHistoryState = null;
+    lightboxClosing = true;
+    history.back();
   }
 }
 
