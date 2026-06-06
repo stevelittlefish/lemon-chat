@@ -44,7 +44,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## High priority
 
-- [ ] **`ForkConversation` drops `tool_calls` and `tool_call_id`** (`internal/store/conversations.go:162`)
+- [x] **`ForkConversation` drops `tool_calls` and `tool_call_id`** (`internal/store/conversations.go:162`)
   The fork SELECT and INSERT both omit `tool_calls` and `tool_call_id` columns. Forking a conversation that used tools produces messages where the assistant's tool-call fields are NULL and tool-result messages have no `tool_call_id`, making the forked history malformed when the model is asked to continue.
 
 - [x] **`DeleteConversation` doesn't clean up attachments** (`internal/store/conversations.go:66`)

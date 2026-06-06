@@ -185,10 +185,12 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 		promptTokens     *int64
 		completionTokens *int64
 		totalTimeMS      *int64
+		toolCalls        *string
+		toolCallID       *string
 	}
 
 	rows, err := s.db.Query(
-		`SELECT role, content, name, character_id, prompt_tokens, completion_tokens, total_time_ms
+		`SELECT role, content, name, character_id, prompt_tokens, completion_tokens, total_time_ms, tool_calls, tool_call_id
 		 FROM message WHERE conversation_id = ? AND id <= ? ORDER BY created_at ASC`,
 		sourceConvID, untilMessageID,
 	)
@@ -198,7 +200,7 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 	var msgRows []msgRow
 	for rows.Next() {
 		var m msgRow
-		if err := rows.Scan(&m.role, &m.content, &m.name, &m.charID, &m.promptTokens, &m.completionTokens, &m.totalTimeMS); err != nil {
+		if err := rows.Scan(&m.role, &m.content, &m.name, &m.charID, &m.promptTokens, &m.completionTokens, &m.totalTimeMS, &m.toolCalls, &m.toolCallID); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -206,6 +208,36 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	type attRow struct {
+		toolCallID, title, filename, mimeType, diskPath, createdAt string
+	}
+	attRows, err := s.db.Query(
+		`SELECT tool_call_id, title, filename, mime_type, disk_path, created_at
+		 FROM attachment
+		 WHERE conversation_id = ?
+		 AND tool_call_id IN (
+		     SELECT tool_call_id FROM message
+		     WHERE conversation_id = ? AND id <= ? AND tool_call_id IS NOT NULL AND tool_call_id != ''
+		 )`,
+		sourceConvID, sourceConvID, untilMessageID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	var atts []attRow
+	for attRows.Next() {
+		var a attRow
+		if err := attRows.Scan(&a.toolCallID, &a.title, &a.filename, &a.mimeType, &a.diskPath, &a.createdAt); err != nil {
+			attRows.Close()
+			return nil, err
+		}
+		atts = append(atts, a)
+	}
+	attRows.Close()
+	if err := attRows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -228,9 +260,19 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 
 	for _, m := range msgRows {
 		if _, err := tx.Exec(
-			`INSERT INTO message (conversation_id, role, content, name, character_id, created_at, prompt_tokens, completion_tokens, total_time_ms)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			newConv.ID, m.role, m.content, m.name, m.charID, t, m.promptTokens, m.completionTokens, m.totalTimeMS,
+			`INSERT INTO message (conversation_id, role, content, name, character_id, created_at, prompt_tokens, completion_tokens, total_time_ms, tool_calls, tool_call_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			newConv.ID, m.role, m.content, m.name, m.charID, t, m.promptTokens, m.completionTokens, m.totalTimeMS, m.toolCalls, m.toolCallID,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, a := range atts {
+		if _, err := tx.Exec(
+			`INSERT INTO attachment (tool_call_id, conversation_id, title, filename, mime_type, disk_path, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			a.toolCallID, newConv.ID, a.title, a.filename, a.mimeType, a.diskPath, a.createdAt,
 		); err != nil {
 			return nil, err
 		}
