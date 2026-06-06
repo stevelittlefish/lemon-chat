@@ -347,8 +347,23 @@ export function showPicker(models, characters, onSelect) {
 
 export function renderMessages(msgs) {
   threadEl.innerHTML = '';
-  // Skip tool-protocol messages (role="tool" and tool-call-only assistant messages).
-  const visible = msgs.filter(m => m.role !== 'tool');
+  // Skip role="tool" messages (merged into tool_interactions by the server).
+  // Merge consecutive tool-call-only assistant messages into one bubble to match streaming.
+  const visible = [];
+  for (const msg of msgs) {
+    if (msg.role === 'tool') continue;
+    if (msg.role === 'assistant' && !msg.content && msg.tool_interactions?.length && visible.length > 0) {
+      const last = visible[visible.length - 1];
+      if (last.role === 'assistant') {
+        visible[visible.length - 1] = {
+          ...last,
+          tool_interactions: [...(last.tool_interactions || []), ...msg.tool_interactions],
+        };
+        continue;
+      }
+    }
+    visible.push(msg);
+  }
   if (!visible.length) {
     showEmpty();
     return;
@@ -422,14 +437,23 @@ export function startStreaming() {
       if (!toolCallsEl) {
         toolCallsEl = document.createElement('div');
         toolCallsEl.className = 'tool-calls';
-        colEl.insertBefore(toolCallsEl, contentEl);
+        // If text has already streamed, place tool calls after the content element.
+        if (accumulated) {
+          colEl.appendChild(toolCallsEl);
+        } else {
+          colEl.insertBefore(toolCallsEl, contentEl);
+        }
       }
       const el = buildToolCallEl(toolCall.name, toolCall.args ?? null, null);
       if (toolCall.id) toolCallEls.set(toolCall.id, el);
       toolCallsEl.appendChild(el);
       if (toolCall.name === 'generate_image' && toolCall.id) {
         const placeholder = buildImagePlaceholder();
-        colEl.insertBefore(placeholder, contentEl);
+        if (accumulated) {
+          colEl.appendChild(placeholder);
+        } else {
+          colEl.insertBefore(placeholder, contentEl);
+        }
         pendingImages.set(toolCall.id, placeholder);
       }
       if (!userScrolledDuringStream) scrollToBottom();
@@ -611,6 +635,13 @@ function buildMessage(msg) {
   roleEl.textContent = msg.role === 'user' ? (msg.name || 'you') : (msg.name || msg.role);
   colEl.appendChild(roleEl);
 
+  if (msg.content) {
+    const contentEl = document.createElement('div');
+    contentEl.className = 'message-content';
+    contentEl.innerHTML = renderMarkdown(msg.content);
+    colEl.appendChild(contentEl);
+  }
+
   if (msg.tool_interactions?.length) {
     const tcEl = document.createElement('div');
     tcEl.className = 'tool-calls';
@@ -628,13 +659,6 @@ function buildMessage(msg) {
         colEl.appendChild(buildAttachmentCard(ti.attachment));
       }
     }
-  }
-
-  if (msg.content) {
-    const contentEl = document.createElement('div');
-    contentEl.className = 'message-content';
-    contentEl.innerHTML = renderMarkdown(msg.content);
-    colEl.appendChild(contentEl);
   }
 
   colEl.appendChild(buildFooter(msg, msg.content));

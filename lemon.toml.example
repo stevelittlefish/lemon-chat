@@ -18,6 +18,10 @@ max_tool_loops = 5
 # Enable verbose debug logging (title worker, trigger conditions, HTTP responses).
 # debug = true
 
+# Log every raw SSE token from the model to <data_dir>/model_tokens.log.
+# Useful for diagnosing streaming issues. Also available as --token-log flag.
+# token_log = true
+
 # Bootstrap: runs once on first start when the DB has no users.
 # Ignored once any user exists in the database.
 # Override with env vars: LEMON_ADMIN_USERNAME, LEMON_ADMIN_PASSWORD

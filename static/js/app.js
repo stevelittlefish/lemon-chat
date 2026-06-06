@@ -222,22 +222,37 @@ async function sendMessage(content) {
   thread.appendMessage('user', content, currentUser.display_name || 'you');
   let stream = thread.startStreaming();
   composer.setStreaming(true);
+  let streamHasToolCalls = false;
+  let currentTurnName = null;
 
   currentAbort = msgApi.send(convId, content, sel, {
-    onName: (name) => stream.setName(name),
-    onDelta: (delta) => stream.append(delta),
+    onName: (name) => {
+      currentTurnName = name;
+      stream.setName(name);
+    },
+    onDelta: (delta) => {
+      if (streamHasToolCalls) {
+        stream.finish();
+        stream = thread.startStreaming();
+        if (currentTurnName) stream.setName(currentTurnName);
+        streamHasToolCalls = false;
+      }
+      stream.append(delta);
+    },
     onStats: (stats) => stream.setStats(stats),
     onMessageId: (id) => stream.setMessageId(id),
-    onToolCall: (tc) => stream.addToolCall(tc),
+    onToolCall: (tc) => {
+      streamHasToolCalls = true;
+      stream.addToolCall(tc);
+    },
     onToolResult: (tr) => stream.updateToolCallResult(tr),
     onAttachment: (att) => stream.addAttachment(att),
     onNewTurn: (info) => {
-      stream.finish();
-      stream = thread.startStreaming();
-      if (info?.name) stream.setName(info.name);
+      if (info?.name) currentTurnName = info.name;
     },
     onDone: () => {
       stream.finish();
+      streamHasToolCalls = false;
       composer.setStreaming(false);
       currentAbort = null;
       sidebar.updateItem(convId, {
@@ -247,11 +262,13 @@ async function sendMessage(content) {
     },
     onAborted: () => {
       stream.truncate();
+      streamHasToolCalls = false;
       composer.setStreaming(false);
       currentAbort = null;
     },
     onError: (err) => {
       stream.error('something went wrong — ' + err.message);
+      streamHasToolCalls = false;
       composer.setStreaming(false);
       currentAbort = null;
     },

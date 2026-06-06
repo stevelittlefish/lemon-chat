@@ -9,6 +9,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -263,7 +265,6 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			var tc []any
 			if jsonErr := json.Unmarshal([]byte(*m.ToolCalls), &tc); jsonErr == nil {
 				msg.ToolCalls = tc
-				msg.Content = ""
 			}
 		}
 		if m.ToolCallID != "" {
@@ -309,6 +310,18 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return s.modelClient.Do(hreq)
 	}
 
+	var tokenLog *os.File
+	if s.cfg.Server.TokenLog {
+		logPath := filepath.Join(s.cfg.Server.DataDir, "model_tokens.log")
+		if f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			tokenLog = f
+			defer tokenLog.Close()
+			fmt.Fprintf(tokenLog, "\n=== conv=%d model=%s time=%s ===\n", convID, modelName, time.Now().Format(time.RFC3339))
+		} else {
+			log.Printf("token log: could not open %s: %v", logPath, err)
+		}
+	}
+
 	startTime := time.Now()
 	resp, err := doRequest()
 	if err != nil {
@@ -349,6 +362,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		scanner.Buffer(make([]byte, 1<<20), 1<<20)
 		for scanner.Scan() {
 			line := scanner.Text()
+			if tokenLog != nil && strings.HasPrefix(line, "data: ") {
+				fmt.Fprintf(tokenLog, "[loop=%d] %s\n", loop, line)
+			}
 			if !strings.HasPrefix(line, "data: ") {
 				continue
 			}
@@ -418,7 +434,8 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		resp.Body.Close()
 
 		if finishReason == "tool_calls" && len(pendingCalls) > 0 {
-			// Persist the assistant tool-call message (role=assistant, content="").
+			// Persist the assistant tool-call message, preserving any text the model
+			// produced before the tool call in the same turn.
 			type tcRecord struct {
 				ID       string `json:"id"`
 				Type     string `json:"type"`
@@ -436,12 +453,13 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			}
 			toolCallsJSON, _ := json.Marshal(records)
 			toolCallsStr := string(toolCallsJSON)
-			if _, err := s.store.CreateMessage(convID, "assistant", "", usedCharacterID, &assistantName, nil, &toolCallsStr, ""); err != nil {
+			turnContent := fullContent.String()
+			if _, err := s.store.CreateMessage(convID, "assistant", turnContent, usedCharacterID, &assistantName, nil, &toolCallsStr, ""); err != nil {
 				log.Printf("messages: failed to persist tool-call message for conv %d: %v", convID, err)
 			}
 			var tc2 []any
 			json.Unmarshal(toolCallsJSON, &tc2) //nolint:errcheck
-			chatMsgs = append(chatMsgs, chatMsg{Role: "assistant", ToolCalls: tc2})
+			chatMsgs = append(chatMsgs, chatMsg{Role: "assistant", Content: turnContent, ToolCalls: tc2})
 
 			// Execute each tool and persist the result.
 			for _, tc := range pendingCalls {
@@ -654,7 +672,6 @@ func (s *Server) handleGetMessageContext(w http.ResponseWriter, r *http.Request)
 			var tc []any
 			if jsonErr := json.Unmarshal([]byte(*m.ToolCalls), &tc); jsonErr == nil {
 				msg.ToolCalls = tc
-				msg.Content = ""
 			}
 		}
 		if m.ToolCallID != "" {

@@ -235,6 +235,21 @@ store: DeleteOrphanedMessages — deleted 3 message(s) successfully
 
 **Debug logging.** Use `debug.Log()` from `internal/debug` for output that is only useful during development (e.g. title-worker trigger conditions, raw HTTP responses from model servers). `debug.Log` is a no-op unless `debug = true` is set in `lemon.toml`. Never use `debug.Log` for things that should always be visible — use `log.Printf` for those.
 
+## Debugging flags
+
+Two flags are available for diagnosing runtime issues. Both can be set in `lemon.toml` or passed as CLI flags (the flag overrides the config value):
+
+| Flag | TOML key | Description |
+|---|---|---|
+| `--debug` | `debug = true` | Enables `debug.Log()` output — title-worker conditions, HTTP details |
+| `--token-log` | `token_log = true` | Writes every raw SSE token from the model to `<data_dir>/model_tokens.log`, prefixed with `[loop=N]`. Useful for diagnosing streaming/rendering inconsistencies. |
+
+The token log appends to the file on each request and includes a header line:
+```
+=== conv=42 model=llama3.2 time=2026-01-01T12:00:00+00:00 ===
+[loop=0] data: {"choices":[{"delta":{"content":"Hello"},...}]}
+```
+
 ## Keeping TODO.md current
 
 Update `TODO.md` as work progresses — mark items `[~]` when started and `[x]` when done. When adding new work that isn't already listed, add it to the relevant section before starting. Don't leave TODO.md stale.

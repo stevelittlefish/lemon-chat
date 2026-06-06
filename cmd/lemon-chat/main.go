@@ -21,6 +21,7 @@ import (
 func main() {
 	cfgPath := flag.String("config", "lemon.toml", "path to config file")
 	debugFlag := flag.Bool("debug", false, "enable debug mode (overrides config)")
+	tokenLogFlag := flag.Bool("token-log", false, "log raw model SSE tokens to <data_dir>/model_tokens.log (overrides config)")
 	listModelsFlag := flag.Bool("list-models", false, "list models from all configured model servers and exit")
 	flag.Parse()
 
@@ -30,6 +31,10 @@ func main() {
 	}
 
 	debug.Enabled = cfg.Server.Debug || *debugFlag
+	cfg.Server.TokenLog = cfg.Server.TokenLog || *tokenLogFlag
+	if cfg.Server.TokenLog {
+		log.Printf("token log enabled — writing to %s/model_tokens.log", cfg.Server.DataDir)
+	}
 
 	if *listModelsFlag {
 		listModels(cfg)

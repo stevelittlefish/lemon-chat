@@ -33,6 +33,7 @@ type Server struct {
 	DataDir                string `toml:"data_dir"`
 	DBPath                 string `toml:"db_path"`
 	Debug                  bool   `toml:"debug"`
+	TokenLog               bool   `toml:"token_log"`
 	DefaultModel           string `toml:"default_model"`
 	DialTimeoutSeconds     int    `toml:"dial_timeout_seconds"`
 	ResponseTimeoutSeconds int    `toml:"response_timeout_seconds"`
