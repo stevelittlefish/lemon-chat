@@ -13,7 +13,6 @@ const artifactPanelClose = document.getElementById('artifact-panel-close');
 const artifactPanelBody = document.getElementById('artifact-panel-body');
 const appEl = document.getElementById('app');
 
-artifactPanelClose.innerHTML = icon('x', 14);
 artifactPanelClose.addEventListener('click', closeArtifactPanel);
 
 export function closeArtifactPanel() {
