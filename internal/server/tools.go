@@ -40,13 +40,13 @@ var toolRegistry = map[string]toolDef{
 		Type: "function",
 		Function: toolFunction{
 			Name:        "roll_dice",
-			Description: "Rolls dice using standard notation (e.g. 2d6, 1d20). Returns each die result and the total.",
+			Description: "Rolls dice using standard notation (e.g. 2d6, d20, 2d6+4, d20-5). Returns each die result and the total.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
 					"notation": map[string]any{
 						"type":        "string",
-						"description": "Dice notation in NdM format, e.g. '2d6' for two six-sided dice.",
+						"description": "Dice notation, e.g. '2d6', 'd20', '2d6+4', 'd20-5'. Count is optional (omit for 1 die).",
 					},
 				},
 				Required: []string{"notation"},
@@ -78,32 +78,60 @@ var executors = map[string]func(string) (string, error){
 		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 			return "", fmt.Errorf("invalid args: %w", err)
 		}
-		parts := strings.SplitN(strings.ToLower(args.Notation), "d", 2)
-		if len(parts) != 2 {
+		halves := strings.SplitN(strings.ToLower(args.Notation), "d", 2)
+		if len(halves) != 2 {
 			return "", fmt.Errorf("invalid dice notation: %q", args.Notation)
 		}
-		count, err := strconv.Atoi(parts[0])
-		if err != nil || count < 1 || count > 100 {
-			return "", fmt.Errorf("invalid dice count: %q", parts[0])
+
+		// Empty prefix means 1 die (e.g. "d20")
+		count := 1
+		if halves[0] != "" {
+			var err error
+			count, err = strconv.Atoi(halves[0])
+			if err != nil || count < 1 || count > 100 {
+				return "", fmt.Errorf("invalid dice count: %q", halves[0])
+			}
 		}
-		sides, err := strconv.Atoi(parts[1])
+
+		// Right part may include a modifier: "6", "6+4", "20-5"
+		right := halves[1]
+		modifier := 0
+		sidesStr := right
+		if idx := strings.IndexAny(right, "+-"); idx != -1 {
+			var err error
+			modifier, err = strconv.Atoi(right[idx:])
+			if err != nil {
+				return "", fmt.Errorf("invalid modifier: %q", right[idx:])
+			}
+			sidesStr = right[:idx]
+		}
+		sides, err := strconv.Atoi(sidesStr)
 		if err != nil || sides < 2 || sides > 10000 {
-			return "", fmt.Errorf("invalid die sides: %q", parts[1])
+			return "", fmt.Errorf("invalid die sides: %q", sidesStr)
 		}
+
 		rolls := make([]int, count)
-		total := 0
+		diceTotal := 0
 		for i := range rolls {
 			rolls[i] = rand.Intn(sides) + 1
-			total += rolls[i]
+			diceTotal += rolls[i]
 		}
-		if count == 1 {
+		total := diceTotal + modifier
+
+		rollStrs := make([]string, count)
+		for i, v := range rolls {
+			rollStrs[i] = strconv.Itoa(v)
+		}
+		rollExpr := strings.Join(rollStrs, " + ")
+
+		if modifier > 0 {
+			return fmt.Sprintf("Rolled %s: %s + %d = %d", args.Notation, rollExpr, modifier, total), nil
+		} else if modifier < 0 {
+			return fmt.Sprintf("Rolled %s: %s - %d = %d", args.Notation, rollExpr, -modifier, total), nil
+		} else if count == 1 {
 			return fmt.Sprintf("Rolled %s: %d", args.Notation, rolls[0]), nil
 		}
-		parts2 := make([]string, count)
-		for i, v := range rolls {
-			parts2[i] = strconv.Itoa(v)
-		}
-		return fmt.Sprintf("Rolled %s: %s = %d", args.Notation, strings.Join(parts2, " + "), total), nil
+		return fmt.Sprintf("Rolled %s: %s = %d", args.Notation, rollExpr, total), nil
 	},
 }
 
