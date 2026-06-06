@@ -421,6 +421,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 			// Execute each tool and persist the result.
 			for _, tc := range pendingCalls {
+				log.Printf("Calling tool name=%q args=%s conversation_id=%d", tc.name, tc.argsJSON.String(), convID)
 				var argsVal any
 				json.Unmarshal([]byte(tc.argsJSON.String()), &argsVal) //nolint:errcheck
 				evtJSON, _ := json.Marshal(map[string]any{"tool_call": map[string]any{
@@ -435,6 +436,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				if execErr != nil {
 					result = "error: " + execErr.Error()
 				}
+				log.Printf("Tool result name=%q conversation_id=%d result=%q", tc.name, convID, result)
 
 				resultEvt, _ := json.Marshal(map[string]any{"tool_result": map[string]any{
 					"id":     tc.id,
