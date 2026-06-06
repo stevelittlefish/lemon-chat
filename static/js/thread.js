@@ -71,6 +71,8 @@ function buildImagePlaceholder() {
 
 let lightbox = null;
 let lightboxClosing = false;
+let lightboxImages = [];
+let lightboxIndex = 0;
 
 function isLightboxOpen() {
   return lightbox !== null && lightbox.classList.contains('is-open');
@@ -86,7 +88,19 @@ export function closeLightboxIfOpen() {
   return true;
 }
 
-function openLightbox(src, alt) {
+function lightboxShow(index) {
+  lightboxIndex = index;
+  const { src, alt } = lightboxImages[index];
+  lightbox.querySelector('.image-lightbox-img').src = src;
+  lightbox.querySelector('.image-lightbox-img').alt = alt;
+  lightbox.querySelector('.image-lightbox-prev').disabled = index === 0;
+  lightbox.querySelector('.image-lightbox-next').disabled = index === lightboxImages.length - 1;
+  const nav = lightbox.querySelector('.image-lightbox-nav');
+  nav.classList.toggle('is-visible', lightboxImages.length >= 2);
+  lightbox.querySelector('.image-lightbox-counter').textContent = `${index + 1} / ${lightboxImages.length}`;
+}
+
+function openLightbox(clickedSrc) {
   if (!lightbox) {
     lightbox = document.createElement('div');
     lightbox.className = 'image-lightbox';
@@ -99,21 +113,62 @@ function openLightbox(src, alt) {
     closeBtn.innerHTML = icon('x', 18);
     closeBtn.addEventListener('click', e => { e.stopPropagation(); closeLightbox(); });
 
+    const body = document.createElement('div');
+    body.className = 'image-lightbox-body';
+    body.addEventListener('click', closeLightbox);
+
     const lbImg = document.createElement('img');
+    lbImg.className = 'image-lightbox-img';
     lbImg.addEventListener('click', e => e.stopPropagation());
 
+    body.appendChild(lbImg);
+
+    const nav = document.createElement('div');
+    nav.className = 'image-lightbox-nav';
+    nav.addEventListener('click', e => e.stopPropagation());
+
+    const inner = document.createElement('div');
+    inner.className = 'image-lightbox-nav-inner';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'image-lightbox-prev';
+    prevBtn.setAttribute('aria-label', 'Previous image');
+    prevBtn.innerHTML = icon('chevron-left', 22);
+    prevBtn.addEventListener('click', () => lightboxShow(lightboxIndex - 1));
+
+    const counter = document.createElement('span');
+    counter.className = 'image-lightbox-counter';
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'image-lightbox-next';
+    nextBtn.setAttribute('aria-label', 'Next image');
+    nextBtn.innerHTML = icon('chevron-right', 22);
+    nextBtn.addEventListener('click', () => lightboxShow(lightboxIndex + 1));
+
+    inner.appendChild(prevBtn);
+    inner.appendChild(counter);
+    inner.appendChild(nextBtn);
+    nav.appendChild(inner);
+
     lightbox.appendChild(closeBtn);
-    lightbox.appendChild(lbImg);
-    lightbox.addEventListener('click', closeLightbox);
+    lightbox.appendChild(body);
+    lightbox.appendChild(nav);
     document.body.appendChild(lightbox);
 
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') closeLightbox();
+      if (!isLightboxOpen()) return;
+      if (e.key === 'Escape') { closeLightbox(); return; }
+      if (e.key === 'ArrowLeft'  && lightboxIndex > 0) lightboxShow(lightboxIndex - 1);
+      if (e.key === 'ArrowRight' && lightboxIndex < lightboxImages.length - 1) lightboxShow(lightboxIndex + 1);
     });
   }
 
-  lightbox.querySelector('img').src = src;
-  lightbox.querySelector('img').alt = alt;
+  lightboxImages = Array.from(document.querySelectorAll('.inline-image-img')).map(img => ({
+    src: img.src,
+    alt: img.alt,
+  }));
+  const idx = lightboxImages.findIndex(im => im.src === clickedSrc);
+  lightboxShow(idx >= 0 ? idx : 0);
   lightbox.classList.add('is-open');
   history.pushState({ lightbox: true }, '');
 }
@@ -136,7 +191,7 @@ function buildInlineImage(att) {
   img.src = `/api/attachments/${att.id}`;
   img.alt = att.title || 'Generated image';
   img.loading = 'lazy';
-  img.addEventListener('click', () => openLightbox(img.src, img.alt));
+  img.addEventListener('click', () => openLightbox(img.src));
 
   const dlBtn = document.createElement('a');
   dlBtn.className = 'inline-image-download';
