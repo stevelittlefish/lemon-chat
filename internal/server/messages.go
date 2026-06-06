@@ -432,7 +432,12 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "data: %s\n\n", evtJSON)
 				flusher.Flush()
 
-				result, execErr := ExecuteTool(tc.name, tc.argsJSON.String())
+				tctx := ToolContext{
+					ModelName:       modelName,
+					ModelServer:     modelServer,
+					ResponseTimeout: responseTimeout,
+				}
+				result, execErr := ExecuteTool(tc.name, tc.argsJSON.String(), tctx)
 				if execErr != nil {
 					result = "error: " + execErr.Error()
 				}

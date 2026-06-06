@@ -1,13 +1,20 @@
 package server
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"math/rand"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/stevelittlefish/lemon-chat/internal/config"
 )
 
 type toolParam struct {
@@ -25,6 +32,13 @@ type toolFunction struct {
 type toolDef struct {
 	Type     string       `json:"type"`
 	Function toolFunction `json:"function"`
+}
+
+// ToolContext carries per-request model context to tool executors that need it.
+type ToolContext struct {
+	ModelName       string
+	ModelServer     *config.ModelServer
+	ResponseTimeout time.Duration
 }
 
 var toolRegistry = map[string]toolDef{
@@ -53,6 +67,27 @@ var toolRegistry = map[string]toolDef{
 			},
 		},
 	},
+	"fetch_url": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "fetch_url",
+			Description: "Fetches the content of a URL. Returns a clean markdown summary by default. Set source to true to get the raw HTML source instead.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"url": map[string]any{
+						"type":        "string",
+						"description": "The URL to fetch.",
+					},
+					"source": map[string]any{
+						"type":        "boolean",
+						"description": "If true, return the raw HTML source instead of a markdown summary.",
+					},
+				},
+				Required: []string{"url"},
+			},
+		},
+	},
 }
 
 // ToolDefsForCharacter returns tool definitions for the given tool IDs.
@@ -66,12 +101,12 @@ func ToolDefsForCharacter(toolIDs []string) []toolDef {
 	return out
 }
 
-var executors = map[string]func(string) (string, error){
-	"get_time": func(_ string) (string, error) {
+var executors = map[string]func(string, ToolContext) (string, error){
+	"get_time": func(_ string, _ ToolContext) (string, error) {
 		now := time.Now()
 		return now.Weekday().String() + ", " + now.Format(time.RFC3339), nil
 	},
-	"roll_dice": func(argsJSON string) (string, error) {
+	"roll_dice": func(argsJSON string, _ ToolContext) (string, error) {
 		var args struct {
 			Notation string `json:"notation"`
 		}
@@ -133,15 +168,144 @@ var executors = map[string]func(string) (string, error){
 		}
 		return fmt.Sprintf("Rolled %s: %s = %d", args.Notation, rollExpr, total), nil
 	},
+	"fetch_url": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			URL    string `json:"url"`
+			Source bool   `json:"source"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.URL == "" {
+			return "", fmt.Errorf("url is required")
+		}
+
+		log.Printf("Fetching URL url=%q source=%v", args.URL, args.Source)
+
+		fetchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		req, err := http.NewRequestWithContext(fetchCtx, "GET", args.URL, nil)
+		if err != nil {
+			return "", fmt.Errorf("invalid URL: %w", err)
+		}
+		req.Header.Set("User-Agent", "lemon-chat/1.0")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("fetch failed: %w", err)
+		}
+		defer resp.Body.Close()
+
+		const maxBody = 5 * 1024 * 1024
+		body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+		if err != nil {
+			return "", fmt.Errorf("read response: %w", err)
+		}
+
+		content := string(body)
+
+		if args.Source {
+			const maxSource = 100_000
+			if len(content) > maxSource {
+				content = content[:maxSource] + "\n\n[truncated — content exceeded 100,000 characters]"
+			}
+			return content, nil
+		}
+
+		stripped := stripHTML(content)
+		const maxStripped = 50_000
+		if len(stripped) > maxStripped {
+			stripped = stripped[:maxStripped] + "\n\n[truncated — page content exceeded 50,000 characters]"
+		}
+
+		if tctx.ModelServer == nil {
+			return stripped, nil
+		}
+		return summariseHTML(stripped, tctx.ModelName, tctx.ModelServer, tctx.ResponseTimeout)
+	},
+}
+
+var (
+	reScript = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	reStyle  = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
+	reTag    = regexp.MustCompile(`<[^>]+>`)
+	reSpace  = regexp.MustCompile(`\s+`)
+)
+
+func stripHTML(html string) string {
+	s := reScript.ReplaceAllString(html, " ")
+	s = reStyle.ReplaceAllString(s, " ")
+	s = reTag.ReplaceAllString(s, " ")
+	s = reSpace.ReplaceAllString(s, " ")
+	return strings.TrimSpace(s)
+}
+
+func summariseHTML(text, modelName string, srv *config.ModelServer, timeout time.Duration) (string, error) {
+	type chatMsg struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
+	}
+	msgs := []chatMsg{
+		{Role: "system", Content: "Convert the following web page text to clean, well-structured markdown. Preserve headings, lists, links, and code blocks. Remove navigation, footer, and boilerplate text."},
+		{Role: "user", Content: text},
+	}
+	payload, _ := json.Marshal(map[string]any{
+		"model":    modelName,
+		"messages": msgs,
+		"stream":   false,
+	})
+
+	chatURL := srv.APIBase + "/chat/completions"
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("build summarise request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if srv.APIKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+srv.APIKey)
+	}
+
+	httpResp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("summarise request failed: %w", err)
+	}
+	defer httpResp.Body.Close()
+
+	respBody, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read summarise response: %w", err)
+	}
+	if httpResp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("model server returned %d: %s", httpResp.StatusCode, respBody)
+	}
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("decode summarise response: %w", err)
+	}
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("no choices in summarise response")
+	}
+	return strings.TrimSpace(result.Choices[0].Message.Content), nil
 }
 
 // ExecuteTool runs a tool by name and returns its result string.
-func ExecuteTool(name, argsJSON string) (string, error) {
+func ExecuteTool(name, argsJSON string, tctx ToolContext) (string, error) {
 	fn, ok := executors[name]
 	if !ok {
 		return "", fmt.Errorf("unknown tool: %s", name)
 	}
-	return fn(argsJSON)
+	return fn(argsJSON, tctx)
 }
 
 // ToolMeta is the metadata shape returned to the frontend.
@@ -155,6 +319,7 @@ type ToolMeta struct {
 var AllTools = []ToolMeta{
 	{"get_time", "Get current time", "Returns the current local date and time."},
 	{"roll_dice", "Roll dice", "Rolls dice using standard notation (e.g. 2d6, 1d20)."},
+	{"fetch_url", "Fetch URL", "Fetches a URL and returns its content as markdown, or raw HTML if source is true."},
 }
 
 func (s *Server) handleGetTools(w http.ResponseWriter, r *http.Request) {

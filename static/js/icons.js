@@ -7,6 +7,7 @@ const ICONS = [
   'ellipsis-vertical', 'refresh-cw', 'copy', 'fork', 'list',
   'layout-grid',
   'play', 'rotate-ccw', 'rotate-cw', 'sliders', 'save',
+  'globe',
 ];
 
 export async function preload() {
