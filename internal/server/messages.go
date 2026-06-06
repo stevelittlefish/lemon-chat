@@ -441,7 +441,11 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				if execErr != nil {
 					result = "error: " + execErr.Error()
 				}
-				log.Printf("Tool result name=%q conversation_id=%d result=%q", tc.name, convID, result)
+				logResult := result
+				if len(logResult) > 200 {
+					logResult = logResult[:200] + "…"
+				}
+				log.Printf("Tool result name=%q conversation_id=%d result=%q", tc.name, convID, logResult)
 
 				resultEvt, _ := json.Marshal(map[string]any{"tool_result": map[string]any{
 					"id":     tc.id,
