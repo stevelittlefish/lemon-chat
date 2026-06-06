@@ -81,6 +81,10 @@ html, body {
   overflow: hidden;
 }
 
+.app.artifact-open {
+  grid-template-columns: 260px 1fr 400px;
+}
+
 /* ── Sidebar ────────────────────────────────────────────── */
 
 .sidebar {
@@ -1220,4 +1224,190 @@ html, body {
   font-size: var(--fs-14);
   color: var(--fg-muted);
   text-align: center;
+}
+
+/* ── Attachment card ────────────────────────────────────────── */
+
+.attachment-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--paper-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  max-width: 360px;
+  margin-top: var(--space-2);
+}
+
+.attachment-card-icon {
+  color: var(--fg-muted);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.attachment-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.attachment-card-title {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-card-filename {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-card-open {
+  flex-shrink: 0;
+}
+
+/* ── Artifact panel ─────────────────────────────────────────── */
+
+.artifact-panel {
+  background: var(--paper-0);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.artifact-panel[hidden] {
+  display: none;
+}
+
+.artifact-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 10px var(--space-4);
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+  min-height: 52px;
+}
+
+.artifact-panel-title-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.artifact-panel-title {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.artifact-panel-filename {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.artifact-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.artifact-panel-x {
+  background: transparent;
+  border: none;
+  color: var(--fg-faint);
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.artifact-panel-x:hover {
+  background: var(--paper-100);
+  color: var(--ink-900);
+}
+
+.artifact-panel-body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--space-5) var(--space-5);
+}
+
+.artifact-panel-body.rendered-md {
+  font-size: var(--fs-15);
+  line-height: 1.65;
+  color: var(--fg);
+}
+
+.artifact-panel-body.rendered-md p { margin: 0 0 var(--space-2); }
+.artifact-panel-body.rendered-md p:last-child { margin-bottom: 0; }
+.artifact-panel-body.rendered-md h1,
+.artifact-panel-body.rendered-md h2,
+.artifact-panel-body.rendered-md h3 { margin: var(--space-4) 0 var(--space-2); }
+.artifact-panel-body.rendered-md code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-xs);
+  padding: 1px 5px;
+}
+.artifact-panel-body.rendered-md pre {
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  overflow-x: auto;
+  margin: var(--space-2) 0;
+}
+.artifact-panel-body.rendered-md pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--fs-13);
+}
+
+.artifact-panel-pre {
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  line-height: 1.6;
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.artifact-panel-loading {
+  color: var(--fg-faint);
+  font-size: var(--fs-14);
+  padding: var(--space-4) 0;
 }

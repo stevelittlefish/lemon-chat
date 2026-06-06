@@ -3,6 +3,93 @@ import { icon } from './icons.js';
 import { messages as msgApi } from './api.js';
 import { escapeHtml } from './utils.js';
 
+// ── Artifact panel ───────────────────────────────────────────
+
+const artifactPanel = document.getElementById('artifact-panel');
+const artifactPanelTitle = document.getElementById('artifact-panel-title');
+const artifactPanelFilename = document.getElementById('artifact-panel-filename');
+const artifactPanelDownload = document.getElementById('artifact-panel-download');
+const artifactPanelClose = document.getElementById('artifact-panel-close');
+const artifactPanelBody = document.getElementById('artifact-panel-body');
+const appEl = document.getElementById('app');
+
+artifactPanelClose.innerHTML = icon('x', 14);
+artifactPanelClose.addEventListener('click', closeArtifactPanel);
+
+export function closeArtifactPanel() {
+  artifactPanel.hidden = true;
+  appEl.classList.remove('artifact-open');
+}
+
+async function openArtifactPanel(att) {
+  artifactPanelTitle.textContent = att.title;
+  artifactPanelFilename.textContent = att.filename;
+  artifactPanelDownload.href = `/api/attachments/${att.id}?download=1`;
+  artifactPanelDownload.setAttribute('download', att.filename);
+  artifactPanelBody.className = 'artifact-panel-body';
+  artifactPanelBody.innerHTML = `<p class="artifact-panel-loading">Loading…</p>`;
+  artifactPanel.hidden = false;
+  appEl.classList.add('artifact-open');
+
+  try {
+    const res = await fetch(`/api/attachments/${att.id}`);
+    if (!res.ok) throw new Error(res.statusText);
+    const text = await res.text();
+    const ext = att.filename.split('.').pop().toLowerCase();
+    if (ext === 'md') {
+      artifactPanelBody.className = 'artifact-panel-body rendered-md';
+      artifactPanelBody.innerHTML = renderMarkdown(text);
+    } else {
+      artifactPanelBody.className = 'artifact-panel-body';
+      const pre = document.createElement('pre');
+      pre.className = 'artifact-panel-pre';
+      pre.textContent = text;
+      artifactPanelBody.innerHTML = '';
+      artifactPanelBody.appendChild(pre);
+    }
+  } catch {
+    artifactPanelBody.innerHTML = `<p class="artifact-panel-loading">Could not load file.</p>`;
+  }
+}
+
+function fileIconName(mimeType, filename) {
+  const ext = (filename || '').split('.').pop().toLowerCase();
+  const codeExts = ['py', 'js', 'ts', 'go', 'sh', 'html', 'css', 'json', 'rb', 'rs', 'cpp', 'c', 'java'];
+  if (ext === 'md' || mimeType === 'text/markdown') return 'file-text';
+  if (codeExts.includes(ext)) return 'file-code';
+  return 'file';
+}
+
+function buildAttachmentCard(att) {
+  const card = document.createElement('div');
+  card.className = 'attachment-card';
+
+  const iconEl = document.createElement('div');
+  iconEl.className = 'attachment-card-icon';
+  iconEl.innerHTML = icon(fileIconName(att.mime_type, att.filename), 20);
+
+  const info = document.createElement('div');
+  info.className = 'attachment-card-info';
+  const titleEl = document.createElement('div');
+  titleEl.className = 'attachment-card-title';
+  titleEl.textContent = att.title;
+  const filenameEl = document.createElement('div');
+  filenameEl.className = 'attachment-card-filename';
+  filenameEl.textContent = att.filename;
+  info.appendChild(titleEl);
+  info.appendChild(filenameEl);
+
+  const openBtn = document.createElement('button');
+  openBtn.className = 'btn btn-secondary btn-sm attachment-card-open';
+  openBtn.textContent = 'Open';
+  openBtn.addEventListener('click', () => openArtifactPanel(att));
+
+  card.appendChild(iconEl);
+  card.appendChild(info);
+  card.appendChild(openBtn);
+  return card;
+}
+
 async function copyToClipboard(text) {
   if (navigator.clipboard) {
     await navigator.clipboard.writeText(text);
@@ -205,6 +292,11 @@ export function startStreaming() {
       const details = el.querySelector('.tool-call-details');
       if (details) details.appendChild(buildToolCallSection('result', result));
     },
+    addAttachment(att) {
+      const card = buildAttachmentCard(att);
+      colEl.appendChild(card);
+      if (!userScrolledDuringStream) scrollToBottom();
+    },
     finish() {
       const shouldScroll = !userScrolledDuringStream;
       userScrolledDuringStream = false;
@@ -365,6 +457,12 @@ function buildMessage(msg) {
   contentEl.className = 'message-content';
   contentEl.innerHTML = renderMarkdown(msg.content);
   colEl.appendChild(contentEl);
+
+  if (msg.tool_interactions?.length) {
+    for (const ti of msg.tool_interactions) {
+      if (ti.attachment) colEl.appendChild(buildAttachmentCard(ti.attachment));
+    }
+  }
 
   colEl.appendChild(buildFooter(msg, msg.content));
 

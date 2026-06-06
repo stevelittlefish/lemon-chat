@@ -8,6 +8,7 @@ const ICONS = [
   'layout-grid',
   'play', 'rotate-ccw', 'rotate-cw', 'sliders', 'save',
   'globe',
+  'file-text', 'file-code', 'file', 'download',
 ];
 
 export async function preload() {

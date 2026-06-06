@@ -90,14 +90,37 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	type attachmentMeta struct {
+		ID       int64  `json:"id"`
+		Title    string `json:"title"`
+		Filename string `json:"filename"`
+		MimeType string `json:"mime_type"`
+	}
 	type toolInteraction struct {
-		Name   string `json:"name"`
-		Args   any    `json:"args,omitempty"`
-		Result string `json:"result,omitempty"`
+		ID         string          `json:"id,omitempty"`
+		Name       string          `json:"name"`
+		Args       any             `json:"args,omitempty"`
+		Result     string          `json:"result,omitempty"`
+		Attachment *attachmentMeta `json:"attachment,omitempty"`
 	}
 	type msgView struct {
 		store.Message
 		ToolInteractions []toolInteraction `json:"tool_interactions,omitempty"`
+	}
+
+	// Load attachments for this conversation and index by tool_call_id.
+	attachments, attErr := s.store.ListAttachmentsByConversation(id)
+	attByCallID := map[string]*attachmentMeta{}
+	if attErr == nil {
+		for i := range attachments {
+			a := &attachments[i]
+			attByCallID[a.ToolCallID] = &attachmentMeta{
+				ID:       a.ID,
+				Title:    a.Title,
+				Filename: a.Filename,
+				MimeType: a.MimeType,
+			}
+		}
 	}
 
 	// Walk all messages, collecting tool interactions and attaching them to the
@@ -126,7 +149,13 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 				for _, c := range tc {
 					var argsVal any
 					json.Unmarshal([]byte(c.Function.Arguments), &argsVal) //nolint:errcheck
-					pending = append(pending, toolInteraction{Name: c.Function.Name, Args: argsVal})
+					ti := toolInteraction{
+						ID:         c.ID,
+						Name:       c.Function.Name,
+						Args:       argsVal,
+						Attachment: attByCallID[c.ID],
+					}
+					pending = append(pending, ti)
 					pendingByID[c.ID] = &pending[len(pending)-1]
 				}
 			}
@@ -437,6 +466,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 					ModelServer:     modelServer,
 					ResponseTimeout: responseTimeout,
 					SearXNGURL:      s.cfg.SearXNG.URL,
+					ToolCallID:      tc.id,
+					ConversationID:  convID,
+					Store:           s.store,
 				}
 				result, execErr := ExecuteTool(tc.name, tc.argsJSON.String(), tctx)
 				if execErr != nil {
@@ -454,6 +486,20 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				}})
 				fmt.Fprintf(w, "data: %s\n\n", resultEvt)
 				flusher.Flush()
+
+				// If the tool produced an attachment, emit a dedicated SSE event.
+				var attResult AttachmentResult
+				if jsonErr := json.Unmarshal([]byte(result), &attResult); jsonErr == nil && attResult.AttachmentID != 0 {
+					attEvt, _ := json.Marshal(map[string]any{"attachment": map[string]any{
+						"id":           attResult.AttachmentID,
+						"tool_call_id": tc.id,
+						"title":        attResult.Title,
+						"filename":     attResult.Filename,
+						"mime_type":    attResult.MimeType,
+					}})
+					fmt.Fprintf(w, "data: %s\n\n", attEvt)
+					flusher.Flush()
+				}
 
 				if _, err := s.store.CreateMessage(convID, "tool", result, nil, nil, nil, nil, tc.id); err != nil {
 					log.Printf("messages: failed to persist tool result for conv %d: %v", convID, err)

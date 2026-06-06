@@ -49,6 +49,9 @@ func (s *Server) Handler() http.Handler {
 	// Models
 	mux.HandleFunc("GET /api/models", s.requireAuth(s.handleModels))
 
+	// Attachments
+	mux.HandleFunc("GET /api/attachments/{id}", s.requireAuth(s.handleGetAttachment))
+
 	// Tools
 	mux.HandleFunc("GET /api/tools", s.requireAuth(s.handleGetTools))
 

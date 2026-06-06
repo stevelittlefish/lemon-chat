@@ -105,6 +105,17 @@ func (s *Store) migrate() error {
 				created_at   TEXT    NOT NULL
 			);
 
+			CREATE TABLE IF NOT EXISTS attachment (
+				id              INTEGER PRIMARY KEY AUTOINCREMENT,
+				tool_call_id    TEXT    NOT NULL,
+				conversation_id INTEGER NOT NULL REFERENCES conversation(id),
+				title           TEXT    NOT NULL,
+				filename        TEXT    NOT NULL,
+				mime_type       TEXT    NOT NULL,
+				disk_path       TEXT    NOT NULL,
+				created_at      TEXT    NOT NULL
+			);
+
 			CREATE TABLE IF NOT EXISTS schema_version (
 				version INTEGER NOT NULL
 			);
@@ -332,6 +343,29 @@ func (s *Store) migrate() error {
 		}
 		version = 15
 		log.Println("store: migration v14 → v15 complete")
+	}
+
+	if version < 16 {
+		log.Println("store: migrating v15 → v16 (create attachment table)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE IF NOT EXISTS attachment (
+				id              INTEGER PRIMARY KEY AUTOINCREMENT,
+				tool_call_id    TEXT    NOT NULL,
+				conversation_id INTEGER NOT NULL REFERENCES conversation(id),
+				title           TEXT    NOT NULL,
+				filename        TEXT    NOT NULL,
+				mime_type       TEXT    NOT NULL,
+				disk_path       TEXT    NOT NULL,
+				created_at      TEXT    NOT NULL
+			)
+		`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (16, ?)`, now()); err != nil {
+			return err
+		}
+		version = 16
+		log.Println("store: migration v15 → v16 complete")
 	}
 
 	log.Printf("store: schema ready at version %d", version)

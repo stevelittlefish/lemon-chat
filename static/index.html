@@ -44,6 +44,19 @@
     </div>
     <div id="composer-container" class="composer-container"></div>
   </main>
+  <aside id="artifact-panel" class="artifact-panel" hidden>
+    <div class="artifact-panel-header">
+      <div class="artifact-panel-title-wrap">
+        <span id="artifact-panel-title" class="artifact-panel-title"></span>
+        <span id="artifact-panel-filename" class="artifact-panel-filename"></span>
+      </div>
+      <div class="artifact-panel-actions">
+        <a id="artifact-panel-download" class="btn btn-secondary btn-sm" download>Download</a>
+        <button id="artifact-panel-close" class="artifact-panel-x" aria-label="Close artifact panel"></button>
+      </div>
+    </div>
+    <div id="artifact-panel-body" class="artifact-panel-body"></div>
+  </aside>
 </div>
 
 <script type="module" src="/js/app.js"></script>

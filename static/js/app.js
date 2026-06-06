@@ -157,6 +157,7 @@ function applyAvatarContext(characterId) {
 }
 
 async function loadConversation(id, { pushHistory = true } = {}) {
+  thread.closeArtifactPanel();
   if (pushHistory) {
     const url = id ? `/?c=${id}` : '/';
     history.pushState({ conversationId: id ?? null }, '', url);
@@ -228,6 +229,7 @@ async function sendMessage(content) {
     onMessageId: (id) => stream.setMessageId(id),
     onToolCall: (tc) => stream.addToolCall(tc),
     onToolResult: (tr) => stream.updateToolCallResult(tr),
+    onAttachment: (att) => stream.addAttachment(att),
     onDone: () => {
       stream.finish();
       composer.setStreaming(false);

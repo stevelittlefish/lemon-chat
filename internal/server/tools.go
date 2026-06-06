@@ -3,6 +3,8 @@ package server
 import (
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,12 +12,15 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
+	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
 type toolParam struct {
@@ -35,15 +40,44 @@ type toolDef struct {
 	Function toolFunction `json:"function"`
 }
 
-// ToolContext carries per-request model context to tool executors that need it.
+// ToolContext carries per-request context to tool executors.
 type ToolContext struct {
 	ModelName       string
 	ModelServer     *config.ModelServer
 	ResponseTimeout time.Duration
 	SearXNGURL      string
+	// for tools that create attachments
+	ToolCallID     string
+	ConversationID int64
+	Store          *store.Store
 }
 
 var toolRegistry = map[string]toolDef{
+	"create_document": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "create_document",
+			Description: "Creates a downloadable file. Use for reports, plans, scripts, code, or any content the user will want to save. Choose the filename extension to match the content type (e.g. report.md, script.py, notes.txt).",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"title": map[string]any{
+						"type":        "string",
+						"description": "Human-readable title shown in the chat.",
+					},
+					"filename": map[string]any{
+						"type":        "string",
+						"description": "Suggested filename including extension, e.g. report.md or analysis.py.",
+					},
+					"content": map[string]any{
+						"type":        "string",
+						"description": "Full text content of the document.",
+					},
+				},
+				Required: []string{"title", "filename", "content"},
+			},
+		},
+	},
 	"web_search": {
 		Type: "function",
 		Function: toolFunction{
@@ -124,7 +158,90 @@ func ToolDefsForCharacter(toolIDs []string) []toolDef {
 	return out
 }
 
+// AttachmentResult is the JSON structure returned by tools that create attachments.
+// The messages layer detects this shape to emit the attachment SSE event.
+type AttachmentResult struct {
+	AttachmentID int64  `json:"attachment_id"`
+	Title        string `json:"title"`
+	Filename     string `json:"filename"`
+	MimeType     string `json:"mime_type"`
+}
+
+func mimeTypeForFilename(filename string) string {
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".md":
+		return "text/markdown"
+	case ".py":
+		return "text/x-python"
+	case ".js":
+		return "text/javascript"
+	case ".ts":
+		return "text/typescript"
+	case ".go":
+		return "text/x-go"
+	case ".sh":
+		return "text/x-sh"
+	case ".html":
+		return "text/html"
+	case ".css":
+		return "text/css"
+	case ".json":
+		return "application/json"
+	case ".txt":
+		return "text/plain"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+func randomID() string {
+	b := make([]byte, 16)
+	_, _ = cryptorand.Read(b)
+	return hex.EncodeToString(b)
+}
+
 var executors = map[string]func(string, ToolContext) (string, error){
+	"create_document": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Title    string `json:"title"`
+			Filename string `json:"filename"`
+			Content  string `json:"content"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Title == "" || args.Filename == "" || args.Content == "" {
+			return "", fmt.Errorf("title, filename, and content are required")
+		}
+		// Sanitise filename: strip any path components.
+		args.Filename = filepath.Base(args.Filename)
+
+		dir := filepath.Join("data", "attachments", randomID())
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return "", fmt.Errorf("create attachment dir: %w", err)
+		}
+		diskPath := filepath.Join(dir, args.Filename)
+		if err := os.WriteFile(diskPath, []byte(args.Content), 0644); err != nil {
+			return "", fmt.Errorf("write attachment: %w", err)
+		}
+
+		mimeType := mimeTypeForFilename(args.Filename)
+		log.Printf("Creating document attachment title=%q filename=%q conversation_id=%d", args.Title, args.Filename, tctx.ConversationID)
+
+		att, err := tctx.Store.CreateAttachment(tctx.ToolCallID, tctx.ConversationID, args.Title, args.Filename, mimeType, diskPath)
+		if err != nil {
+			return "", fmt.Errorf("store attachment: %w", err)
+		}
+
+		result := AttachmentResult{
+			AttachmentID: att.ID,
+			Title:        att.Title,
+			Filename:     att.Filename,
+			MimeType:     att.MimeType,
+		}
+		out, _ := json.Marshal(result)
+		return string(out), nil
+	},
 	"get_time": func(_ string, _ ToolContext) (string, error) {
 		now := time.Now()
 		return now.Weekday().String() + ", " + now.Format(time.RFC3339), nil
@@ -429,6 +546,7 @@ func InitTools(cfg *config.Config) {
 		{"get_time", "Get current time", "Returns the current local date and time."},
 		{"roll_dice", "Roll dice", "Rolls dice using standard notation (e.g. 2d6, 1d20)."},
 		{"fetch_url", "Fetch URL", "Fetches a URL and returns its content as markdown, or raw HTML if source is true."},
+		{"create_document", "Create document", "Saves a file (report, script, notes, etc.) the user can download."},
 	}
 	if cfg.SearXNG.URL != "" {
 		allTools = append(allTools, ToolMeta{"web_search", "Web search", "Searches the web using SearXNG and returns the top results."})
