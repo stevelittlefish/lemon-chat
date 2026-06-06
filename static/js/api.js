@@ -70,7 +70,7 @@ export const messages = {
   },
   // selection: { type: 'model', name } | { type: 'character', id } | null
   // Returns an abort() function that cancels the in-flight request.
-  send: (conversationId, content, selection, { onName, onDelta, onDone, onAborted, onError, onStats, onMessageId, onToolCall, onToolResult, onAttachment }) => {
+  send: (conversationId, content, selection, { onName, onDelta, onDone, onAborted, onError, onStats, onMessageId, onToolCall, onToolResult, onAttachment, onNewTurn }) => {
     const url = `/api/conversations/${conversationId}/messages`;
     const body = { content };
     if (selection?.type === 'model') body.model = selection.name;

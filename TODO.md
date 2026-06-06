@@ -9,7 +9,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`isDuplicateUsername` checks the wrong table name** (`internal/server/admin.go:15`)
   The unique-constraint string is `"UNIQUE constraint failed: users.username"` but the table is named `user` (singular). SQLite emits `user.username`, so the check always returns `false`. Creating a duplicate username via the admin API returns 500 instead of 409.
 
-- [ ] **`onNewTurn` is missing from `api.js:send()` destructured params** (`static/js/api.js:73`)
+- [x] **`onNewTurn` is missing from `api.js:send()` destructured params** (`static/js/api.js:73`)
   `onNewTurn` is referenced inside the function on line 113 (`if (new_turn) onNewTurn?.(new_turn)`) but is not in the destructured parameter list, so it is always `undefined` inside the function regardless of what the caller passes. The callback never fires, meaning multi-turn tool calls never start a new message bubble — all follow-up responses stream into the same element as the tool-call list.
 
 - [x] **Missing character visibility check in `handleSendMessage`** (`internal/server/messages.go:84`)
