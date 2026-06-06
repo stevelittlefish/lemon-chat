@@ -14,6 +14,11 @@ type Config struct {
 	Bootstrap    Bootstrap     `toml:"bootstrap"`
 	ModelServers []ModelServer `toml:"model_server"`
 	Models       []Model       `toml:"model"`
+	SearXNG      SearXNG       `toml:"searxng"`
+}
+
+type SearXNG struct {
+	URL string `toml:"url"`
 }
 
 type Server struct {

@@ -9,6 +9,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -39,9 +40,31 @@ type ToolContext struct {
 	ModelName       string
 	ModelServer     *config.ModelServer
 	ResponseTimeout time.Duration
+	SearXNGURL      string
 }
 
 var toolRegistry = map[string]toolDef{
+	"web_search": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "web_search",
+			Description: "Search the web using SearXNG and return the top results.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"query": map[string]any{
+						"type":        "string",
+						"description": "The search query.",
+					},
+					"max_results": map[string]any{
+						"type":        "integer",
+						"description": "Number of results to return (1–10, default 5).",
+					},
+				},
+				Required: []string{"query"},
+			},
+		},
+	},
 	"get_time": {
 		Type: "function",
 		Function: toolFunction{
@@ -224,6 +247,88 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		}
 		return summariseHTML(stripped, tctx.ModelName, tctx.ModelServer, tctx.ResponseTimeout)
 	},
+	"web_search": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Query      string `json:"query"`
+			MaxResults int    `json:"max_results"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Query == "" {
+			return "", fmt.Errorf("query is required")
+		}
+		if tctx.SearXNGURL == "" {
+			return "", fmt.Errorf("web_search is not configured (add [searxng] url to lemon.toml)")
+		}
+		n := args.MaxResults
+		if n <= 0 {
+			n = 5
+		}
+		if n > 10 {
+			n = 10
+		}
+
+		log.Printf("Searching web query=%q max_results=%d", args.Query, n)
+
+		searchURL := strings.TrimRight(tctx.SearXNGURL, "/") + "/search?q=" + url.QueryEscape(args.Query) + "&format=json&pageno=1"
+		fetchCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		req, err := http.NewRequestWithContext(fetchCtx, "GET", searchURL, nil)
+		if err != nil {
+			return "", fmt.Errorf("build search request: %w", err)
+		}
+		req.Header.Set("User-Agent", "lemon-chat/1.0")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("search request failed: %w", err)
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 1*1024*1024))
+		if err != nil {
+			return "", fmt.Errorf("read search response: %w", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("SearXNG returned %d", resp.StatusCode)
+		}
+
+		var data searxngResponse
+		if err := json.Unmarshal(body, &data); err != nil {
+			return "", fmt.Errorf("decode search response: %w", err)
+		}
+
+		if len(data.Results) == 0 {
+			return "No results found for: " + args.Query, nil
+		}
+
+		results := data.Results
+		if len(results) > n {
+			results = results[:n]
+		}
+
+		var sb strings.Builder
+		for i, r := range results {
+			fmt.Fprintf(&sb, "%d. **%s** — %s\n", i+1, r.Title, r.URL)
+			if r.Content != "" {
+				fmt.Fprintf(&sb, "   %s\n", r.Content)
+			}
+			sb.WriteString("\n")
+		}
+		return strings.TrimSpace(sb.String()), nil
+	},
+}
+
+type searxngResponse struct {
+	Results []searxngResult `json:"results"`
+}
+
+type searxngResult struct {
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Content string `json:"content"`
 }
 
 var (
@@ -315,13 +420,21 @@ type ToolMeta struct {
 	Description string `json:"description"`
 }
 
-// AllTools is the full list of available tools exposed to the frontend.
-var AllTools = []ToolMeta{
-	{"get_time", "Get current time", "Returns the current local date and time."},
-	{"roll_dice", "Roll dice", "Rolls dice using standard notation (e.g. 2d6, 1d20)."},
-	{"fetch_url", "Fetch URL", "Fetches a URL and returns its content as markdown, or raw HTML if source is true."},
+var allTools []ToolMeta
+
+// InitTools builds the available tools list. Call once at server startup.
+// web_search is included only when cfg.SearXNG.URL is non-empty.
+func InitTools(cfg *config.Config) {
+	allTools = []ToolMeta{
+		{"get_time", "Get current time", "Returns the current local date and time."},
+		{"roll_dice", "Roll dice", "Rolls dice using standard notation (e.g. 2d6, 1d20)."},
+		{"fetch_url", "Fetch URL", "Fetches a URL and returns its content as markdown, or raw HTML if source is true."},
+	}
+	if cfg.SearXNG.URL != "" {
+		allTools = append(allTools, ToolMeta{"web_search", "Web search", "Searches the web using SearXNG and returns the top results."})
+	}
 }
 
 func (s *Server) handleGetTools(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, AllTools)
+	writeJSON(w, http.StatusOK, allTools)
 }

@@ -27,6 +27,7 @@ func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
 			}).DialContext,
 		},
 	}
+	InitTools(cfg)
 	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client}
 }
 

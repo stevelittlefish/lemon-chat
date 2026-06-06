@@ -436,6 +436,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 					ModelName:       modelName,
 					ModelServer:     modelServer,
 					ResponseTimeout: responseTimeout,
+					SearXNGURL:      s.cfg.SearXNG.URL,
 				}
 				result, execErr := ExecuteTool(tc.name, tc.argsJSON.String(), tctx)
 				if execErr != nil {

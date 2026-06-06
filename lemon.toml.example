@@ -45,3 +45,8 @@ model_server = "local"
 name         = "mistralai/Mistral-7B-Instruct-v0.3"
 display_name = "Mistral 7B"
 model_server = "local"
+
+# Optional: SearXNG web search integration.
+# When set, the web_search tool becomes available to characters.
+# [searxng]
+# url = "http://localhost:8181"
