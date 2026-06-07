@@ -27,6 +27,28 @@ type chatMsg struct {
 	ToolCallID string `json:"tool_call_id,omitempty"`
 }
 
+// buildChatMsgs assembles the LLM message payload from an optional prefix
+// (e.g. character system prompt + hidden messages) and the stored message history.
+// It is the single source of truth used by both the send handler and the context
+// preview endpoint, so the two are guaranteed to produce identical output.
+func buildChatMsgs(prefix []chatMsg, history []store.Message) []chatMsg {
+	msgs := append([]chatMsg(nil), prefix...)
+	for _, m := range history {
+		msg := chatMsg{Role: m.Role, Content: m.Content}
+		if m.ToolCalls != nil {
+			var tc []any
+			if json.Unmarshal([]byte(*m.ToolCalls), &tc) == nil {
+				msg.ToolCalls = tc
+			}
+		}
+		if m.ToolCallID != "" {
+			msg.ToolCallID = m.ToolCallID
+		}
+		msgs = append(msgs, msg)
+	}
+	return msgs
+}
+
 type streamToolCall struct {
 	id       string
 	name     string
@@ -259,19 +281,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, m := range history {
-		msg := chatMsg{Role: m.Role, Content: m.Content}
-		if m.ToolCalls != nil {
-			var tc []any
-			if jsonErr := json.Unmarshal([]byte(*m.ToolCalls), &tc); jsonErr == nil {
-				msg.ToolCalls = tc
-			}
-		}
-		if m.ToolCallID != "" {
-			msg.ToolCallID = m.ToolCallID
-		}
-		chatMsgs = append(chatMsgs, msg)
-	}
+	chatMsgs = buildChatMsgs(chatMsgs, history)
 
 	// Determine tool definitions for this character.
 	var activeToolDefs []toolDef
@@ -648,29 +658,17 @@ func (s *Server) handleGetMessageContext(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var chatMsgs []chatMsg
+	var prefix []chatMsg
 
 	if conv.CharacterID != nil {
 		var char *store.Character
-		char, chatMsgs = s.resolveCharacter(w, user, *conv.CharacterID, chatMsgs)
+		char, prefix = s.resolveCharacter(w, user, *conv.CharacterID, prefix)
 		if char == nil {
 			return
 		}
 	}
 
-	for _, m := range history {
-		msg := chatMsg{Role: m.Role, Content: m.Content}
-		if m.ToolCalls != nil {
-			var tc []any
-			if jsonErr := json.Unmarshal([]byte(*m.ToolCalls), &tc); jsonErr == nil {
-				msg.ToolCalls = tc
-			}
-		}
-		if m.ToolCallID != "" {
-			msg.ToolCallID = m.ToolCallID
-		}
-		chatMsgs = append(chatMsgs, msg)
-	}
+	chatMsgs := buildChatMsgs(prefix, history)
 	if chatMsgs == nil {
 		chatMsgs = []chatMsg{}
 	}

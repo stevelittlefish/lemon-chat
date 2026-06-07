@@ -903,14 +903,33 @@ async function openCtxModal(convId, msgId) {
     for (const msg of messages) {
       const block = document.createElement('div');
       block.className = 'ctx-msg-block';
-      const role = document.createElement('div');
-      role.className = 'ctx-msg-role';
-      role.textContent = msg.role;
-      const pre = document.createElement('pre');
-      pre.className = 'ctx-msg-content';
-      pre.textContent = msg.content;
-      block.appendChild(role);
-      block.appendChild(pre);
+
+      const roleEl = document.createElement('div');
+      roleEl.className = 'ctx-msg-role';
+      let roleLabel = msg.role;
+      if (msg.tool_call_id) roleLabel += ` (id: ${msg.tool_call_id})`;
+      roleEl.textContent = roleLabel;
+      block.appendChild(roleEl);
+
+      if (msg.content) {
+        const pre = document.createElement('pre');
+        pre.className = 'ctx-msg-content';
+        pre.textContent = msg.content;
+        block.appendChild(pre);
+      }
+      if (msg.tool_calls) {
+        const pre = document.createElement('pre');
+        pre.className = 'ctx-msg-content';
+        pre.textContent = JSON.stringify(msg.tool_calls, null, 2);
+        block.appendChild(pre);
+      }
+      if (!msg.content && !msg.tool_calls) {
+        const pre = document.createElement('pre');
+        pre.className = 'ctx-msg-content';
+        pre.textContent = '';
+        block.appendChild(pre);
+      }
+
       modal.body.appendChild(block);
     }
   } catch (err) {

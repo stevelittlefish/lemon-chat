@@ -67,7 +67,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`handleGetMessageContext` silently ignores character fetch errors** (`internal/server/messages.go:634`)
   Character system prompt and hidden messages are wrapped in `if err == nil { ... }`, so a DB error causes them to be silently omitted. The returned context will differ from what the model actually received. The pattern used in `resolveCharacter` (return an HTTP error on failure) should be used here instead.
 
-- [ ] **Context modal shows blank for tool-call messages** (`static/js/thread.js:764`)
+- [x] **Context modal shows blank for tool-call messages** (`static/js/thread.js:764`)
   The context viewer renders `pre.textContent = msg.content`. For assistant messages that triggered tool calls, `content` is `""` and the data lives in `msg.tool_calls`. These appear as empty blocks. The modal should also render `msg.tool_calls` (and `msg.tool_call_id` for tool-result messages) when present.
 
 - [ ] **No CSRF protection on mutation endpoints**
