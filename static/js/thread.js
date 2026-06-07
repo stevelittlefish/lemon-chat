@@ -429,15 +429,17 @@ export function startStreaming() {
   const colEl = document.createElement('div');
   colEl.className = 'message-col';
 
-  const roleEl = document.createElement('div');
-  roleEl.className = 'message-role';
-  roleEl.textContent = '';
+  const roleEl = streamIsConsecutive ? null : document.createElement('div');
+  if (roleEl) {
+    roleEl.className = 'message-role';
+    roleEl.textContent = '';
+    colEl.appendChild(roleEl);
+  }
 
   const contentEl = document.createElement('div');
   contentEl.className = 'message-content';
   contentEl.innerHTML = typingIndicatorHTML();
 
-  colEl.appendChild(roleEl);
   colEl.appendChild(contentEl);
   wrapper.appendChild(colEl);
   threadEl.appendChild(wrapper);
@@ -454,7 +456,7 @@ export function startStreaming() {
 
   return {
     setName(name) {
-      roleEl.textContent = name;
+      if (roleEl) roleEl.textContent = name;
     },
     append(delta) {
       accumulated += delta;
@@ -715,10 +717,12 @@ function buildMessage(msg, hideAvatar = false) {
   const colEl = document.createElement('div');
   colEl.className = 'message-col';
 
-  const roleEl = document.createElement('div');
-  roleEl.className = 'message-role';
-  roleEl.textContent = msg.role === 'user' ? (msg.name || 'you') : (msg.name || msg.role);
-  colEl.appendChild(roleEl);
+  if (!hideAvatar) {
+    const roleEl = document.createElement('div');
+    roleEl.className = 'message-role';
+    roleEl.textContent = msg.role === 'user' ? (msg.name || 'you') : (msg.name || msg.role);
+    colEl.appendChild(roleEl);
+  }
 
   if (msg.content) {
     const contentEl = document.createElement('div');
