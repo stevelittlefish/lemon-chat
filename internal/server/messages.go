@@ -651,18 +651,10 @@ func (s *Server) handleGetMessageContext(w http.ResponseWriter, r *http.Request)
 	var chatMsgs []chatMsg
 
 	if conv.CharacterID != nil {
-		char, err := s.store.GetCharacter(*conv.CharacterID)
-		if err == nil {
-			userName := resolveUserName(user)
-			if char.SystemPrompt != nil {
-				chatMsgs = append(chatMsgs, chatMsg{Role: "system", Content: substituteVars(*char.SystemPrompt, char.Name, userName)})
-			}
-			hiddenMsgs, err := s.store.ListCharacterHiddenMessages(char.ID)
-			if err == nil {
-				for _, hm := range hiddenMsgs {
-					chatMsgs = append(chatMsgs, chatMsg{Role: hm.Role, Content: substituteVars(hm.Content, char.Name, userName)})
-				}
-			}
+		var char *store.Character
+		char, chatMsgs = s.resolveCharacter(w, user, *conv.CharacterID, chatMsgs)
+		if char == nil {
+			return
 		}
 	}
 
