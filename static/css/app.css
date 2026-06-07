@@ -914,6 +914,15 @@ html, body {
   position: relative;
 }
 
+.picker-card--default .picker-card-avatar {
+  width: 56px;
+  height: 56px;
+}
+
+.picker-card--default .picker-card-avatar--placeholder {
+  font-size: 28px;
+}
+
 .picker-card-star {
   position: absolute;
   top: var(--space-2);
