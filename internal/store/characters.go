@@ -25,6 +25,7 @@ type Character struct {
 	CreatedBy      int64    `json:"created_by"`
 	Visibility     string   `json:"visibility"`
 	AutoTitle      bool     `json:"auto_title"`
+	IsDefault      bool     `json:"is_default"`
 	Tools          []string `json:"tools"`
 	AvatarFilename *string  `json:"-"`
 	HasAvatar      bool     `json:"has_avatar"`
@@ -36,7 +37,7 @@ type Character struct {
 // Private characters created by other users are excluded unless the user is an admin.
 func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, tools, avatar_filename, created_at, updated_at
+		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, is_default, tools, avatar_filename, created_at, updated_at
 		 FROM character
 		 WHERE visibility != 'private' OR created_by = ? OR ?
 		 ORDER BY name`,
@@ -49,12 +50,13 @@ func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) 
 	var chars []Character
 	for rows.Next() {
 		var c Character
-		var autoTitle int
+		var autoTitle, isDefault int
 		var toolsJSON sql.NullString
-		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &isDefault, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		c.AutoTitle = autoTitle != 0
+		c.IsDefault = isDefault != 0
 		c.HasAvatar = c.AvatarFilename != nil
 		if toolsJSON.Valid && toolsJSON.String != "" {
 			json.Unmarshal([]byte(toolsJSON.String), &c.Tools) //nolint:errcheck
@@ -69,12 +71,12 @@ func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) 
 
 func (s *Store) GetCharacter(id int64) (*Character, error) {
 	c := &Character{}
-	var autoTitle int
+	var autoTitle, isDefault int
 	var toolsJSON sql.NullString
 	err := s.db.QueryRow(
-		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, tools, avatar_filename, created_at, updated_at
+		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, is_default, tools, avatar_filename, created_at, updated_at
 		 FROM character WHERE id = ?`, id,
-	).Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &isDefault, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -82,6 +84,7 @@ func (s *Store) GetCharacter(id int64) (*Character, error) {
 		return nil, err
 	}
 	c.AutoTitle = autoTitle != 0
+	c.IsDefault = isDefault != 0
 	c.HasAvatar = c.AvatarFilename != nil
 	if toolsJSON.Valid && toolsJSON.String != "" {
 		json.Unmarshal([]byte(toolsJSON.String), &c.Tools) //nolint:errcheck
@@ -171,6 +174,26 @@ func (s *Store) SetCharacterAvatar(id int64, filename string) error {
 
 func (s *Store) ClearCharacterAvatar(id int64) error {
 	_, err := s.db.Exec(`UPDATE character SET avatar_filename = NULL WHERE id = ?`, id)
+	return err
+}
+
+func (s *Store) SetDefaultCharacter(id int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`UPDATE character SET is_default = 0 WHERE is_default = 1`); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`UPDATE character SET is_default = 1 WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) ClearDefaultCharacter() error {
+	_, err := s.db.Exec(`UPDATE character SET is_default = 0 WHERE is_default = 1`)
 	return err
 }
 

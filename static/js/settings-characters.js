@@ -175,9 +175,10 @@ function renderCharRows(list, emptyMsg) {
     const avatarHtml = c.has_avatar
       ? `<img class="avatar-sm" src="/api/characters/${c.id}/avatar" alt="">`
       : '';
+    const starHtml = c.is_default ? `<img src="/assets/icons/star-mustard.svg" class="char-list-star" width="12" height="12" alt="" title="Default character">` : '';
     return `
       <tr data-id="${c.id}">
-        <td class="char-col-name"><div class="char-name-cell">${avatarHtml}${escapeHtml(c.name)}</div></td>
+        <td class="char-col-name"><div class="char-name-cell">${starHtml}${avatarHtml}${escapeHtml(c.name)}</div></td>
         <td class="char-col-model"><span class="chip">${escapeHtml(c.model)}</span></td>
         <td class="char-col-visibility"><span class="chip character-chip--${c.visibility}">${visLabel}</span></td>
         <td class="char-col-actions"><div class="user-row-actions">${exportBtn}${editBtn}${deleteBtn}</div></td>

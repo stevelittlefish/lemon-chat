@@ -144,6 +144,8 @@ export const characters = {
   delete:       (id)       => request('DELETE', `/api/characters/${id}`),
   uploadAvatar: (id, file, crop) => uploadFile('PUT', `/api/characters/${id}/avatar${crop ? `?crop=${crop}` : ''}`, file),
   deleteAvatar: (id)       => request('DELETE', `/api/characters/${id}/avatar`),
+  setDefault:   (id)       => request('POST',   `/api/characters/${id}/set-default`),
+  clearDefault: ()         => request('DELETE', '/api/characters/default'),
 };
 
 // Completions

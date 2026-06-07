@@ -113,6 +113,67 @@ function renderError(msg) {
   `;
 }
 
+function renderDefaultSection(character) {
+  if (character.is_default) {
+    return `
+      <label class="character-form-lbl">Default character</label>
+      <div class="char-default-status char-default-status--active">
+        <img src="/assets/icons/star-mustard.svg" class="char-default-star" width="14" height="14" alt="">
+        <span>This is the default character — it appears at the top of the model picker for all users.</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="char-unset-default-btn">Remove as default</button>
+      </div>
+    `;
+  }
+  const isPrivate = character.visibility === 'private';
+  return `
+    <label class="character-form-lbl">Default character</label>
+    <div class="char-default-status">
+      <button type="button" class="btn btn-ghost btn-sm" id="char-set-default-btn"${isPrivate ? ' disabled title="Private characters cannot be the default"' : ''}>Set as default</button>
+      ${isPrivate ? `<span class="char-default-hint">Private characters cannot be the default.</span>` : ''}
+    </div>
+  `;
+}
+
+function attachDefaultSection(character) {
+  const setBtn   = document.getElementById('char-set-default-btn');
+  const unsetBtn = document.getElementById('char-unset-default-btn');
+  const errorEl  = document.getElementById('char-err');
+
+  if (setBtn) {
+    setBtn.addEventListener('click', async () => {
+      setBtn.disabled    = true;
+      setBtn.textContent = 'Setting…';
+      try {
+        await charactersApi.setDefault(character.id);
+        character.is_default = true;
+        document.getElementById('char-default-row').innerHTML = renderDefaultSection(character);
+        attachDefaultSection(character);
+      } catch (err) {
+        setBtn.disabled    = false;
+        setBtn.textContent = 'Set as default';
+        if (errorEl) { errorEl.hidden = false; errorEl.textContent = err.message; }
+      }
+    });
+  }
+
+  if (unsetBtn) {
+    unsetBtn.addEventListener('click', async () => {
+      unsetBtn.disabled    = true;
+      unsetBtn.textContent = 'Removing…';
+      try {
+        await charactersApi.clearDefault();
+        character.is_default = false;
+        document.getElementById('char-default-row').innerHTML = renderDefaultSection(character);
+        attachDefaultSection(character);
+      } catch (err) {
+        unsetBtn.disabled    = false;
+        unsetBtn.textContent = 'Remove as default';
+        if (errorEl) { errorEl.hidden = false; errorEl.textContent = err.message; }
+      }
+    });
+  }
+}
+
 function modelOptions(modelsData, selected) {
   return modelsData.map(m =>
     `<option value="${escapeHtml(m.name)}" ${m.name === selected ? 'selected' : ''}>${escapeHtml(m.display_name || m.name)}</option>`
@@ -204,6 +265,10 @@ function renderForm(character, modelsData) {
             <option value="readwrite" ${visibility === 'readwrite' ? 'selected' : ''}>Read-write — others can see and edit</option>
           </select>
         </div>` : ''}
+        ${user.is_admin && !isNew ? `
+        <div class="character-form-row" id="char-default-row">
+          ${renderDefaultSection(character)}
+        </div>` : ''}
       </div>
       <div class="field-msg field-msg--error" id="char-err" hidden></div>
       <div class="char-form-actions">
@@ -252,6 +317,10 @@ function renderForm(character, modelsData) {
     else saveChar(character);
   });
   document.getElementById('char-clone-btn')?.addEventListener('click', () => cloneChar(character));
+
+  if (user.is_admin && !isNew && character) {
+    attachDefaultSection(character);
+  }
 }
 
 function renderHiddenMessages() {

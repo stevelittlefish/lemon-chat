@@ -158,6 +158,10 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 	} else if !validVisibility(req.Visibility) {
 		req.Visibility = existing.Visibility
 	}
+	if existing.IsDefault && req.Visibility == "private" {
+		writeError(w, http.StatusBadRequest, "cannot set visibility to private while this is the default character")
+		return
+	}
 	log.Printf("Updating character id=%d name=%q user_id=%d", id, req.Name, user.ID)
 	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.TitlePrompt, req.Visibility, req.AutoTitle, req.Tools); err != nil {
 		internalError(w, err)
@@ -295,6 +299,42 @@ func (s *Server) handleDeleteCharacterAvatar(w http.ResponseWriter, r *http.Requ
 		s.deleteAvatarFile(*existing.AvatarFilename)
 	}
 	if err := s.store.ClearCharacterAvatar(id); err != nil {
+		internalError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleSetDefaultCharacter(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	char, err := s.store.GetCharacter(id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	if char.Visibility == "private" {
+		writeError(w, http.StatusBadRequest, "cannot set a private character as the default")
+		return
+	}
+	log.Printf("Setting default character id=%d name=%q", id, char.Name)
+	if err := s.store.SetDefaultCharacter(id); err != nil {
+		internalError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleClearDefaultCharacter(w http.ResponseWriter, r *http.Request) {
+	log.Println("Clearing default character")
+	if err := s.store.ClearDefaultCharacter(); err != nil {
 		internalError(w, err)
 		return
 	}

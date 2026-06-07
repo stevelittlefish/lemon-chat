@@ -393,6 +393,21 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v16 → v17 complete")
 	}
 
+	if version < 18 {
+		log.Println("store: migrating v17 → v18 (add is_default to character)")
+		if _, err := s.db.Exec(`ALTER TABLE character ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`CREATE UNIQUE INDEX idx_character_one_default ON character (is_default) WHERE is_default = 1`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (18, ?)`, now()); err != nil {
+			return err
+		}
+		version = 18
+		log.Println("store: migration v17 → v18 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

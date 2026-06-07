@@ -127,7 +127,23 @@ function toggleDropdown() {
   const isMSel = state.selection?.type === 'model';
   const isCSel = state.selection?.type === 'character';
 
-  let html = `<div class="model-picker-dropdown-label">model</div>`;
+  const defaultChar = state.characters.find(c => c.is_default) ?? null;
+  const restChars   = state.characters.filter(c => !c.is_default);
+
+  let html = '';
+
+  if (defaultChar) {
+    html += `<div class="model-picker-dropdown-label">default</div>`;
+    const sel = isCSel && defaultChar.id === state.selection.id;
+    html += `
+      <div class="model-picker-option${sel ? ' selected' : ''}" data-type="character" data-id="${defaultChar.id}">
+        <span class="model-picker-option-icon">${icon(sel ? 'check' : 'star', 13)}</span>
+        <span class="model-picker-option-name">${escapeHtml(defaultChar.name)}</span>
+      </div>`;
+    html += `<div class="model-picker-divider"></div>`;
+  }
+
+  html += `<div class="model-picker-dropdown-label">model</div>`;
   html += state.models.map(m => {
     const sel = isMSel && m.name === state.selection.name;
     return `
@@ -137,10 +153,10 @@ function toggleDropdown() {
       </div>`;
   }).join('');
 
-  if (state.characters.length) {
+  if (restChars.length) {
     html += `<div class="model-picker-divider"></div>`;
     html += `<div class="model-picker-dropdown-label">character</div>`;
-    html += state.characters.map(c => {
+    html += restChars.map(c => {
       const sel = isCSel && c.id === state.selection.id;
       return `
         <div class="model-picker-option${sel ? ' selected' : ''}" data-type="character" data-id="${c.id}">
@@ -180,7 +196,11 @@ function toggleDropdown() {
 }
 
 function selectionIcon() {
-  return state.selection?.type === 'character' ? 'drama' : 'cpu';
+  if (state.selection?.type === 'character') {
+    const char = state.characters.find(c => c.id === state.selection.id);
+    return char?.is_default ? 'star' : 'drama';
+  }
+  return 'cpu';
 }
 
 function selectedDisplayName() {

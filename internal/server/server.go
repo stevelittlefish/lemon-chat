@@ -78,6 +78,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/characters/{id}/avatar", s.requireAuth(s.handleServeCharacterAvatar))
 	mux.HandleFunc("PUT /api/characters/{id}/avatar", s.requireAuth(s.handleUploadCharacterAvatar))
 	mux.HandleFunc("DELETE /api/characters/{id}/avatar", s.requireAuth(s.handleDeleteCharacterAvatar))
+	mux.HandleFunc("POST /api/characters/{id}/set-default", s.requireAdmin(s.handleSetDefaultCharacter))
+	mux.HandleFunc("DELETE /api/characters/default", s.requireAdmin(s.handleClearDefaultCharacter))
 
 	// Admin
 	mux.HandleFunc("GET /api/admin/users", s.requireAdmin(s.handleAdminListUsers))

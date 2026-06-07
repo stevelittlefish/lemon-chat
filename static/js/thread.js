@@ -314,8 +314,10 @@ export function showPicker(models, characters, onSelect) {
     </button>
   `).join('');
 
-  const charCards = characters.map(c => `
-    <button class="picker-card" data-type="character" data-id="${c.id}">
+  const sorted = [...characters].sort((a, b) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0));
+  const charCards = sorted.map(c => `
+    <button class="picker-card${c.is_default ? ' picker-card--default' : ''}" data-type="character" data-id="${c.id}">
+      ${c.is_default ? `<span class="picker-card-star">${icon('star', 11)}</span>` : ''}
       ${c.has_avatar
         ? `<div class="picker-card-avatar"><img src="/api/characters/${c.id}/avatar" alt=""></div>`
         : `<div class="picker-card-avatar picker-card-avatar--placeholder">${icon('drama', 20)}</div>`
