@@ -13,17 +13,41 @@ import (
 	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
 
+const defaultConversationPageSize = 30
+
 func (s *Server) handleListConversations(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	convs, err := s.store.ListConversations(user.ID)
+
+	limit := defaultConversationPageSize
+	offset := 0
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+
+	// Fetch one extra to detect whether more pages exist.
+	convs, err := s.store.ListConversations(user.ID, limit+1, offset)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
+	hasMore := len(convs) > limit
+	if hasMore {
+		convs = convs[:limit]
+	}
 	if convs == nil {
 		convs = []store.Conversation{}
 	}
-	writeJSON(w, http.StatusOK, convs)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"conversations": convs,
+		"has_more":      hasMore,
+	})
 }
 
 func (s *Server) handleCreateConversation(w http.ResponseWriter, r *http.Request) {

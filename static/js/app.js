@@ -99,6 +99,7 @@ async function initApp() {
     onNew: () => loadConversation(null),
     api: convApi,
     newLabel: 'New conversation',
+    paginated: true,
   });
 
   let models, chars;

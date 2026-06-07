@@ -12,7 +12,13 @@ let state = {
   username: '',
   api: null,
   newLabel: 'New',
+  paginated: false,
+  offset: 0,
+  hasMore: false,
+  loading: false,
 };
+
+let _observer = null;
 
 // Body-level context menu — avoids overflow clipping from the scrollable list
 let _menuEl = null;
@@ -202,12 +208,13 @@ document.addEventListener('click', (e) => {
   }
 });
 
-export function init({ onSelect, onNew, username, api, newLabel = 'New' }) {
+export function init({ onSelect, onNew, username, api, newLabel = 'New', paginated = false }) {
   state.onSelect = onSelect;
   state.onNew = onNew;
   state.username = username;
   state.api = api;
   state.newLabel = newLabel;
+  state.paginated = paginated;
 
   sidebarEl.innerHTML = `
     <div class="sidebar-header">
@@ -243,8 +250,64 @@ export function init({ onSelect, onNew, username, api, newLabel = 'New' }) {
 }
 
 export async function load() {
-  state.items = await state.api.list();
-  renderList();
+  if (state.paginated) {
+    state.items = [];
+    state.offset = 0;
+    state.hasMore = false;
+    state.loading = false;
+    if (_observer) { _observer.disconnect(); _observer = null; }
+    const result = await state.api.list(0);
+    state.items = result.conversations;
+    state.hasMore = result.has_more;
+    state.offset = result.conversations.length;
+    renderList();
+    setupSentinel();
+  } else {
+    state.items = await state.api.list();
+    renderList();
+  }
+}
+
+async function loadMore() {
+  if (state.loading || !state.hasMore) return;
+  state.loading = true;
+  try {
+    const result = await state.api.list(state.offset);
+    const items = result.conversations;
+    state.hasMore = result.has_more;
+    state.offset += items.length;
+    state.items = [...state.items, ...items];
+    appendItems(items);
+  } finally {
+    state.loading = false;
+  }
+}
+
+function appendItems(items) {
+  const listEl = document.getElementById('sidebar-list');
+  if (!listEl) return;
+  const sentinel = listEl.querySelector('.sidebar-sentinel');
+  for (const item of items) {
+    const tmpl = document.createElement('template');
+    tmpl.innerHTML = listItem(item).trim();
+    const el = tmpl.content.firstElementChild;
+    if (sentinel) listEl.insertBefore(el, sentinel);
+    else listEl.appendChild(el);
+    attachItemListeners(el, item.id);
+    if (item.id === state.activeId) el.classList.add('active');
+  }
+}
+
+function setupSentinel() {
+  const listEl = document.getElementById('sidebar-list');
+  if (!listEl) return;
+  const sentinel = document.createElement('div');
+  sentinel.className = 'sidebar-sentinel';
+  listEl.appendChild(sentinel);
+  _observer = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) loadMore();
+  }, { root: listEl, threshold: 0 });
+  _observer.observe(sentinel);
 }
 
 export function setActive(id) {

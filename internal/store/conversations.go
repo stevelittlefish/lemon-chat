@@ -16,11 +16,11 @@ type Conversation struct {
 	UpdatedAt   string  `json:"updated_at"`
 }
 
-func (s *Store) ListConversations(userID int64) ([]Conversation, error) {
+func (s *Store) ListConversations(userID int64, limit, offset int) ([]Conversation, error) {
 	rows, err := s.db.Query(
 		`SELECT id, user_id, model, character_id, title, created_at, updated_at
-		 FROM conversation WHERE user_id = ? ORDER BY updated_at DESC`,
-		userID,
+		 FROM conversation WHERE user_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
+		userID, limit, offset,
 	)
 	if err != nil {
 		return nil, err
