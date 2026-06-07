@@ -156,7 +156,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **Modal construction pattern repeated four times** (`static/js/thread.js`, `static/js/sidebar.js`)
   `getMdModal()`, `getForkModal()`, `getCtxModal()`, and `getDeleteModal()` each implement the same lazy-singleton: create overlay, wire backdrop-click, add Escape listener, append to body, cache result. The four Escape-key listeners also accumulate permanently on `document`. A small `createModal({ title, body, actions })` factory would remove the duplication and fix the listener leak.
 
-- [ ] **`handleUndo` and `handleRedo` in complete-app.js are 95% identical** (`static/js/complete-app.js:569, 590`)
+- [x] **`handleUndo` and `handleRedo` in complete-app.js are 95% identical** (`static/js/complete-app.js:569, 590`)
   Both functions differ only in which API is called and which direction the `undone` flag goes. Steps 3–10 are identical (reset state, set textarea, setMode, renderControls, updateUndoBtn, scroll). Merge into a shared `performUndoRedo(forward)` function.
 
 - [ ] **`character_hidden_message` appears in both v0→v1 and v8→v9 migrations** (`internal/store/store.go:99, 227`)

@@ -205,7 +205,7 @@ function createEditorDOM() {
   editorWrapEl.appendChild(contentRowEl);
   completeMainEl.appendChild(editorWrapEl);
 
-  undoBtnEl.addEventListener('click', () => undone ? handleRedo() : handleUndo());
+  undoBtnEl.addEventListener('click', () => performUndoRedo(undone));
   saveBtnEl.addEventListener('click', handleSave);
   runBtnEl.addEventListener('click', () => {
     if (streaming) handleStop();
@@ -590,39 +590,17 @@ function updateUndoBtn() {
   }
 }
 
-async function handleUndo() {
-  if (prevContent == null || undone) return;
+async function performUndoRedo(forward) {
+  if (prevContent == null || (forward ? !undone : undone)) return;
   undoBtnEl.classList.add('hidden');
   try {
-    const result = await completionsApi.undo(activeCompletionId);
+    const result = await (forward ? completionsApi.redo : completionsApi.undo)(activeCompletionId);
     currentText = result.content;
-    prevContent = textareaEl.value; // the post-run content is now the snapshot
-    undone = true;
+    prevContent = textareaEl.value;
+    undone = !forward;
   } catch (err) {
-    console.error('failed to undo completion:', err);
-    showError('Undo failed');
-    return;
-  }
-  genStart = null;
-  settled = true;
-  textareaEl.value = currentText;
-  setMode('write');
-  renderControls();
-  updateUndoBtn();
-  setTimeout(() => { editorScrollEl.scrollTop = editorScrollEl.scrollHeight; }, 0);
-}
-
-async function handleRedo() {
-  if (prevContent == null || !undone) return;
-  undoBtnEl.classList.add('hidden');
-  try {
-    const result = await completionsApi.redo(activeCompletionId);
-    currentText = result.content;
-    prevContent = textareaEl.value; // the pre-run content is now the snapshot
-    undone = false;
-  } catch (err) {
-    console.error('failed to redo completion:', err);
-    showError('Redo failed');
+    console.error(`failed to ${forward ? 'redo' : 'undo'} completion:`, err);
+    showError(forward ? 'Redo failed' : 'Undo failed');
     return;
   }
   genStart = null;
