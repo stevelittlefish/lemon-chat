@@ -76,7 +76,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **Completion page errors are invisible to the user** (`static/js/complete-app.js`)
   Most async failures in the completions page log to `console.error` but show nothing to the user — save failures, model-change failures, run errors, reload failures. Add a toast or status area to surface these errors, matching the inline error display the chat page provides.
 
-- [ ] **`sidebar.addItem` doesn't deduplicate** (`static/js/sidebar.js:275`)
+- [x] **`sidebar.addItem` doesn't deduplicate** (`static/js/sidebar.js:275`)
   `state.items.unshift(item)` with no check. If called twice for the same conversation ID (e.g., a race between a local `addItem` and a WebSocket `conversations_changed` reloading the sidebar), duplicate entries appear in `state.items` and in the DOM until the next full `renderList()`.
 
 - [x] **`DeleteConversation` never returns `ErrNotFound`** (`internal/store/conversations.go:66`)

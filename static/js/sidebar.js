@@ -273,6 +273,7 @@ export function setActive(id) {
 }
 
 export function addItem(item) {
+  if (state.items.some(c => c.id === item.id)) return;
   state.items.unshift(item);
   sidebarEl.querySelector('.sidebar-item.active')?.classList.remove('active');
   state.activeId = item.id;
