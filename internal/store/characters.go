@@ -23,6 +23,7 @@ type Character struct {
 	FirstMessage   *string  `json:"first_message"`
 	TitlePrompt    *string  `json:"title_prompt"`
 	CreatedBy      int64    `json:"created_by"`
+	CreatedByName  string   `json:"created_by_name"`
 	Visibility     string   `json:"visibility"`
 	AutoTitle      bool     `json:"auto_title"`
 	IsDefault      bool     `json:"is_default"`
@@ -37,10 +38,13 @@ type Character struct {
 // Private characters created by other users are excluded unless the user is an admin.
 func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, is_default, tools, avatar_filename, created_at, updated_at
-		 FROM character
-		 WHERE visibility != 'private' OR created_by = ? OR ?
-		 ORDER BY name`,
+		`SELECT c.id, c.name, c.model, c.system_prompt, c.first_message, c.title_prompt, c.created_by,
+		        COALESCE(u.display_name, u.username) as created_by_name,
+		        c.visibility, c.auto_title, c.is_default, c.tools, c.avatar_filename, c.created_at, c.updated_at
+		 FROM character c
+		 LEFT JOIN user u ON u.id = c.created_by
+		 WHERE c.visibility != 'private' OR c.created_by = ? OR ?
+		 ORDER BY c.name`,
 		userID, boolToInt(isAdmin),
 	)
 	if err != nil {
@@ -52,7 +56,7 @@ func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) 
 		var c Character
 		var autoTitle, isDefault int
 		var toolsJSON sql.NullString
-		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &isDefault, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.CreatedByName, &c.Visibility, &autoTitle, &isDefault, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		c.AutoTitle = autoTitle != 0

@@ -410,6 +410,7 @@ a.snav-item { text-decoration: none; }
   color: var(--fg-strong);
 }
 
+.char-col-owner  { width: 1px; white-space: nowrap; color: var(--fg-muted); font-size: 13px; }
 .char-col-model  { width: 1px; white-space: nowrap; }
 .char-col-visibility { width: 1px; white-space: nowrap; }
 .char-col-actions { width: 1px; white-space: nowrap; }

@@ -103,8 +103,8 @@ async function renderPage() {
       <h2>Other characters</h2>
       <p class="lead">Characters created by other users.</p>
       <table class="chars-table">
-        <thead><tr><th>Name</th><th>Model</th><th>Visibility</th><th></th></tr></thead>
-        <tbody id="other-chars-list"><tr><td colspan="4" class="users-status">Loading…</td></tr></tbody>
+        <thead><tr><th>Name</th><th>Owner</th><th>Model</th><th>Visibility</th><th></th></tr></thead>
+        <tbody id="other-chars-list"><tr><td colspan="5" class="users-status">Loading…</td></tr></tbody>
       </table>
     </div>
   `;
@@ -137,8 +137,8 @@ function renderCharacterLists() {
   const mine  = charactersData.filter(c => c.created_by === user.id);
   const other = charactersData.filter(c => c.created_by !== user.id);
 
-  myList.innerHTML    = renderCharRows(mine,  'You have no characters yet.');
-  otherList.innerHTML = renderCharRows(other, 'No characters from other users.');
+  myList.innerHTML    = renderCharRows(mine,  'You have no characters yet.', false);
+  otherList.innerHTML = renderCharRows(other, 'No characters from other users.', true);
   if (otherSection) otherSection.hidden = other.length === 0;
 
   attachRowEvents(myList);
@@ -163,9 +163,10 @@ function renderCharacterLists() {
   }
 }
 
-function renderCharRows(list, emptyMsg) {
+function renderCharRows(list, emptyMsg, showOwner) {
+  const colspan = showOwner ? 5 : 4;
   if (!list.length) {
-    return `<tr><td colspan="4" class="users-status">${emptyMsg}</td></tr>`;
+    return `<tr><td colspan="${colspan}" class="users-status">${emptyMsg}</td></tr>`;
   }
   return list.map(c => {
     const exportBtn = `<button class="btn btn-ghost btn-sm" data-action="export" data-id="${c.id}">${svgDownload} Export</button>`;
@@ -176,9 +177,11 @@ function renderCharRows(list, emptyMsg) {
       ? `<img class="avatar-sm" src="/api/characters/${c.id}/avatar" alt="">`
       : '';
     const starHtml = c.is_default ? `<img src="/assets/icons/star-mustard.svg" class="char-list-star" width="12" height="12" alt="" title="Default character">` : '';
+    const ownerCell = showOwner ? `<td class="char-col-owner">${escapeHtml(c.created_by_name)}</td>` : '';
     return `
       <tr data-id="${c.id}">
         <td class="char-col-name"><div class="char-name-cell">${starHtml}${avatarHtml}${escapeHtml(c.name)}</div></td>
+        ${ownerCell}
         <td class="char-col-model"><span class="chip">${escapeHtml(c.model)}</span></td>
         <td class="char-col-visibility"><span class="chip character-chip--${c.visibility}">${visLabel}</span></td>
         <td class="char-col-actions"><div class="user-row-actions">${exportBtn}${editBtn}${deleteBtn}</div></td>
