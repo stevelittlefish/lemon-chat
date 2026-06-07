@@ -153,7 +153,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **SSE streaming logic copy-pasted between `messages.send` and `completions.run`** (`static/js/api.js:79, 152`)
   Both functions contain identical boilerplate: getReader → TextDecoder → buffer → split on newlines → strip `data: ` prefix → check `[DONE]` → parse JSON. Only the extracted fields differ. Extract a shared `consumeSSE(res, onEvent)` helper that calls `onEvent(parsed)` for each chunk.
 
-- [ ] **Modal construction pattern repeated four times** (`static/js/thread.js`, `static/js/sidebar.js`)
+- [x] **Modal construction pattern repeated four times** (`static/js/thread.js`, `static/js/sidebar.js`)
   `getMdModal()`, `getForkModal()`, `getCtxModal()`, and `getDeleteModal()` each implement the same lazy-singleton: create overlay, wire backdrop-click, add Escape listener, append to body, cache result. The four Escape-key listeners also accumulate permanently on `document`. A small `createModal({ title, body, actions })` factory would remove the duplication and fix the listener leak.
 
 - [ ] **`handleUndo` and `handleRedo` in complete-app.js are 95% identical** (`static/js/complete-app.js:569, 590`)

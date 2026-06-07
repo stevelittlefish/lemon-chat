@@ -1,5 +1,6 @@
 import { icon } from './icons.js';
 import { escapeHtml } from './utils.js';
+import { createModal } from './modal.js';
 
 const sidebarEl = document.getElementById('sidebar');
 
@@ -142,13 +143,8 @@ let _deleteModal = null;
 function getDeleteModal() {
   if (_deleteModal) return _deleteModal;
 
-  const overlay = document.createElement('div');
+  const { overlay, dialog, open, close } = createModal('Delete item');
   overlay.className = 'fork-modal';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', 'Delete item');
-
-  const dialog = document.createElement('div');
   dialog.className = 'fork-modal-dialog';
 
   const title = document.createElement('p');
@@ -165,7 +161,7 @@ function getDeleteModal() {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'btn btn-secondary btn-sm';
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', closeDeleteModal);
+  cancelBtn.addEventListener('click', close);
 
   const confirmBtn = document.createElement('button');
   confirmBtn.className = 'btn btn-danger btn-sm';
@@ -176,41 +172,28 @@ function getDeleteModal() {
   dialog.appendChild(title);
   dialog.appendChild(body);
   dialog.appendChild(actions);
-  overlay.appendChild(dialog);
 
-  overlay.addEventListener('mousedown', (e) => {
-    if (e.target === overlay) closeDeleteModal();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.classList.contains('open')) closeDeleteModal();
-  });
-
-  document.body.appendChild(overlay);
-  _deleteModal = { overlay, confirmBtn };
+  _deleteModal = { overlay, open, close, confirmBtn };
   return _deleteModal;
 }
 
 function showDeleteConfirm(id) {
-  const { overlay, confirmBtn } = getDeleteModal();
-  confirmBtn.disabled = false;
-  confirmBtn.textContent = 'Delete';
-  confirmBtn.onclick = async () => {
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = 'Deleting…';
+  const modal = getDeleteModal();
+  modal.confirmBtn.disabled = false;
+  modal.confirmBtn.textContent = 'Delete';
+  modal.confirmBtn.onclick = async () => {
+    modal.confirmBtn.disabled = true;
+    modal.confirmBtn.textContent = 'Deleting…';
     try {
       await state.api.delete(id);
       const wasActive = state.activeId === id;
       removeItem(id);
       if (wasActive) state.onSelect?.(null);
     } finally {
-      closeDeleteModal();
+      modal.close();
     }
   };
-  overlay.classList.add('open');
-}
-
-function closeDeleteModal() {
-  _deleteModal?.overlay.classList.remove('open');
+  modal.open();
 }
 
 document.addEventListener('click', (e) => {

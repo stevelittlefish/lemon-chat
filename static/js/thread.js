@@ -2,6 +2,7 @@ import { render as renderMarkdown } from './markdown.js';
 import { icon } from './icons.js';
 import { messages as msgApi } from './api.js';
 import { escapeHtml } from './utils.js';
+import { createModal } from './modal.js';
 
 // ── Artifact panel ───────────────────────────────────────────
 
@@ -684,13 +685,8 @@ let _mdModal = null;
 function getMdModal() {
   if (_mdModal) return _mdModal;
 
-  const overlay = document.createElement('div');
+  const { overlay, dialog, open, close } = createModal('Raw markdown');
   overlay.className = 'md-modal';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', 'Raw markdown');
-
-  const dialog = document.createElement('div');
   dialog.className = 'md-modal-dialog';
 
   const head = document.createElement('div');
@@ -702,6 +698,9 @@ function getMdModal() {
 
   const actions = document.createElement('div');
   actions.className = 'md-modal-actions';
+
+  const pre = document.createElement('pre');
+  pre.className = 'md-modal-pre';
 
   const copyBtn = document.createElement('button');
   copyBtn.className = 'btn btn-secondary btn-sm';
@@ -718,40 +717,24 @@ function getMdModal() {
   closeBtn.className = 'md-modal-x';
   closeBtn.setAttribute('aria-label', 'Close');
   closeBtn.innerHTML = icon('x', 14);
-  closeBtn.addEventListener('click', closeMdModal);
+  closeBtn.addEventListener('click', close);
 
   actions.appendChild(copyBtn);
   actions.appendChild(closeBtn);
   head.appendChild(eyebrow);
   head.appendChild(actions);
 
-  const pre = document.createElement('pre');
-  pre.className = 'md-modal-pre';
-
   dialog.appendChild(head);
   dialog.appendChild(pre);
-  overlay.appendChild(dialog);
 
-  overlay.addEventListener('mousedown', (e) => {
-    if (e.target === overlay) closeMdModal();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.classList.contains('open')) closeMdModal();
-  });
-
-  document.body.appendChild(overlay);
-  _mdModal = { overlay, pre };
+  _mdModal = { overlay, open, close, pre };
   return _mdModal;
 }
 
 function openMdModal(content) {
-  const { overlay, pre } = getMdModal();
-  pre.textContent = content;
-  overlay.classList.add('open');
-}
-
-function closeMdModal() {
-  _mdModal?.overlay.classList.remove('open');
+  const modal = getMdModal();
+  modal.pre.textContent = content;
+  modal.open();
 }
 
 // ── Fork confirmation modal ──────────────────────────────────
@@ -761,13 +744,8 @@ let _forkModal = null;
 function getForkModal() {
   if (_forkModal) return _forkModal;
 
-  const overlay = document.createElement('div');
+  const { overlay, dialog, open, close } = createModal('Duplicate conversation');
   overlay.className = 'fork-modal';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', 'Duplicate conversation');
-
-  const dialog = document.createElement('div');
   dialog.className = 'fork-modal-dialog';
 
   const title = document.createElement('p');
@@ -784,7 +762,7 @@ function getForkModal() {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'btn btn-secondary btn-sm';
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', closeForkModal);
+  cancelBtn.addEventListener('click', close);
 
   const confirmBtn = document.createElement('button');
   confirmBtn.className = 'btn btn-primary btn-sm';
@@ -795,39 +773,25 @@ function getForkModal() {
   dialog.appendChild(title);
   dialog.appendChild(body);
   dialog.appendChild(actions);
-  overlay.appendChild(dialog);
 
-  overlay.addEventListener('mousedown', (e) => {
-    if (e.target === overlay) closeForkModal();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.classList.contains('open')) closeForkModal();
-  });
-
-  document.body.appendChild(overlay);
-  _forkModal = { overlay, confirmBtn };
+  _forkModal = { overlay, open, close, confirmBtn };
   return _forkModal;
 }
 
-
 function showForkConfirm(messageId) {
-  const { overlay, confirmBtn } = getForkModal();
-  confirmBtn.disabled = false;
-  confirmBtn.textContent = 'Duplicate';
-  confirmBtn.onclick = async () => {
-    confirmBtn.disabled = true;
-    confirmBtn.textContent = 'Duplicating…';
+  const modal = getForkModal();
+  modal.confirmBtn.disabled = false;
+  modal.confirmBtn.textContent = 'Duplicate';
+  modal.confirmBtn.onclick = async () => {
+    modal.confirmBtn.disabled = true;
+    modal.confirmBtn.textContent = 'Duplicating…';
     try {
       await forkHandler?.(messageId);
     } finally {
-      closeForkModal();
+      modal.close();
     }
   };
-  overlay.classList.add('open');
-}
-
-function closeForkModal() {
-  _forkModal?.overlay.classList.remove('open');
+  modal.open();
 }
 
 // ── Context modal ────────────────────────────────────────────
@@ -837,13 +801,8 @@ let _ctxModal = null;
 function getCtxModal() {
   if (_ctxModal) return _ctxModal;
 
-  const overlay = document.createElement('div');
+  const { overlay, dialog, open, close } = createModal('LLM context');
   overlay.className = 'ctx-modal';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', 'LLM context');
-
-  const dialog = document.createElement('div');
   dialog.className = 'ctx-modal-dialog';
 
   const head = document.createElement('div');
@@ -872,7 +831,7 @@ function getCtxModal() {
   closeBtn.className = 'md-modal-x';
   closeBtn.setAttribute('aria-label', 'Close');
   closeBtn.innerHTML = icon('x', 14);
-  closeBtn.addEventListener('click', closeCtxModal);
+  closeBtn.addEventListener('click', close);
 
   actions.appendChild(copyBtn);
   actions.appendChild(closeBtn);
@@ -884,24 +843,15 @@ function getCtxModal() {
 
   dialog.appendChild(head);
   dialog.appendChild(body);
-  overlay.appendChild(dialog);
 
-  overlay.addEventListener('mousedown', (e) => {
-    if (e.target === overlay) closeCtxModal();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.classList.contains('open')) closeCtxModal();
-  });
-
-  document.body.appendChild(overlay);
-  _ctxModal = { overlay, body, _messages: null };
+  _ctxModal = { overlay, open, close, body, _messages: null };
   return _ctxModal;
 }
 
 async function openCtxModal(convId, msgId) {
   const modal = getCtxModal();
   modal.body.innerHTML = '<p class="ctx-modal-loading">Loading…</p>';
-  modal.overlay.classList.add('open');
+  modal.open();
   try {
     const { messages } = await msgApi.context(convId, msgId);
     modal._messages = messages;
@@ -941,10 +891,6 @@ async function openCtxModal(convId, msgId) {
   } catch (err) {
     modal.body.innerHTML = `<p class="ctx-modal-loading">Failed to load context: ${escapeHtml(err.message)}</p>`;
   }
-}
-
-function closeCtxModal() {
-  _ctxModal?.overlay.classList.remove('open');
 }
 
 // ── Message footer ───────────────────────────────────────────
