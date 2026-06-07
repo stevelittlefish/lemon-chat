@@ -293,6 +293,13 @@ html, body {
 
 .avatar-chat--ghost { visibility: hidden; }
 
+.avatar-chat--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-faint);
+}
+
 .avatar-chat img {
   width: 100%;
   height: 100%;

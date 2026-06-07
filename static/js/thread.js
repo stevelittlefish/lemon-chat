@@ -613,32 +613,41 @@ function lastThreadSenderKey() {
 }
 
 function buildAvatar(role, msgCharacterId, ghost = false) {
+  const el = document.createElement('div');
+  el.className = ghost ? 'avatar-chat avatar-chat--ghost' : 'avatar-chat';
+  if (ghost) return el;
+
   if (role === 'user') {
-    if (!avatarCtx.userHasAvatar || !avatarCtx.userId) return null;
-    const el = document.createElement('div');
-    el.className = ghost ? 'avatar-chat avatar-chat--ghost' : 'avatar-chat';
-    if (!ghost) {
+    if (avatarCtx.userHasAvatar && avatarCtx.userId) {
       const img = withRetry(document.createElement('img'));
       img.src = `/api/users/${avatarCtx.userId}/avatar`;
       img.alt = '';
       el.appendChild(img);
+    } else {
+      el.classList.add('avatar-chat--placeholder');
+      el.innerHTML = icon('user', 28);
     }
     return el;
   }
+
   // assistant — use the character ID stored on the message (or passed explicitly for streaming)
   const charId = msgCharacterId;
-  if (!charId) return null;
+  if (!charId) {
+    el.classList.add('avatar-chat--placeholder');
+    el.innerHTML = icon('cpu', 28);
+    return el;
+  }
   const hasAvatar = avatarCtx.characterMap.has(charId)
     ? avatarCtx.characterMap.get(charId)
     : (charId === avatarCtx.characterId ? avatarCtx.characterHasAvatar : false);
-  if (!hasAvatar) return null;
-  const el = document.createElement('div');
-  el.className = ghost ? 'avatar-chat avatar-chat--ghost' : 'avatar-chat';
-  if (!ghost) {
+  if (hasAvatar) {
     const img = withRetry(document.createElement('img'));
     img.src = `/api/characters/${charId}/avatar`;
     img.alt = '';
     el.appendChild(img);
+  } else {
+    el.classList.add('avatar-chat--placeholder');
+    el.innerHTML = icon('drama', 28);
   }
   return el;
 }
