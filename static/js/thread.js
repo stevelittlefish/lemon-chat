@@ -279,15 +279,21 @@ export function setAvatarContext(ctx) {
   avatarCtx = { ...ctx };
 }
 
-// Distinguish user-initiated scrolls from programmatic ones.
-// scroll fires after position changes, so isNearBottom() is accurate here.
+// wheel fires before position changes and never fires for programmatic scrolls,
+// so it reliably detects upward-scroll intent without the rAF race.
+container.addEventListener('wheel', (e) => {
+  if (e.deltaY < 0) userScrolledDuringStream = true;
+}, { passive: true });
+
+// Fallback for touch and keyboard (Page Up, arrow keys): scroll fires after
+// position changes, so we guard against programmatic scrolls here.
 container.addEventListener('scroll', () => {
   if (programmaticScroll) return;
   if (!isNearBottom()) userScrolledDuringStream = true;
 }, { passive: true });
 
 function isNearBottom() {
-  return container.scrollHeight - container.scrollTop - container.clientHeight < 40;
+  return container.scrollHeight - container.scrollTop - container.clientHeight < 120;
 }
 
 export function showEmpty() {

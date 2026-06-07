@@ -141,7 +141,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`applyFirstMessage` swallows all errors** (`static/js/app.js:254`)
   The catch block is intentionally silent for expected 409/400 responses, but also hides network errors and server errors. Narrow the suppression to expected status codes.
 
-- [ ] **Improve auto-scroll stop sensitivity during streaming** (`static/js/thread.js:52-58`)
+- [x] **Improve auto-scroll stop sensitivity during streaming** (`static/js/thread.js:52-58`)
   The `scroll` listener only sets `userScrolledDuringStream` when the user is more than 40 px from the bottom, and the `programmaticScroll` flag is cleared only after a `requestAnimationFrame` — so a user scroll that lands during that window is silently ignored and the auto-scroll fights back. Consider using a `wheel` or `pointerdown` event to detect intent before the position changes, and raise or remove the `isNearBottom` threshold guard.
 
 - [ ] **`mimeFromFilename` (avatars.go) and `mimeTypeForFilename` (tools.go) are duplicate MIME helpers** (`internal/server/avatars.go:29`, `internal/server/tools.go:193`)
