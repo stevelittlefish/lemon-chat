@@ -730,7 +730,7 @@ func (s *Server) handleFirstMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if char.FirstMessage == nil {
-		writeError(w, http.StatusBadRequest, "character has no first message")
+		writeError(w, http.StatusUnprocessableEntity, "character has no first message")
 		return
 	}
 
