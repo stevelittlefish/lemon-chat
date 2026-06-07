@@ -225,27 +225,6 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v7 → v8 complete")
 	}
 
-	if version < 9 {
-		log.Println("store: migrating v8 → v9 (create character_hidden_message table)")
-		if _, err := s.db.Exec(`
-			CREATE TABLE IF NOT EXISTS character_hidden_message (
-				id           INTEGER PRIMARY KEY,
-				character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE,
-				role         TEXT    NOT NULL CHECK (role IN ('user', 'assistant')),
-				content      TEXT    NOT NULL,
-				sort_order   INTEGER NOT NULL DEFAULT 0,
-				created_at   TEXT    NOT NULL
-			)
-		`); err != nil {
-			return err
-		}
-		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (9, ?)`, now()); err != nil {
-			return err
-		}
-		version = 9
-		log.Println("store: migration v8 → v9 complete")
-	}
-
 	if version < 10 {
 		log.Println("store: migrating v9 → v10 (add indexes on message, conversation, session)")
 		for _, stmt := range []string{
