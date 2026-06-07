@@ -694,12 +694,6 @@ function buildMessage(msg) {
   roleEl.className = 'message-role';
   roleEl.textContent = msg.role === 'user' ? (msg.name || 'you') : (msg.name || msg.role);
   colEl.appendChild(roleEl);
-  if (msg.created_at) {
-    const tsEl = document.createElement('div');
-    tsEl.className = 'message-ts';
-    tsEl.textContent = formatTime(msg.created_at);
-    colEl.appendChild(tsEl);
-  }
 
   if (msg.content) {
     const contentEl = document.createElement('div');
@@ -957,6 +951,13 @@ async function openCtxModal(convId, msgId) {
 function buildFooter(msg, content) {
   const footer = document.createElement('div');
   footer.className = 'message-footer';
+
+  if (msg.created_at) {
+    const tsEl = document.createElement('div');
+    tsEl.className = 'message-ts';
+    tsEl.textContent = formatTime(msg.created_at);
+    footer.appendChild(tsEl);
+  }
 
   const clipBtn = document.createElement('button');
   clipBtn.className = 'foot-btn';

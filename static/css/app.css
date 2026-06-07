@@ -332,6 +332,8 @@ html, body {
   font-size: 10px;
   color: var(--fg-faint);
   padding: 0 2px;
+  line-height: 26px;
+  white-space: nowrap;
 }
 
 .date-sep {
