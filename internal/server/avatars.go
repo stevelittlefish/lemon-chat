@@ -24,22 +24,6 @@ func (s *Server) avatarDir() string {
 	return filepath.Join(s.cfg.Server.DataDir, "avatars")
 }
 
-// mimeFromFilename returns the MIME type for a filename. receiveAvatar always
-// produces ".jpg" files, so only the JPEG case is reachable in practice.
-func mimeFromFilename(filename string) string {
-	parts := strings.Split(filename, ".")
-	if len(parts) < 2 {
-		return "application/octet-stream"
-	}
-	ext := strings.ToLower(parts[len(parts)-1])
-	switch ext {
-	case "jpg", "jpeg":
-		return "image/jpeg"
-	}
-	log.Printf("avatars: unhandled extension %q, falling back to octet-stream", ext)
-	return "application/octet-stream"
-}
-
 // receiveAvatar parses a multipart upload (field "avatar"), validates it is an
 // image ≤5 MB, then crops and resizes it to a 256×256 JPEG.
 // Pass ?crop=top to crop from the top of the image instead of the center.
@@ -172,7 +156,7 @@ func (s *Server) serveAvatarFile(w http.ResponseWriter, r *http.Request, filenam
 		internalError(w, err)
 		return
 	}
-	w.Header().Set("Content-Type", mimeFromFilename(filename))
+	w.Header().Set("Content-Type", mimeTypeForFilename(filename))
 	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeContent(w, r, filename, info.ModTime(), f)
 }

@@ -263,6 +263,14 @@ type AttachmentResult struct {
 
 func mimeTypeForFilename(filename string) string {
 	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
 	case ".md":
 		return "text/markdown"
 	case ".py":
