@@ -387,20 +387,26 @@ export function renderMessages(msgs) {
     return;
   }
   let lastDk = null;
+  let prevSender = null;
   for (const msg of visible) {
     const dk = msgDateKey(msg.created_at);
     if (dk && dk !== lastDk) {
       threadEl.appendChild(buildDateSep(msg.created_at));
       lastDk = dk;
+      prevSender = null;
     }
-    threadEl.appendChild(buildMessage(msg));
+    const key = senderKey(msg.role, msg.character_id ?? null);
+    threadEl.appendChild(buildMessage(msg, key === prevSender));
+    prevSender = key;
   }
   scrollToBottom();
 }
 
 export function appendMessage(role, content, assistantName, characterId = null) {
   removeEmpty();
-  const el = buildMessage({ role, content, name: assistantName, character_id: characterId, created_at: new Date().toISOString() });
+  const key = senderKey(role, characterId);
+  const hideAvatar = key === lastThreadSenderKey();
+  const el = buildMessage({ role, content, name: assistantName, character_id: characterId, created_at: new Date().toISOString() }, hideAvatar);
   threadEl.appendChild(el);
   scrollToBottom();
   return el;
@@ -413,8 +419,11 @@ export function startStreaming() {
 
   const wrapper = document.createElement('div');
   wrapper.className = 'message assistant';
+  const streamSenderKey = senderKey('assistant', avatarCtx.characterId);
+  wrapper.dataset.sender = streamSenderKey;
 
-  const avatarEl = buildAvatar('assistant', avatarCtx.characterId);
+  const streamIsConsecutive = streamSenderKey === lastThreadSenderKey();
+  const avatarEl = buildAvatar('assistant', avatarCtx.characterId, streamIsConsecutive);
   if (avatarEl) wrapper.appendChild(avatarEl);
 
   const colEl = document.createElement('div');
@@ -591,15 +600,27 @@ function withRetry(img) {
   return img;
 }
 
-function buildAvatar(role, msgCharacterId) {
+function senderKey(role, characterId) {
+  if (role === 'user') return 'user';
+  return characterId ? `assistant:${characterId}` : 'assistant';
+}
+
+function lastThreadSenderKey() {
+  const msgs = threadEl.querySelectorAll('.message[data-sender]');
+  return msgs.length ? msgs[msgs.length - 1].dataset.sender : null;
+}
+
+function buildAvatar(role, msgCharacterId, ghost = false) {
   if (role === 'user') {
     if (!avatarCtx.userHasAvatar || !avatarCtx.userId) return null;
     const el = document.createElement('div');
-    el.className = 'avatar-chat';
-    const img = withRetry(document.createElement('img'));
-    img.src = `/api/users/${avatarCtx.userId}/avatar`;
-    img.alt = '';
-    el.appendChild(img);
+    el.className = ghost ? 'avatar-chat avatar-chat--ghost' : 'avatar-chat';
+    if (!ghost) {
+      const img = withRetry(document.createElement('img'));
+      img.src = `/api/users/${avatarCtx.userId}/avatar`;
+      img.alt = '';
+      el.appendChild(img);
+    }
     return el;
   }
   // assistant — use the character ID stored on the message (or passed explicitly for streaming)
@@ -610,11 +631,13 @@ function buildAvatar(role, msgCharacterId) {
     : (charId === avatarCtx.characterId ? avatarCtx.characterHasAvatar : false);
   if (!hasAvatar) return null;
   const el = document.createElement('div');
-  el.className = 'avatar-chat';
-  const img = withRetry(document.createElement('img'));
-  img.src = `/api/characters/${charId}/avatar`;
-  img.alt = '';
-  el.appendChild(img);
+  el.className = ghost ? 'avatar-chat avatar-chat--ghost' : 'avatar-chat';
+  if (!ghost) {
+    const img = withRetry(document.createElement('img'));
+    img.src = `/api/characters/${charId}/avatar`;
+    img.alt = '';
+    el.appendChild(img);
+  }
   return el;
 }
 
@@ -681,11 +704,12 @@ function buildToolCallEl(name, args, result) {
   return container;
 }
 
-function buildMessage(msg) {
+function buildMessage(msg, hideAvatar = false) {
   const wrapper = document.createElement('div');
   wrapper.className = `message ${msg.role}`;
+  wrapper.dataset.sender = senderKey(msg.role, msg.character_id ?? null);
 
-  const avatarEl = buildAvatar(msg.role, msg.character_id ?? null);
+  const avatarEl = buildAvatar(msg.role, msg.character_id ?? null, hideAvatar);
   if (avatarEl) wrapper.appendChild(avatarEl);
 
   const colEl = document.createElement('div');
