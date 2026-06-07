@@ -375,7 +375,13 @@ export function renderMessages(msgs) {
     showEmpty();
     return;
   }
+  let lastDk = null;
   for (const msg of visible) {
+    const dk = msgDateKey(msg.created_at);
+    if (dk && dk !== lastDk) {
+      threadEl.appendChild(buildDateSep(msg.created_at));
+      lastDk = dk;
+    }
     threadEl.appendChild(buildMessage(msg));
   }
   scrollToBottom();
@@ -527,6 +533,42 @@ export function startStreaming() {
   };
 }
 
+function formatTime(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d)) return '';
+  const h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h % 12 || 12}:${m}${h < 12 ? 'am' : 'pm'}`;
+}
+
+function formatDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d)) return '';
+  const weekday = d.toLocaleDateString('en-GB', { weekday: 'long' });
+  const day = d.getDate();
+  const month = d.toLocaleDateString('en-GB', { month: 'long' });
+  const label = `${weekday} ${day} ${month}`;
+  return d.getFullYear() !== new Date().getFullYear() ? `${label} ${d.getFullYear()}` : label;
+}
+
+function msgDateKey(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d)) return '';
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function buildDateSep(isoStr) {
+  const el = document.createElement('div');
+  el.className = 'date-sep';
+  const span = document.createElement('span');
+  span.textContent = formatDate(isoStr);
+  el.appendChild(span);
+  return el;
+}
+
 // Retry a failed image load once with a cache-busting param.
 function withRetry(img) {
   img.onerror = () => {
@@ -641,6 +683,12 @@ function buildMessage(msg) {
   roleEl.className = 'message-role';
   roleEl.textContent = msg.role === 'user' ? (msg.name || 'you') : (msg.name || msg.role);
   colEl.appendChild(roleEl);
+  if (msg.created_at) {
+    const tsEl = document.createElement('div');
+    tsEl.className = 'message-ts';
+    tsEl.textContent = formatTime(msg.created_at);
+    colEl.appendChild(tsEl);
+  }
 
   if (msg.content) {
     const contentEl = document.createElement('div');

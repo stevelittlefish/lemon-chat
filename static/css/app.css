@@ -327,6 +327,33 @@ html, body {
   padding: 0 2px;
 }
 
+.message-ts {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-faint);
+  padding: 0 2px;
+}
+
+.date-sep {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.date-sep::before,
+.date-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 .message-content {
   font-size: var(--fs-15);
   line-height: 1.6;

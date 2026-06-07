@@ -171,7 +171,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **Settings pages each independently check auth** (`static/js/settings-account.js`, `static/js/settings-character-edit.js`, etc.)
   Every settings page calls `auth.me()` and redirects to `/` on failure. A shared `requireAuth()` module that throws/redirects would centralize this and ensure consistency if the redirect target changes.
 
-- [ ] **Show per-message timestamps in the thread** (`static/js/thread.js:116,252,535`)
+- [x] **Show per-message timestamps in the thread** (`static/js/thread.js:116,252,535`)
   Add a subtle timestamp (e.g. "2:34 pm") to each message using `msg.created_at`. When the date changes mid-conversation, insert a date separator (e.g. "Tuesday 3 June") between messages so the day boundary is visible. Should be unobtrusive — small, muted text — but legible without hovering.
 
 - [x] **`window.location.reload()` after logout** (`static/js/sidebar.js:191`)
