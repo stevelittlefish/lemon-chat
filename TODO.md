@@ -70,7 +70,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **Context modal shows blank for tool-call messages** (`static/js/thread.js:764`)
   The context viewer renders `pre.textContent = msg.content`. For assistant messages that triggered tool calls, `content` is `""` and the data lives in `msg.tool_calls`. These appear as empty blocks. The modal should also render `msg.tool_calls` (and `msg.tool_call_id` for tool-result messages) when present.
 
-- [ ] **No CSRF protection on mutation endpoints**
+- [x] **No CSRF protection on mutation endpoints**
   Auth is entirely cookie-based. `SameSite: Strict` helps with modern browsers but any state-mutating endpoint is reachable from non-browser clients without a CSRF check. A double-submit cookie or a required custom header (`X-Requested-With`) is conventional for cookie-authed APIs.
 
 - [ ] **Completion page errors are invisible to the user** (`static/js/complete-app.js`)

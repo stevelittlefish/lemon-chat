@@ -6,6 +6,9 @@ async function request(method, path, body) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
   }
+  if (method !== 'GET' && method !== 'HEAD') {
+    opts.headers['X-Requested-With'] = 'XMLHttpRequest';
+  }
   const res = await fetch(path, opts);
   if (res.status === 204) return null;
   const data = await res.json();
@@ -20,7 +23,7 @@ async function request(method, path, body) {
 async function uploadFile(method, path, file) {
   const form = new FormData();
   form.append('avatar', file);
-  const res = await fetch(path, { method, body: form });
+  const res = await fetch(path, { method, body: form, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
   if (res.status === 204) return null;
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || res.statusText);
@@ -78,7 +81,7 @@ export const messages = {
     const ctrl = new AbortController();
     fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify(body),
       signal: ctrl.signal,
     }).then(async (res) => {
@@ -151,7 +154,7 @@ export const completions = {
     if (temperature != null) body.temperature = temperature;
     fetch(`/api/completions/${id}/run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify(body),
       signal: ctrl.signal,
     }).then(async (res) => {

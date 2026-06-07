@@ -14,6 +14,13 @@ const ctxUser contextKey = 0
 
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete:
+			if r.Header.Get("X-Requested-With") != "XMLHttpRequest" {
+				writeError(w, http.StatusForbidden, "forbidden")
+				return
+			}
+		}
 		cookie, err := r.Cookie("session")
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, "not authenticated")
