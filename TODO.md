@@ -61,7 +61,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Medium priority
 
-- [ ] **`GetCompletion` converts all DB errors to `ErrNotFound`** (`internal/store/completions.go:46`)
+- [x] **`GetCompletion` converts all DB errors to `ErrNotFound`** (`internal/store/completions.go:46`)
   `if err != nil { return nil, ErrNotFound }` swallows real database errors (connection failures, schema mismatches). Any underlying error surfaces as a 404 instead of a 500. Compare with `GetConversation` which correctly uses `errors.Is(err, sql.ErrNoRows)`.
 
 - [ ] **`handleGetMessageContext` silently ignores character fetch errors** (`internal/server/messages.go:634`)

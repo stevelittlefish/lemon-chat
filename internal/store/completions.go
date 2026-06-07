@@ -1,6 +1,10 @@
 package store
 
-import "time"
+import (
+	"database/sql"
+	"errors"
+	"time"
+)
 
 type Completion struct {
 	ID               int64   `json:"id"`
@@ -44,8 +48,11 @@ func (s *Store) GetCompletion(id, userID int64) (*Completion, error) {
 		 FROM completion WHERE id = ? AND user_id = ?`,
 		id, userID,
 	).Scan(&c.ID, &c.UserID, &c.Model, &c.Title, &c.Content, &c.PrevContent, &c.PromptTokens, &c.CompletionTokens, &c.Undone, &c.CreatedAt, &c.UpdatedAt)
-	if err != nil {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
 	}
 	return &c, nil
 }

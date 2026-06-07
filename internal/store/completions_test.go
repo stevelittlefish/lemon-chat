@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"slices"
 	"testing"
 	"time"
@@ -14,6 +15,30 @@ func newTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(func() { s.Close() })
 	return s
+}
+
+func TestGetCompletionErrors(t *testing.T) {
+	s := newTestStore(t)
+	user, err := s.CreateUser("testuser", nil, false, nil)
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	// Missing row → ErrNotFound
+	_, err = s.GetCompletion(999, user.ID)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing row: got %v, want ErrNotFound", err)
+	}
+
+	// Closed DB → real DB error, not ErrNotFound
+	s.db.Close()
+	_, err = s.GetCompletion(999, user.ID)
+	if errors.Is(err, ErrNotFound) {
+		t.Fatal("closed DB: got ErrNotFound, want a real DB error")
+	}
+	if err == nil {
+		t.Fatal("closed DB: got nil, want error")
+	}
 }
 
 func TestListUntitledEligibleCompletions(t *testing.T) {
