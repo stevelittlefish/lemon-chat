@@ -147,7 +147,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`mimeFromFilename` (avatars.go) and `mimeTypeForFilename` (tools.go) are duplicate MIME helpers** (`internal/server/avatars.go:29`, `internal/server/tools.go:193`)
   Both exist in the same package. The avatars version uses `strings.Split` instead of `filepath.Ext` and only handles JPEG. Remove `mimeFromFilename` and call `mimeTypeForFilename` from avatars.go instead.
 
-- [ ] **`noCacheMiddleware` is defined but never used** (`internal/server/middleware.go:56`)
+- [x] **`noCacheMiddleware` is defined but never used** (`internal/server/middleware.go:56`)
   Dead code — remove it. The individual route handlers set `Cache-Control: no-cache` inline where needed.
 
 - [ ] **SSE streaming logic copy-pasted between `messages.send` and `completions.run`** (`static/js/api.js:79, 152`)

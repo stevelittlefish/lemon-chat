@@ -59,10 +59,3 @@ func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 func currentUser(r *http.Request) *store.User {
 	return r.Context().Value(ctxUser).(*store.User)
 }
-
-func noCacheMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		next.ServeHTTP(w, r)
-	})
-}
