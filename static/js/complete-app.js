@@ -46,6 +46,8 @@ let saveBtnEl = null;
 let runBtnEl = null;
 let modeWriteBtnEl = null;
 let modeReadBtnEl = null;
+let errorMsgEl = null;
+let errorTimer = null;
 
 async function start() {
   try {
@@ -84,6 +86,7 @@ async function initApp() {
         await completionsApi.update(activeCompletionId, { model: sel.name });
       } catch (err) {
         console.error('failed to save model change:', err);
+        showError('Failed to save model change');
       }
     },
   });
@@ -177,6 +180,9 @@ function createEditorDOM() {
 
   const growEl = document.createElement('div');
   growEl.className = 'grow';
+  errorMsgEl = document.createElement('span');
+  errorMsgEl.className = 'cmp-error-msg hidden';
+  growEl.appendChild(errorMsgEl);
 
   const hintEl = document.createElement('span');
   hintEl.className = 'run-hint';
@@ -294,6 +300,7 @@ function scheduleAutoSave() {
       await completionsApi.update(savedId, { content: savedText });
     } catch (err) {
       console.error('auto-save failed:', err);
+      showError('Auto-save failed — use Save to preserve changes');
     }
   }, 1000);
 }
@@ -364,6 +371,17 @@ function updateReadView() {
   }
 }
 
+function showError(msg) {
+  if (!errorMsgEl) return;
+  if (errorTimer) clearTimeout(errorTimer);
+  errorMsgEl.textContent = msg;
+  errorMsgEl.classList.remove('hidden');
+  errorTimer = setTimeout(() => {
+    errorMsgEl.classList.add('hidden');
+    errorTimer = null;
+  }, 5000);
+}
+
 function showEmpty() {
   if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
   activeCompletionId = null;
@@ -428,6 +446,7 @@ async function loadCompletion(id, { pushHistory = true } = {}) {
     updateTokenStats();
   } catch (err) {
     console.error('failed to load completion:', err);
+    showError('Failed to load completion');
   }
 }
 
@@ -441,6 +460,7 @@ async function newCompletion() {
     loadCompletion(item.id);
   } catch (err) {
     console.error('failed to create completion:', err);
+    showError('Failed to create completion');
   }
 }
 
@@ -475,6 +495,7 @@ function handleRun() {
     },
     onError(err) {
       console.error('completion run error:', err);
+      showError('Run failed' + (err?.message ? ': ' + err.message : ''));
       finishStreaming();
     },
   });
@@ -496,6 +517,7 @@ async function finishStreaming(stopped = false) {
         await completionsApi.update(activeCompletionId, { content: currentText });
       } catch (err) {
         console.error('failed to save partial content on stop:', err);
+        showError('Failed to save partial content');
       }
       genStart = null;
       settled = true;
@@ -523,6 +545,7 @@ async function finishStreaming(stopped = false) {
       }
     } catch (err) {
       console.error('failed to reload completion after run:', err);
+      showError('Failed to reload after run');
     }
   }
 
@@ -552,6 +575,7 @@ async function handleSave() {
     }, 1500);
   } catch (err) {
     console.error('save failed:', err);
+    showError('Save failed');
   }
 }
 
@@ -576,6 +600,7 @@ async function handleUndo() {
     undone = true;
   } catch (err) {
     console.error('failed to undo completion:', err);
+    showError('Undo failed');
     return;
   }
   genStart = null;
@@ -597,6 +622,7 @@ async function handleRedo() {
     undone = false;
   } catch (err) {
     console.error('failed to redo completion:', err);
+    showError('Redo failed');
     return;
   }
   genStart = null;

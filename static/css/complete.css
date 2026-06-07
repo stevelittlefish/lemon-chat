@@ -276,7 +276,20 @@ input.param-range::-moz-range-thumb {
   flex-shrink: 0;
 }
 
-.cmp-actionbar .grow { flex: 1; min-width: 0; }
+.cmp-actionbar .grow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.cmp-error-msg {
+  font-size: 13px;
+  color: var(--danger);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .cmp-undo-btn {
   display: inline-flex;
