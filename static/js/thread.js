@@ -979,7 +979,7 @@ function buildFooter(msg, content) {
   }
 
   const convId = msg.conversation_id ?? currentConvId;
-  if (msg.id && convId) {
+  if (msg.role === 'assistant' && msg.id && convId) {
     const ctxBtn = document.createElement('button');
     ctxBtn.className = 'foot-btn';
     ctxBtn.title = 'View LLM context';
