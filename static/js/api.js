@@ -1,5 +1,30 @@
 // Fetch wrappers for the lemon-chat REST API.
 
+// Reads an SSE response body, calling onEvent(parsed) for each JSON chunk.
+// onEvent may return false to stop early (without calling onDone).
+// Calls onDone when [DONE] is received or the stream ends naturally.
+async function consumeSSE(res, onEvent, onDone) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const payload = line.slice(6);
+      if (payload === '[DONE]') { onDone?.(); return; }
+      try {
+        if (onEvent(JSON.parse(payload)) === false) return;
+      } catch { /* malformed chunk, skip */ }
+    }
+  }
+  onDone?.();
+}
+
 async function request(method, path, body) {
   const opts = { method, headers: {} };
   if (body !== undefined) {
@@ -90,34 +115,18 @@ export const messages = {
         onError?.(new Error(data.error || res.statusText));
         return;
       }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop(); // keep incomplete line
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6);
-          if (payload === '[DONE]') { onDone?.(); return; }
-          try {
-            const { delta, error, name, stats, message_id, tool_call, tool_result, attachment, new_turn } = JSON.parse(payload);
-            if (error) { onError?.(new Error(error)); return; }
-            if (name) onName?.(name);
-            if (delta) onDelta?.(delta);
-            if (stats) onStats?.(stats);
-            if (message_id) onMessageId?.(message_id);
-            if (tool_call) onToolCall?.(tool_call);
-            if (tool_result) onToolResult?.(tool_result);
-            if (attachment) onAttachment?.(attachment);
-            if (new_turn) onNewTurn?.(new_turn);
-          } catch { /* malformed chunk, skip */ }
-        }
-      }
-      onDone?.();
+      await consumeSSE(res, (ev) => {
+        const { delta, error, name, stats, message_id, tool_call, tool_result, attachment, new_turn } = ev;
+        if (error) { onError?.(new Error(error)); return false; }
+        if (name) onName?.(name);
+        if (delta) onDelta?.(delta);
+        if (stats) onStats?.(stats);
+        if (message_id) onMessageId?.(message_id);
+        if (tool_call) onToolCall?.(tool_call);
+        if (tool_result) onToolResult?.(tool_result);
+        if (attachment) onAttachment?.(attachment);
+        if (new_turn) onNewTurn?.(new_turn);
+      }, onDone);
     }).catch((err) => {
       if (err.name === 'AbortError') onAborted?.();
       else onError?.(err);
@@ -163,27 +172,11 @@ export const completions = {
         onError?.(new Error(data.error || res.statusText));
         return;
       }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const payload = line.slice(6);
-          if (payload === '[DONE]') { onDone?.(); return; }
-          try {
-            const { delta, error } = JSON.parse(payload);
-            if (error) { onError?.(new Error(error)); return; }
-            if (delta) onDelta?.(delta);
-          } catch {}
-        }
-      }
-      onDone?.();
+      await consumeSSE(res, (ev) => {
+        const { delta, error } = ev;
+        if (error) { onError?.(new Error(error)); return false; }
+        if (delta) onDelta?.(delta);
+      }, onDone);
     }).catch((err) => {
       if (err.name !== 'AbortError') onError?.(err);
     });

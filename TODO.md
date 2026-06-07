@@ -150,7 +150,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`noCacheMiddleware` is defined but never used** (`internal/server/middleware.go:56`)
   Dead code — remove it. The individual route handlers set `Cache-Control: no-cache` inline where needed.
 
-- [ ] **SSE streaming logic copy-pasted between `messages.send` and `completions.run`** (`static/js/api.js:79, 152`)
+- [x] **SSE streaming logic copy-pasted between `messages.send` and `completions.run`** (`static/js/api.js:79, 152`)
   Both functions contain identical boilerplate: getReader → TextDecoder → buffer → split on newlines → strip `data: ` prefix → check `[DONE]` → parse JSON. Only the extracted fields differ. Extract a shared `consumeSSE(res, onEvent)` helper that calls `onEvent(parsed)` for each chunk.
 
 - [ ] **Modal construction pattern repeated four times** (`static/js/thread.js`, `static/js/sidebar.js`)
