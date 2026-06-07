@@ -61,6 +61,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	log.Printf("Logout user_id=%d username=%q", user.ID, user.Username)
 	cookie, err := r.Cookie("session")
 	if err == nil {
 		_ = s.store.DeleteSession(cookie.Value)
@@ -96,6 +98,7 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 			displayName = req.DisplayName
 		}
 	}
+	log.Printf("Updating profile user_id=%d", user.ID)
 	if err := s.store.UpdateUser(user.ID, user.Username, user.PasswordHash, user.IsAdmin, displayName); err != nil {
 		internalError(w, err)
 		return
@@ -132,6 +135,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hashStr := string(hash)
+	log.Printf("Changing password user_id=%d", user.ID)
 	if err := s.store.UpdateUser(user.ID, user.Username, &hashStr, user.IsAdmin, user.DisplayName); err != nil {
 		internalError(w, err)
 		return
@@ -168,11 +172,13 @@ func (s *Server) handleUploadUserAvatar(w http.ResponseWriter, r *http.Request) 
 		internalError(w, err)
 		return
 	}
+	log.Printf("Uploading user avatar user_id=%d", user.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"has_avatar": true})
 }
 
 func (s *Server) handleDeleteUserAvatar(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
+	log.Printf("Deleting user avatar user_id=%d", user.ID)
 	if user.AvatarFilename != nil {
 		s.deleteAvatarFile(*user.AvatarFilename)
 	}

@@ -223,6 +223,8 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Sending message conversation_id=%d user_id=%d", convID, user.ID)
+
 	var chatMsgs []chatMsg
 
 	// Resolve which model/character to use: request override takes precedence over conversation.
@@ -740,6 +742,7 @@ func (s *Server) handleFirstMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	log.Printf("Sending first message conversation_id=%d user_id=%d", convID, user.ID)
 	content := substituteVars(*char.FirstMessage, char.Name, resolveUserName(user))
 	msg, err := s.store.CreateMessage(convID, "assistant", content, charID, &char.Name, nil, nil, "")
 	if err != nil {

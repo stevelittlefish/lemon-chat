@@ -158,6 +158,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 	} else if !validVisibility(req.Visibility) {
 		req.Visibility = existing.Visibility
 	}
+	log.Printf("Updating character id=%d name=%q user_id=%d", id, req.Name, user.ID)
 	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.TitlePrompt, req.Visibility, req.AutoTitle, req.Tools); err != nil {
 		internalError(w, err)
 		return
@@ -192,6 +193,7 @@ func (s *Server) handleDeleteCharacter(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "forbidden")
 		return
 	}
+	log.Printf("Deleting character id=%d name=%q user_id=%d", existing.ID, existing.Name, user.ID)
 	if existing.AvatarFilename != nil {
 		s.deleteAvatarFile(*existing.AvatarFilename)
 	}
@@ -199,7 +201,6 @@ func (s *Server) handleDeleteCharacter(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	log.Printf("Deleting character id=%d name=%q user_id=%d", existing.ID, existing.Name, user.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -289,6 +290,7 @@ func (s *Server) handleDeleteCharacterAvatar(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusForbidden, "forbidden")
 		return
 	}
+	log.Printf("Deleting character avatar id=%d user_id=%d", id, user.ID)
 	if existing.AvatarFilename != nil {
 		s.deleteAvatarFile(*existing.AvatarFilename)
 	}

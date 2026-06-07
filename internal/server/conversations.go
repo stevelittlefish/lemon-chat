@@ -41,6 +41,7 @@ func (s *Server) handleCreateConversation(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "exactly one of model or character_id is required")
 		return
 	}
+	log.Printf("Creating conversation user_id=%d", user.ID)
 	conv, err := s.store.CreateConversation(user.ID, req.Title, req.Model, req.CharacterID)
 	if err != nil {
 		internalError(w, err)
@@ -71,6 +72,7 @@ func (s *Server) handleUpdateConversation(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if req.Title != nil {
+		log.Printf("Updating conversation title id=%d user_id=%d", id, user.ID)
 		if err := s.store.UpdateConversationTitle(id, *req.Title); err != nil {
 			internalError(w, err)
 			return
@@ -94,6 +96,7 @@ func (s *Server) handleRegenerateTitle(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
+	log.Printf("Regenerating title conversation_id=%d user_id=%d", id, user.ID)
 	tasks.GenerateTitleForConversation(s.store, s.cfg, id, func(convID int64, title string) {
 		s.hub.BroadcastTitleUpdate(convID, title)
 	})
@@ -114,6 +117,7 @@ func (s *Server) handleForkConversation(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "message_id required")
 		return
 	}
+	log.Printf("Forking conversation id=%d user_id=%d", id, user.ID)
 	conv, err := s.store.ForkConversation(id, user.ID, req.MessageID)
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not found")

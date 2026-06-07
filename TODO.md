@@ -183,7 +183,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`err.message` used as `innerHTML` without escaping** (`static/js/thread.js:518`)
   Error messages from the server may contain `<` or `>` characters. Escape before inserting into the DOM, or use `.textContent`.
 
-- [ ] **Add request-level logging to all non-frequent handlers** (`internal/server/conversations.go`, `internal/server/messages.go`, `internal/server/auth.go`)
+- [x] **Add request-level logging to all non-frequent handlers** (`internal/server/conversations.go`, `internal/server/messages.go`, `internal/server/auth.go`)
   Most handlers (create/delete conversation, send message, logout, update profile, change password, fork, first-message, etc.) emit no log line. Per the logging conventions in CLAUDE.md, each should log one `log.Printf` line on entry with the relevant IDs and username.
 
 - [x] **Sidebar footer invisible until first conversation is selected** (`static/js/app.js:93`)
