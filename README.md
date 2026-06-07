@@ -12,6 +12,8 @@ Talks to locally-running models via HTTP API (tested with [Ollama](https://ollam
 
 **Characters** — define AI personas with a system prompt, a first message, hidden context messages, a custom avatar, and per-character model and title-generation settings. Characters can be private or shared with all users. SillyTavern character card PNG files can be imported directly.
 
+**Tool calls** — characters can be given a set of tools to use during chat. Built-in tools: get current time, roll dice, fetch a URL (returned as markdown), create downloadable documents, and search/read Wikipedia. Optional integrations: web search via [SearXNG](https://searxng.github.io/searxng/) and image generation via [ComfyUI](https://github.com/comfyanonymous/ComfyUI) (Stable Diffusion XL). Tools that produce files create download cards inline in the chat.
+
 **Multi-user** — admin users can create accounts, reset passwords, and grant or revoke admin access. Each user's conversations and completions are private to them.
 
 ## Requirements
@@ -55,9 +57,23 @@ All configuration lives in `lemon.toml`. See `lemon.toml.example` for the full r
 | Variable | Overrides |
 |---|---|
 | `LEMON_PORT` | `server.port` |
+| `LEMON_DATA_DIR` | `server.data_dir` |
 | `LEMON_DB_PATH` | `server.db_path` |
 | `LEMON_ADMIN_USERNAME` | `bootstrap.admin_username` |
 | `LEMON_ADMIN_PASSWORD` | `bootstrap.admin_password` |
+
+## CLI flags
+
+```
+lemon-chat [--config <path>] [--debug] [--token-log] [--list-models]
+```
+
+| Flag | Description |
+|---|---|
+| `--config <path>` | Path to config file (default: `lemon.toml`) |
+| `--debug` | Enable verbose debug logging (overrides `debug = true` in config) |
+| `--token-log` | Log every raw SSE token from the model to `<data_dir>/model_tokens.log` |
+| `--list-models` | Query all configured model servers, print their model IDs, then exit |
 
 ## Stack
 

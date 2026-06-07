@@ -93,6 +93,8 @@ internal/
     models.go          # model list handler
     characters.go      # character CRUD handlers
     completions.go     # completions CRUD + streaming handlers
+    tools.go           # tool registry, executors, attachment helpers
+    attachments.go     # attachment serve handler
     admin.go           # admin user-management handlers
     middleware.go      # session, auth, admin middleware
     ws.go              # WebSocket hub, upgrade handler, broadcast
@@ -104,6 +106,7 @@ internal/
     messages.go        # message queries
     characters.go      # character queries
     completions.go     # completion queries
+    attachments.go     # attachment queries
   tasks/
     titles.go          # background title-generation worker
     cleanup.go         # background stale-conversation cleanup worker
@@ -163,12 +166,37 @@ SPEC.md
 CLAUDE.md
 ```
 
+## Tool calls
+
+Characters can have a list of tools enabled. When a message is sent to a character with tools, the model may call tools during the response loop. The server runs up to `max_tool_loops` rounds (default 5, configurable in `lemon.toml`) before cutting off and returning the final response.
+
+Tool definitions and executors live in `internal/server/tools.go`. To add a new tool: add an entry to `toolRegistry` (the `toolDef` sent to the model) and a matching entry in `executors` (the Go function that runs it).
+
+Available tools and their config requirements:
+
+| Tool ID | Display name | Requires config |
+|---|---|---|
+| `get_time` | Get current time | — |
+| `roll_dice` | Roll dice | — |
+| `fetch_url` | Fetch URL | — |
+| `create_document` | Create document | — |
+| `wikipedia_search` | Wikipedia search | — |
+| `wikipedia_get_page` | Wikipedia get page | — |
+| `searxng` | SearXNG | `[searxng] url` in `lemon.toml` |
+| `generate_image` | Generate image | `[comfyui] url` + `workflow` in `lemon.toml` |
+
+`InitTools(cfg)` is called once at startup and sets the `Configured` flag on tools that need external services. The frontend reads `GET /api/tools` and shows a config hint for unconfigured tools.
+
+### Attachments
+
+Tools that produce files (`create_document`, `generate_image`) create an `attachment` DB record and write the file under `<data_dir>/attachments/<random-id>/`. They return an `AttachmentResult` JSON struct; `messages.go` detects this shape and emits an `attachment` SSE event so the frontend can render a download card. Attachments are served by `handleGetAttachment` in `attachments.go` — `?download=1` forces a download, otherwise the file is served inline.
+
 ## Not yet implemented
 
 The following are not yet built. Stub them out rather than building them:
 
 - User profiles / profile switcher — auth is done; only one active user at a time, no switcher UI
-- File attachments
+- User-uploaded file attachments (tool-generated attachments are implemented)
 - Model management UI — config file only, no settings panel for it
 - Message editing and regeneration
 - Conversation search
@@ -234,6 +262,18 @@ store: DeleteOrphanedMessages — deleted 3 message(s) successfully
 ```
 
 **Debug logging.** Use `debug.Log()` from `internal/debug` for output that is only useful during development (e.g. title-worker trigger conditions, raw HTTP responses from model servers). `debug.Log` is a no-op unless `debug = true` is set in `lemon.toml`. Never use `debug.Log` for things that should always be visible — use `log.Printf` for those.
+
+## CLI flags
+
+```
+lemon-chat [flags]
+  --config <path>    path to config file (default: lemon.toml)
+  --debug            enable debug logging (overrides config debug = true)
+  --token-log        log raw model SSE tokens to <data_dir>/model_tokens.log (overrides config)
+  --list-models      query all configured model servers, print their model lists, then exit
+```
+
+`--list-models` is useful for finding exact model ID strings to put in `lemon.toml`.
 
 ## Debugging flags
 
