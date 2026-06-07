@@ -24,9 +24,14 @@ export function init({ models, characters, onChange = null }) {
 }
 
 export function setConversation(id, title) {
+  const prevId = state.conversationId;
   state.conversationId = id;
   state.title = title ?? null;
-  render();
+  if (id !== null && id === prevId) {
+    updateTitle(state.title);
+  } else {
+    render();
+  }
 }
 
 export function updateTitle(title) {

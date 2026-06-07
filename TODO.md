@@ -162,7 +162,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`character_hidden_message` appears in both v0→v1 and v8→v9 migrations** (`internal/store/store.go:99, 227`)
   The table is created in the initial v1 schema block AND in a separate v9 migration using `CREATE TABLE IF NOT EXISTS`. The v9 block is now a no-op for any install that ran the current v1. Remove the v9 block (or add a comment explaining why it exists) to clarify migration ownership.
 
-- [ ] **`header.js` drops the open model-picker dropdown on every WebSocket title update** (`static/js/header.js:80`)
+- [x] **`header.js` drops the open model-picker dropdown on every WebSocket title update** (`static/js/header.js:80`)
   `render()` writes `headerEl.innerHTML = ...`, destroying all child elements including any open dropdown. `updateTitle()` already has a targeted path for title-only changes — `setConversation()` should call `updateTitle()` when only the title changes rather than calling `render()`.
 
 - [ ] **Session cookie lacks `Secure` flag** (`internal/server/auth.go:51`)
