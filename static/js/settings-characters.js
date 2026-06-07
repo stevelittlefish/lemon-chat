@@ -1,4 +1,5 @@
-import { auth, characters as charactersApi, models as modelsApi } from './api.js';
+import { characters as charactersApi, models as modelsApi } from './api.js';
+import { requireAuth } from './settings-auth.js';
 import { preload as preloadIcons, icon } from './icons.js';
 import { escapeHtml } from './utils.js';
 
@@ -8,12 +9,8 @@ let svgArrowLeft, svgUser, svgUsers, svgCpu, svgPlus, svgPencil, svgTrash, svgDo
 let charactersData = [];
 
 async function init() {
-  try {
-    user = await auth.me();
-  } catch {
-    window.location.href = '/';
-    return;
-  }
+  user = await requireAuth();
+  if (!user) return;
   await preloadIcons();
   svgArrowLeft = icon('arrow-left', 14);
   svgUser      = icon('user', 16);

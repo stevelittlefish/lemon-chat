@@ -165,10 +165,10 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] **`header.js` drops the open model-picker dropdown on every WebSocket title update** (`static/js/header.js:80`)
   `render()` writes `headerEl.innerHTML = ...`, destroying all child elements including any open dropdown. `updateTitle()` already has a targeted path for title-only changes — `setConversation()` should call `updateTitle()` when only the title changes rather than calling `render()`.
 
-- [ ] **Session cookie lacks `Secure` flag** (`internal/server/auth.go:51`)
+- [x] **Session cookie lacks `Secure` flag** (`internal/server/auth.go:51`)
   If the server is ever accessed over HTTP (common for local/self-hosted use), the session cookie is transmitted in plaintext. Add `Secure: true` and document that it requires HTTPS, or make it configurable.
 
-- [ ] **Settings pages each independently check auth** (`static/js/settings-account.js`, `static/js/settings-character-edit.js`, etc.)
+- [x] **Settings pages each independently check auth** (`static/js/settings-account.js`, `static/js/settings-character-edit.js`, etc.)
   Every settings page calls `auth.me()` and redirects to `/` on failure. A shared `requireAuth()` module that throws/redirects would centralize this and ensure consistency if the redirect target changes.
 
 - [ ] **Show per-message timestamps in the thread** (`static/js/thread.js:116,252,535`)

@@ -1,4 +1,5 @@
-import { auth, admin } from './api.js';
+import { admin } from './api.js';
+import { requireAuth } from './settings-auth.js';
 import { preload as preloadIcons, icon } from './icons.js';
 import { escapeHtml } from './utils.js';
 
@@ -10,12 +11,8 @@ let editingId      = null;
 let showingAddForm = false;
 
 async function init() {
-  try {
-    user = await auth.me();
-  } catch {
-    window.location.href = '/';
-    return;
-  }
+  user = await requireAuth();
+  if (!user) return;
   if (!user.is_admin) {
     window.location.href = '/settings/account';
     return;

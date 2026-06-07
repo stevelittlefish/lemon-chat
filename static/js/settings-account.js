@@ -1,4 +1,5 @@
 import { auth } from './api.js';
+import { requireAuth } from './settings-auth.js';
 import { preload as preloadIcons, icon } from './icons.js';
 import { renderAvatarSection, attachAvatarSection } from './settings-avatar.js';
 import { escapeHtml } from './utils.js';
@@ -7,12 +8,8 @@ let user = null;
 let svgArrowLeft, svgUser, svgUsers, svgCpu, svgLock, svgEye, svgPencil;
 
 async function init() {
-  try {
-    user = await auth.me();
-  } catch {
-    window.location.href = '/';
-    return;
-  }
+  user = await requireAuth();
+  if (!user) return;
   await preloadIcons();
   svgArrowLeft = icon('arrow-left', 14);
   svgUser      = icon('user', 16);

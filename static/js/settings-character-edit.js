@@ -1,4 +1,5 @@
-import { auth, characters as charactersApi, models as modelsApi, tools as toolsApi } from './api.js';
+import { characters as charactersApi, models as modelsApi, tools as toolsApi } from './api.js';
+import { requireAuth } from './settings-auth.js';
 import { preload as preloadIcons, icon } from './icons.js';
 import { renderAvatarSection, attachAvatarSection } from './settings-avatar.js';
 import { escapeHtml } from './utils.js';
@@ -20,12 +21,8 @@ let allTools    = [];
 let enabledTools = [];
 
 async function init() {
-  try {
-    user = await auth.me();
-  } catch {
-    window.location.href = '/';
-    return;
-  }
+  user = await requireAuth();
+  if (!user) return;
 
   if (!isNew && !editId) {
     window.location.href = '/settings/characters';
