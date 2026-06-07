@@ -400,7 +400,7 @@ export function renderMessages(msgs) {
 
 export function appendMessage(role, content, assistantName, characterId = null) {
   removeEmpty();
-  const el = buildMessage({ role, content, name: assistantName, character_id: characterId });
+  const el = buildMessage({ role, content, name: assistantName, character_id: characterId, created_at: new Date().toISOString() });
   threadEl.appendChild(el);
   scrollToBottom();
   return el;
@@ -437,6 +437,7 @@ export function startStreaming() {
   let accumulated = '';
   let streamStats = null;
   let streamMsgId = null;
+  const streamStartedAt = new Date().toISOString();
   let toolCallsEl = null; // lazy-created container for tool call entries
   const toolCallEls = new Map(); // id → .tool-call element for result updates
   const pendingImages = new Map(); // tool call id → placeholder element
@@ -512,7 +513,7 @@ export function startStreaming() {
       }
       if (accumulated) {
         contentEl.innerHTML = renderMarkdown(accumulated);
-        colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId }, accumulated));
+        colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId, created_at: streamStartedAt }, accumulated));
       } else {
         // Tool calls / images only — remove the empty typing-indicator contentEl.
         contentEl.remove();
@@ -531,7 +532,7 @@ export function startStreaming() {
         stopNote.className = 'message-stopped';
         stopNote.textContent = 'stopped';
         colEl.appendChild(stopNote);
-        colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId }, accumulated));
+        colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId, created_at: streamStartedAt }, accumulated));
       } else {
         contentEl.remove();
       }
