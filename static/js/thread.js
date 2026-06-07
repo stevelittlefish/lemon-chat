@@ -307,6 +307,21 @@ export function showEmpty() {
 }
 
 export function showPicker(models, characters, onSelect) {
+  const defaultChar = characters.find(c => c.is_default) ?? null;
+  const restChars   = characters.filter(c => !c.is_default);
+
+  function charCard(c) {
+    return `
+      <button class="picker-card${c.is_default ? ' picker-card--default' : ''}" data-type="character" data-id="${c.id}">
+        ${c.is_default ? `<span class="picker-card-star">${icon('star', 11)}</span>` : ''}
+        ${c.has_avatar
+          ? `<div class="picker-card-avatar"><img src="/api/characters/${c.id}/avatar" alt=""></div>`
+          : `<div class="picker-card-avatar picker-card-avatar--placeholder">${icon('drama', 20)}</div>`
+        }
+        <span class="picker-card-name">${escapeHtml(c.name)}</span>
+      </button>`;
+  }
+
   const modelCards = models.map(m => `
     <button class="picker-card" data-type="model" data-name="${escapeHtml(m.name)}">
       <span class="picker-card-icon">${icon('cpu', 22)}</span>
@@ -314,28 +329,22 @@ export function showPicker(models, characters, onSelect) {
     </button>
   `).join('');
 
-  const sorted = [...characters].sort((a, b) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0));
-  const charCards = sorted.map(c => `
-    <button class="picker-card${c.is_default ? ' picker-card--default' : ''}" data-type="character" data-id="${c.id}">
-      ${c.is_default ? `<span class="picker-card-star">${icon('star', 11)}</span>` : ''}
-      ${c.has_avatar
-        ? `<div class="picker-card-avatar"><img src="/api/characters/${c.id}/avatar" alt=""></div>`
-        : `<div class="picker-card-avatar picker-card-avatar--placeholder">${icon('drama', 20)}</div>`
-      }
-      <span class="picker-card-name">${escapeHtml(c.name)}</span>
-    </button>
-  `).join('');
-
   threadEl.innerHTML = `
     <div class="picker">
+      ${defaultChar ? `
+        <div class="picker-section">
+          <div class="picker-section-label">default</div>
+          <div class="picker-grid">${charCard(defaultChar)}</div>
+        </div>
+      ` : ''}
       <div class="picker-section">
         <div class="picker-section-label">models</div>
         <div class="picker-grid">${modelCards}</div>
       </div>
-      ${characters.length ? `
+      ${restChars.length ? `
         <div class="picker-section">
           <div class="picker-section-label">characters</div>
-          <div class="picker-grid">${charCards}</div>
+          <div class="picker-grid">${restChars.map(charCard).join('')}</div>
         </div>
       ` : ''}
     </div>

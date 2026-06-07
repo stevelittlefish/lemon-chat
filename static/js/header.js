@@ -18,8 +18,13 @@ export function init({ models, characters, onChange = null }) {
   state.models = models;
   state.characters = characters;
   state.onChange = onChange;
-  const def = models.find(m => m.default) ?? models[0];
-  state.selection = def ? { type: 'model', name: def.name } : null;
+  const defaultChar = characters.find(c => c.is_default);
+  if (defaultChar) {
+    state.selection = { type: 'character', id: defaultChar.id };
+  } else {
+    const def = models.find(m => m.default) ?? models[0];
+    state.selection = def ? { type: 'model', name: def.name } : null;
+  }
   render();
 }
 
