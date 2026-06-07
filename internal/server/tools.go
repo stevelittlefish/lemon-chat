@@ -189,6 +189,56 @@ var toolRegistry = map[string]toolDef{
 			},
 		},
 	},
+	"wikipedia_search": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "wikipedia_search",
+			Description: "Searches Wikipedia and returns matching article titles and snippets. Use this to find the correct article title before calling wikipedia_get_page.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"query": map[string]any{
+						"type":        "string",
+						"description": "The search query.",
+					},
+					"max_results": map[string]any{
+						"type":        "integer",
+						"description": "Number of results to return (1–10, default 5).",
+					},
+					"lang": map[string]any{
+						"type":        "string",
+						"description": "Wikipedia language code (e.g. \"en\", \"fr\", \"de\"). Defaults to \"en\".",
+					},
+				},
+				Required: []string{"query"},
+			},
+		},
+	},
+	"wikipedia_get_page": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "wikipedia_get_page",
+			Description: "Fetches a Wikipedia article. Without a section argument, returns the intro paragraph and a table of contents listing all sections. With a section argument, returns the full text of that section. Use iteratively to read an article section by section.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"title": map[string]any{
+						"type":        "string",
+						"description": "The Wikipedia article title, exactly as returned by wikipedia_search.",
+					},
+					"section": map[string]any{
+						"type":        "string",
+						"description": "Section name to retrieve. Omit to get the intro and table of contents.",
+					},
+					"lang": map[string]any{
+						"type":        "string",
+						"description": "Wikipedia language code (e.g. \"en\", \"fr\", \"de\"). Defaults to \"en\".",
+					},
+				},
+				Required: []string{"title"},
+			},
+		},
+	},
 }
 
 // ToolDefsForCharacter returns tool definitions for the given tool IDs.
@@ -680,6 +730,221 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		out, _ := json.Marshal(result)
 		return string(out), nil
 	},
+	"wikipedia_search": func(argsJSON string, _ ToolContext) (string, error) {
+		var args struct {
+			Query      string `json:"query"`
+			MaxResults int    `json:"max_results"`
+			Lang       string `json:"lang"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Query == "" {
+			return "", fmt.Errorf("query is required")
+		}
+		lang := args.Lang
+		if lang == "" {
+			lang = "en"
+		}
+		n := args.MaxResults
+		if n <= 0 {
+			n = 5
+		}
+		if n > 10 {
+			n = 10
+		}
+
+		log.Printf("Searching Wikipedia query=%q lang=%q", args.Query, lang)
+
+		searchURL := fmt.Sprintf("https://%s.wikipedia.org/w/api.php?action=query&list=search&srsearch=%s&format=json&srlimit=%d",
+			lang, url.QueryEscape(args.Query), n)
+
+		fetchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		req, err := http.NewRequestWithContext(fetchCtx, "GET", searchURL, nil)
+		if err != nil {
+			return "", fmt.Errorf("build request: %w", err)
+		}
+		req.Header.Set("User-Agent", "lemon-chat/1.0")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("could not reach Wikipedia: %w", err)
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 1*1024*1024))
+		if err != nil {
+			return "", fmt.Errorf("could not read response: %w", err)
+		}
+
+		var data struct {
+			Query struct {
+				Search []struct {
+					Title   string `json:"title"`
+					Snippet string `json:"snippet"`
+				} `json:"search"`
+			} `json:"query"`
+		}
+		if err := json.Unmarshal(body, &data); err != nil {
+			return "", fmt.Errorf("could not parse Wikipedia response: %w", err)
+		}
+
+		if len(data.Query.Search) == 0 {
+			return "No results found for: " + args.Query, nil
+		}
+
+		var sb strings.Builder
+		for i, r := range data.Query.Search {
+			snippet := strings.TrimSpace(stripHTML(r.Snippet))
+			fmt.Fprintf(&sb, "%d. **%s** — %s\n", i+1, r.Title, snippet)
+		}
+		return strings.TrimSpace(sb.String()), nil
+	},
+	"wikipedia_get_page": func(argsJSON string, _ ToolContext) (string, error) {
+		var args struct {
+			Title   string `json:"title"`
+			Section string `json:"section"`
+			Lang    string `json:"lang"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Title == "" {
+			return "", fmt.Errorf("title is required")
+		}
+		lang := args.Lang
+		if lang == "" {
+			lang = "en"
+		}
+
+		log.Printf("Fetching Wikipedia page title=%q section=%q lang=%q", args.Title, args.Section, lang)
+
+		fetchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		doGet := func(u string) ([]byte, int, error) {
+			req, err := http.NewRequestWithContext(fetchCtx, "GET", u, nil)
+			if err != nil {
+				return nil, 0, err
+			}
+			req.Header.Set("User-Agent", "lemon-chat/1.0")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return nil, 0, err
+			}
+			defer resp.Body.Close()
+			body, err := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024))
+			return body, resp.StatusCode, err
+		}
+
+		// Fetch TOC (needed for both the intro and section cases).
+		tocURL := fmt.Sprintf("https://%s.wikipedia.org/w/api.php?action=parse&page=%s&prop=sections&format=json",
+			lang, url.QueryEscape(args.Title))
+		tocBody, tocStatus, err := doGet(tocURL)
+		if err != nil {
+			return "", fmt.Errorf("could not reach Wikipedia: %w", err)
+		}
+		if tocStatus != http.StatusOK {
+			return "", fmt.Errorf("Wikipedia returned HTTP %d for %q", tocStatus, args.Title)
+		}
+
+		var tocData struct {
+			Parse struct {
+				Sections []struct {
+					Number string `json:"number"`
+					Line   string `json:"line"`
+					Index  string `json:"index"`
+				} `json:"sections"`
+			} `json:"parse"`
+			Error struct {
+				Info string `json:"info"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(tocBody, &tocData); err != nil {
+			return "", fmt.Errorf("could not parse Wikipedia response: %w", err)
+		}
+		if tocData.Error.Info != "" {
+			return "", fmt.Errorf("Wikipedia error for %q: %s — try wikipedia_search to find the correct article title", args.Title, tocData.Error.Info)
+		}
+
+		if args.Section == "" {
+			// Fetch intro via the REST summary endpoint.
+			summaryURL := fmt.Sprintf("https://%s.wikipedia.org/api/rest_v1/page/summary/%s",
+				lang, url.PathEscape(args.Title))
+			summaryBody, summaryStatus, err := doGet(summaryURL)
+			if err != nil {
+				return "", fmt.Errorf("could not reach Wikipedia: %w", err)
+			}
+			if summaryStatus == http.StatusNotFound {
+				return "", fmt.Errorf("Wikipedia article %q not found — try wikipedia_search to find the correct article title", args.Title)
+			}
+			if summaryStatus != http.StatusOK {
+				return "", fmt.Errorf("Wikipedia returned HTTP %d for %q", summaryStatus, args.Title)
+			}
+
+			var summary struct {
+				Extract string `json:"extract"`
+			}
+			if err := json.Unmarshal(summaryBody, &summary); err != nil {
+				return "", fmt.Errorf("could not parse Wikipedia summary: %w", err)
+			}
+
+			var sb strings.Builder
+			sb.WriteString(summary.Extract)
+			if len(tocData.Parse.Sections) > 0 {
+				sb.WriteString("\n\nSections:\n")
+				for _, s := range tocData.Parse.Sections {
+					title := strings.TrimSpace(stripHTML(s.Line))
+					fmt.Fprintf(&sb, "%s. %s\n", s.Number, title)
+				}
+			}
+			return strings.TrimSpace(sb.String()), nil
+		}
+
+		// Section requested — find its index.
+		sectionLower := strings.ToLower(args.Section)
+		sectionIndex := ""
+		for _, s := range tocData.Parse.Sections {
+			title := strings.TrimSpace(stripHTML(s.Line))
+			if strings.ToLower(title) == sectionLower {
+				sectionIndex = s.Index
+				break
+			}
+		}
+		if sectionIndex == "" {
+			var names []string
+			for _, s := range tocData.Parse.Sections {
+				names = append(names, strings.TrimSpace(stripHTML(s.Line)))
+			}
+			return "", fmt.Errorf("section %q not found in %q — available sections: %s", args.Section, args.Title, strings.Join(names, ", "))
+		}
+
+		contentURL := fmt.Sprintf("https://%s.wikipedia.org/w/api.php?action=parse&page=%s&prop=text&section=%s&format=json",
+			lang, url.QueryEscape(args.Title), sectionIndex)
+		contentBody, contentStatus, err := doGet(contentURL)
+		if err != nil {
+			return "", fmt.Errorf("could not reach Wikipedia: %w", err)
+		}
+		if contentStatus != http.StatusOK {
+			return "", fmt.Errorf("Wikipedia returned HTTP %d fetching section %q", contentStatus, args.Section)
+		}
+
+		var contentData struct {
+			Parse struct {
+				Text map[string]string `json:"text"`
+			} `json:"parse"`
+		}
+		if err := json.Unmarshal(contentBody, &contentData); err != nil {
+			return "", fmt.Errorf("could not parse Wikipedia section response: %w", err)
+		}
+		html := contentData.Parse.Text["*"]
+		if html == "" {
+			return fmt.Sprintf("Section %q appears to be empty.", args.Section), nil
+		}
+		return strings.TrimSpace(stripHTML(html)), nil
+	},
 }
 
 type searxngResponse struct {
@@ -794,6 +1059,8 @@ func InitTools(cfg *config.Config) {
 		{"roll_dice", "Roll dice", "Rolls dice using standard notation (e.g. 2d6, 1d20).", true, ""},
 		{"fetch_url", "Fetch URL", "Fetches a URL and returns its content as markdown, or raw HTML if source is true.", true, ""},
 		{"create_document", "Create document", "Saves a file (report, script, notes, etc.) the user can download.", true, ""},
+		{"wikipedia_search", "Wikipedia search", "Searches Wikipedia and returns matching article titles and snippets.", true, ""},
+		{"wikipedia_get_page", "Wikipedia get page", "Fetches a Wikipedia article intro + TOC, or a specific section by name.", true, ""},
 	}
 	searxngConfigured := cfg.SearXNG.URL != ""
 	searxngHint := ""
