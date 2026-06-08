@@ -519,16 +519,18 @@ export function startStreaming() {
     },
     addAttachment(att) {
       if (att.mime_type?.startsWith('image/') && att.tool_call_id) {
+        const imgWrap = buildInlineImage(att);
+        const imgTag = imgWrap.querySelector('img');
+        if (imgTag) imgTag.addEventListener('load', () => { if (!userScrolledDuringStream) scrollToBottom(); }, { once: true });
         const placeholder = pendingImages.get(att.tool_call_id);
         if (placeholder) {
-          placeholder.replaceWith(buildInlineImage(att));
+          placeholder.replaceWith(imgWrap);
           pendingImages.delete(att.tool_call_id);
         } else {
           // Fallback: no placeholder was pre-created — insert after tool calls.
-          const img = buildInlineImage(att);
-          if (waitingEl) colEl.insertBefore(img, waitingEl);
-          else if (accumulated) colEl.appendChild(img);
-          else colEl.insertBefore(img, contentEl);
+          if (waitingEl) colEl.insertBefore(imgWrap, waitingEl);
+          else if (accumulated) colEl.appendChild(imgWrap);
+          else colEl.insertBefore(imgWrap, contentEl);
         }
         hasImages = true;
       } else {
