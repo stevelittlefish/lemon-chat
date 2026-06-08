@@ -180,7 +180,7 @@ var toolRegistry = map[string]toolDef{
 					},
 					"steps": map[string]any{
 						"type":        "integer",
-						"description": "Number of diffusion steps. Default: 25. More steps can improve quality but take longer. Typical range: 20–50.",
+						"description": "Number of diffusion steps. Default: 30. More steps can improve quality but take longer. Typical range: 20–50.",
 					},
 				},
 				Required: []string{"prompt"},
@@ -1112,7 +1112,7 @@ func InitTools(cfg *config.Config) {
 	if !sdxlConfigured {
 		sdxlHint = "Add [comfyui] url and sdxl_file to lemon.toml to enable SDXL image generation."
 	} else {
-		executors["generate_image_sdxl"] = makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.SDXLFile, 25, 7.0)
+		executors["generate_image_sdxl"] = makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.SDXLFile, 30, 7.0)
 	}
 	allTools = append(allTools, ToolMeta{"generate_image_sdxl", "Generate image (SDXL)", toolRegistry["generate_image_sdxl"].Function.Description, sdxlConfigured, sdxlHint})
 
