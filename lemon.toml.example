@@ -59,9 +59,12 @@ model_server = "local"
 # url = "http://localhost:8181"
 
 # Optional: ComfyUI image generation integration.
-# When set, the generate_image tool becomes available to characters.
-# workflow points to a ComfyUI workflow JSON file with "__PROMPT__" and
-# "__NEGATIVE_PROMPT__" as placeholder strings on the text input nodes.
+# Set url plus whichever workflow files you have. Each enables a separate tool:
+#   sdxl_file → generate_image_sdxl  (20–50 steps, supports negative prompt)
+#   flux_file → generate_image_flux  (1–4 steps, faster, no negative prompt)
+# Workflow JSON files use placeholder strings: "__PROMPT__", "__NEGATIVE_PROMPT__",
+#   __SEED__, __CFG__, __WIDTH__, __HEIGHT__, __STEPS__
 # [comfyui]
-# url      = "http://localhost:8188"
-# workflow = "data/comfyui/sdxl.json"
+# url       = "http://localhost:8188"
+# sdxl_file = "data/comfyui/sdxl.json"
+# flux_file = "data/comfyui/flux.json"

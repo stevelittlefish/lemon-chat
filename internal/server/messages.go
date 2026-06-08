@@ -495,8 +495,6 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 					ModelServer:     modelServer,
 					ResponseTimeout: responseTimeout,
 					SearXNGURL:      s.cfg.SearXNG.URL,
-					ComfyUIURL:      s.cfg.ComfyUI.URL,
-					ComfyUIWorkflow: s.cfg.ComfyUI.Workflow,
 					ToolCallID:      tc.id,
 					ConversationID:  convID,
 					Store:           s.store,

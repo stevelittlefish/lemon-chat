@@ -46,8 +46,6 @@ type ToolContext struct {
 	ModelServer     *config.ModelServer
 	ResponseTimeout time.Duration
 	SearXNGURL      string
-	ComfyUIURL      string
-	ComfyUIWorkflow string
 	// for tools that create attachments
 	ToolCallID     string
 	ConversationID int64
@@ -148,10 +146,10 @@ var toolRegistry = map[string]toolDef{
 			},
 		},
 	},
-	"generate_image": {
+	"generate_image_sdxl": {
 		Type: "function",
 		Function: toolFunction{
-			Name:        "generate_image",
+			Name:        "generate_image_sdxl",
 			Description: "Generates an image using Stable Diffusion XL via ComfyUI. Use to illustrate scenes, characters, or objects. Be descriptive — include art style, lighting, and mood. The generated image is automatically displayed in the chat — do not describe or embed it in your text response.",
 			Parameters: toolParam{
 				Type: "object",
@@ -183,6 +181,39 @@ var toolRegistry = map[string]toolDef{
 					"steps": map[string]any{
 						"type":        "integer",
 						"description": "Number of diffusion steps. Default: 25. More steps can improve quality but take longer. Typical range: 20–50.",
+					},
+				},
+				Required: []string{"prompt"},
+			},
+		},
+	},
+	"generate_image_flux": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "generate_image_flux",
+			Description: "Generates an image using Flux Schnell via ComfyUI. Fast, high-quality image generation. Use 1–4 steps for best results — no negative prompt needed. Be descriptive about subject, art style, lighting, and mood. The generated image is automatically displayed in the chat — do not describe or embed it in your text response.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"prompt": map[string]any{
+						"type":        "string",
+						"description": "Detailed visual description of the image. Include subject, setting, art style, lighting, and mood.",
+					},
+					"seed": map[string]any{
+						"type":        "integer",
+						"description": "Seed for reproducible results. Omit or set to 0 for a random seed.",
+					},
+					"width": map[string]any{
+						"type":        "integer",
+						"description": "Image width in pixels. Default: 1024. Must be a multiple of 64. Recommended sizes: 1024×1024 (square), 1360×768 (16:9), 768×1360 (9:16), 1024×768 (4:3), 768×1024 (3:4).",
+					},
+					"height": map[string]any{
+						"type":        "integer",
+						"description": "Image height in pixels. Default: 1024. Must be a multiple of 64. See width description for recommended size combinations.",
+					},
+					"steps": map[string]any{
+						"type":        "integer",
+						"description": "Number of diffusion steps. Default: 4. Range: 1–8. Flux Schnell is optimised for very few steps.",
 					},
 				},
 				Required: []string{"prompt"},
@@ -543,201 +574,6 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		}
 		return strings.TrimSpace(sb.String()), nil
 	},
-	"generate_image": func(argsJSON string, tctx ToolContext) (string, error) {
-		var args struct {
-			Prompt         string  `json:"prompt"`
-			NegativePrompt string  `json:"negative_prompt"`
-			Seed           int64   `json:"seed"`
-			CFG            float64 `json:"cfg"`
-			Width          int     `json:"width"`
-			Height         int     `json:"height"`
-			Steps          int     `json:"steps"`
-		}
-		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
-			return "", fmt.Errorf("invalid args: %w", err)
-		}
-		if args.Prompt == "" {
-			return "", fmt.Errorf("prompt is required")
-		}
-		if tctx.ComfyUIURL == "" {
-			return "", fmt.Errorf("generate_image is not configured (add [comfyui] url to lemon.toml)")
-		}
-		if tctx.ComfyUIWorkflow == "" {
-			return "", fmt.Errorf("generate_image is not configured: add workflow = \"/path/to/workflow.json\" under [comfyui] in lemon.toml")
-		}
-
-		// Apply defaults.
-		seed := args.Seed
-		if seed <= 0 {
-			seed = rand.Int63()
-		}
-		cfg := args.CFG
-		if cfg <= 0 {
-			cfg = 7.0
-		}
-		width := args.Width
-		if width <= 0 {
-			width = 1024
-		}
-		height := args.Height
-		if height <= 0 {
-			height = 1024
-		}
-		steps := args.Steps
-		if steps <= 0 {
-			steps = 25
-		}
-
-		workflowData, err := os.ReadFile(tctx.ComfyUIWorkflow)
-		if err != nil {
-			return "", fmt.Errorf("generate_image: cannot read workflow file %q — check the workflow path in lemon.toml: %w", tctx.ComfyUIWorkflow, err)
-		}
-
-		// Replace placeholders: prompts use JSON-encoded strings; numeric values are bare.
-		promptJSON, _ := json.Marshal(args.Prompt)
-		negJSON, _ := json.Marshal(args.NegativePrompt)
-		workflowStr := strings.ReplaceAll(string(workflowData), `"__PROMPT__"`, string(promptJSON))
-		workflowStr = strings.ReplaceAll(workflowStr, `"__NEGATIVE_PROMPT__"`, string(negJSON))
-		workflowStr = strings.ReplaceAll(workflowStr, `__SEED__`, strconv.FormatInt(seed, 10))
-		workflowStr = strings.ReplaceAll(workflowStr, `__CFG__`, strconv.FormatFloat(cfg, 'f', -1, 64))
-		workflowStr = strings.ReplaceAll(workflowStr, `__WIDTH__`, strconv.Itoa(width))
-		workflowStr = strings.ReplaceAll(workflowStr, `__HEIGHT__`, strconv.Itoa(height))
-		workflowStr = strings.ReplaceAll(workflowStr, `__STEPS__`, strconv.Itoa(steps))
-
-		var workflow map[string]any
-		if err := json.Unmarshal([]byte(workflowStr), &workflow); err != nil {
-			return "", fmt.Errorf("workflow file %q contains invalid JSON: %w — tell the user the image could not be generated due to an invalid workflow file", tctx.ComfyUIWorkflow, err)
-		}
-
-		clientID := randomID()
-		promptPayload, _ := json.Marshal(map[string]any{
-			"prompt":    workflow,
-			"client_id": clientID,
-		})
-
-		log.Printf("Generating image prompt=%q conversation_id=%d", args.Prompt, tctx.ConversationID)
-
-		comfyBase := strings.TrimRight(tctx.ComfyUIURL, "/")
-
-		submitCtx, submitCancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer submitCancel()
-
-		req, err := http.NewRequestWithContext(submitCtx, "POST", comfyBase+"/prompt", bytes.NewReader(promptPayload))
-		if err != nil {
-			return "", fmt.Errorf("build prompt request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return "", fmt.Errorf("could not reach ComfyUI at %q: %w — tell the user the image could not be generated because ComfyUI is unreachable and they should check that it is running", tctx.ComfyUIURL, err)
-		}
-		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("ComfyUI returned HTTP %d: %s — tell the user the image could not be generated because ComfyUI returned an error", resp.StatusCode, respBody)
-		}
-
-		var promptResp struct {
-			PromptID string `json:"prompt_id"`
-		}
-		if err := json.Unmarshal(respBody, &promptResp); err != nil || promptResp.PromptID == "" {
-			return "", fmt.Errorf("ComfyUI returned an unexpected response (expected a prompt_id): %s — tell the user image generation failed due to an unexpected ComfyUI response", string(respBody))
-		}
-
-		// Poll /history/{prompt_id} until the job completes or we time out.
-		type comfyImage struct {
-			Filename  string `json:"filename"`
-			Subfolder string `json:"subfolder"`
-			Type      string `json:"type"`
-		}
-		type comfyOutput struct {
-			Images []comfyImage `json:"images"`
-		}
-		type comfyJob struct {
-			Outputs map[string]comfyOutput `json:"outputs"`
-		}
-
-		deadline := time.Now().Add(120 * time.Second)
-		var found *comfyImage
-		for time.Now().Before(deadline) {
-			time.Sleep(1 * time.Second)
-
-			pollCtx, pollCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			pollReq, _ := http.NewRequestWithContext(pollCtx, "GET", comfyBase+"/history/"+promptResp.PromptID, nil)
-			pollResp, pollErr := http.DefaultClient.Do(pollReq)
-			pollCancel()
-			if pollErr != nil {
-				continue
-			}
-			pollBody, _ := io.ReadAll(pollResp.Body)
-			pollResp.Body.Close()
-
-			var history map[string]comfyJob
-			if jsonErr := json.Unmarshal(pollBody, &history); jsonErr != nil {
-				continue
-			}
-			if job, ok := history[promptResp.PromptID]; ok {
-				for _, output := range job.Outputs {
-					if len(output.Images) > 0 {
-						img := output.Images[0]
-						found = &img
-						break
-					}
-				}
-				if found != nil {
-					break
-				}
-			}
-		}
-
-		if found == nil {
-			return "", fmt.Errorf("image generation timed out after 120 seconds — tell the user the image was not produced in time and suggest checking that ComfyUI is processing jobs correctly")
-		}
-
-		// Download the generated image.
-		viewURL := comfyBase + "/view?filename=" + url.QueryEscape(found.Filename) +
-			"&subfolder=" + url.QueryEscape(found.Subfolder) +
-			"&type=" + url.QueryEscape(found.Type)
-
-		dlCtx, dlCancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer dlCancel()
-
-		dlReq, err := http.NewRequestWithContext(dlCtx, "GET", viewURL, nil)
-		if err != nil {
-			return "", fmt.Errorf("build download request: %w", err)
-		}
-		dlResp, err := http.DefaultClient.Do(dlReq)
-		if err != nil {
-			return "", fmt.Errorf("image was generated but could not be downloaded from ComfyUI: %w — tell the user the image was produced but could not be retrieved", err)
-		}
-		imgData, _ := io.ReadAll(dlResp.Body)
-		dlResp.Body.Close()
-
-		relDir := filepath.Join("attachments", randomID())
-		absDir := filepath.Join(tctx.DataDir, relDir)
-		if err := os.MkdirAll(absDir, 0755); err != nil {
-			return "", fmt.Errorf("server error: could not create storage directory (%w) — tell the user the image was generated but could not be saved due to a server storage problem", err)
-		}
-		if err := os.WriteFile(filepath.Join(absDir, "image.png"), imgData, 0644); err != nil {
-			return "", fmt.Errorf("server error: could not write image to disk (%w) — tell the user the image was generated but could not be saved due to a server storage problem", err)
-		}
-		diskPath := filepath.Join(relDir, "image.png")
-
-		att, err := tctx.Store.CreateAttachment(tctx.ToolCallID, tctx.ConversationID, "Generated image", "image.png", "image/png", diskPath)
-		if err != nil {
-			return "", fmt.Errorf("server error: could not record image in database (%w) — tell the user the image was generated but could not be saved due to a server error", err)
-		}
-
-		result := AttachmentResult{
-			AttachmentID: att.ID,
-			Title:        "Generated image",
-			Filename:     "image.png",
-			MimeType:     "image/png",
-		}
-		out, _ := json.Marshal(result)
-		return string(out), nil
-	},
 	"wikipedia_search": func(argsJSON string, _ ToolContext) (string, error) {
 		var args struct {
 			Query      string `json:"query"`
@@ -1058,9 +894,202 @@ type ToolMeta struct {
 
 var allTools []ToolMeta
 
-// InitTools builds the available tools list. Call once at server startup.
-// searxng and generate_image are always included; Configured is false when
-// the required config is missing, and ConfigHint tells the user what to add.
+// makeImageExecutor returns an executor for a ComfyUI workflow. comfyURL,
+// workflowFile, defaultSteps, and defaultCFG are captured at startup.
+func makeImageExecutor(comfyURL, workflowFile string, defaultSteps int, defaultCFG float64) func(string, ToolContext) (string, error) {
+	return func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Prompt         string  `json:"prompt"`
+			NegativePrompt string  `json:"negative_prompt"`
+			Seed           int64   `json:"seed"`
+			CFG            float64 `json:"cfg"`
+			Width          int     `json:"width"`
+			Height         int     `json:"height"`
+			Steps          int     `json:"steps"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Prompt == "" {
+			return "", fmt.Errorf("prompt is required")
+		}
+
+		seed := args.Seed
+		if seed <= 0 {
+			seed = rand.Int63()
+		}
+		cfg := args.CFG
+		if cfg <= 0 {
+			cfg = defaultCFG
+		}
+		width := args.Width
+		if width <= 0 {
+			width = 1024
+		}
+		height := args.Height
+		if height <= 0 {
+			height = 1024
+		}
+		steps := args.Steps
+		if steps <= 0 {
+			steps = defaultSteps
+		}
+
+		workflowData, err := os.ReadFile(workflowFile)
+		if err != nil {
+			return "", fmt.Errorf("generate_image: cannot read workflow file %q — check the workflow path in lemon.toml: %w", workflowFile, err)
+		}
+
+		// Replace placeholders: prompts use JSON-encoded strings; numeric values are bare.
+		// Placeholders absent from the workflow JSON are replaced as no-ops.
+		promptJSON, _ := json.Marshal(args.Prompt)
+		negJSON, _ := json.Marshal(args.NegativePrompt)
+		workflowStr := strings.ReplaceAll(string(workflowData), `"__PROMPT__"`, string(promptJSON))
+		workflowStr = strings.ReplaceAll(workflowStr, `"__NEGATIVE_PROMPT__"`, string(negJSON))
+		workflowStr = strings.ReplaceAll(workflowStr, `__SEED__`, strconv.FormatInt(seed, 10))
+		workflowStr = strings.ReplaceAll(workflowStr, `__CFG__`, strconv.FormatFloat(cfg, 'f', -1, 64))
+		workflowStr = strings.ReplaceAll(workflowStr, `__WIDTH__`, strconv.Itoa(width))
+		workflowStr = strings.ReplaceAll(workflowStr, `__HEIGHT__`, strconv.Itoa(height))
+		workflowStr = strings.ReplaceAll(workflowStr, `__STEPS__`, strconv.Itoa(steps))
+
+		var workflow map[string]any
+		if err := json.Unmarshal([]byte(workflowStr), &workflow); err != nil {
+			return "", fmt.Errorf("workflow file %q contains invalid JSON: %w — tell the user the image could not be generated due to an invalid workflow file", workflowFile, err)
+		}
+
+		clientID := randomID()
+		promptPayload, _ := json.Marshal(map[string]any{
+			"prompt":    workflow,
+			"client_id": clientID,
+		})
+
+		log.Printf("Generating image prompt=%q conversation_id=%d", args.Prompt, tctx.ConversationID)
+
+		comfyBase := strings.TrimRight(comfyURL, "/")
+
+		submitCtx, submitCancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer submitCancel()
+
+		req, err := http.NewRequestWithContext(submitCtx, "POST", comfyBase+"/prompt", bytes.NewReader(promptPayload))
+		if err != nil {
+			return "", fmt.Errorf("build prompt request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("could not reach ComfyUI at %q: %w — tell the user the image could not be generated because ComfyUI is unreachable and they should check that it is running", comfyURL, err)
+		}
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("ComfyUI returned HTTP %d: %s — tell the user the image could not be generated because ComfyUI returned an error", resp.StatusCode, respBody)
+		}
+
+		var promptResp struct {
+			PromptID string `json:"prompt_id"`
+		}
+		if err := json.Unmarshal(respBody, &promptResp); err != nil || promptResp.PromptID == "" {
+			return "", fmt.Errorf("ComfyUI returned an unexpected response (expected a prompt_id): %s — tell the user image generation failed due to an unexpected ComfyUI response", string(respBody))
+		}
+
+		// Poll /history/{prompt_id} until the job completes or we time out.
+		type comfyImage struct {
+			Filename  string `json:"filename"`
+			Subfolder string `json:"subfolder"`
+			Type      string `json:"type"`
+		}
+		type comfyOutput struct {
+			Images []comfyImage `json:"images"`
+		}
+		type comfyJob struct {
+			Outputs map[string]comfyOutput `json:"outputs"`
+		}
+
+		deadline := time.Now().Add(120 * time.Second)
+		var found *comfyImage
+		for time.Now().Before(deadline) {
+			time.Sleep(1 * time.Second)
+
+			pollCtx, pollCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			pollReq, _ := http.NewRequestWithContext(pollCtx, "GET", comfyBase+"/history/"+promptResp.PromptID, nil)
+			pollResp, pollErr := http.DefaultClient.Do(pollReq)
+			pollCancel()
+			if pollErr != nil {
+				continue
+			}
+			pollBody, _ := io.ReadAll(pollResp.Body)
+			pollResp.Body.Close()
+
+			var history map[string]comfyJob
+			if jsonErr := json.Unmarshal(pollBody, &history); jsonErr != nil {
+				continue
+			}
+			if job, ok := history[promptResp.PromptID]; ok {
+				for _, output := range job.Outputs {
+					if len(output.Images) > 0 {
+						img := output.Images[0]
+						found = &img
+						break
+					}
+				}
+				if found != nil {
+					break
+				}
+			}
+		}
+
+		if found == nil {
+			return "", fmt.Errorf("image generation timed out after 120 seconds — tell the user the image was not produced in time and suggest checking that ComfyUI is processing jobs correctly")
+		}
+
+		// Download the generated image.
+		viewURL := comfyBase + "/view?filename=" + url.QueryEscape(found.Filename) +
+			"&subfolder=" + url.QueryEscape(found.Subfolder) +
+			"&type=" + url.QueryEscape(found.Type)
+
+		dlCtx, dlCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer dlCancel()
+
+		dlReq, err := http.NewRequestWithContext(dlCtx, "GET", viewURL, nil)
+		if err != nil {
+			return "", fmt.Errorf("build download request: %w", err)
+		}
+		dlResp, err := http.DefaultClient.Do(dlReq)
+		if err != nil {
+			return "", fmt.Errorf("image was generated but could not be downloaded from ComfyUI: %w — tell the user the image was produced but could not be retrieved", err)
+		}
+		imgData, _ := io.ReadAll(dlResp.Body)
+		dlResp.Body.Close()
+
+		relDir := filepath.Join("attachments", randomID())
+		absDir := filepath.Join(tctx.DataDir, relDir)
+		if err := os.MkdirAll(absDir, 0755); err != nil {
+			return "", fmt.Errorf("server error: could not create storage directory (%w) — tell the user the image was generated but could not be saved due to a server storage problem", err)
+		}
+		if err := os.WriteFile(filepath.Join(absDir, "image.png"), imgData, 0644); err != nil {
+			return "", fmt.Errorf("server error: could not write image to disk (%w) — tell the user the image was generated but could not be saved due to a server storage problem", err)
+		}
+		diskPath := filepath.Join(relDir, "image.png")
+
+		att, err := tctx.Store.CreateAttachment(tctx.ToolCallID, tctx.ConversationID, "Generated image", "image.png", "image/png", diskPath)
+		if err != nil {
+			return "", fmt.Errorf("server error: could not record image in database (%w) — tell the user the image was generated but could not be saved due to a server error", err)
+		}
+
+		result := AttachmentResult{
+			AttachmentID: att.ID,
+			Title:        "Generated image",
+			Filename:     "image.png",
+			MimeType:     "image/png",
+		}
+		out, _ := json.Marshal(result)
+		return string(out), nil
+	}
+}
+
+// InitTools wires up executors for configured image tools and builds the list
+// returned by GET /api/tools. Call once at server startup.
 func InitTools(cfg *config.Config) {
 	allTools = []ToolMeta{
 		{"get_time", "Get current time", "Returns the current local date and time.", true, ""},
@@ -1070,6 +1099,7 @@ func InitTools(cfg *config.Config) {
 		{"wikipedia_search", "Wikipedia search", "Searches Wikipedia and returns matching article titles and snippets.", true, ""},
 		{"wikipedia_get_page", "Wikipedia get page", "Fetches a Wikipedia article intro + TOC, or a specific section by name.", true, ""},
 	}
+
 	searxngConfigured := cfg.SearXNG.URL != ""
 	searxngHint := ""
 	if !searxngConfigured {
@@ -1077,12 +1107,23 @@ func InitTools(cfg *config.Config) {
 	}
 	allTools = append(allTools, ToolMeta{"searxng", "SearXNG", "Searches the web via SearXNG and returns the top results.", searxngConfigured, searxngHint})
 
-	comfyConfigured := cfg.ComfyUI.URL != "" && cfg.ComfyUI.Workflow != ""
-	comfyHint := ""
-	if !comfyConfigured {
-		comfyHint = "Add [comfyui] url = \"http://…\" and workflow = \"/path/to/workflow.json\" to lemon.toml to enable image generation."
+	sdxlConfigured := cfg.ComfyUI.URL != "" && cfg.ComfyUI.SDXLFile != ""
+	sdxlHint := ""
+	if !sdxlConfigured {
+		sdxlHint = "Add [comfyui] url and sdxl_file to lemon.toml to enable SDXL image generation."
+	} else {
+		executors["generate_image_sdxl"] = makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.SDXLFile, 25, 7.0)
 	}
-	allTools = append(allTools, ToolMeta{"generate_image", "Generate image", "Generates an image using Stable Diffusion via ComfyUI.", comfyConfigured, comfyHint})
+	allTools = append(allTools, ToolMeta{"generate_image_sdxl", "Generate image (SDXL)", toolRegistry["generate_image_sdxl"].Function.Description, sdxlConfigured, sdxlHint})
+
+	fluxConfigured := cfg.ComfyUI.URL != "" && cfg.ComfyUI.FluxFile != ""
+	fluxHint := ""
+	if !fluxConfigured {
+		fluxHint = "Add [comfyui] url and flux_file to lemon.toml to enable Flux Schnell image generation."
+	} else {
+		executors["generate_image_flux"] = makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.FluxFile, 4, 1.0)
+	}
+	allTools = append(allTools, ToolMeta{"generate_image_flux", "Generate image (Flux Schnell)", toolRegistry["generate_image_flux"].Function.Description, fluxConfigured, fluxHint})
 }
 
 func (s *Server) handleGetTools(w http.ResponseWriter, r *http.Request) {
