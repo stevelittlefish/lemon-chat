@@ -1505,6 +1505,7 @@ html, body {
 .inline-image-wrap {
   position: relative;
   display: inline-block;
+  align-self: flex-start;
   margin-top: var(--space-2);
   border-radius: var(--radius-lg);
   overflow: hidden;
