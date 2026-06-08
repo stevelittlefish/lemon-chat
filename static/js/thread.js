@@ -453,12 +453,28 @@ export function startStreaming() {
   const toolCallEls = new Map(); // id → .tool-call element for result updates
   const pendingImages = new Map(); // tool call id → placeholder element
   let hasImages = false; // true once any inline image is committed
+  let waitingEl = null; // typing indicator shown while a tool call is running after text has streamed
+
+  function showWaiting() {
+    if (waitingEl) return;
+    waitingEl = document.createElement('div');
+    waitingEl.className = 'message-content';
+    waitingEl.innerHTML = typingIndicatorHTML();
+    colEl.appendChild(waitingEl);
+  }
+
+  function hideWaiting() {
+    if (!waitingEl) return;
+    waitingEl.remove();
+    waitingEl = null;
+  }
 
   return {
     setName(name) {
       if (roleEl) roleEl.textContent = name;
     },
     append(delta) {
+      hideWaiting();
       accumulated += delta;
       contentEl.innerHTML = renderMarkdown(accumulated) || typingIndicatorHTML();
       if (!userScrolledDuringStream) scrollToBottom();
@@ -492,6 +508,7 @@ export function startStreaming() {
         }
         pendingImages.set(toolCall.id, placeholder);
       }
+      if (accumulated) showWaiting();
       if (!userScrolledDuringStream) scrollToBottom();
     },
     updateToolCallResult({ id, result }) {
@@ -516,6 +533,7 @@ export function startStreaming() {
       if (!userScrolledDuringStream) scrollToBottom();
     },
     finish() {
+      hideWaiting();
       const shouldScroll = !userScrolledDuringStream;
       userScrolledDuringStream = false;
       if (!accumulated && !hasImages && !toolCallsEl) {
