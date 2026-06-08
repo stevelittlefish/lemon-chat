@@ -499,10 +499,10 @@ export function startStreaming() {
       const el = buildToolCallEl(toolCall.name, toolCall.args ?? null, null);
       if (toolCall.id) toolCallEls.set(toolCall.id, el);
       toolCallsEl.appendChild(el);
-      if (toolCall.name === 'generate_image' && toolCall.id) {
+      if (toolCall.name.startsWith('generate_image') && toolCall.id) {
         const placeholder = buildImagePlaceholder();
         if (accumulated) {
-          colEl.appendChild(placeholder);
+          colEl.insertBefore(placeholder, waitingEl ?? null);
         } else {
           colEl.insertBefore(placeholder, contentEl);
         }
@@ -524,7 +524,11 @@ export function startStreaming() {
           placeholder.replaceWith(buildInlineImage(att));
           pendingImages.delete(att.tool_call_id);
         } else {
-          colEl.insertBefore(buildInlineImage(att), contentEl);
+          // Fallback: no placeholder was pre-created — insert after tool calls.
+          const img = buildInlineImage(att);
+          if (waitingEl) colEl.insertBefore(img, waitingEl);
+          else if (accumulated) colEl.appendChild(img);
+          else colEl.insertBefore(img, contentEl);
         }
         hasImages = true;
       } else {
