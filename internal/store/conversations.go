@@ -82,8 +82,13 @@ func (s *Store) DeleteConversation(id, userID int64) (attachmentPaths []string, 
 		return nil, ErrNotFound
 	}
 
-	// Collect attachment disk paths before deleting rows.
-	attRows, err := tx.Query(`SELECT disk_path FROM attachment WHERE conversation_id = ?`, id)
+	// Collect attachment disk paths that are not referenced by any other conversation
+	// (forked conversations share the same disk_path, so we must not delete shared files).
+	attRows, err := tx.Query(`
+		SELECT disk_path FROM attachment WHERE conversation_id = ?
+		AND disk_path NOT IN (
+			SELECT disk_path FROM attachment WHERE conversation_id != ?
+		)`, id, id)
 	if err != nil {
 		return nil, err
 	}
