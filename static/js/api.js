@@ -83,6 +83,7 @@ export const conversations = {
   list: (offset = 0) => request('GET', `/api/conversations?limit=30&offset=${offset}`),
   create: (title, model, characterId) => request('POST', '/api/conversations', { title, model, character_id: characterId }),
   fork: (id, messageId) => request('POST', `/api/conversations/${id}/fork`, { message_id: messageId }),
+  importChat: (data) => request('POST', '/api/conversations/import_chat', data),
   update: (id, data) => request('PATCH', `/api/conversations/${id}`, data),
   delete: (id) => request('DELETE', `/api/conversations/${id}`),
   regenerateTitle: (id) => request('POST', `/api/conversations/${id}/regenerate-title`),

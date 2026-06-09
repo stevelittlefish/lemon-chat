@@ -290,6 +290,58 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 	return newConv, nil
 }
 
+type ImportMessage struct {
+	Role       string
+	Content    string
+	ToolCalls  *string // JSON array string, nil if none
+	ToolCallID string  // empty means NULL
+}
+
+func (s *Store) ImportConversation(userID int64, model *string, characterID *int64, msgs []ImportMessage) (*Conversation, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	t := now()
+	res, err := tx.Exec(
+		`INSERT INTO conversation (user_id, model, character_id, title, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?)`,
+		userID, model, characterID, t, t,
+	)
+	if err != nil {
+		return nil, err
+	}
+	convID, _ := res.LastInsertId()
+
+	base := time.Now().UTC()
+	n := len(msgs)
+	for i, m := range msgs {
+		ts := base.Add(-time.Duration(n-1-i) * time.Second).Format(time.RFC3339)
+		var tcID *string
+		if m.ToolCallID != "" {
+			tcID = &m.ToolCallID
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO message (conversation_id, role, content, name, character_id, created_at,
+			                      prompt_tokens, completion_tokens, total_time_ms, tool_calls, tool_call_id)
+			 VALUES (?, ?, ?, NULL, NULL, ?, NULL, NULL, NULL, ?, ?)`,
+			convID, m.Role, m.Content, ts, m.ToolCalls, tcID,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return &Conversation{
+		ID: convID, UserID: userID, Model: model, CharacterID: characterID,
+		CreatedAt: t, UpdatedAt: t,
+	}, nil
+}
+
 func (s *Store) GetConversationTitlePrompt(convID int64) (string, error) {
 	var prompt string
 	err := s.db.QueryRow(

@@ -60,6 +60,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/conversations", s.requireAuth(s.handleCreateConversation))
 	mux.HandleFunc("PATCH /api/conversations/{id}", s.requireAuth(s.handleUpdateConversation))
 	mux.HandleFunc("DELETE /api/conversations/{id}", s.requireAuth(s.handleDeleteConversation))
+	mux.HandleFunc("POST /api/conversations/import_chat", s.requireAuth(s.handleImportConversation))
 	mux.HandleFunc("POST /api/conversations/{id}/fork", s.requireAuth(s.handleForkConversation))
 	mux.HandleFunc("POST /api/conversations/{id}/regenerate-title", s.requireAuth(s.handleRegenerateTitle))
 
@@ -122,6 +123,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings/characters/{id}/edit", serveFile("static/settings/character-edit.html"))
 	mux.HandleFunc("GET /settings/users", serveFile("static/settings/users.html"))
 	mux.HandleFunc("GET /settings/tools", serveFile("static/settings/tools.html"))
+	mux.HandleFunc("GET /settings/import_chat", serveFile("static/settings/import_chat.html"))
 
 	// Static files — no forced no-cache; ETags handle revalidation naturally
 	mux.Handle("/", http.FileServer(http.Dir("static")))

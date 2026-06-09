@@ -65,6 +65,16 @@ function renderPage() {
       <p>Database maintenance and diagnostics.</p>
     </div>
     <div class="section">
+      <h2>Conversations</h2>
+      <div class="tool-row">
+        <div class="tool-row-info">
+          <div class="tool-row-name">Import chat</div>
+          <div class="tool-row-desc">Recreate a conversation from a JSON export as a new conversation on your account.</div>
+        </div>
+        <a href="/settings/import_chat" class="btn btn-secondary btn-sm">Import</a>
+      </div>
+    </div>
+    <div class="section">
       <h2>Database</h2>
       <div class="tool-row" id="tool-orphaned-messages">
         <div class="tool-row-info">

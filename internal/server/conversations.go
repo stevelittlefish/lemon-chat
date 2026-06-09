@@ -154,6 +154,79 @@ func (s *Server) handleForkConversation(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusCreated, conv)
 }
 
+func (s *Server) handleImportConversation(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+
+	var req struct {
+		Model       *string `json:"model"`
+		CharacterID *int64  `json:"character_id"`
+		Messages    []struct {
+			Role       string           `json:"role"`
+			Content    string           `json:"content"`
+			ToolCalls  []map[string]any `json:"tool_calls"`
+			ToolCallID string           `json:"tool_call_id"`
+		} `json:"messages"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if (req.Model == nil) == (req.CharacterID == nil) {
+		writeError(w, http.StatusBadRequest, "exactly one of model or character_id is required")
+		return
+	}
+
+	const attachmentPlaceholder = "[Attachment not available: the file referenced here was not included in the JSON export and cannot be displayed.]"
+
+	var msgs []store.ImportMessage
+	for _, m := range req.Messages {
+		if m.Role == "system" {
+			continue
+		}
+
+		content := m.Content
+
+		if m.Role == "tool" && content != "" {
+			var att AttachmentResult
+			if jsonErr := json.Unmarshal([]byte(content), &att); jsonErr == nil && att.AttachmentID != 0 {
+				content = attachmentPlaceholder
+			}
+		}
+
+		var toolCallsStr *string
+		if len(m.ToolCalls) > 0 {
+			b, err := json.Marshal(m.ToolCalls)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "invalid tool_calls")
+				return
+			}
+			tc := string(b)
+			toolCallsStr = &tc
+		}
+
+		msgs = append(msgs, store.ImportMessage{
+			Role:       m.Role,
+			Content:    content,
+			ToolCalls:  toolCallsStr,
+			ToolCallID: m.ToolCallID,
+		})
+	}
+
+	if len(msgs) == 0 {
+		writeError(w, http.StatusBadRequest, "no messages to import")
+		return
+	}
+
+	log.Printf("Importing conversation user_id=%d messages=%d", user.ID, len(msgs))
+	conv, err := s.store.ImportConversation(user.ID, req.Model, req.CharacterID, msgs)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	s.hub.BroadcastConversationListChanged()
+	writeJSON(w, http.StatusCreated, conv)
+}
+
 func (s *Server) handleDeleteConversation(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
