@@ -39,6 +39,7 @@ type Server struct {
 	DialTimeoutSeconds     int    `toml:"dial_timeout_seconds"`
 	ResponseTimeoutSeconds int    `toml:"response_timeout_seconds"`
 	MaxToolLoops           int    `toml:"max_tool_loops"`
+	Timezone               string `toml:"timezone"`
 }
 
 type Bootstrap struct {

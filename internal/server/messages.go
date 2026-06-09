@@ -495,6 +495,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 					ModelServer:     modelServer,
 					ResponseTimeout: responseTimeout,
 					SearXNGURL:      s.cfg.SearXNG.URL,
+					Timezone:        s.cfg.Server.Timezone,
 					ToolCallID:      tc.id,
 					ConversationID:  convID,
 					Store:           s.store,

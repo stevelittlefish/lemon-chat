@@ -46,6 +46,7 @@ type ToolContext struct {
 	ModelServer     *config.ModelServer
 	ResponseTimeout time.Duration
 	SearXNGURL      string
+	Timezone        string
 	// for tools that create attachments
 	ToolCallID     string
 	ConversationID int64
@@ -376,8 +377,16 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		out, _ := json.Marshal(result)
 		return string(out), nil
 	},
-	"get_time": func(_ string, _ ToolContext) (string, error) {
+	"get_time": func(_ string, tctx ToolContext) (string, error) {
 		now := time.Now()
+		if tctx.Timezone != "" {
+			loc, err := time.LoadLocation(tctx.Timezone)
+			if err == nil {
+				now = now.In(loc)
+			} else {
+				return "", fmt.Errorf("invalid timezone configuration: %w", err)
+			}
+		}
 		return now.Weekday().String() + ", " + now.Format(time.RFC3339), nil
 	},
 	"roll_dice": func(argsJSON string, _ ToolContext) (string, error) {
