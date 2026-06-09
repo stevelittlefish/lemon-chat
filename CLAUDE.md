@@ -4,7 +4,6 @@
 
 lemon-chat is a local, open-source AI chat UI. Think self-hosted claude.ai or ChatGPT. It talks to locally-running models via HTTP API (e.g. Ollama) and persists everything in a local SQLite database.
 
-See `SPEC.md` for the full feature specification.
 
 ## Technical constraints
 
@@ -28,14 +27,7 @@ These apply to every change. Don't add packages, build steps, or abstractions wi
 
 ## Design system
 
-The design system lives at `.claude/skills/lemon-ai-design/`. Read it before touching any UI.
-
-Key files:
-- `colors_and_type.css` — all colour, type, spacing, and motion tokens
-- `components.css` — buttons, inputs, cards, bubbles, toggles
-- `assets/` — brand SVGs (logo, lemon-slice, sparkle, scribble-underline)
-- `ui_kits/chat/` — reference implementation for the chat UI
-- `ui_kits/settings/` — reference implementation for the settings pane
+Tokens live in `static/css/colors_and_type.css`; component styles in `static/css/components.css`. Read these files before touching any UI.
 
 Non-negotiable design rules:
 - Paper backgrounds, never pure white (`--bg` from tokens)
@@ -126,6 +118,8 @@ static/
     utils.js           # shared frontend utilities (e.g. escapeHtml)
     ws.js              # WebSocket client, auto-reconnect, event dispatch
     complete-app.js    # completions page entry
+    modal.js           # shared modal scaffold utility
+    settings-auth.js   # auth guard (requireAuth)
     settings-account.js       # account settings page
     settings-avatar.js        # shared avatar upload UI component
     settings-character-edit.js # character edit page
@@ -136,8 +130,8 @@ static/
       marked.esm.js    # marked.js (vendored, no build step)
       katex.esm.js     # KaTeX math rendering (vendored, no build step)
   css/
-    colors_and_type.css   # copied from design system
-    components.css        # copied from design system
+    colors_and_type.css   # colour, type, spacing, and motion tokens
+    components.css        # buttons, inputs, cards, bubbles, toggles
     app.css               # layout and app-specific overrides
     complete.css          # completions page layout and overrides
     menu.css              # menu page styles
@@ -151,7 +145,7 @@ static/
     users.html            # user management page
   assets/
     icons/             # Lucide SVGs served individually (fetched by icons.js)
-    *.svg              # brand SVGs copied from design system
+    *.svg              # brand SVGs (logo, lemon-slice, sparkle, scribble-underline)
 data/
   lemon.toml           # config for Docker volume mount
 Dockerfile
@@ -160,9 +154,10 @@ docker-compose.override.yml.example
 run.sh                 # shortcut: go run ./cmd/lemon-chat
 lemon.toml.example     # documented config template (committed)
 lemon.toml             # live config (gitignored)
+docs/
+  SPEC.md              # feature specification (not actively maintained)
 README.md
 LICENSE
-SPEC.md
 CLAUDE.md
 ```
 
@@ -183,13 +178,14 @@ Available tools and their config requirements:
 | `wikipedia_search` | Wikipedia search | — |
 | `wikipedia_get_page` | Wikipedia get page | — |
 | `searxng` | SearXNG | `[searxng] url` in `lemon.toml` |
-| `generate_image` | Generate image | `[comfyui] url` + `workflow` in `lemon.toml` |
+| `generate_image_sdxl` | Generate image (SDXL) | `[comfyui] url` + `sdxl_file` in `lemon.toml` |
+| `generate_image_flux` | Generate image (Flux Schnell) | `[comfyui] url` + `flux_file` in `lemon.toml` |
 
 `InitTools(cfg)` is called once at startup and sets the `Configured` flag on tools that need external services. The frontend reads `GET /api/tools` and shows a config hint for unconfigured tools.
 
 ### Attachments
 
-Tools that produce files (`create_document`, `generate_image`) create an `attachment` DB record and write the file under `<data_dir>/attachments/<random-id>/`. They return an `AttachmentResult` JSON struct; `messages.go` detects this shape and emits an `attachment` SSE event so the frontend can render a download card. Attachments are served by `handleGetAttachment` in `attachments.go` — `?download=1` forces a download, otherwise the file is served inline.
+Tools that produce files (`create_document`, `generate_image_sdxl`, `generate_image_flux`) create an `attachment` DB record and write the file under `<data_dir>/attachments/<random-id>/`. They return an `AttachmentResult` JSON struct; `messages.go` detects this shape and emits an `attachment` SSE event so the frontend can render a download card. Attachments are served by `handleGetAttachment` in `attachments.go` — `?download=1` forces a download, otherwise the file is served inline.
 
 ## Not yet implemented
 
@@ -200,8 +196,6 @@ The following are not yet built. Stub them out rather than building them:
 - Model management UI — config file only, no settings panel for it
 - Message editing and regeneration
 - Conversation search
-
-Note: `SPEC.md` uses the term "personas" — these were redesigned and implemented as **characters** (`internal/server/characters.go`, `internal/store/characters.go`). Ignore the personas section of `SPEC.md`.
 
 When something is stubbed, return a `501 Not Implemented` from the API endpoint and leave a `// TODO` comment. Don't build placeholder UI for features that don't exist yet.
 

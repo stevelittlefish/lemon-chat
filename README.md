@@ -12,7 +12,7 @@ Talks to locally-running models via HTTP API (tested with [Ollama](https://ollam
 
 **Characters** — define AI personas with a system prompt, a first message, hidden context messages, a custom avatar, and per-character model and title-generation settings. Characters can be private or shared with all users. SillyTavern character card PNG files can be imported directly.
 
-**Tool calls** — characters can be given a set of tools to use during chat. Built-in tools: get current time, roll dice, fetch a URL (returned as markdown), create downloadable documents, and search/read Wikipedia. Optional integrations: web search via [SearXNG](https://searxng.github.io/searxng/) and image generation via [ComfyUI](https://github.com/comfyanonymous/ComfyUI) (Stable Diffusion XL). Tools that produce files create download cards inline in the chat.
+**Tool calls** — characters can be given a set of tools to use during chat. Built-in tools: get current time, roll dice, fetch a URL (returned as markdown), create downloadable documents, and search/read Wikipedia. Optional integrations: web search via [SearXNG](https://searxng.github.io/searxng/) and image generation via [ComfyUI](https://github.com/comfyanonymous/ComfyUI) (Stable Diffusion XL and Flux Schnell). Tools that produce files create download cards inline in the chat.
 
 **Multi-user** — admin users can create accounts, reset passwords, and grant or revoke admin access. Each user's conversations and completions are private to them.
 
