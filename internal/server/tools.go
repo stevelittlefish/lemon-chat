@@ -96,6 +96,10 @@ var toolRegistry = map[string]toolDef{
 						"type":        "integer",
 						"description": "Number of results to return (1–10, default 5).",
 					},
+					"page": map[string]any{
+						"type":        "integer",
+						"description": "Page number of results (default 1). Use higher values to retrieve more results beyond the first page.",
+					},
 				},
 				Required: []string{"query"},
 			},
@@ -515,6 +519,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		var args struct {
 			Query      string `json:"query"`
 			MaxResults int    `json:"max_results"`
+			Page       int    `json:"page"`
 		}
 		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 			return "", fmt.Errorf("invalid args: %w", err)
@@ -532,10 +537,14 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		if n > 10 {
 			n = 10
 		}
+		page := args.Page
+		if page <= 0 {
+			page = 1
+		}
 
-		log.Printf("Searching web query=%q max_results=%d", args.Query, n)
+		log.Printf("Searching web query=%q max_results=%d page=%d", args.Query, n, page)
 
-		searchURL := strings.TrimRight(tctx.SearXNGURL, "/") + "/search?q=" + url.QueryEscape(args.Query) + "&format=json&pageno=1"
+		searchURL := strings.TrimRight(tctx.SearXNGURL, "/") + "/search?q=" + url.QueryEscape(args.Query) + fmt.Sprintf("&format=json&pageno=%d", page)
 		fetchCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
