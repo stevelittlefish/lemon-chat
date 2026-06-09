@@ -159,11 +159,9 @@ func generateCompletionTitles(st *store.Store, cfg *config.Config, onTitled func
 	}
 }
 
-const defaultCompletionTitlePrompt = "Generate a short title (at most 6 words) for the following text. Respond with only the title — no quotes, no trailing punctuation, no explanation."
-
 func generateCompletionTitle(content, chatURL, modelName, apiKey string, responseTimeout time.Duration) (string, error) {
-	if len(content) > 3000 {
-		content = content[:3000]
+	if len(content) > titleTranscriptLimit {
+		content = content[:titleTranscriptLimit]
 	}
 
 	type chatMsg struct {
@@ -171,7 +169,7 @@ func generateCompletionTitle(content, chatURL, modelName, apiKey string, respons
 		Content string `json:"content"`
 	}
 	msgs := []chatMsg{
-		{Role: "system", Content: defaultCompletionTitlePrompt},
+		{Role: "system", Content: "Generate a short title (at most 6 words) for the following text. Respond with only the title — no quotes, no trailing punctuation, no explanation."},
 		{Role: "user", Content: content},
 	}
 	payload, _ := json.Marshal(map[string]any{
@@ -181,6 +179,7 @@ func generateCompletionTitle(content, chatURL, modelName, apiKey string, respons
 		"max_tokens": 20,
 	})
 
+	debug.Log("title: completion title payload: %s", payload)
 	debug.Log("title: POST %s (model=%s, completion title)", chatURL, modelName)
 	ctx, cancel := context.WithTimeout(context.Background(), responseTimeout)
 	defer cancel()
@@ -271,7 +270,31 @@ func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, st
 	}
 }
 
-const defaultTitlePrompt = "Generate a short title (at most 6 words) for the following conversation. Respond with only the title — no quotes, no trailing punctuation, no explanation."
+const titleTranscriptLimit = 10000
+
+func buildTranscript(msgs []store.Message) string {
+	var sb strings.Builder
+	for _, m := range msgs {
+		switch m.Role {
+		case "user":
+			sb.WriteString("User: ")
+		case "assistant":
+			sb.WriteString("Assistant: ")
+		default:
+			continue
+		}
+		sb.WriteString(m.Content)
+		sb.WriteString("\n\n")
+		if sb.Len() >= titleTranscriptLimit {
+			break
+		}
+	}
+	transcript := sb.String()
+	if len(transcript) > titleTranscriptLimit {
+		transcript = transcript[:titleTranscriptLimit]
+	}
+	return strings.TrimSpace(transcript)
+}
 
 func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID int64, responseTimeout time.Duration) (string, error) {
 	msgs, err := st.ListMessages(convID)
@@ -282,12 +305,7 @@ func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID in
 		return "", fmt.Errorf("no messages")
 	}
 
-	systemPrompt := defaultTitlePrompt
-	if p, err := st.GetConversationTitlePrompt(convID); err != nil {
-		log.Printf("title worker: get title prompt for conversation %d: %v", convID, err)
-	} else if p != "" {
-		systemPrompt = p
-	}
+	transcript := buildTranscript(msgs)
 
 	type chatMsg struct {
 		Role    string `json:"role"`
@@ -297,21 +315,12 @@ func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID in
 	out := []chatMsg{
 		{
 			Role:    "system",
-			Content: systemPrompt,
+			Content: "Generate a short title (at most 6 words) for the following conversation. Respond with only the title — no quotes, no trailing punctuation, no explanation.",
 		},
-	}
-
-	var total int
-	for _, m := range msgs {
-		content := m.Content
-		if total+len(content) > 3000 {
-			content = content[:3000-total]
-		}
-		out = append(out, chatMsg{Role: m.Role, Content: content})
-		total += len(content)
-		if total >= 3000 {
-			break
-		}
+		{
+			Role:    "user",
+			Content: transcript,
+		},
 	}
 
 	payload, _ := json.Marshal(map[string]any{
@@ -321,7 +330,8 @@ func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID in
 		"max_tokens": 20,
 	})
 
-	debug.Log("title: POST %s (model=%s, conv=%d, %d messages)", chatURL, modelName, convID, len(out)-1)
+	debug.Log("title: payload for conversation %d: %s", convID, payload)
+	debug.Log("title: POST %s (model=%s, conv=%d)", chatURL, modelName, convID)
 	ctx, cancel := context.WithTimeout(context.Background(), responseTimeout)
 	defer cancel()
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
