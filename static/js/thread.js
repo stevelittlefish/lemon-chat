@@ -942,6 +942,20 @@ function getCtxModal() {
     setTimeout(() => { copyLabel.textContent = 'Copy JSON'; }, 1500);
   });
 
+  const downloadBtn = document.createElement('button');
+  downloadBtn.className = 'btn btn-secondary btn-sm';
+  downloadBtn.textContent = 'Download JSON';
+  downloadBtn.addEventListener('click', () => {
+    if (!_ctxModal?._messages) return;
+    const blob = new Blob([JSON.stringify(_ctxModal._messages, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'context.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
   const closeBtn = document.createElement('button');
   closeBtn.className = 'md-modal-x';
   closeBtn.setAttribute('aria-label', 'Close');
@@ -949,6 +963,7 @@ function getCtxModal() {
   closeBtn.addEventListener('click', close);
 
   actions.appendChild(copyBtn);
+  actions.appendChild(downloadBtn);
   actions.appendChild(closeBtn);
   head.appendChild(eyebrow);
   head.appendChild(actions);
