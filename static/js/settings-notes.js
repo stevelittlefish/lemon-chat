@@ -265,8 +265,14 @@ function attachHandlers() {
   });
 
   document.querySelectorAll('[data-action="edit"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      editingId = parseInt(btn.dataset.id, 10);
+    btn.addEventListener('click', async () => {
+      const id = parseInt(btn.dataset.id, 10);
+      const note = notesData.find(n => n.id === id);
+      if (note && !note.value) {
+        const full = await notesApi.get(id);
+        note.value = full.value;
+      }
+      editingId = id;
       showingAddForm = false;
       renderPage();
       document.querySelector(`.note-edit-form[data-id="${editingId}"] textarea`)?.focus();
@@ -309,7 +315,7 @@ async function handleAddSubmit(e) {
 
   try {
     const created = await notesApi.upsert(key, value, readOnly);
-    notesData.push(created);
+    notesData.push({ ...created, excerpt: (created.value ?? '').slice(0, 120) });
     showingAddForm = false;
     editingId = null;
     renderPage();
