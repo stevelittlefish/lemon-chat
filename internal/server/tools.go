@@ -453,8 +453,9 @@ Use notes for long-form prose content: lore entries, NPC descriptions, session b
 
 The prefix parameter controls what is searched:
   - Omit or pass "" to list all accessible notes.
-  - Pass a bare term like "eldoria" to search all scopes: finds g.eldoria, u.eldoria, c.eldoria and their children.
-  - Pass a scoped prefix like "g.eldoria" to search only global notes under that path.
+  - Pass a scope letter ("g", "u", or "c") to list all notes in that scope.
+  - Pass a scoped path like "g.eldoria" to list global notes at that key or under it.
+  - Pass a bare term like "test" to find keys starting with g.test, u.test, or c.test.
 
 Call note_list at the start of a session to discover what notes are available, then note_load specific keys you need.`,
 			Parameters: toolParam{
@@ -462,7 +463,7 @@ Call note_list at the start of a session to discover what notes are available, t
 				Properties: map[string]any{
 					"prefix": map[string]any{
 						"type":        "string",
-						"description": "Optional prefix to filter by. Bare term (e.g. \"eldoria\") searches all scopes; scoped prefix (e.g. \"g.eldoria\") searches one scope only.",
+						"description": "Optional filter. Scope letter (\"g\", \"u\", \"c\") lists all in that scope; scoped path (\"g.eldoria\") finds global notes starting with that key; bare term (\"test\") finds keys starting with g.test, u.test, or c.test.",
 					},
 				},
 				Required: []string{},

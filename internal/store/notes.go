@@ -127,14 +127,13 @@ func (s *Store) LoadNote(key string, userID, convID int64) (Note, error) {
 
 // ListNotes returns matching notes visible to the caller. prefix may be:
 //   - empty: all accessible notes
-//   - a bare term like "eldoria": cross-scope search (g.eldoria*, u.eldoria*, c.eldoria*)
-//   - a scoped term like "g.eldoria": single-scope search
+//   - a scope letter alone ("g", "g.", "u", "u.", "c", "c."): all notes in that scope
+//   - a scoped path like "g.eldoria": global notes at that key or under it
+//   - a bare term like "eldoria": prefix match under each scope (g.eldoria*, u.eldoria*, c.eldoria*)
 func (s *Store) ListNotes(prefix string, userID, convID int64) (string, error) {
 	var whereClauses []string
 	var args []any
 
-	// Appends a scope condition. exactKey/likeKey are the scoped key patterns (e.g. "g.foo", "g.foo.%").
-	// Pass empty strings to match all notes in that scope.
 	addGlobal := func(exactKey, likeKey string) {
 		if exactKey == "" {
 			whereClauses = append(whereClauses, "(user_id IS NULL AND conversation_id IS NULL)")
@@ -170,10 +169,22 @@ func (s *Store) ListNotes(prefix string, userID, convID int64) (string, error) {
 		addUser("", "")
 		addConv("", "")
 	} else {
-		hasScope := len(prefix) >= 3 && prefix[1] == '.' && (prefix[0] == 'g' || prefix[0] == 'u' || prefix[0] == 'c')
-		if hasScope {
+		scopeLetter := prefix[0] == 'g' || prefix[0] == 'u' || prefix[0] == 'c'
+		scopeOnly := scopeLetter && (len(prefix) == 1 || (len(prefix) == 2 && prefix[1] == '.'))
+		hasScope := scopeLetter && !scopeOnly && len(prefix) >= 3 && prefix[1] == '.'
+
+		if scopeOnly {
+			switch prefix[0] {
+			case 'g':
+				addGlobal("", "")
+			case 'u':
+				addUser("", "")
+			case 'c':
+				addConv("", "")
+			}
+		} else if hasScope {
 			exact := prefix
-			like := prefix + ".%"
+			like := prefix + "%"
 			switch prefix[0] {
 			case 'g':
 				addGlobal(exact, like)
@@ -183,10 +194,10 @@ func (s *Store) ListNotes(prefix string, userID, convID int64) (string, error) {
 				addConv(exact, like)
 			}
 		} else {
-			// Bare term: expand across all scopes.
-			addGlobal("g."+prefix, "g."+prefix+".%")
-			addUser("u."+prefix, "u."+prefix+".%")
-			addConv("c."+prefix, "c."+prefix+".%")
+			// Bare term: prefix match under each scope (e.g. "foo" finds g.foo*, u.foo*, c.foo*).
+			addGlobal("g."+prefix, "g."+prefix+"%")
+			addUser("u."+prefix, "u."+prefix+"%")
+			addConv("c."+prefix, "c."+prefix+"%")
 		}
 	}
 
