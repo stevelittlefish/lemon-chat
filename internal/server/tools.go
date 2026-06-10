@@ -130,6 +130,24 @@ var toolRegistry = map[string]toolDef{
 			},
 		},
 	},
+	"pick_random": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "pick_random",
+			Description: "Picks one item at random from a list of options. Use when you want a random outcome from a defined set — encounter type, weather, NPC mood, loot, etc. Define all options before calling; the result is server-side random and cannot be influenced.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"options": map[string]any{
+						"type":        "array",
+						"description": "The options to pick from. Must contain at least 2 items.",
+						"items":       map[string]any{"type": "string"},
+					},
+				},
+				Required: []string{"options"},
+			},
+		},
+	},
 	"fetch_url": {
 		Type: "function",
 		Function: toolFunction{
@@ -454,6 +472,19 @@ var executors = map[string]func(string, ToolContext) (string, error){
 			return fmt.Sprintf("Rolled %s: %d", args.Notation, rolls[0]), nil
 		}
 		return fmt.Sprintf("Rolled %s: %s = %d", args.Notation, rollExpr, total), nil
+	},
+	"pick_random": func(argsJSON string, _ ToolContext) (string, error) {
+		var args struct {
+			Options []string `json:"options"`
+			Label   string   `json:"label"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if len(args.Options) < 2 {
+			return "", fmt.Errorf("options must contain at least 2 items")
+		}
+		return args.Options[rand.Intn(len(args.Options))], nil
 	},
 	"fetch_url": func(argsJSON string, tctx ToolContext) (string, error) {
 		var args struct {
@@ -1112,6 +1143,7 @@ func InitTools(cfg *config.Config) {
 	allTools = []ToolMeta{
 		{"get_time", "Get current time", "Returns the current local date and time.", true, ""},
 		{"roll_dice", "Roll dice", "Rolls dice using standard notation (e.g. 2d6, 1d20).", true, ""},
+		{"pick_random", "Pick random", "Picks one item at random from a list of options.", true, ""},
 		{"fetch_url", "Fetch URL", "Fetches a URL and returns its content as markdown, or raw HTML if source is true.", true, ""},
 		{"create_document", "Create document", "Saves a file (report, script, notes, etc.) the user can download.", true, ""},
 		{"wikipedia_search", "Wikipedia search", "Searches Wikipedia and returns matching article titles and snippets.", true, ""},
