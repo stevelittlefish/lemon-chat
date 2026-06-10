@@ -2,11 +2,53 @@ import { notes as notesApi } from './api.js';
 import { requireAuth } from './settings-auth.js';
 import { preload as preloadIcons, icon } from './icons.js';
 import { escapeHtml } from './utils.js';
+import { createModal } from './modal.js';
 
 let user = null;
 let notesData = [];
 let editingId = null;
 let showingAddForm = false;
+
+// ── Note view modal ───────────────────────────────────────────────────
+
+let noteModal = null;
+let noteModalKey = null;
+let noteModalPre = null;
+
+function ensureNoteModal() {
+  if (noteModal) return;
+  noteModal = createModal('View note');
+  noteModal.overlay.className = 'note-modal';
+  noteModal.dialog.className = 'note-modal-dialog';
+  noteModal.dialog.innerHTML = `
+    <div class="note-modal-head">
+      <code class="note-modal-key" id="note-modal-key"></code>
+      <button class="btn btn-ghost btn-sm note-modal-x" id="note-modal-close">${icon('x', 14)}</button>
+    </div>
+    <pre class="note-modal-pre" id="note-modal-pre"></pre>
+  `;
+  noteModalKey = noteModal.dialog.querySelector('#note-modal-key');
+  noteModalPre = noteModal.dialog.querySelector('#note-modal-pre');
+  noteModal.dialog.querySelector('#note-modal-close').addEventListener('click', () => noteModal.close());
+}
+
+async function showNoteModal(id) {
+  ensureNoteModal();
+  const note = notesData.find(n => n.id === id);
+  if (!note) return;
+  noteModalKey.textContent = note.key;
+  noteModalPre.textContent = note.value ?? note.excerpt;
+  // If we only have the excerpt, fetch the full note.
+  if (!note.value) {
+    noteModalPre.textContent = note.excerpt + (note.excerpt.length >= 120 ? '…' : '');
+    try {
+      const full = await notesApi.get(note.id);
+      note.value = full.value;
+      noteModalPre.textContent = full.value;
+    } catch { /* show excerpt */ }
+  }
+  noteModal.open();
+}
 
 async function init() {
   user = await requireAuth();
@@ -81,9 +123,8 @@ function renderNoteRow(note) {
   const ro = note.read_only
     ? `<span class="note-badge note-badge--ro">read-only</span>`
     : '';
-  const canEdit = !note.read_only && note.key[0] !== 'c';
-  const editBtn = canEdit
-    ? `<button class="btn btn-ghost btn-sm" data-action="edit" data-id="${note.id}">${icon('pencil', 13)}</button>`
+  const editBtn = note.key[0] !== 'c'
+    ? `<button class="btn btn-ghost btn-sm" data-action="edit" data-id="${note.id}" ${note.read_only ? 'disabled' : ''}>${icon('pencil', 13)}</button>`
     : '';
   return `
     <div class="note-row${editingId === note.id ? ' note-row--editing' : ''}" data-id="${note.id}">
@@ -96,8 +137,9 @@ function renderNoteRow(note) {
         <div class="note-row-excerpt">${escapeHtml(note.excerpt)}${note.excerpt.length >= 120 ? '…' : ''}</div>
       </div>
       <div class="note-row-actions">
+        <button class="btn btn-ghost btn-sm" data-action="view" data-id="${note.id}" title="View">${icon('eye', 13)}</button>
         <button class="btn btn-ghost btn-sm" data-action="toggle-ro" data-id="${note.id}" data-ro="${note.read_only}" title="${note.read_only ? 'Unlock' : 'Lock'}">
-          ${icon(note.read_only ? 'lock' : 'eye', 13)}
+          ${icon(note.read_only ? 'lock-open' : 'lock', 13)}
         </button>
         ${editBtn}
         <button class="btn btn-ghost btn-sm note-delete-btn" data-action="delete" data-id="${note.id}" data-key="${escapeHtml(note.key)}" ${note.read_only ? 'disabled' : ''}>${icon('trash', 13)}</button>
@@ -217,6 +259,10 @@ function attachHandlers() {
   if (addForm) {
     addForm.addEventListener('submit', handleAddSubmit);
   }
+
+  document.querySelectorAll('[data-action="view"]').forEach(btn => {
+    btn.addEventListener('click', () => showNoteModal(parseInt(btn.dataset.id, 10)));
+  });
 
   document.querySelectorAll('[data-action="edit"]').forEach(btn => {
     btn.addEventListener('click', () => {

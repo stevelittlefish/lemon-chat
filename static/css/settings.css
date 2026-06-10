@@ -949,7 +949,69 @@ a.snav-item { text-decoration: none; }
   gap: 8px;
 }
 
-.note-delete-btn:disabled { opacity: 0.3; pointer-events: none; }
+.note-row-actions button:disabled { opacity: 0.3; pointer-events: none; }
+
+/* ── Note view modal ────────────────────────────────────── */
+
+.note-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.note-modal.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.note-modal-dialog {
+  width: min(640px, calc(100vw - 48px));
+  max-height: min(520px, calc(100vh - 80px));
+  background: var(--paper-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(8px);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.note-modal.open .note-modal-dialog {
+  transform: translateY(0);
+}
+.note-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 10px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+.note-modal-key {
+  font-size: 0.85rem;
+  color: var(--ink-500);
+}
+.note-modal-x {
+  flex-shrink: 0;
+}
+.note-modal-pre {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0;
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg);
+}
 
 /* ── Scrollbar ──────────────────────────────────────────── */
 
