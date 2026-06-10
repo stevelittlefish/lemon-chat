@@ -449,7 +449,7 @@ Use notes for long-form prose content: lore entries, NPC descriptions, session b
 		Type: "function",
 		Function: toolFunction{
 			Name: "note_list",
-			Description: `Lists accessible notes. Returns key, a short excerpt, read-only status, and last-updated time for each result. Does not return full values — use note_load to retrieve content.
+			Description: `Lists accessible notes. Returns {"notes": [...], "message": "..."} where each note has key, excerpt, read_only, and updated_at. Does not return full values — use note_load to retrieve content. At most 50 notes are returned; if the list is truncated a message field explains this — use a more specific prefix to narrow results.
 
 The prefix parameter controls what is searched:
   - Omit or pass "" to list all accessible notes.

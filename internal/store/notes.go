@@ -205,12 +205,15 @@ func (s *Store) ListNotes(prefix string, userID, convID int64) (string, error) {
 		return "[]", nil
 	}
 
+	const limit = 50
+
 	query := fmt.Sprintf(`
 		SELECT id, key, SUBSTR(value, 1, 120), read_only, updated_at
 		FROM note
 		WHERE %s
 		ORDER BY key
-	`, strings.Join(whereClauses, " OR "))
+		LIMIT %d
+	`, strings.Join(whereClauses, " OR "), limit+1)
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -229,10 +232,24 @@ func (s *Store) ListNotes(prefix string, userID, convID int64) (string, error) {
 	if err := rows.Err(); err != nil {
 		return "", err
 	}
-	if len(result) == 0 {
-		return "[]", nil
+
+	truncated := len(result) > limit
+	if truncated {
+		result = result[:limit]
 	}
-	b, err := json.Marshal(result)
+
+	type listResponse struct {
+		Notes   []NoteRow `json:"notes"`
+		Message string    `json:"message,omitempty"`
+	}
+	resp := listResponse{Notes: result}
+	if result == nil {
+		resp.Notes = []NoteRow{}
+	}
+	if truncated {
+		resp.Message = fmt.Sprintf("Showing first %d results. Use a more specific prefix to narrow the list.", limit)
+	}
+	b, err := json.Marshal(resp)
 	if err != nil {
 		return "", err
 	}
