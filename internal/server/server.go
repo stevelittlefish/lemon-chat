@@ -55,6 +55,13 @@ func (s *Server) Handler() http.Handler {
 	// Tools
 	mux.HandleFunc("GET /api/tools", s.requireAuth(s.handleGetTools))
 
+	// Notes
+	mux.HandleFunc("GET /api/notes", s.requireAuth(s.handleListNotes))
+	mux.HandleFunc("GET /api/notes/{id}", s.requireAuth(s.handleGetNote))
+	mux.HandleFunc("PUT /api/notes", s.requireAuth(s.handleUpsertNote))
+	mux.HandleFunc("DELETE /api/notes/{id}", s.requireAuth(s.handleDeleteNote))
+	mux.HandleFunc("PATCH /api/notes/{id}/read-only", s.requireAuth(s.handleSetNoteReadOnly))
+
 	// Conversations
 	mux.HandleFunc("GET /api/conversations", s.requireAuth(s.handleListConversations))
 	mux.HandleFunc("POST /api/conversations", s.requireAuth(s.handleCreateConversation))
@@ -123,6 +130,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings/characters/{id}/edit", serveFile("static/settings/character-edit.html"))
 	mux.HandleFunc("GET /settings/users", serveFile("static/settings/users.html"))
 	mux.HandleFunc("GET /settings/tools", serveFile("static/settings/tools.html"))
+	mux.HandleFunc("GET /settings/notes", serveFile("static/settings/notes.html"))
 	mux.HandleFunc("GET /settings/import_chat", serveFile("static/settings/import_chat.html"))
 
 	// Static files — no forced no-cache; ETags handle revalidation naturally

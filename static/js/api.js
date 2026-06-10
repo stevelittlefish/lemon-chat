@@ -78,6 +78,15 @@ export const tools = {
   list: () => request('GET', '/api/tools'),
 };
 
+// Notes
+export const notes = {
+  list:        (prefix)           => request('GET',    prefix ? `/api/notes?prefix=${encodeURIComponent(prefix)}` : '/api/notes'),
+  get:         (id)               => request('GET',    `/api/notes/${id}`),
+  upsert:      (key, value, readOnly) => request('PUT', '/api/notes', { key, value, ...(readOnly !== undefined ? { read_only: readOnly } : {}) }),
+  delete:      (id)               => request('DELETE', `/api/notes/${id}`),
+  setReadOnly: (id, readOnly)     => request('PATCH',  `/api/notes/${id}/read-only`, { read_only: readOnly }),
+};
+
 // Conversations
 export const conversations = {
   list: (offset = 0) => request('GET', `/api/conversations?limit=30&offset=${offset}`),

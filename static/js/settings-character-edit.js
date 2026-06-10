@@ -97,6 +97,10 @@ function renderNav() {
       ${svgCpu}
       Characters
     </a>
+    <a href="/settings/notes" class="snav-item">
+      ${icon('file-text', 16)}
+      Notes
+    </a>
     ${adminSection}
   `;
 }
@@ -118,6 +122,7 @@ const TOOL_GROUPS = [
   { label: 'Search & Knowledge', ids: ['wikipedia_search', 'wikipedia_get_page', 'searxng'] },
   { label: 'Image Generation',  ids: ['generate_image_sdxl', 'generate_image_flux'] },
   { label: 'World State',       ids: ['world_state'] },
+  { label: 'Notes',             ids: ['notes'] },
 ];
 
 function renderToolGroups(tools, enabled) {

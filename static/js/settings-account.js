@@ -56,6 +56,10 @@ function renderNav() {
       ${svgCpu}
       Characters
     </a>
+    <a href="/settings/notes" class="snav-item${path === '/settings/notes' ? ' active' : ''}">
+      ${icon('file-text', 16)}
+      Notes
+    </a>
     ${adminSection}
   `;
 }

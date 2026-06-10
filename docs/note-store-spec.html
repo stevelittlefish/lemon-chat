@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Note Store — Spec</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 17px;
+      line-height: 1.7;
+      color: #2a2318;
+      background: #faf7f2;
+      padding: 2rem 1rem 6rem;
+    }
+
+    .page { max-width: 860px; margin: 0 auto; }
+
+    header {
+      border-bottom: 3px solid #2a2318;
+      padding-bottom: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    header h1 { font-size: 2.2rem; font-weight: normal; letter-spacing: -0.5px; }
+
+    header .subtitle {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #7a6a50;
+      margin-top: 0.4rem;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: normal;
+      margin: 3rem 0 0.75rem;
+      padding-bottom: 0.3rem;
+      border-bottom: 1px solid #d4c9b4;
+      color: #1a1410;
+    }
+
+    h3 {
+      font-family: 'Courier New', monospace;
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #5a4a30;
+      margin: 2rem 0 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    p { margin: 0.75rem 0; }
+    ul, ol { margin: 0.75rem 0 0.75rem 1.5rem; }
+    li { margin: 0.3rem 0; }
+
+    .callout {
+      background: #f0ebe0;
+      border-left: 4px solid #c8a84b;
+      padding: 0.9rem 1.1rem;
+      margin: 1.25rem 0;
+      font-size: 0.95rem;
+    }
+    .callout strong { color: #7a5a10; }
+
+    .callout.info {
+      border-left-color: #7aaac8;
+      background: #eef3f8;
+    }
+    .callout.info strong { color: #2a5a7a; }
+
+    .callout.warn {
+      border-left-color: #c87a4b;
+      background: #f8f0ea;
+    }
+    .callout.warn strong { color: #7a3a10; }
+
+    code {
+      font-family: 'Courier New', monospace;
+      font-size: 0.88em;
+      background: #ede8dc;
+      padding: 0.1em 0.35em;
+      border-radius: 2px;
+    }
+
+    pre {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      line-height: 1.6;
+      padding: 1.1rem 1.3rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    pre.dark {
+      background: #1e1a14;
+      color: #e8dfc8;
+    }
+
+    pre.light {
+      background: #f0ebe0;
+      color: #2a2318;
+    }
+
+    pre .comment { color: #8a7a5a; }
+    pre .fn      { color: #c8a84b; }
+    pre .str     { color: #9ecf8a; }
+    pre .num     { color: #e8a86a; }
+    pre .kw      { color: #a8c8e8; }
+    pre .ret     { color: #c8a8e8; }
+    pre .err     { color: #e88a8a; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+      margin: 1rem 0;
+    }
+
+    th {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      text-align: left;
+      padding: 0.4rem 0.7rem;
+      background: #ede8dc;
+      border-bottom: 2px solid #c8b894;
+    }
+
+    td {
+      padding: 0.45rem 0.7rem;
+      border-bottom: 1px solid #e0d8c8;
+      vertical-align: top;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .op-block {
+      border: 1px solid #d4c9b4;
+      border-radius: 4px;
+      margin: 2rem 0;
+      overflow: hidden;
+    }
+
+    .op-header {
+      background: #ede8dc;
+      padding: 0.7rem 1.1rem;
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .op-name {
+      font-family: 'Courier New', monospace;
+      font-size: 1rem;
+      font-weight: bold;
+      color: #2a1a08;
+    }
+
+    .op-sig {
+      font-family: 'Courier New', monospace;
+      font-size: 0.83rem;
+      color: #7a5a20;
+    }
+
+    .op-body { padding: 1rem 1.2rem; }
+    .op-body p { margin: 0.5rem 0; font-size: 0.95rem; }
+
+    .op-body h4 {
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #7a6a50;
+      margin: 1rem 0 0.3rem;
+    }
+
+    .param-table { font-size: 0.88rem; margin: 0.4rem 0 0.8rem; }
+    .param-table td:first-child { font-family: 'Courier New', monospace; width: 8rem; }
+    .param-table td:nth-child(2) { width: 6rem; color: #7a6a50; font-family: 'Courier New', monospace; font-size: 0.82rem; }
+
+    .section-note {
+      font-style: italic;
+      color: #7a6a50;
+      font-size: 0.92rem;
+      margin: 0.5rem 0 1rem;
+    }
+
+    hr.section-break {
+      border: none;
+      border-top: 1px dashed #c8b894;
+      margin: 2.5rem 0;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>Note Store — Spec</h1>
+    <p class="subtitle">Persistent and session-scoped long-form notes for LLM tool use &bull; June 2026</p>
+  </header>
+
+  <p>
+    The note store gives an LLM a place to write and retrieve free-form text that persists beyond
+    the context window. It is designed for lorebooks, world-building notes, NPC descriptions, scene
+    summaries, and anything the model needs to recall accurately across a long session or across
+    multiple sessions.
+  </p>
+
+  <div class="callout">
+    <strong>Contrast with world state.</strong> The existing <code>state_set</code> / <code>state_modify</code>
+    tools handle short named values — HP, gold, conditions, boolean flags. Notes are for longer prose
+    content that is written once and read back whole: lore entries, character descriptions, session
+    briefs. Do not use notes for values the model will increment or compare numerically.
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Key Format</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p>
+    Every note is identified by a key. Keys encode their scope in a mandatory prefix and use dot
+    notation to express hierarchy.
+  </p>
+
+  <h3>Allowed characters</h3>
+  <p>
+    After the prefix, keys may contain lowercase letters (<code>a–z</code>), digits
+    (<code>0–9</code>), underscores (<code>_</code>), hyphens (<code>-</code>), and full stops
+    (<code>.</code>) used as segment separators. No uppercase, no spaces, no other punctuation.
+  </p>
+
+  <h3>Structural rules</h3>
+  <ul>
+    <li>Must begin with exactly one of: <code>g.</code>, <code>u.</code>, <code>c.</code></li>
+    <li>Must have at least one character after the prefix</li>
+    <li>Must not end with a full stop</li>
+    <li>Must not contain two consecutive full stops</li>
+  </ul>
+
+  <h3>Validation regex</h3>
+  <pre class="light">^(g|u|c)\.([a-z0-9_-]+\.)*[a-z0-9_-]+$</pre>
+
+  <h3>Examples</h3>
+  <table>
+    <tr><th>Key</th><th>Valid</th><th>Reason</th></tr>
+    <tr><td><code>g.eldoria</code></td><td>Yes</td><td>Global note, single segment</td></tr>
+    <tr><td><code>g.eldoria.bestiary</code></td><td>Yes</td><td>Global note, two segments</td></tr>
+    <tr><td><code>u.quest_log</code></td><td>Yes</td><td>User note with underscore</td></tr>
+    <tr><td><code>c.eldoria.the_great_lake</code></td><td>Yes</td><td>Conversation note, two segments</td></tr>
+    <tr><td><code>u.my-character.backstory</code></td><td>Yes</td><td>Hyphen is allowed</td></tr>
+    <tr><td><code>eldoria</code></td><td>No</td><td>Missing prefix</td></tr>
+    <tr><td><code>g.Eldoria</code></td><td>No</td><td>Uppercase not allowed</td></tr>
+    <tr><td><code>g.eldoria.</code></td><td>No</td><td>Trailing full stop</td></tr>
+    <tr><td><code>g.eldoria..bestiary</code></td><td>No</td><td>Consecutive full stops</td></tr>
+    <tr><td><code>g.</code></td><td>No</td><td>Nothing after prefix</td></tr>
+  </table>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Scopes</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p>
+    The prefix determines where a note lives, who can see it, and who can write to it.
+    The three scopes are mutually exclusive — a note belongs to exactly one.
+  </p>
+
+  <table>
+    <tr>
+      <th>Prefix</th>
+      <th>Scope</th>
+      <th>Lifetime</th>
+      <th>Readable by</th>
+      <th>Writable by</th>
+    </tr>
+    <tr>
+      <td><code>g.</code></td>
+      <td>Global</td>
+      <td>Forever (manual delete only)</td>
+      <td>Any user, any LLM session</td>
+      <td>Any user or LLM (unless read-only)</td>
+    </tr>
+    <tr>
+      <td><code>u.</code></td>
+      <td>User</td>
+      <td>Until the user is deleted</td>
+      <td>That user and their LLM sessions only</td>
+      <td>That user or their LLM sessions (unless read-only)</td>
+    </tr>
+    <tr>
+      <td><code>c.</code></td>
+      <td>Conversation</td>
+      <td>Until the conversation is deleted</td>
+      <td>Sessions within that conversation only</td>
+      <td>Sessions within that conversation (unless read-only)</td>
+    </tr>
+  </table>
+
+  <div class="callout info">
+    <strong>Scope is encoded in the key.</strong> The server derives scope purely from the prefix —
+    there is no separate scope parameter in tool calls. A tool call that writes <code>u.quest_log</code>
+    always goes to the current user's note store; <code>c.notes</code> always goes to the current
+    conversation. The caller never needs to pass context separately.
+  </div>
+
+  <h3>Prefix search expansion</h3>
+  <p>
+    <code>note_list</code> accepts a bare search term without a prefix (e.g. <code>eldoria</code>).
+    The server expands this into a search across all three scopes: it looks for
+    <code>g.eldoria</code>, <code>u.eldoria</code>, and <code>c.eldoria</code> and their children,
+    filtered to notes the caller can see. This lets the model discover all lore related to a topic
+    without knowing in advance which scope it lives in.
+  </p>
+  <p>
+    If the search term already has a prefix (e.g. <code>g.eldoria</code>), only that scope is searched.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Value Handling</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p>
+    Note values are free-form text with no size limit imposed by the schema. In practice, values
+    should be kept to what can be usefully retrieved in a single tool result — very large notes
+    will consume context budget when loaded.
+  </p>
+
+  <p>
+    <strong>Trimming:</strong> leading and trailing whitespace (including newlines) is stripped from
+    the value before storage on every <code>note_save</code> and <code>note_append</code> call.
+    The stored value is always trimmed; it is returned as-is on load.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Read-only Flag</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p>
+    Any note can be marked read-only. When <code>read_only</code> is true:
+  </p>
+  <ul>
+    <li><code>note_save</code> on an existing key returns an error</li>
+    <li><code>note_append</code> returns an error</li>
+    <li><code>note_delete</code> returns an error</li>
+    <li><code>note_load</code> and <code>note_list</code> are unaffected</li>
+  </ul>
+
+  <div class="callout warn">
+    <strong>The read-only flag is never set by a tool call.</strong> It can only be toggled in the
+    settings UI. This is intentional: it allows a user to lock a lorebook note that the LLM must
+    be able to read but must not be able to overwrite mid-session.
+  </div>
+
+  <p>
+    The <code>read_only</code> field is included in the response from <code>note_list</code> so
+    the model can see which notes are protected before attempting a write.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Database Schema</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p>
+    One new table. Added as a new numbered migration in <code>internal/store/store.go</code>.
+  </p>
+
+  <pre class="dark"><span class="kw">CREATE TABLE</span> note (
+    id              <span class="kw">INTEGER PRIMARY KEY</span>,
+    key             <span class="kw">TEXT NOT NULL</span>,
+    value           <span class="kw">TEXT NOT NULL DEFAULT</span> <span class="str">''</span>,
+    user_id         <span class="kw">INTEGER REFERENCES</span> user(id) <span class="kw">ON DELETE CASCADE</span>,
+    conversation_id <span class="kw">INTEGER REFERENCES</span> conversation(id) <span class="kw">ON DELETE CASCADE</span>,
+    read_only       <span class="kw">INTEGER NOT NULL DEFAULT</span> <span class="num">0</span>,
+    created_at      <span class="kw">TEXT NOT NULL</span>,
+    updated_at      <span class="kw">TEXT NOT NULL</span>
+);
+
+<span class="comment">-- Scope partitioning: global=(0,0), user=(user_id,0), conversation=(0,conv_id).
+-- COALESCE avoids the NULL != NULL problem in SQLite unique indexes.</span>
+<span class="kw">CREATE UNIQUE INDEX</span> note_key_scope
+    <span class="kw">ON</span> note(key, <span class="fn">COALESCE</span>(user_id, <span class="num">0</span>), <span class="fn">COALESCE</span>(conversation_id, <span class="num">0</span>));
+
+<span class="comment">-- Fast prefix lookups for note_list.</span>
+<span class="kw">CREATE INDEX</span> note_key_prefix <span class="kw">ON</span> note(key);</pre>
+
+  <h3>Constraints</h3>
+  <ul>
+    <li><code>user_id</code> and <code>conversation_id</code> are mutually exclusive: at most one is non-null.</li>
+    <li>Global notes have both null. This is enforced in application code, not by a DB constraint.</li>
+    <li>Cascade deletes ensure notes are cleaned up when a user or conversation is removed.</li>
+  </ul>
+
+  <h3>Store functions</h3>
+  <p>
+    New file <code>internal/store/notes.go</code>. Public functions:
+  </p>
+  <ul>
+    <li><code>SaveNote(key, value string, userID, convID *int64) error</code></li>
+    <li><code>LoadNote(key string, userID, convID *int64) (Note, error)</code></li>
+    <li><code>ListNotes(prefix string, userID, convID *int64) ([]NoteRow, error)</code></li>
+    <li><code>DeleteNote(key string, userID, convID *int64) error</code></li>
+    <li><code>AppendNote(key, text string, userID, convID *int64) error</code></li>
+    <li><code>SetNoteReadOnly(id int64, readOnly bool) error</code> — used by the settings UI handler only</li>
+  </ul>
+
+  <p>
+    The <code>NoteRow</code> type returned by <code>ListNotes</code> includes key, a short excerpt
+    (first 120 characters of value), read_only, and timestamps — not the full value, to keep list
+    responses compact.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Tool API</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p class="section-note">
+    All five tools live in <code>internal/server/tools.go</code> under a <code>notes</code> compound
+    group (analogous to <code>world_state</code>). The tool executor receives the current user ID and
+    conversation ID from <code>ToolContext</code>.
+  </p>
+
+  <!-- note_save -->
+  <div class="op-block">
+    <div class="op-header">
+      <span class="op-name">note_save</span>
+      <span class="op-sig">(key: string, value: string) → "saved"</span>
+    </div>
+    <div class="op-body">
+      <p>
+        Creates or replaces a note. If a note with this key already exists in the same scope it is
+        overwritten. If it is marked read-only the call returns an error instead.
+      </p>
+
+      <h4>Parameters</h4>
+      <table class="param-table">
+        <tr><td>key</td><td>string</td><td>Full key including prefix. Must pass validation.</td></tr>
+        <tr><td>value</td><td>string</td><td>Content to store. Trimmed before storage.</td></tr>
+      </table>
+
+      <h4>Behaviour</h4>
+      <ol>
+        <li>Validate key format. Return error if invalid.</li>
+        <li>Derive scope from prefix. Resolve user_id / conversation_id from context.</li>
+        <li>If a note with this (key, scope) exists and is read-only, return error.</li>
+        <li>Trim value. Upsert the note, updating <code>updated_at</code>.</li>
+        <li>Return <code>"saved"</code>.</li>
+      </ol>
+
+      <h4>Errors</h4>
+      <ul>
+        <li><code>invalid key: ...</code> — key fails validation</li>
+        <li><code>note is read-only</code> — existing note is protected</li>
+        <li><code>no active conversation</code> — <code>c.</code> key used outside a conversation context</li>
+      </ul>
+
+      <h4>Example</h4>
+      <pre class="dark"><span class="fn">note_save</span>(<span class="str">"g.eldoria"</span>, <span class="str">"In the land of Eldoria, magic was outlawed after the Sundering..."</span>)
+<span class="comment">→ "saved"</span>
+
+<span class="fn">note_save</span>(<span class="str">"c.session_brief"</span>, <span class="str">"Quest: recover the stolen crown before dawn."</span>)
+<span class="comment">→ "saved"</span></pre>
+    </div>
+  </div>
+
+  <!-- note_load -->
+  <div class="op-block">
+    <div class="op-header">
+      <span class="op-name">note_load</span>
+      <span class="op-sig">(key: string) → {key, value, read_only, updated_at}</span>
+    </div>
+    <div class="op-body">
+      <p>
+        Loads a single note by its exact key. Returns the full value. Returns an error if the note
+        does not exist or is not accessible in the current context.
+      </p>
+
+      <h4>Parameters</h4>
+      <table class="param-table">
+        <tr><td>key</td><td>string</td><td>Exact key including prefix.</td></tr>
+      </table>
+
+      <h4>Behaviour</h4>
+      <ol>
+        <li>Validate key format.</li>
+        <li>Derive scope; resolve context FKs.</li>
+        <li>Look up the note. Enforce scope visibility (u. notes only visible to their owner).</li>
+        <li>Return the note object, or error if not found.</li>
+      </ol>
+
+      <h4>Errors</h4>
+      <ul>
+        <li><code>invalid key: ...</code></li>
+        <li><code>note not found</code></li>
+        <li><code>no active conversation</code></li>
+      </ul>
+
+      <h4>Example</h4>
+      <pre class="dark"><span class="fn">note_load</span>(<span class="str">"g.eldoria"</span>)
+<span class="ret">→ {
+    "key": "g.eldoria",
+    "value": "In the land of Eldoria, magic was outlawed after the Sundering...",
+    "read_only": true,
+    "updated_at": "2026-06-10T14:23:00Z"
+  }</span></pre>
+    </div>
+  </div>
+
+  <!-- note_list -->
+  <div class="op-block">
+    <div class="op-header">
+      <span class="op-name">note_list</span>
+      <span class="op-sig">(prefix?: string) → [{key, excerpt, read_only, updated_at}]</span>
+    </div>
+    <div class="op-body">
+      <p>
+        Lists accessible notes, optionally filtered by prefix. Returns key, a short excerpt (first
+        120 characters of the value), and metadata. Does not return full values — use
+        <code>note_load</code> to retrieve content.
+      </p>
+
+      <h4>Parameters</h4>
+      <table class="param-table">
+        <tr><td>prefix</td><td>string?</td><td>Optional. Bare term (e.g. <code>eldoria</code>) or scoped prefix (e.g. <code>g.eldoria</code>).</td></tr>
+      </table>
+
+      <h4>Prefix expansion</h4>
+      <p>If <code>prefix</code> is omitted or empty, all accessible notes are returned.</p>
+      <p>
+        If <code>prefix</code> has no scope prefix, the server searches all three scopes. For example,
+        <code>eldoria</code> matches:
+      </p>
+      <ul>
+        <li><code>g.eldoria</code> and any <code>g.eldoria.*</code></li>
+        <li><code>u.eldoria</code> and any <code>u.eldoria.*</code> (current user only)</li>
+        <li><code>c.eldoria</code> and any <code>c.eldoria.*</code> (current conversation only)</li>
+      </ul>
+      <p>
+        If <code>prefix</code> has a scope prefix (e.g. <code>g.eldoria</code>), only that scope is
+        searched: matches <code>g.eldoria</code> and any <code>g.eldoria.*</code>.
+      </p>
+      <p>SQL equivalent for a bare term <code>T</code>:</p>
+      <pre class="light">key = 'g.T'        OR key LIKE 'g.T.%'
+OR key = 'u.T'     OR key LIKE 'u.T.%'   -- filtered to current user_id
+OR key = 'c.T'     OR key LIKE 'c.T.%'   -- filtered to current conversation_id</pre>
+
+      <h4>Errors</h4>
+      <ul>
+        <li><code>invalid prefix: ...</code> — prefix fails key-segment validation</li>
+      </ul>
+
+      <h4>Example</h4>
+      <pre class="dark"><span class="fn">note_list</span>(<span class="str">"eldoria"</span>)
+<span class="ret">→ [
+    { "key": "g.eldoria",            "excerpt": "In the land of Eldoria, magic was...", "read_only": true,  "updated_at": "..." },
+    { "key": "g.eldoria.bestiary",   "excerpt": "Common creatures: wolf (3 HP), gob...", "read_only": true,  "updated_at": "..." },
+    { "key": "u.eldoria.the_great_lake", "excerpt": "A vast freshwater lake to the no...", "read_only": false, "updated_at": "..." }
+  ]</span></pre>
+    </div>
+  </div>
+
+  <!-- note_delete -->
+  <div class="op-block">
+    <div class="op-header">
+      <span class="op-name">note_delete</span>
+      <span class="op-sig">(key: string) → "deleted"</span>
+    </div>
+    <div class="op-body">
+      <p>
+        Deletes a note by exact key. Returns an error if the note does not exist, is not accessible,
+        or is marked read-only.
+      </p>
+
+      <h4>Parameters</h4>
+      <table class="param-table">
+        <tr><td>key</td><td>string</td><td>Exact key including prefix.</td></tr>
+      </table>
+
+      <h4>Errors</h4>
+      <ul>
+        <li><code>invalid key: ...</code></li>
+        <li><code>note not found</code></li>
+        <li><code>note is read-only</code></li>
+        <li><code>no active conversation</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- note_append -->
+  <div class="op-block">
+    <div class="op-header">
+      <span class="op-name">note_append</span>
+      <span class="op-sig">(key: string, text: string) → "appended" | "created"</span>
+    </div>
+    <div class="op-body">
+      <p>
+        Appends text to an existing note non-destructively. A blank line is inserted between the
+        existing content and the new text, so successive appends produce clearly separated paragraphs.
+        This allows the model to add information without having to rewrite the entire note.
+      </p>
+      <p>
+        If the note does not exist it is created with the given text as its initial value (equivalent
+        to <code>note_save</code>). Returns <code>"appended"</code> or <code>"created"</code>
+        accordingly.
+      </p>
+
+      <h4>Parameters</h4>
+      <table class="param-table">
+        <tr><td>key</td><td>string</td><td>Exact key including prefix.</td></tr>
+        <tr><td>text</td><td>string</td><td>Text to append. Trimmed before use.</td></tr>
+      </table>
+
+      <h4>Behaviour</h4>
+      <ol>
+        <li>Validate key format.</li>
+        <li>Derive scope; resolve context FKs.</li>
+        <li>If the note does not exist: create it with <code>value = trim(text)</code>. Return <code>"created"</code>.</li>
+        <li>If the note exists and is read-only: return error.</li>
+        <li>Compute <code>new_value = existing_value + "\n\n" + trim(text)</code>.</li>
+        <li>Update the note. Return <code>"appended"</code>.</li>
+      </ol>
+
+      <h4>Errors</h4>
+      <ul>
+        <li><code>invalid key: ...</code></li>
+        <li><code>note is read-only</code></li>
+        <li><code>no active conversation</code></li>
+      </ul>
+
+      <h4>Example</h4>
+      <pre class="dark"><span class="fn">note_append</span>(<span class="str">"u.eldoria.the_great_lake"</span>, <span class="str">"The northern shore is controlled by the Fisher-Folk, a secretive clan."</span>)
+<span class="comment">→ "appended"
+
+Stored value becomes:
+"A vast freshwater lake to the north of Eldoria.
+
+The northern shore is controlled by the Fisher-Folk, a secretive clan."</span></pre>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Access Control Summary</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <table>
+    <tr>
+      <th>Scope</th>
+      <th>Who can read</th>
+      <th>Who can write / delete</th>
+      <th>Read-only overrides</th>
+    </tr>
+    <tr>
+      <td><code>g.</code> global</td>
+      <td>Any user, any LLM session</td>
+      <td>Any user, any LLM session</td>
+      <td>Yes — blocks all writes</td>
+    </tr>
+    <tr>
+      <td><code>u.</code> user</td>
+      <td>That user and their sessions only</td>
+      <td>That user and their sessions only</td>
+      <td>Yes — blocks all writes</td>
+    </tr>
+    <tr>
+      <td><code>c.</code> conversation</td>
+      <td>Sessions within that conversation only</td>
+      <td>Sessions within that conversation only</td>
+      <td>Yes — blocks all writes</td>
+    </tr>
+  </table>
+
+  <p>
+    Attempts to access a note outside the caller's visibility (e.g. another user's <code>u.</code>
+    note) return <code>note not found</code> rather than a permission error. This avoids leaking
+    the existence of notes the caller cannot see.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Registration and Tool Group</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p>
+    The five tools are registered individually in <code>toolRegistry</code> and <code>executors</code>
+    in <code>internal/server/tools.go</code>. A compound group ID <code>notes</code> is added to the
+    expansion logic alongside <code>world_state</code>, expanding to:
+    <code>note_save</code>, <code>note_load</code>, <code>note_list</code>,
+    <code>note_delete</code>, <code>note_append</code>.
+  </p>
+
+  <p>
+    <code>TOOL_GROUPS</code> in <code>static/js/settings-character-edit.js</code> gets a new entry:
+  </p>
+  <pre class="dark">{ <span class="str">id</span>: <span class="str">"notes"</span>, <span class="str">label</span>: <span class="str">"Notes"</span>, <span class="str">description</span>: <span class="str">"Note store: save, load, list, delete, and append to named notes across global, user, and conversation scopes."</span> }</pre>
+
+  <p>
+    The tool display table in <code>CLAUDE.md</code> gains five rows (one per tool), all with no
+    required config.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Settings UI</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p>
+    A new settings page at <code>static/settings/notes.html</code> (and corresponding JS in
+    <code>static/js/settings-notes.js</code>) provides a management interface for notes outside
+    the chat.
+  </p>
+
+  <h3>What users see</h3>
+  <ul>
+    <li>All <code>g.</code> global notes (any user can see and edit these)</li>
+    <li>All <code>u.</code> notes belonging to the logged-in user</li>
+    <li>All <code>c.</code> notes for conversations the user owns (read-only in the UI — conversation notes are primarily managed by the LLM during chat)</li>
+  </ul>
+
+  <h3>Operations available in the UI</h3>
+  <ul>
+    <li><strong>Create</strong> a new note — key (with prefix), value, read-only toggle. Scope is inferred from the key prefix the user types.</li>
+    <li><strong>Edit</strong> key, value, and read-only flag of any note the user can write.</li>
+    <li><strong>Toggle read-only</strong> — the only place this flag can be changed.</li>
+    <li><strong>Delete</strong> any note the user can write. Read-only notes cannot be deleted from the UI either.</li>
+  </ul>
+
+  <h3>API endpoints</h3>
+  <p>New REST endpoints in <code>internal/server/notes.go</code>:</p>
+  <table>
+    <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+    <tr><td><code>GET</code></td><td><code>/api/notes</code></td><td>List notes visible to the current user. Accepts optional <code>?prefix=</code> query param.</td></tr>
+    <tr><td><code>GET</code></td><td><code>/api/notes/{key}</code></td><td>Load a single note by key.</td></tr>
+    <tr><td><code>PUT</code></td><td><code>/api/notes/{key}</code></td><td>Create or update a note. Body: <code>{value, read_only?}</code>.</td></tr>
+    <tr><td><code>DELETE</code></td><td><code>/api/notes/{key}</code></td><td>Delete a note.</td></tr>
+  </table>
+
+  <div class="callout info">
+    <strong>Key encoding in URLs.</strong> The key contains dots and a prefix that includes a dot
+    (e.g. <code>g.eldoria.bestiary</code>). When used in the path segment the key should be
+    URL-encoded by the client: <code>/api/notes/g.eldoria.bestiary</code> works as-is since dots
+    are valid in path segments, but the router must treat the remainder of the path after
+    <code>/api/notes/</code> as a single parameter to avoid misinterpreting dots.
+  </div>
+
+  <p>
+    The <code>PUT</code> endpoint accepts an optional <code>read_only</code> boolean in the body.
+    This is the only endpoint where <code>read_only</code> can be set. The tool executors never
+    call this endpoint — they use store functions that do not expose the <code>read_only</code>
+    parameter.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Logging</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p>
+    Follow the existing logging conventions. The REST handlers (settings UI operations) each emit
+    one log line:
+  </p>
+  <pre class="light">Saving note key="g.eldoria" user_id=1
+Deleting note key="g.eldoria" user_id=1
+Toggling read-only key="g.eldoria" read_only=true user_id=1</pre>
+
+  <p>
+    Tool executor calls (LLM-driven) are not logged individually — they are high-frequency within
+    a message loop. Tool loop activity is already captured at the message level.
+  </p>
+
+  <hr class="section-break">
+
+  <p class="section-note">
+    Spec complete. The world-state tools (<code>state_set</code> etc.) are unaffected — they remain
+    the right tool for short numeric and boolean values. Notes complement them for longer prose content.
+  </p>
+
+</div>
+</body>
+</html>

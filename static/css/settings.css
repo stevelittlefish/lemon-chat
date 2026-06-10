@@ -838,6 +838,119 @@ a.snav-item { text-decoration: none; }
   border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
 }
 
+/* ── Notes page ─────────────────────────────────────────── */
+
+.note-group { margin-bottom: 8px; }
+
+.note-group-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--fg-muted);
+  padding: 12px 0 4px;
+}
+
+.note-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.note-row--editing { background: var(--paper-100); padding: 10px 8px; border-radius: var(--radius-sm); margin: 0 -8px; }
+
+.note-row-main { flex: 1; min-width: 0; }
+
+.note-row-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+
+.note-row-key code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-900);
+}
+
+.note-row-excerpt {
+  font-size: 13px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-row-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.note-scope-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  border-radius: 3px;
+  padding: 1px 5px;
+  border: 1px solid transparent;
+}
+.note-scope-tag--global       { background: var(--paper-100); color: var(--fg-muted); border-color: var(--border-soft); }
+.note-scope-tag--user         { background: #dde8f4; color: #1a3a6a; border-color: #aac0e0; }
+.note-scope-tag--conversation { background: #e8f0dd; color: #2a5a1a; border-color: #a8c890; }
+
+.note-badge { font-family: var(--font-mono); font-size: 10px; border-radius: 3px; padding: 1px 5px; }
+.note-badge--ro { background: #f4ead4; color: #7a4a10; border: 1px solid #d4b080; }
+
+.note-edit-form {
+  padding: 10px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note-add-form {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-bottom: 20px;
+  background: var(--paper-100);
+}
+
+.note-key-row {
+  display: flex;
+  gap: 8px;
+}
+
+.note-scope-select {
+  width: auto;
+  flex-shrink: 0;
+}
+
+.note-key-input { flex: 1; }
+
+.note-value-input { width: 100%; font-family: var(--font-mono); font-size: 13px; resize: vertical; }
+
+.note-ro-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.note-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-delete-btn:disabled { opacity: 0.3; pointer-events: none; }
+
 /* ── Scrollbar ──────────────────────────────────────────── */
 
 .smain::-webkit-scrollbar { width: 10px; }

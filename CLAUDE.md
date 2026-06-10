@@ -188,8 +188,17 @@ Available tools and their config requirements:
 | `searxng` | SearXNG | `[searxng] url` in `lemon.toml` |
 | `generate_image_sdxl` | Generate image (SDXL) | `[comfyui] url` + `sdxl_file` in `lemon.toml` |
 | `generate_image_flux` | Generate image (Flux Schnell) | `[comfyui] url` + `flux_file` in `lemon.toml` |
+| `note_save` | Note: save | — |
+| `note_load` | Note: load | — |
+| `note_list` | Note: list | — |
+| `note_delete` | Note: delete | — |
+| `note_append` | Note: append | — |
 
 `InitTools(cfg)` is called once at startup and sets the `Configured` flag on tools that need external services. The frontend reads `GET /api/tools` and shows a config hint for unconfigured tools.
+
+Compound group IDs expand to multiple tools:
+- `world_state` → `state_set`, `state_modify`, `state_unset`, `state_list`
+- `notes` → `note_save`, `note_load`, `note_list`, `note_delete`, `note_append`
 
 ### Attachments
 

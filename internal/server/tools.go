@@ -49,6 +49,7 @@ type ToolContext struct {
 	Timezone        string
 	// for tools that create attachments
 	ToolCallID     string
+	UserID         int64
 	ConversationID int64
 	Store          *store.Store
 	DataDir        string
@@ -397,15 +398,133 @@ Examples:
 			Parameters:  toolParam{Type: "object", Properties: map[string]any{}, Required: []string{}},
 		},
 	},
+	"note_save": {
+		Type: "function",
+		Function: toolFunction{
+			Name: "note_save",
+			Description: `Saves a note. Creates or replaces the note at the given key. Fails if the note is marked read-only.
+
+Keys must start with a scope prefix:
+  g.  global — visible to all users and sessions, persists forever
+  u.  user   — visible only to you, persists across all your conversations
+  c.  conversation — scoped to this conversation, deleted when the conversation is deleted
+
+After the prefix, use lowercase letters, digits, underscores, hyphens, and dots as segment separators (e.g. g.eldoria.bestiary). No consecutive dots, no trailing dot.
+
+Use notes for long-form prose content: lore entries, NPC descriptions, session briefs, memories. For short numeric or boolean values use state_set instead.`,
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"key": map[string]any{
+						"type":        "string",
+						"description": "Full key including scope prefix, e.g. \"g.eldoria\", \"u.quest_log\", \"c.session_brief\".",
+					},
+					"value": map[string]any{
+						"type":        "string",
+						"description": "Content to store. Leading and trailing whitespace is stripped automatically.",
+					},
+				},
+				Required: []string{"key", "value"},
+			},
+		},
+	},
+	"note_load": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "note_load",
+			Description: "Loads a single note by its exact key. Returns the full value, read-only status, and last-updated timestamp. Returns an error if the note does not exist or is not accessible in the current scope.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"key": map[string]any{
+						"type":        "string",
+						"description": "Exact key including scope prefix, e.g. \"g.eldoria\", \"u.quest_log\".",
+					},
+				},
+				Required: []string{"key"},
+			},
+		},
+	},
+	"note_list": {
+		Type: "function",
+		Function: toolFunction{
+			Name: "note_list",
+			Description: `Lists accessible notes. Returns key, a short excerpt, read-only status, and last-updated time for each result. Does not return full values — use note_load to retrieve content.
+
+The prefix parameter controls what is searched:
+  - Omit or pass "" to list all accessible notes.
+  - Pass a bare term like "eldoria" to search all scopes: finds g.eldoria, u.eldoria, c.eldoria and their children.
+  - Pass a scoped prefix like "g.eldoria" to search only global notes under that path.
+
+Call note_list at the start of a session to discover what notes are available, then note_load specific keys you need.`,
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"prefix": map[string]any{
+						"type":        "string",
+						"description": "Optional prefix to filter by. Bare term (e.g. \"eldoria\") searches all scopes; scoped prefix (e.g. \"g.eldoria\") searches one scope only.",
+					},
+				},
+				Required: []string{},
+			},
+		},
+	},
+	"note_delete": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "note_delete",
+			Description: "Deletes a note by its exact key. Returns an error if the note does not exist, is not accessible, or is marked read-only.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"key": map[string]any{
+						"type":        "string",
+						"description": "Exact key including scope prefix.",
+					},
+				},
+				Required: []string{"key"},
+			},
+		},
+	},
+	"note_append": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "note_append",
+			Description: "Appends text to an existing note without overwriting it. A blank line is inserted between the existing content and the new text. If the note does not exist it is created. Fails if the note is marked read-only. Use this to accumulate information incrementally — NPC discoveries, session events, growing lorebook entries — without risking overwriting earlier content.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"key": map[string]any{
+						"type":        "string",
+						"description": "Exact key including scope prefix.",
+					},
+					"text": map[string]any{
+						"type":        "string",
+						"description": "Text to append. Leading and trailing whitespace is stripped automatically.",
+					},
+				},
+				Required: []string{"key", "text"},
+			},
+		},
+	},
 }
 
 // ToolDefsForCharacter returns tool definitions for the given tool IDs.
-// "world_state" is a compound ID that expands to state_set, state_modify, state_unset, state_list.
+// "world_state" expands to state_set, state_modify, state_unset, state_list.
+// "notes" expands to note_save, note_load, note_list, note_delete, note_append.
 func ToolDefsForCharacter(toolIDs []string) []toolDef {
 	var out []toolDef
 	for _, id := range toolIDs {
 		if id == "world_state" {
 			for _, name := range []string{"state_set", "state_modify", "state_unset", "state_list"} {
+				if def, ok := toolRegistry[name]; ok {
+					out = append(out, def)
+				}
+			}
+			continue
+		}
+		if id == "notes" {
+			for _, name := range []string{"note_save", "note_load", "note_list", "note_delete", "note_append"} {
 				if def, ok := toolRegistry[name]; ok {
 					out = append(out, def)
 				}
@@ -897,6 +1016,84 @@ var executors = map[string]func(string, ToolContext) (string, error){
 	"state_list": func(_ string, tctx ToolContext) (string, error) {
 		return tctx.Store.ListState(tctx.ConversationID)
 	},
+	"note_save": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Key == "" {
+			return "", fmt.Errorf("key is required")
+		}
+		if err := tctx.Store.SaveNote(args.Key, args.Value, tctx.UserID, tctx.ConversationID); err != nil {
+			return "", err
+		}
+		return "saved", nil
+	},
+	"note_load": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Key string `json:"key"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Key == "" {
+			return "", fmt.Errorf("key is required")
+		}
+		n, err := tctx.Store.LoadNote(args.Key, tctx.UserID, tctx.ConversationID)
+		if err != nil {
+			return "", err
+		}
+		type noteResult struct {
+			Key       string `json:"key"`
+			Value     string `json:"value"`
+			ReadOnly  bool   `json:"read_only"`
+			UpdatedAt string `json:"updated_at"`
+		}
+		out, _ := json.Marshal(noteResult{Key: n.Key, Value: n.Value, ReadOnly: n.ReadOnly, UpdatedAt: n.UpdatedAt})
+		return string(out), nil
+	},
+	"note_list": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Prefix string `json:"prefix"`
+		}
+		if argsJSON != "" {
+			if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+				return "", fmt.Errorf("invalid args: %w", err)
+			}
+		}
+		return tctx.Store.ListNotes(args.Prefix, tctx.UserID, tctx.ConversationID)
+	},
+	"note_delete": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Key string `json:"key"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Key == "" {
+			return "", fmt.Errorf("key is required")
+		}
+		if err := tctx.Store.DeleteNote(args.Key, tctx.UserID, tctx.ConversationID); err != nil {
+			return "", err
+		}
+		return "deleted", nil
+	},
+	"note_append": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Key  string `json:"key"`
+			Text string `json:"text"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Key == "" {
+			return "", fmt.Errorf("key is required")
+		}
+		return tctx.Store.AppendNote(args.Key, args.Text, tctx.UserID, tctx.ConversationID)
+	},
 	"wikipedia_get_page": func(argsJSON string, _ ToolContext) (string, error) {
 		var args struct {
 			Title   string `json:"title"`
@@ -1352,6 +1549,7 @@ func InitTools(cfg *config.Config) {
 		{"wikipedia_search", "Wikipedia search", "Searches Wikipedia and returns matching article titles and snippets.", true, ""},
 		{"wikipedia_get_page", "Wikipedia get page", "Fetches a Wikipedia article intro + TOC, or a specific section by name.", true, ""},
 		{"world_state", "World State", "Session state tools: set, modify, remove, and list named values scoped to this conversation.", true, ""},
+		{"notes", "Notes", "Note store: save, load, list, delete, and append to named notes across global, user, and conversation scopes.", true, ""},
 	}
 
 	searxngConfigured := cfg.SearXNG.URL != ""

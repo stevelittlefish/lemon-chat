@@ -475,6 +475,32 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v19 → v20 complete")
 	}
 
+	if version < 21 {
+		log.Println("store: migrating v20 → v21 (create note table)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE note (
+				id              INTEGER PRIMARY KEY,
+				key             TEXT    NOT NULL,
+				value           TEXT    NOT NULL DEFAULT '',
+				user_id         INTEGER REFERENCES user(id) ON DELETE CASCADE,
+				conversation_id INTEGER REFERENCES conversation(id) ON DELETE CASCADE,
+				read_only       INTEGER NOT NULL DEFAULT 0,
+				created_at      TEXT    NOT NULL,
+				updated_at      TEXT    NOT NULL
+			);
+			CREATE UNIQUE INDEX note_key_scope
+				ON note(key, COALESCE(user_id, 0), COALESCE(conversation_id, 0));
+			CREATE INDEX note_key_prefix ON note(key);
+		`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (21, ?)`, now()); err != nil {
+			return err
+		}
+		version = 21
+		log.Println("store: migration v20 → v21 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

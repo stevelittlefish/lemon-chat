@@ -44,6 +44,10 @@ function renderNav() {
       ${icon('drama', 16)}
       Characters
     </a>
+    <a href="/settings/notes" class="snav-item${path === '/settings/notes' ? ' active' : ''}">
+      ${icon('file-text', 16)}
+      Notes
+    </a>
     <div class="snav-group-label">Admin</div>
     <a href="/settings/users" class="snav-item${path === '/settings/users' ? ' active' : ''}">
       ${svgUsers}
