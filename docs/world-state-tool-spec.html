@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World State Tool — Spec</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 17px;
+      line-height: 1.7;
+      color: #2a2318;
+      background: #faf7f2;
+      padding: 2rem 1rem 6rem;
+    }
+
+    .page { max-width: 860px; margin: 0 auto; }
+
+    header {
+      border-bottom: 3px solid #2a2318;
+      padding-bottom: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    header h1 { font-size: 2.2rem; font-weight: normal; letter-spacing: -0.5px; }
+
+    header .subtitle {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #7a6a50;
+      margin-top: 0.4rem;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: normal;
+      margin: 3rem 0 0.75rem;
+      padding-bottom: 0.3rem;
+      border-bottom: 1px solid #d4c9b4;
+      color: #1a1410;
+    }
+
+    h3 {
+      font-family: 'Courier New', monospace;
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #5a4a30;
+      margin: 2rem 0 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    p { margin: 0.75rem 0; }
+    ul, ol { margin: 0.75rem 0 0.75rem 1.5rem; }
+    li { margin: 0.3rem 0; }
+
+    .callout {
+      background: #f0ebe0;
+      border-left: 4px solid #c8a84b;
+      padding: 0.9rem 1.1rem;
+      margin: 1.25rem 0;
+      font-size: 0.95rem;
+    }
+    .callout strong { color: #7a5a10; }
+
+    .callout.info {
+      border-left-color: #7aaac8;
+      background: #eef3f8;
+    }
+    .callout.info strong { color: #2a5a7a; }
+
+    .callout.warn {
+      border-left-color: #c87a4b;
+      background: #f8f0ea;
+    }
+    .callout.warn strong { color: #7a3a10; }
+
+    code {
+      font-family: 'Courier New', monospace;
+      font-size: 0.88em;
+      background: #ede8dc;
+      padding: 0.1em 0.35em;
+      border-radius: 2px;
+    }
+
+    pre {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      line-height: 1.6;
+      padding: 1.1rem 1.3rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    pre.dark {
+      background: #1e1a14;
+      color: #e8dfc8;
+    }
+
+    pre.light {
+      background: #f0ebe0;
+      color: #2a2318;
+    }
+
+    pre .comment { color: #8a7a5a; }
+    pre .fn      { color: #c8a84b; }
+    pre .str     { color: #9ecf8a; }
+    pre .num     { color: #e8a86a; }
+    pre .kw      { color: #a8c8e8; }
+    pre .ret     { color: #c8a8e8; }
+    pre .err     { color: #e88a8a; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+      margin: 1rem 0;
+    }
+
+    th {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      text-align: left;
+      padding: 0.4rem 0.7rem;
+      background: #ede8dc;
+      border-bottom: 2px solid #c8b894;
+    }
+
+    td {
+      padding: 0.45rem 0.7rem;
+      border-bottom: 1px solid #e0d8c8;
+      vertical-align: top;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .op-block {
+      border: 1px solid #d4c9b4;
+      border-radius: 4px;
+      margin: 2rem 0;
+      overflow: hidden;
+    }
+
+    .op-header {
+      background: #ede8dc;
+      padding: 0.7rem 1.1rem;
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .op-name {
+      font-family: 'Courier New', monospace;
+      font-size: 1rem;
+      font-weight: bold;
+      color: #2a1a08;
+    }
+
+    .op-sig {
+      font-family: 'Courier New', monospace;
+      font-size: 0.83rem;
+      color: #7a5a20;
+    }
+
+    .op-body { padding: 1rem 1.2rem; }
+    .op-body p { margin: 0.5rem 0; font-size: 0.95rem; }
+
+    .op-body h4 {
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #7a6a50;
+      margin: 1rem 0 0.3rem;
+    }
+
+    .param-table { font-size: 0.88rem; margin: 0.4rem 0 0.8rem; }
+    .param-table td:first-child { font-family: 'Courier New', monospace; width: 8rem; }
+    .param-table td:nth-child(2) { width: 6rem; color: #7a6a50; font-family: 'Courier New', monospace; font-size: 0.82rem; }
+
+    .section-note {
+      font-style: italic;
+      color: #7a6a50;
+      font-size: 0.92rem;
+      margin: 0.5rem 0 1rem;
+    }
+
+    hr.section-break {
+      border: none;
+      border-top: 1px dashed #c8b894;
+      margin: 2.5rem 0;
+    }
+
+    .wireframe {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      line-height: 1.7;
+      background: #f0ebe0;
+      border: 1px solid #d4c9b4;
+      border-radius: 4px;
+      padding: 1.2rem 1.4rem;
+      margin: 1rem 0;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+
+    .col-card {
+      background: #f5f0e6;
+      border: 1px solid #d4c9b4;
+      border-radius: 4px;
+      padding: 0.9rem 1.1rem;
+      font-size: 0.92rem;
+    }
+
+    .col-card h4 {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #5a4a30;
+      margin-bottom: 0.5rem;
+    }
+
+    .col-card ul { margin-left: 1.1rem; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>World State Tool — Spec</h1>
+    <p class="subtitle">Design and implementation spec for the session state store &bull; June 2026</p>
+  </header>
+
+  <p>
+    A general-purpose key-value store that gives the LLM a reliable memory for the current session.
+    Covers stats (HP, gold), conditions (poisoned, exhausted), flags (talked to the old man),
+    and inventory (torches, rope) — all as named values in one flat store.
+  </p>
+
+  <div class="callout">
+    <strong>Why one store, not three tools:</strong> Stats, conditions, and inventory are structurally
+    identical — named values. The only distinction is semantic. A single flat store with four operations
+    is simpler to implement, simpler for the LLM to use, and leaves the organisational choices (naming
+    conventions, grouping) to whoever is writing the character prompt.
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Persistence</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <h3>Scope</h3>
+  <p>
+    State is scoped to a conversation. Each conversation has its own isolated key-value store. Starting
+    a new conversation starts with an empty store — there is no automatic carry-over between sessions.
+  </p>
+  <p>
+    This is the right default for RPG sessions: each adventure starts fresh. If persistent world state
+    across conversations is needed later, that belongs in the note store (a separate, future tool).
+  </p>
+
+  <h3>Database schema</h3>
+  <p>
+    One new table, added as a migration. Keys are unique per conversation — setting an existing key
+    overwrites it.
+  </p>
+
+  <pre class="dark"><span class="kw">CREATE TABLE</span> conversation_state (
+    id              <span class="kw">INTEGER PRIMARY KEY</span>,
+    conversation_id <span class="kw">INTEGER NOT NULL REFERENCES</span> conversation(id) <span class="kw">ON DELETE CASCADE</span>,
+    key             <span class="kw">TEXT NOT NULL</span>,
+    value           <span class="kw">TEXT NOT NULL</span>,
+    updated_at      <span class="kw">TEXT NOT NULL</span>,
+    <span class="kw">UNIQUE</span>(conversation_id, key)
+);
+
+<span class="kw">CREATE INDEX</span> conversation_state_conversation_id
+    <span class="kw">ON</span> conversation_state(conversation_id);</pre>
+
+  <p>
+    All values are stored as <code>TEXT</code>. Numbers are stored as their string representation
+    (<code>"7"</code>, <code>"3.5"</code>). The <code>state_modify</code> operation parses the stored
+    value as a number, applies the delta, and writes the result back. If the stored value cannot be
+    parsed as a number, <code>state_modify</code> returns an error.
+  </p>
+
+  <h3>Lifecycle</h3>
+  <ul>
+    <li>State is created the first time <code>state_set</code> is called in a conversation.</li>
+    <li>State persists for the lifetime of the conversation row — it survives server restarts.</li>
+    <li>When a conversation is deleted, its state is deleted via <code>ON DELETE CASCADE</code>.</li>
+    <li>There is no automatic expiry or session timeout.</li>
+    <li>State can be inspected at any point with <code>state_list</code>.</li>
+  </ul>
+
+  <h3>Numeric storage</h3>
+  <p>
+    When <code>state_modify</code> writes a result back, it stores the number cleanly:
+  </p>
+  <ul>
+    <li>If the result is a whole number, store as an integer string: <code>"7"</code> not <code>"7.0"</code>.</li>
+    <li>If the result has a fractional part, store as a decimal string: <code>"3.5"</code>.</li>
+  </ul>
+  <p>
+    This means <code>state_list</code> output is always human-readable and the LLM can interpret it
+    without needing to strip trailing zeros.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Operations</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p class="section-note">
+    Four tool functions. Each is a separate tool definition in the registry, but all are toggled
+    together as a group in the character editor UI.
+  </p>
+
+  <!-- state_set -->
+  <div class="op-block">
+    <div class="op-header">
+      <span class="op-name">state_set</span>
+      <span class="op-sig">state_set(key: string, value: string)</span>
+    </div>
+    <div class="op-body">
+      <p>Creates or overwrites a named value. Use for initial setup, resetting a value, or storing
+      anything that is not a numeric delta.</p>
+
+      <h4>Parameters</h4>
+      <table class="param-table">
+        <tr><td>key</td><td>string</td><td>Name of the value. Non-empty. Any string is valid.</td></tr>
+        <tr><td>value</td><td>string</td><td>The value to store. Use numeric strings for anything you intend to modify later.</td></tr>
+      </table>
+
+      <h4>Returns</h4>
+      <p>Empty string on success. The LLM does not need to acknowledge the result.</p>
+
+      <h4>Errors</h4>
+      <ul>
+        <li>Empty <code>key</code></li>
+        <li>Empty <code>value</code> — use <code>state_unset</code> to remove a key</li>
+      </ul>
+
+      <h4>Examples</h4>
+      <pre class="light"><span class="comment">-- Set up a character sheet at the start of a session</span>
+<span class="fn">state_set</span>(<span class="str">"HP"</span>, <span class="str">"10"</span>)
+<span class="fn">state_set</span>(<span class="str">"max HP"</span>, <span class="str">"10"</span>)
+<span class="fn">state_set</span>(<span class="str">"gold"</span>, <span class="str">"5"</span>)
+<span class="fn">state_set</span>(<span class="str">"torches"</span>, <span class="str">"3"</span>)
+
+<span class="comment">-- Mark a condition</span>
+<span class="fn">state_set</span>(<span class="str">"poisoned"</span>, <span class="str">"yes"</span>)
+
+<span class="comment">-- Record a story flag</span>
+<span class="fn">state_set</span>(<span class="str">"talked to old man"</span>, <span class="str">"yes"</span>)
+
+<span class="comment">-- Store free text — values are not limited to numbers or single words</span>
+<span class="fn">state_set</span>(<span class="str">"quest"</span>, <span class="str">"find the stolen crown before dawn"</span>)
+
+<span class="comment">-- Overwrite an existing value</span>
+<span class="fn">state_set</span>(<span class="str">"HP"</span>, <span class="str">"10"</span>)  <span class="comment">-- resets HP to full after a rest</span></pre>
+    </div>
+  </div>
+
+  <!-- state_modify -->
+  <div class="op-block">
+    <div class="op-header">
+      <span class="op-name">state_modify</span>
+      <span class="op-sig">state_modify(key: string, delta: number)</span>
+    </div>
+    <div class="op-body">
+      <p>
+        Adds a numeric delta to an existing value. This is the operation that justifies having a
+        server-side tool at all — it reads, computes, and writes atomically, so the LLM never has
+        to do arithmetic or trust its own memory of the previous value.
+      </p>
+      <p>
+        Use a positive delta to increase, negative to decrease. The key must already exist and its
+        current value must be parseable as a number.
+      </p>
+
+      <h4>Parameters</h4>
+      <table class="param-table">
+        <tr><td>key</td><td>string</td><td>Name of the value to modify. Must exist.</td></tr>
+        <tr><td>delta</td><td>number</td><td>Amount to add. Negative values subtract.</td></tr>
+      </table>
+
+      <h4>Returns</h4>
+      <p>The new value as a string, e.g. <code>7</code>. The LLM can use this directly in narration.</p>
+
+      <h4>Errors</h4>
+      <ul>
+        <li>Key not found — must <code>state_set</code> first</li>
+        <li>Current value is not numeric — cannot modify a text value</li>
+      </ul>
+
+      <div class="callout info" style="margin-top:0.8rem">
+        <strong>Why not auto-initialise to 0?</strong> Requiring an explicit <code>state_set</code>
+        before <code>state_modify</code> means the LLM must make a conscious decision about the
+        starting value. Auto-initialising to 0 would hide setup mistakes and make
+        <code>state_list</code> output harder to trust.
+      </div>
+
+      <h4>Examples</h4>
+      <pre class="light"><span class="comment">-- Player takes 3 damage</span>
+<span class="fn">state_modify</span>(<span class="str">"HP"</span>, <span class="num">-3</span>)   <span class="ret">→ "7"</span>
+
+<span class="comment">-- Player finds gold</span>
+<span class="fn">state_modify</span>(<span class="str">"gold"</span>, <span class="num">+12</span>)  <span class="ret">→ "17"</span>
+
+<span class="comment">-- Player uses a torch</span>
+<span class="fn">state_modify</span>(<span class="str">"torches"</span>, <span class="num">-1</span>)  <span class="ret">→ "2"</span>
+
+<span class="comment">-- Error: key doesn't exist yet</span>
+<span class="fn">state_modify</span>(<span class="str">"arrows"</span>, <span class="num">-1</span>)
+<span class="err">→ error: key "arrows" not found — use state_set to initialise it first</span>
+
+<span class="comment">-- Error: value is not numeric</span>
+<span class="fn">state_modify</span>(<span class="str">"poisoned"</span>, <span class="num">-1</span>)
+<span class="err">→ error: value "yes" is not a number — use state_set to change text values</span></pre>
+    </div>
+  </div>
+
+  <!-- state_unset -->
+  <div class="op-block">
+    <div class="op-header">
+      <span class="op-name">state_unset</span>
+      <span class="op-sig">state_unset(key: string)</span>
+    </div>
+    <div class="op-body">
+      <p>Removes a key entirely. Use when a condition clears, an item is fully consumed, or a
+      flag is no longer relevant.</p>
+
+      <h4>Parameters</h4>
+      <table class="param-table">
+        <tr><td>key</td><td>string</td><td>Name of the value to remove.</td></tr>
+      </table>
+
+      <h4>Returns</h4>
+      <p>Empty string on success. Returns an error if the key does not exist — this is intentional,
+      to catch cases where the LLM thinks it is removing something that was never set.</p>
+
+      <h4>Examples</h4>
+      <pre class="light"><span class="comment">-- Condition clears after a rest</span>
+<span class="fn">state_unset</span>(<span class="str">"poisoned"</span>)
+
+<span class="comment">-- Item fully used up</span>
+<span class="fn">state_modify</span>(<span class="str">"torches"</span>, <span class="num">-1</span>)  <span class="ret">→ "0"</span>
+<span class="fn">state_unset</span>(<span class="str">"torches"</span>)  <span class="comment">-- remove now it's depleted</span>
+
+<span class="comment">-- Error: key doesn't exist</span>
+<span class="fn">state_unset</span>(<span class="str">"rope"</span>)
+<span class="err">→ error: key "rope" not found</span></pre>
+    </div>
+  </div>
+
+  <!-- state_list -->
+  <div class="op-block">
+    <div class="op-header">
+      <span class="op-name">state_list</span>
+      <span class="op-sig">state_list()</span>
+    </div>
+    <div class="op-body">
+      <p>
+        Returns all current state for the conversation as a formatted list. The LLM should call
+        this at the start of each turn in a stateful session to reorient itself — it is the single
+        source of truth for what is currently true in the world.
+      </p>
+      <p>
+        Results are returned in insertion order (oldest first), so a character sheet set up at
+        the start of the session will always appear at the top.
+      </p>
+
+      <h4>Parameters</h4>
+      <p>None.</p>
+
+      <h4>Returns</h4>
+      <p>One <code>key: value</code> pair per line. If the store is empty, returns
+      <code>No state stored.</code></p>
+
+      <h4>Examples</h4>
+      <pre class="light"><span class="fn">state_list</span>()
+
+<span class="ret">HP: 7
+max HP: 10
+gold: 17
+torches: 2
+quest: find the stolen crown before dawn
+poisoned: yes
+talked to old man: yes</span>
+
+<span class="comment">-- Empty store</span>
+<span class="fn">state_list</span>()
+<span class="ret">No state stored.</span></pre>
+
+      <div class="callout" style="margin-top:0.8rem">
+        <strong>Recommended system prompt instruction:</strong> Tell the character to call
+        <code>state_list</code> silently at the start of each player turn before composing a
+        response. This keeps the LLM grounded without the player seeing any machinery. The call
+        is collapsed in the UI — only the narration is visible.
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Naming Conventions</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p>
+    The store is a flat namespace — there are no categories or sub-stores. Naming conventions are
+    a matter of character prompt style, not enforcement. Some reasonable approaches:
+  </p>
+
+  <div class="two-col">
+    <div class="col-card">
+      <h4>Flat readable names</h4>
+      <p>Simple, works well for short sessions. The character prompt describes the conventions.</p>
+      <pre class="light" style="background:transparent;padding:0.3rem 0;font-size:0.8rem">HP: 7
+gold: 12
+poisoned: yes
+rusty key: 1
+talked to guard: yes</pre>
+    </div>
+    <div class="col-card">
+      <h4>Prefixed names</h4>
+      <p>Useful if <code>state_list</code> output needs to be scanned quickly in a longer session.</p>
+      <pre class="light" style="background:transparent;padding:0.3rem 0;font-size:0.8rem">stat.HP: 7
+stat.gold: 12
+cond.poisoned: yes
+item.rusty key: 1
+flag.talked to guard: yes</pre>
+    </div>
+  </div>
+
+  <p>
+    Either approach works. The LLM should be consistent within a session. The character's system
+    prompt should specify which convention to use, or leave it to the LLM's discretion.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>A Full Session Example</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p>How the tool calls flow through a short exchange, all collapsed and invisible to the player.</p>
+
+  <pre class="light"><span class="comment">--- Session starts ---</span>
+
+<span class="fn">state_set</span>(<span class="str">"HP"</span>, <span class="str">"10"</span>)
+<span class="fn">state_set</span>(<span class="str">"max HP"</span>, <span class="str">"10"</span>)
+<span class="fn">state_set</span>(<span class="str">"gold"</span>, <span class="str">"5"</span>)
+<span class="fn">state_set</span>(<span class="str">"torch"</span>, <span class="str">"2"</span>)
+<span class="fn">state_set</span>(<span class="str">"rope"</span>, <span class="str">"1"</span>)
+
+<span class="comment">--- Player: "I search the goblin" ---</span>
+
+<span class="fn">state_list</span>()   <span class="comment">-- LLM reorients</span>
+<span class="fn">state_modify</span>(<span class="str">"gold"</span>, <span class="num">+3</span>)   <span class="ret">→ "8"</span>
+<span class="comment">-- LLM narrates: "You find 3 gold coins on the goblin. You now have 8."</span>
+
+<span class="comment">--- Player: "I go north into the dark passage" ---</span>
+
+<span class="fn">state_list</span>()   <span class="comment">-- LLM reorients</span>
+<span class="fn">state_modify</span>(<span class="str">"torch"</span>, <span class="num">-1</span>)   <span class="ret">→ "1"</span>
+<span class="comment">-- LLM narrates: "You light a torch. One remaining."</span>
+
+<span class="comment">--- Player fights a spider, gets poisoned ---</span>
+
+<span class="fn">state_list</span>()
+<span class="fn">state_modify</span>(<span class="str">"HP"</span>, <span class="num">-4</span>)     <span class="ret">→ "6"</span>
+<span class="fn">state_set</span>(<span class="str">"poisoned"</span>, <span class="str">"yes"</span>)
+<span class="comment">-- LLM narrates: "The spider bites you. You're poisoned. HP: 6/10."</span>
+
+<span class="comment">--- Player rests at a shrine ---</span>
+
+<span class="fn">state_list</span>()
+<span class="fn">state_set</span>(<span class="str">"HP"</span>, <span class="str">"10"</span>)
+<span class="fn">state_unset</span>(<span class="str">"poisoned"</span>)
+<span class="comment">-- LLM narrates: "The shrine's magic cleanses the poison. You are restored."</span>
+
+<span class="comment">--- End of session state_list ---</span>
+
+<span class="ret">HP: 10
+max HP: 10
+gold: 8
+torch: 1
+rope: 1
+talked to guard: yes</span></pre>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>UI — Tool Groups</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <p>
+    The world state tool is made up of four separate tool definitions in the registry
+    (<code>state_set</code>, <code>state_modify</code>, <code>state_unset</code>,
+    <code>state_list</code>). These are always enabled or disabled together — enabling "world state"
+    means enabling all four. It would not make sense to enable <code>state_modify</code> without
+    <code>state_set</code>.
+  </p>
+
+  <p>
+    This is the first tool that makes a flat checkbox list genuinely awkward. As more tools are
+    added, grouping becomes necessary. The character edit page should organise tools into named
+    groups, each with a master toggle.
+  </p>
+
+  <h3>Proposed groups</h3>
+
+  <table>
+    <tr><th>Group</th><th>Tools</th><th>Notes</th></tr>
+    <tr>
+      <td><strong>General</strong></td>
+      <td><code>get_time</code>, <code>roll_dice</code>, <code>pick_random</code>, <code>fetch_url</code>, <code>create_document</code></td>
+      <td>Broadly useful, no external dependencies</td>
+    </tr>
+    <tr>
+      <td><strong>Search &amp; Knowledge</strong></td>
+      <td><code>searxng</code>, <code>wikipedia_search</code>, <code>wikipedia_get_page</code></td>
+      <td>SearXNG requires config; Wikipedia does not</td>
+    </tr>
+    <tr>
+      <td><strong>Image Generation</strong></td>
+      <td><code>generate_image_sdxl</code>, <code>generate_image_flux</code></td>
+      <td>Both require ComfyUI config</td>
+    </tr>
+    <tr>
+      <td><strong>World State</strong></td>
+      <td><code>state_set</code>, <code>state_modify</code>, <code>state_unset</code>, <code>state_list</code></td>
+      <td>Always enabled/disabled as a unit</td>
+    </tr>
+  </table>
+
+  <p>
+    Future tools (note store, checklist, countdown) would slot into World State or form their own
+    group if distinct enough.
+  </p>
+
+  <h3>Group toggle behaviour</h3>
+  <ul>
+    <li>The group header has a checkbox that enables or disables all tools in the group at once.</li>
+    <li>Groups where all tools require the same external config (image generation) can show one
+    config hint at the group level rather than per tool.</li>
+    <li>Groups where some tools are unconfigured (e.g. SearXNG within Search &amp; Knowledge)
+    show the hint on the individual tool, not the group header.</li>
+    <li>Toggling a group on does not override individual tool state — if the user had previously
+    disabled <code>fetch_url</code> individually, toggling "General" on should not re-enable it.
+    Toggling off does disable all tools in the group.</li>
+  </ul>
+
+  <div class="callout warn">
+    <strong>Implementation note:</strong> World State tools should be stored in the character's
+    <code>tools</code> array as a single entry <code>"world_state"</code>, not as four separate
+    IDs. The server expands <code>"world_state"</code> into the four tool definitions when building
+    the request. This keeps the DB clean and makes it trivial to add a new state operation later
+    without touching every existing character record.
+  </div>
+
+  <h3>Wireframe — character edit tools section</h3>
+
+  <div class="wireframe">┌─ Tools ──────────────────────────────────────────────────────────┐
+│                                                                    │
+│  [✓] General                                            enable all │
+│  ├── [✓] Get current time                                          │
+│  ├── [✓] Roll dice                                                 │
+│  ├── [✓] Pick random                                               │
+│  ├── [✓] Fetch URL                                                 │
+│  └── [ ] Create document                                           │
+│                                                                    │
+│  [ ] Search &amp; Knowledge                                enable all │
+│  ├── [ ] SearXNG          ⚠ requires [searxng] url in lemon.toml  │
+│  ├── [ ] Wikipedia search                                          │
+│  └── [ ] Wikipedia article                                         │
+│                                                                    │
+│  [ ] Image Generation                                   enable all │
+│  ├── [ ] SDXL             ⚠ requires [comfyui] config             │
+│  └── [ ] Flux Schnell     ⚠ requires [comfyui] config             │
+│                                                                    │
+│  [✓] World State                                        enable all │
+│      Tracks stats, conditions, inventory, and story flags          │
+│      for the current conversation. All four operations are         │
+│      always enabled together.                                      │
+│                                                                    │
+└────────────────────────────────────────────────────────────────────┘</div>
+
+  <p class="section-note">
+    World State is shown without individual sub-toggles because the four operations are not
+    independently useful. The description beneath the group header replaces the item list.
+  </p>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <h2>Implementation Checklist</h2>
+  <!-- ═══════════════════════════════════════════ -->
+
+  <ol>
+    <li>Add <code>conversation_state</code> table as a new migration in <code>internal/store/store.go</code>.</li>
+    <li>Add store functions in <code>internal/store/conversations.go</code> (or a new <code>state.go</code>):
+      <code>SetState</code>, <code>ModifyState</code>, <code>UnsetState</code>, <code>ListState</code>.</li>
+    <li>Add four tool definitions to <code>toolRegistry</code> in <code>internal/server/tools.go</code>.</li>
+    <li>Add four executors to <code>executors</code> in <code>tools.go</code>.</li>
+    <li>Add <code>"world_state"</code> as a compound tool ID that <code>ToolDefsForCharacter</code>
+    expands into the four definitions.</li>
+    <li>Add <code>ToolMeta</code> entry to <code>allTools</code> in <code>InitTools</code>.</li>
+    <li>Update the character edit page to render tools in groups with group-level toggles.</li>
+    <li>Update <code>ToolContext</code> to carry <code>ConversationID</code> and <code>Store</code>
+    (both already present — verify they are passed through to these executors).</li>
+  </ol>
+
+  <hr class="section-break">
+
+  <p class="section-note">
+    Spec ends here. The four operations are small and the DB schema is trivial — the most significant
+    work is the UI grouping on the character edit page.
+  </p>
+
+</div>
+</body>
+</html>

@@ -293,12 +293,88 @@ var toolRegistry = map[string]toolDef{
 			},
 		},
 	},
+	"state_set": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "state_set",
+			Description: "Sets a named value in the conversation's persistent state. Use this when something is first established: a stat, a condition, an inventory item, or any named fact. Replaces the value if the key already exists.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"key": map[string]any{
+						"type":        "string",
+						"description": "The name of the value to set. Use short, descriptive keys (e.g. \"hp\", \"max_hp\", \"poisoned\", \"torch\").",
+					},
+					"value": map[string]any{
+						"type":        "string",
+						"description": "The value to store. Numbers, text, and flags (\"yes\"/\"no\") are all valid.",
+					},
+				},
+				Required: []string{"key", "value"},
+			},
+		},
+	},
+	"state_modify": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "state_modify",
+			Description: "Adds a numeric delta to a stored value. Use this for any numeric change — damage, healing, spending gold, item counts. Never compute the new value yourself; always call this tool so the result is reliable. Errors if the key does not exist or the stored value is not numeric.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"key": map[string]any{
+						"type":        "string",
+						"description": "The key whose value to modify.",
+					},
+					"delta": map[string]any{
+						"type":        "number",
+						"description": "Amount to add. Use negative values to subtract (e.g. -3 for 3 points of damage).",
+					},
+				},
+				Required: []string{"key", "delta"},
+			},
+		},
+	},
+	"state_unset": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "state_unset",
+			Description: "Removes a named key from state. Use when a condition ends, an item is fully consumed, or a fact is no longer relevant. Errors if the key is not set.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"key": map[string]any{
+						"type":        "string",
+						"description": "The key to remove.",
+					},
+				},
+				Required: []string{"key"},
+			},
+		},
+	},
+	"state_list": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "state_list",
+			Description: "Returns all currently stored key/value pairs for this conversation. Call this at the start of a session or before any check that depends on current state.",
+			Parameters:  toolParam{Type: "object", Properties: map[string]any{}, Required: []string{}},
+		},
+	},
 }
 
 // ToolDefsForCharacter returns tool definitions for the given tool IDs.
+// "world_state" is a compound ID that expands to state_set, state_modify, state_unset, state_list.
 func ToolDefsForCharacter(toolIDs []string) []toolDef {
 	var out []toolDef
 	for _, id := range toolIDs {
+		if id == "world_state" {
+			for _, name := range []string{"state_set", "state_modify", "state_unset", "state_list"} {
+				if def, ok := toolRegistry[name]; ok {
+					out = append(out, def)
+				}
+			}
+			continue
+		}
 		if def, ok := toolRegistry[id]; ok {
 			out = append(out, def)
 		}
@@ -694,6 +770,50 @@ var executors = map[string]func(string, ToolContext) (string, error){
 			fmt.Fprintf(&sb, "%d. **%s** — %s\n", i+1, r.Title, snippet)
 		}
 		return strings.TrimSpace(sb.String()), nil
+	},
+	"state_set": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Key == "" {
+			return "", fmt.Errorf("key is required")
+		}
+		if err := tctx.Store.SetState(tctx.ConversationID, args.Key, args.Value); err != nil {
+			return "", err
+		}
+		return "", nil
+	},
+	"state_modify": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Key   string  `json:"key"`
+			Delta float64 `json:"delta"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Key == "" {
+			return "", fmt.Errorf("key is required")
+		}
+		return tctx.Store.ModifyState(tctx.ConversationID, args.Key, args.Delta)
+	},
+	"state_unset": func(argsJSON string, tctx ToolContext) (string, error) {
+		var args struct {
+			Key string `json:"key"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Key == "" {
+			return "", fmt.Errorf("key is required")
+		}
+		return "", tctx.Store.UnsetState(tctx.ConversationID, args.Key)
+	},
+	"state_list": func(_ string, tctx ToolContext) (string, error) {
+		return tctx.Store.ListState(tctx.ConversationID)
 	},
 	"wikipedia_get_page": func(argsJSON string, _ ToolContext) (string, error) {
 		var args struct {
@@ -1148,6 +1268,7 @@ func InitTools(cfg *config.Config) {
 		{"create_document", "Create document", "Saves a file (report, script, notes, etc.) the user can download.", true, ""},
 		{"wikipedia_search", "Wikipedia search", "Searches Wikipedia and returns matching article titles and snippets.", true, ""},
 		{"wikipedia_get_page", "Wikipedia get page", "Fetches a Wikipedia article intro + TOC, or a specific section by name.", true, ""},
+		{"world_state", "World State", "Session state tools: set, modify, remove, and list named values scoped to this conversation.", true, ""},
 	}
 
 	searxngConfigured := cfg.SearXNG.URL != ""

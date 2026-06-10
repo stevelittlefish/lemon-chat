@@ -599,6 +599,51 @@ a.snav-item { text-decoration: none; }
 
 /* ── Tools section ──────────────────────────────────────── */
 
+.char-tool-group {
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.char-tool-group + .char-tool-group {
+  margin-top: var(--space-3);
+}
+
+.char-tool-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 12px;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+  user-select: none;
+}
+
+.char-tool-group-header:last-child {
+  border-bottom: none;
+}
+
+.char-tool-group-header input[type="checkbox"] {
+  flex-shrink: 0;
+  accent-color: var(--lemon-500);
+  width: 14px;
+  height: 14px;
+}
+
+.char-tool-group-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  font-weight: 500;
+}
+
+.char-tool-group-items {
+  padding: 0 12px;
+}
+
 .char-tool-row {
   display: flex;
   align-items: flex-start;

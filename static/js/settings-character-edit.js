@@ -113,6 +113,68 @@ function renderError(msg) {
   `;
 }
 
+const TOOL_GROUPS = [
+  { label: 'General',           ids: ['get_time', 'roll_dice', 'pick_random', 'fetch_url', 'create_document'] },
+  { label: 'Search & Knowledge', ids: ['wikipedia_search', 'wikipedia_get_page', 'searxng'] },
+  { label: 'Image Generation',  ids: ['generate_image_sdxl', 'generate_image_flux'] },
+  { label: 'World State',       ids: ['world_state'] },
+];
+
+function renderToolGroups(tools, enabled) {
+  const byId = Object.fromEntries(tools.map(t => [t.id, t]));
+  return TOOL_GROUPS.map(group => {
+    const groupTools = group.ids.map(id => byId[id]).filter(Boolean);
+    if (groupTools.length === 0) return '';
+    const allChecked = groupTools.every(t => enabled.includes(t.id));
+    const someChecked = groupTools.some(t => enabled.includes(t.id));
+    return `
+      <div class="char-tool-group" data-group="${escapeHtml(group.label)}">
+        <div class="char-tool-group-header">
+          <input type="checkbox" class="char-tool-group-toggle"
+            ${allChecked ? 'checked' : ''}
+            ${!allChecked && someChecked ? 'data-indeterminate="true"' : ''}>
+          <span class="char-tool-group-label">${escapeHtml(group.label)}</span>
+        </div>
+        <div class="char-tool-group-items">
+          ${groupTools.map(t => `
+            <label class="char-tool-row">
+              <input type="checkbox" class="char-tool-checkbox" data-id="${escapeHtml(t.id)}" ${enabled.includes(t.id) ? 'checked' : ''}>
+              <div class="char-tool-info">
+                <span class="char-tool-name">${escapeHtml(t.display_name)} <code class="char-tool-code">${escapeHtml(t.id)}</code></span>
+                <span class="char-tool-desc">${escapeHtml(t.description)}</span>
+                ${!t.configured ? `<span class="char-tool-config-hint">Not configured — ${escapeHtml(t.config_hint)}</span>` : ''}
+              </div>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function attachToolGroupToggles() {
+  document.querySelectorAll('.char-tool-group').forEach(group => {
+    const toggle = group.querySelector('.char-tool-group-toggle');
+    const checkboxes = group.querySelectorAll('.char-tool-checkbox');
+
+    // Apply indeterminate state from data attribute (can't set via HTML).
+    if (toggle.dataset.indeterminate === 'true') toggle.indeterminate = true;
+
+    toggle.addEventListener('change', () => {
+      checkboxes.forEach(cb => { cb.checked = toggle.checked; });
+      toggle.indeterminate = false;
+    });
+
+    checkboxes.forEach(cb => {
+      cb.addEventListener('change', () => {
+        const checked = Array.from(checkboxes).filter(c => c.checked).length;
+        toggle.checked       = checked === checkboxes.length;
+        toggle.indeterminate = checked > 0 && checked < checkboxes.length;
+      });
+    });
+  });
+}
+
 function renderDefaultSection(character) {
   if (character.is_default) {
     return `
@@ -239,16 +301,7 @@ function renderForm(character, modelsData) {
           <span class="character-form-lbl">Tools</span>
           <div class="character-form-hint" style="margin-bottom:8px">Tools this character is allowed to call.</div>
           <div id="char-tools-list">
-            ${allTools.map(t => `
-              <label class="char-tool-row">
-                <input type="checkbox" class="char-tool-checkbox" data-id="${escapeHtml(t.id)}" ${enabledTools.includes(t.id) ? 'checked' : ''}>
-                <div class="char-tool-info">
-                  <span class="char-tool-name">${escapeHtml(t.display_name)} <code class="char-tool-code">${escapeHtml(t.id)}</code></span>
-                  <span class="char-tool-desc">${escapeHtml(t.description)}</span>
-                  ${!t.configured ? `<span class="char-tool-config-hint">Not configured — ${escapeHtml(t.config_hint)}</span>` : ''}
-                </div>
-              </label>
-            `).join('')}
+            ${renderToolGroups(allTools, enabledTools)}
           </div>
         </div>` : ''}
         <div class="character-form-row">
@@ -282,6 +335,7 @@ function renderForm(character, modelsData) {
   hiddenMessages = (character?.hidden_messages ?? []).map(m => ({ role: m.role, content: m.content }));
   renderHiddenMessages();
   document.getElementById('hidden-msg-add-btn').addEventListener('click', addHiddenMessage);
+  attachToolGroupToggles();
 
   if (!isNew && character) {
     const avatarUrl = `/api/characters/${character.id}/avatar`;

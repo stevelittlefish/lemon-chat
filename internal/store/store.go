@@ -452,6 +452,29 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v18 → v19 complete")
 	}
 
+	if version < 20 {
+		log.Println("store: migrating v19 → v20 (create conversation_state table)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE conversation_state (
+				id              INTEGER PRIMARY KEY,
+				conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+				key             TEXT    NOT NULL,
+				value           TEXT    NOT NULL,
+				updated_at      TEXT    NOT NULL,
+				UNIQUE(conversation_id, key)
+			);
+			CREATE INDEX conversation_state_conversation_id
+				ON conversation_state(conversation_id);
+		`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (20, ?)`, now()); err != nil {
+			return err
+		}
+		version = 20
+		log.Println("store: migration v19 → v20 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }
