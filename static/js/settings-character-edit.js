@@ -114,7 +114,7 @@ function renderError(msg) {
 }
 
 const TOOL_GROUPS = [
-  { label: 'General',           ids: ['get_time', 'roll_dice', 'pick_random', 'fetch_url', 'create_document'] },
+  { label: 'General',           ids: ['get_time', 'roll_dice', 'pick_random', 'random_chance', 'fetch_url', 'create_document'] },
   { label: 'Search & Knowledge', ids: ['wikipedia_search', 'wikipedia_get_page', 'searxng'] },
   { label: 'Image Generation',  ids: ['generate_image_sdxl', 'generate_image_flux'] },
   { label: 'World State',       ids: ['world_state'] },

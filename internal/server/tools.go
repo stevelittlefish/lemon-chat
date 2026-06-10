@@ -148,6 +148,43 @@ var toolRegistry = map[string]toolDef{
 			},
 		},
 	},
+	"random_chance": {
+		Type: "function",
+		Function: toolFunction{
+			Name: "random_chance",
+			Description: `Resolves a binary success/failure check by rolling a die and comparing the result to a threshold. Use this whenever an action has an uncertain outcome — picking a lock, landing a hit, resisting a spell, sneaking past a guard.
+
+CRITICAL: You must call this tool BEFORE narrating the outcome of any uncertain action. The server rolls the die; the result is binding. You must narrate exactly what the result says — do not reinterpret, soften, or override a failure as a success (or vice versa).
+
+How to use:
+  - action:    Describe exactly what is being determined, e.g. "player picks the lock" or "enemy notices the player".
+  - dice:      Which die to roll, e.g. "d20", "d6", "d100". A single die only — no count prefix, no modifier.
+  - threshold: The minimum roll needed for success (roll >= threshold = success).
+
+Examples:
+  - Hard d20 check (need 18+): dice="d20", threshold=18 → succeeds on rolls 18, 19, or 20 (15% chance)
+  - Medium d20 check (need 10+): dice="d20", threshold=10 → succeeds on rolls 10–20 (55% chance)
+  - Percentage-based check: use dice="d100". For a 70% success rate set threshold=31 (rolls 31–100 succeed, 70 of 100 outcomes). Formula: threshold = 101 - desired_percentage.`,
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"action": map[string]any{
+						"type":        "string",
+						"description": "What is being determined, e.g. \"player picks the lock\" or \"arrow hits the target\". Used in the result message.",
+					},
+					"dice": map[string]any{
+						"type":        "string",
+						"description": "The die to roll, e.g. \"d20\", \"d6\", \"d100\". Single die only — no count prefix, no modifier.",
+					},
+					"threshold": map[string]any{
+						"type":        "integer",
+						"description": "Minimum roll needed to succeed. Roll >= threshold = success. For a percentage-based check on d100, use threshold = 101 - desired_percentage (e.g. 70% chance → threshold 31).",
+					},
+				},
+				Required: []string{"action", "dice", "threshold"},
+			},
+		},
+	},
 	"fetch_url": {
 		Type: "function",
 		Function: toolFunction{
@@ -561,6 +598,51 @@ var executors = map[string]func(string, ToolContext) (string, error){
 			return "", fmt.Errorf("options must contain at least 2 items")
 		}
 		return args.Options[rand.Intn(len(args.Options))], nil
+	},
+	"random_chance": func(argsJSON string, _ ToolContext) (string, error) {
+		var args struct {
+			Action    string `json:"action"`
+			Dice      string `json:"dice"`
+			Threshold int    `json:"threshold"`
+		}
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+		if args.Action == "" {
+			return "", fmt.Errorf("action is required")
+		}
+		if args.Dice == "" {
+			return "", fmt.Errorf("dice is required")
+		}
+		if args.Threshold < 1 {
+			return "", fmt.Errorf("threshold must be at least 1")
+		}
+
+		diceStr := strings.ToLower(strings.TrimSpace(args.Dice))
+		// Accept "d20" or "1d20" — strip leading "1d" or require plain "dN"
+		if strings.HasPrefix(diceStr, "d") {
+			diceStr = diceStr[1:]
+		} else if strings.HasPrefix(diceStr, "1d") {
+			diceStr = diceStr[2:]
+		} else {
+			return "", fmt.Errorf("invalid dice %q: use a single die like \"d20\" or \"d100\"", args.Dice)
+		}
+		sides, err := strconv.Atoi(diceStr)
+		if err != nil || sides < 2 || sides > 10000 {
+			return "", fmt.Errorf("invalid die %q: sides must be a whole number between 2 and 10000", args.Dice)
+		}
+		if args.Threshold > sides {
+			return "", fmt.Errorf("threshold %d exceeds die sides %d — success would be impossible", args.Threshold, sides)
+		}
+
+		roll := rand.Intn(sides) + 1
+		success := roll >= args.Threshold
+		outcome := "FAILURE"
+		if success {
+			outcome = "SUCCESS"
+		}
+		return fmt.Sprintf("Check: %s | Rolled %s: %d | Threshold: %d | Result: %s",
+			args.Action, args.Dice, roll, args.Threshold, outcome), nil
 	},
 	"fetch_url": func(argsJSON string, tctx ToolContext) (string, error) {
 		var args struct {
@@ -1264,6 +1346,7 @@ func InitTools(cfg *config.Config) {
 		{"get_time", "Get current time", "Returns the current local date and time.", true, ""},
 		{"roll_dice", "Roll dice", "Rolls dice using standard notation (e.g. 2d6, 1d20).", true, ""},
 		{"pick_random", "Pick random", "Picks one item at random from a list of options.", true, ""},
+		{"random_chance", "Random chance", "Resolves a success/failure check by rolling a die against a threshold.", true, ""},
 		{"fetch_url", "Fetch URL", "Fetches a URL and returns its content as markdown, or raw HTML if source is true.", true, ""},
 		{"create_document", "Create document", "Saves a file (report, script, notes, etc.) the user can download.", true, ""},
 		{"wikipedia_search", "Wikipedia search", "Searches Wikipedia and returns matching article titles and snippets.", true, ""},

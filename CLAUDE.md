@@ -165,7 +165,13 @@ CLAUDE.md
 
 Characters can have a list of tools enabled. When a message is sent to a character with tools, the model may call tools during the response loop. The server runs up to `max_tool_loops` rounds (default 5, configurable in `lemon.toml`) before cutting off and returning the final response.
 
-Tool definitions and executors live in `internal/server/tools.go`. To add a new tool: add an entry to `toolRegistry` (the `toolDef` sent to the model) and a matching entry in `executors` (the Go function that runs it).
+Tool definitions and executors live in `internal/server/tools.go`. To add a new tool:
+
+1. Add an entry to `toolRegistry` (the `toolDef` sent to the model).
+2. Add a matching entry to `executors` (the Go function that runs it).
+3. Add the tool to `allTools` in `InitTools` so it appears on `GET /api/tools`.
+4. Add the tool ID to the `TOOL_GROUPS` array in `static/js/settings-character-edit.js` — tools not listed there are silently excluded from the character editor UI even though the API returns them.
+5. Update the table below.
 
 Available tools and their config requirements:
 
@@ -173,6 +179,8 @@ Available tools and their config requirements:
 |---|---|---|
 | `get_time` | Get current time | — |
 | `roll_dice` | Roll dice | — |
+| `pick_random` | Pick random | — |
+| `random_chance` | Random chance | — |
 | `fetch_url` | Fetch URL | — |
 | `create_document` | Create document | — |
 | `wikipedia_search` | Wikipedia search | — |
