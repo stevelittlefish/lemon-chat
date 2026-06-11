@@ -416,6 +416,23 @@ Examples:
 			Parameters:  toolParam{Type: "object", Properties: map[string]any{}, Required: []string{}},
 		},
 	},
+	"note_to_self": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "note_to_self",
+			Description: "Records a private thought, plan, or reminder visible only in the model's context — not shown in chat. Use to track intentions, reasoning steps, or reminders without surfacing them to the user.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"text": map[string]any{
+						"type":        "string",
+						"description": "The thought or note to record.",
+					},
+				},
+				Required: []string{"text"},
+			},
+		},
+	},
 	"note_save": {
 		Type: "function",
 		Function: toolFunction{
@@ -1049,6 +1066,9 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		}
 		return fmt.Sprintf("Cleared %d key(s).", n), nil
 	},
+	"note_to_self": func(_ string, _ ToolContext) (string, error) {
+		return "", nil
+	},
 	"note_save": func(argsJSON string, tctx ToolContext) (string, error) {
 		var args struct {
 			Key   string `json:"key"`
@@ -1583,6 +1603,7 @@ func InitTools(cfg *config.Config) {
 		{"wikipedia_get_page", "Wikipedia get page", "Fetches a Wikipedia article intro + TOC, or a specific section by name.", true, ""},
 		{"world_state", "World State", "Session state tools: set, modify, remove, and list named values scoped to this conversation.", true, ""},
 		{"notes", "Notes", "Note store: save, load, list, delete, and append to named notes across global, user, and conversation scopes.", true, ""},
+		{"note_to_self", "Note to self", toolRegistry["note_to_self"].Function.Description, true, ""},
 	}
 
 	searxngConfigured := cfg.SearXNG.URL != ""

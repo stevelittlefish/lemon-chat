@@ -123,6 +123,7 @@ const TOOL_GROUPS = [
   { label: 'Image Generation',  ids: ['generate_image_sdxl', 'generate_image_flux'] },
   { label: 'World State',       ids: ['world_state'] },
   { label: 'Notes',             ids: ['notes'] },
+  { label: 'Reasoning',         ids: ['note_to_self'] },
 ];
 
 function renderToolGroups(tools, enabled) {
