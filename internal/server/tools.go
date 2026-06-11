@@ -335,20 +335,30 @@ Examples:
 		Type: "function",
 		Function: toolFunction{
 			Name:        "state_set",
-			Description: "Sets a named value in the conversation's persistent state. Use this when something is first established: a stat, a condition, an inventory item, or any named fact. Replaces the value if the key already exists.",
+			Description: "Sets one or more named values in the conversation's persistent state. Use this when something is first established: a stat, a condition, an inventory item, or any named fact. Replaces the value if the key already exists.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
-					"key": map[string]any{
-						"type":        "string",
-						"description": "The name of the value to set. Use short, descriptive keys (e.g. \"hp\", \"max_hp\", \"poisoned\", \"torch\").",
-					},
-					"value": map[string]any{
-						"type":        "string",
-						"description": "The value to store. Numbers, text, and flags (\"yes\"/\"no\") are all valid.",
+					"items": map[string]any{
+						"type":        "array",
+						"description": "List of key/value pairs to set.",
+						"items": map[string]any{
+							"type": "object",
+							"properties": map[string]any{
+								"key": map[string]any{
+									"type":        "string",
+									"description": "The name of the value to set. Use short, descriptive keys (e.g. \"hp\", \"max_hp\", \"poisoned\", \"torch\").",
+								},
+								"value": map[string]any{
+									"type":        "string",
+									"description": "The value to store. Numbers, text, and flags (\"yes\"/\"no\") are all valid.",
+								},
+							},
+							"required": []string{"key", "value"},
+						},
 					},
 				},
-				Required: []string{"key", "value"},
+				Required: []string{"items"},
 			},
 		},
 	},
@@ -395,6 +405,14 @@ Examples:
 		Function: toolFunction{
 			Name:        "state_list",
 			Description: "Returns all currently stored key/value pairs for this conversation. Call this at the start of a session or before any check that depends on current state.",
+			Parameters:  toolParam{Type: "object", Properties: map[string]any{}, Required: []string{}},
+		},
+	},
+	"state_clear": {
+		Type: "function",
+		Function: toolFunction{
+			Name:        "state_clear",
+			Description: "Deletes all state for this conversation. Use when starting a fresh game or resetting a session. Returns how many keys were removed.",
 			Parameters:  toolParam{Type: "object", Properties: map[string]any{}, Required: []string{}},
 		},
 	},
@@ -517,7 +535,7 @@ func ToolDefsForCharacter(toolIDs []string) []toolDef {
 	var out []toolDef
 	for _, id := range toolIDs {
 		if id == "world_state" {
-			for _, name := range []string{"state_set", "state_modify", "state_unset", "state_list"} {
+			for _, name := range []string{"state_set", "state_modify", "state_unset", "state_list", "state_clear"} {
 				if def, ok := toolRegistry[name]; ok {
 					out = append(out, def)
 				}
@@ -975,17 +993,24 @@ var executors = map[string]func(string, ToolContext) (string, error){
 	},
 	"state_set": func(argsJSON string, tctx ToolContext) (string, error) {
 		var args struct {
-			Key   string `json:"key"`
-			Value string `json:"value"`
+			Items []struct {
+				Key   string `json:"key"`
+				Value string `json:"value"`
+			} `json:"items"`
 		}
 		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 			return "", fmt.Errorf("invalid args: %w", err)
 		}
-		if args.Key == "" {
-			return "", fmt.Errorf("key is required")
+		if len(args.Items) == 0 {
+			return "", fmt.Errorf("items must not be empty")
 		}
-		if err := tctx.Store.SetState(tctx.ConversationID, args.Key, args.Value); err != nil {
-			return "", err
+		for _, item := range args.Items {
+			if item.Key == "" {
+				return "", fmt.Errorf("each item must have a non-empty key")
+			}
+			if err := tctx.Store.SetState(tctx.ConversationID, item.Key, item.Value); err != nil {
+				return "", err
+			}
 		}
 		return "", nil
 	},
@@ -1016,6 +1041,13 @@ var executors = map[string]func(string, ToolContext) (string, error){
 	},
 	"state_list": func(_ string, tctx ToolContext) (string, error) {
 		return tctx.Store.ListState(tctx.ConversationID)
+	},
+	"state_clear": func(_ string, tctx ToolContext) (string, error) {
+		n, err := tctx.Store.ClearState(tctx.ConversationID)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Cleared %d key(s).", n), nil
 	},
 	"note_save": func(argsJSON string, tctx ToolContext) (string, error) {
 		var args struct {

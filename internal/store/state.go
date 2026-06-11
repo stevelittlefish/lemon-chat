@@ -70,6 +70,18 @@ func (s *Store) UnsetState(conversationID int64, key string) error {
 	return nil
 }
 
+func (s *Store) ClearState(conversationID int64) (int64, error) {
+	result, err := s.db.Exec(
+		`DELETE FROM conversation_state WHERE conversation_id = ?`,
+		conversationID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	n, err := result.RowsAffected()
+	return n, err
+}
+
 func (s *Store) ListState(conversationID int64) (string, error) {
 	rows, err := s.db.Query(
 		`SELECT key, value FROM conversation_state WHERE conversation_id = ? ORDER BY id`,
