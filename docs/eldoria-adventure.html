@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Three Heartstones of Eldoria — Adventure Setup</title>
+  <style>
+    :root {
+      --bg:       #f7f3ee;
+      --bg-card:  #f0ece5;
+      --bg-code:  #e4dfd8;
+      --fg:       #1a1612;
+      --muted:    #6b6157;
+      --border:   #d4cdc4;
+      --accent:   #e8c840;
+      --accent-bg:#fdf8d8;
+      --green:    #4a7c59;
+      --red:      #8b3a3a;
+      --sans:     -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono:     'Fira Mono', 'Cascadia Code', Consolas, monospace;
+      --serif:    Georgia, 'Times New Roman', serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.65;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 6rem;
+    }
+
+    /* ── typography ── */
+    h1 { font-family: var(--serif); font-size: 2rem; font-weight: normal; letter-spacing: -.01em; }
+    h2 { font-family: var(--serif); font-size: 1.35rem; font-weight: normal;
+         margin: 2.5rem 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+    h3 { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+         letter-spacing: .1em; color: var(--muted); margin: 1.75rem 0 .6rem; }
+    p  { margin-bottom: .75rem; }
+    a  { color: var(--fg); }
+    code { font-family: var(--mono); font-size: .85em; background: var(--bg-code);
+           padding: .1em .35em; border-radius: 3px; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+    /* ── header ── */
+    .page-header { border-bottom: 2px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 2rem; }
+    .eyebrow { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+               letter-spacing: .1em; color: var(--muted); margin-bottom: .35rem; }
+
+    /* ── toc ── */
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+           padding: 1.1rem 1.4rem; margin-bottom: 2rem; }
+    .toc ol { padding-left: 1.2rem; }
+    .toc li { margin-bottom: .2rem; }
+    .toc a { text-decoration: none; border-bottom: 1px solid var(--border); }
+    .toc a:hover { border-bottom-color: var(--fg); }
+
+    /* ── steps list ── */
+    .steps { list-style: none; counter-reset: s; padding: 0; }
+    .steps li { counter-increment: s; display: flex; gap: .9rem; margin-bottom: .75rem; align-items: flex-start; }
+    .steps li::before {
+      content: counter(s);
+      background: var(--fg); color: var(--bg);
+      font-family: var(--mono); font-size: .7rem; font-weight: bold;
+      width: 1.4rem; height: 1.4rem; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: .18rem;
+    }
+
+    /* ── badges ── */
+    .badge { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+             letter-spacing: .05em; padding: .2rem .45rem; border-radius: 3px; border: 1px solid; }
+    .b-global   { color: var(--green); border-color: var(--green); background: #f0fdf4; }
+    .b-readonly { color: var(--red);   border-color: var(--red);   background: #fdf0f0; }
+    .b-gm       { color: #7a5c1e;     border-color: #c4a050;      background: #fdf6e3; }
+
+    /* ── note cards ── */
+    .card { background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 6px; margin-bottom: 1.4rem; overflow: hidden; }
+    .card-head { display: flex; align-items: center; justify-content: space-between;
+                 padding: .8rem 1.2rem; border-bottom: 1px solid var(--border); gap: .75rem; }
+    .card-key  { font-family: var(--mono); font-size: .9rem; font-weight: bold; }
+    .card-meta { display: flex; gap: .4rem; flex-shrink: 0; }
+    .card-desc { font-size: .83rem; color: var(--muted); font-style: italic;
+                 padding: .5rem 1.2rem; border-bottom: 1px solid var(--border); }
+    .card-body { position: relative; }
+    .card-body textarea {
+      width: 100%; min-height: 200px; background: var(--bg-code);
+      border: none; resize: vertical;
+      padding: .9rem 1.2rem; padding-right: 5.5rem;
+      font-family: var(--mono); font-size: .78rem; line-height: 1.55;
+      color: var(--fg); outline: none;
+    }
+    .copy-btn {
+      position: absolute; top: .5rem; right: .5rem;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
+      padding: .28rem .65rem; font-family: var(--mono); font-size: .68rem;
+      text-transform: uppercase; letter-spacing: .05em; cursor: pointer; color: var(--muted);
+      transition: all .15s;
+    }
+    .copy-btn:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--fg); }
+    .copy-btn.ok    { background: #f0fdf4; border-color: var(--green); color: var(--green); }
+
+    /* ── field rows (character card) ── */
+    .field { display: flex; gap: 1rem; padding: .7rem 1.2rem;
+             border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .field:last-child { border-bottom: none; }
+    .field-lbl { font-family: var(--mono); font-size: .68rem; text-transform: uppercase;
+                 letter-spacing: .08em; color: var(--muted); width: 110px; flex-shrink: 0; padding-top: .1rem; }
+    .tool-tag { display: inline-block; font-family: var(--mono); font-size: .75rem;
+                padding: .12rem .38rem; background: var(--bg-code); border: 1px solid var(--border);
+                border-radius: 3px; margin: .1rem; }
+
+    /* ── callout ── */
+    .callout { border-left: 3px solid var(--accent); background: var(--accent-bg);
+               padding: .7rem 1rem; border-radius: 0 4px 4px 0; margin: 1rem 0; font-size: .875rem; }
+
+    /* ── stat grid ── */
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border);
+                 border-radius: 6px; overflow: hidden; margin-bottom: 1rem; }
+    .stat { padding: .6rem .9rem; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .stat:nth-child(2n) { border-right: none; }
+    .stat:nth-last-child(-n+2) { border-bottom: none; }
+    .stat-lbl { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+                letter-spacing: .08em; color: var(--muted); margin-bottom: .15rem; }
+    .stat-val { font-size: .875rem; }
+
+    ul.plain { padding-left: 1.4rem; margin-bottom: .75rem; }
+    ul.plain li { margin-bottom: .3rem; }
+    ol.plain { padding-left: 1.4rem; margin-bottom: .75rem; }
+    ol.plain li { margin-bottom: .4rem; }
+  </style>
+</head>
+<body>
+
+<header class="page-header">
+  <p class="eyebrow">Lemon-chat adventure setup</p>
+  <h1>The Three Heartstones of Eldoria</h1>
+</header>
+
+<nav class="toc">
+  <h3 style="margin:0 0 .6rem">Contents</h3>
+  <ol>
+    <li><a href="#overview">Adventure overview</a></li>
+    <li><a href="#setup">Setup steps</a></li>
+    <li><a href="#notes">Notes to create</a></li>
+    <li><a href="#character">Game master character</a></li>
+    <li><a href="#play">Starting play</a></li>
+  </ol>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════ OVERVIEW -->
+<section id="overview">
+  <h2>Adventure overview</h2>
+  <p>
+    The magical forest of Eldoria is failing. Three ancient Heartstones — the source of
+    the forest's protective barriers — have vanished from their sacred places. The Shadowfangs,
+    corrupted creatures that have stalked Eldoria for two hundred years, grow bolder each night
+    the stones remain missing.
+  </p>
+  <p>
+    The player wakes in Seraphina's Glade, having been found unconscious after a Shadowfang attack.
+    Seraphina, the forest's gentle guardian, has healed their wounds — but she cannot leave her
+    glade without the safety of everyone sheltered there collapsing. She asks the player to go
+    in her place and recover the three stones before it is too late.
+  </p>
+
+  <h3>At a glance</h3>
+  <div class="stat-grid">
+    <div class="stat"><div class="stat-lbl">Difficulty</div><div class="stat-val">Moderate — 3 health</div></div>
+    <div class="stat"><div class="stat-lbl">Length</div><div class="stat-val">6–12 scenes</div></div>
+    <div class="stat"><div class="stat-lbl">Objectives</div><div class="stat-val">4 (3 stones + final seal)</div></div>
+    <div class="stat"><div class="stat-lbl">Dice system</div><div class="stat-val">2d6 — 10+ full, 7–9 partial, 6– fail</div></div>
+    <div class="stat"><div class="stat-lbl">Key NPC</div><div class="stat-val">Seraphina (guardian, healer)</div></div>
+    <div class="stat"><div class="stat-lbl">Age range</div><div class="stat-val">8+ — no gore, real failure possible</div></div>
+  </div>
+
+  <h3>Objectives</h3>
+  <p>The Grove and Mill can be tackled in any order. Shadow Peak is locked until at least one stone is found.</p>
+  <ol class="plain">
+    <li><strong>Grove Heartstone</strong> — Ancient Grove, east. Challenge: the Corrupted Treant.</li>
+    <li><strong>River Heartstone</strong> — Sunken Mill, north-west. Challenge: pass the River Spirit Lyra's test of character.</li>
+    <li><strong>Peak Heartstone</strong> — Shadow Peak, north. Challenge: confront Malgrath the Shadowfang Alpha. <em>Locked until one other stone is found.</em></li>
+    <li><strong>Restore the Seal</strong> — Return to Seraphina's Glade with all three. No dice needed — succeeds automatically.</li>
+  </ol>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════ SETUP -->
+<section id="setup">
+  <h2>Setup steps</h2>
+  <ol class="steps">
+    <li>Go to <strong>Settings → Notes</strong> and create each of the six notes in the section below. Paste the content shown exactly.</li>
+    <li>After saving each note, enable the <strong>Read-only</strong> toggle for every note marked <span class="badge b-readonly">read-only</span>. This protects your lore from accidental modification.</li>
+    <li>Go to <strong>Settings → Characters</strong> and create a new character called <strong>The Chronicler</strong> using the configuration below.</li>
+    <li>Start a new conversation with The Chronicler. It will search for available adventures automatically.</li>
+  </ol>
+
+  <div class="callout">
+    <strong>Easier for younger players:</strong> Before starting, edit <code>g.eldoria</code>
+    and change <code>player_health = "3"</code> to <code>"5"</code>. Remember to turn
+    read-only back on after editing.
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════ NOTES -->
+<section id="notes">
+  <h2>Notes to create</h2>
+  <p>Six notes in total. Enter the key exactly as shown. Mark read-only after saving.</p>
+
+  <!-- ── g.eldoria ── -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.eldoria</span>
+      <div class="card-meta">
+        <span class="badge b-global">global</span>
+        <span class="badge b-readonly">read-only</span>
+      </div>
+    </div>
+    <div class="card-desc">Adventure manifest — the first note loaded. Contains the intro, load instructions, initial world state, and objectives.</div>
+    <div class="card-body">
+      <textarea id="n0" readonly>ADVENTURE: The Three Heartstones of Eldoria
+TAGLINE: The forest's last light is fading. Only you can bring it back.
+
+LOAD IMMEDIATELY:
+- g.eldoria.rules
+- g.eldoria.world
+- g.eldoria.secrets
+
+LOAD ON DEMAND:
+- g.eldoria.bestiary — load when the player first enters combat or encounters a creature
+
+WORLD STATE INIT:
+player_health  = "3"
+stone_grove    = "not_found"
+stone_river    = "not_found"
+stone_peak     = "not_found"
+seal_restored  = "false"
+seraphina_heal = "available"
+pip_helped     = "false"
+
+OBJECTIVES:
+1. stone_grove   — Find the Grove Heartstone.
+                   Gate: face the Corrupted Treant in the Ancient Grove.
+2. stone_river   — Find the River Heartstone.
+                   Gate: pass River Spirit Lyra's test at the Sunken Mill.
+3. stone_peak    — Find the Peak Heartstone.
+                   Gate: confront Shadowfang Alpha Malgrath at Shadow Peak.
+                   LOCKED until at least one other stone is found.
+4. seal_restored — Place all three stones in the Great Seal in Seraphina's Glade.
+                   No dice needed — succeeds automatically when all three stones are found.
+
+FAILURE: player_health reaches 0.
+Narrate: "The shadows close in. You fought bravely — Eldoria will not forget you. But the
+darkness wins today. Perhaps another brave soul will one day walk these paths."
+
+VICTORY: seal_restored = "true"
+Load and read g.eldoria.victory aloud to the player.
+
+OPENING NARRATION:
+You open your eyes slowly. Warm golden light filters through leaves overhead, and somewhere
+nearby water trickles softly. You are lying on a bed of soft moss in a sunlit clearing, and
+everything hurts — but less than it should.
+
+A young woman with long pink hair kneels beside you, her amber eyes searching your face
+with worry. She lets out a long, relieved breath. "Ah, you are awake at last. I was so
+worried." She clasps your hands gently, and warmth flows from her touch like sunlight
+through glass. "My name is Seraphina. I am the guardian of this forest — I found you on
+the path, hurt and unconscious. The Shadowfangs had found you."
+
+She helps you sit up and presses a warm cup of tea into your hands. The clearing around
+you is beautiful — a perfect circle of golden-leafed trees, a small stream running through
+the middle, a moss-covered cottage at the far edge. It feels safe here in a way that is
+hard to put into words.
+
+"Something has gone very wrong," Seraphina says quietly. "The three Heartstones — ancient
+stones that have protected this forest for two hundred years — they have vanished from their
+sacred places. Without them, the barriers that keep the Shadowfangs out are weakening. They
+grow bolder every night."
+
+She looks at you steadily. "I cannot leave this glade. My presence here is what keeps it
+safe — if I go, the Shadowfangs will take it within a day, and everyone sheltering here
+will be lost." A hopeful look crosses her face, tentative and a little ashamed at the
+asking. "But you could go. You survived the forest, which most do not. And I have healed
+your wounds as best I can."
+
+She meets your eyes. "Would you be willing to look for the stones? I can tell you where
+each one was kept. It will be dangerous — I will not pretend otherwise. But if they are
+not returned, I do not know how much longer Eldoria can hold on."</textarea>
+      <button class="copy-btn" onclick="cp('n0',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- ── g.eldoria.rules ── -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.eldoria.rules</span>
+      <div class="card-meta">
+        <span class="badge b-global">global</span>
+        <span class="badge b-readonly">read-only</span>
+      </div>
+    </div>
+    <div class="card-desc">Game mechanics — dice rules, health, healing sources, and pacing rules the GM must follow.</div>
+    <div class="card-body">
+      <textarea id="n1" readonly>DICE RULES:
+All challenges are resolved by rolling 2d6.
+
+10+  Full success. The player achieves their goal completely and cleanly.
+7–9  Partial success. The player succeeds but at a cost: 1 health lost, an alarm raised,
+     a complication introduced, or an item used up.
+6-   Failure. The player does not achieve the goal this attempt. Costs 1 health.
+
+The seal_restored objective requires no dice roll — it resolves automatically when all
+three stone keys are set to "found" in world state.
+
+HEALTH:
+The player starts at the value defined in WORLD STATE INIT (default 3).
+Show health clearly at the end of every response using hearts: ❤️❤️❤️ / ❤️❤️ / ❤️ / 💀
+At 0 health: narrate the failure ending from the manifest. Stop. No more choices.
+
+HEALING — only these sources may restore health:
+- Seraphina's healing: she can heal the player once during the adventure, restoring 1 health.
+  Check seraphina_heal in world state. The player must return to the glade to receive it.
+  Set seraphina_heal = "used" afterwards. Never offer this a second time.
+- Healing herb: a cluster of silver-leafed clover near the Ancient Grove entrance. The player
+  can pick it before facing the Treant. One-time use, restores 1 health when used.
+- River blessing: if the player earns Lyra's blessing (see bestiary), their next failed dice
+  roll does NOT cost health. Set river_blessing = "true" when granted; set it to "false"
+  after it has been used.
+
+PACING RULES:
+- Each response covers exactly one scene. Never combine two encounters into one response.
+- Every response ends with exactly 3 numbered choices. No exceptions.
+- Never narrate an action the player did not choose.
+- Never skip or trivially resolve an objective — the gate condition and dice roll are required.
+- Never write a victory or failure ending while objectives remain incomplete.
+- Shadow Peak is locked until at least one other stone is found. If the player tries to go
+  there first, the path becomes too dark and dangerous and turns them back naturally.
+
+CHOICE DESIGN:
+Every set of 3 choices should include:
+- One cautious or careful option
+- One bold or direct option
+- One creative or unexpected option
+Do not include "do nothing" or "wait." Every choice moves the story forward.
+
+SECRETS:
+Notes ending in .secrets are for the GM only. Never quote, summarise, or directly reveal
+their contents. Use them only to inform narration, NPC behaviour, and foreshadowing.</textarea>
+      <button class="copy-btn" onclick="cp('n1',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- ── g.eldoria.world ── -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.eldoria.world</span>
+      <div class="card-meta">
+        <span class="badge b-global">global</span>
+        <span class="badge b-readonly">read-only</span>
+      </div>
+    </div>
+    <div class="card-desc">World lore — locations, key NPCs, atmosphere, and hidden details for each area.</div>
+    <div class="card-body">
+      <textarea id="n2" readonly>## Eldoria
+An ancient magical forest. Once a safe haven, it has grown dark and dangerous since the
+Shadowfangs appeared two hundred years ago. Pockets of warmth and safety still exist —
+Seraphina's Glade strongest among them — but the shadows spread a little further each year.
+The trees creak and whisper in patterns that sound almost like words. Seraphina can
+understand them. The forest is aware, and it is afraid.
+
+## Seraphina's Glade
+A perfect circle of golden-leafed trees surrounding a sunlit clearing. A shallow stream
+runs through it. A moss-covered cottage stands at the far edge, smoke curling gently from
+the chimney. No Shadowfang or corrupted creature can enter — Seraphina's magic wards it
+completely. It is the safest place in Eldoria.
+
+Seraphina is always here. She is warm, caring, and quietly afraid for the forest. She will
+share everything she knows about any location the player asks about. If the player returns
+hurt, she offers her healing if seraphina_heal = "available". She carries a private sadness
+she will not explain. Let this show in small ways — a pause, a careful word, eyes that look
+briefly elsewhere. She is not ready to talk about it.
+
+When the player returns with each stone she reacts with visible, growing relief. By the
+third stone she is barely holding herself together.
+
+## The Whispering Path
+The main path out of the glade. Three directions branch from a mossy crossroads:
+- EAST: The Ancient Grove — Corrupted Treant, stone_grove
+- NORTH-WEST: The Sunken Mill, following the river — River Spirit Lyra, stone_river
+- NORTH: Shadow Peak, through darkening trees — Malgrath, stone_peak (LOCKED early on)
+
+## The Ancient Grove
+Old-growth trees with massive silver-grey trunks. Filtered green light. The air smells of
+wet bark and something faintly burnt. A Corrupted Treant — a walking tree twenty feet tall,
+bark stained shadow-black, branches like grasping hands — guards the clearing where the
+Grove Heartstone rests on a mossy altar.
+
+HEALING HERB: A cluster of silver-leafed clover grows near the grove entrance, easy to spot.
+Picking it takes a moment. One-time use, restores 1 health.
+
+PIP THE FOX SPRITE: A young fox sprite named Pip lives in a hollow oak at the grove edge.
+He has bright copper eyes and is timid but kind. If the player is gentle, patient, or shares
+something with him, he will show them a secret path through the roots — a hidden approach
+that lets them get behind the Treant. Set pip_helped = "true" in world state.
+Effect: if pip_helped = "true", roll 2d6 twice and take the higher result for the Treant
+encounter.
+
+## The Sunken Mill
+An old wooden watermill, half-submerged where a wide river bends. The wood is dark with
+age; the great wheel still turns slowly. The water glows faintly blue at dawn and dusk.
+A River Spirit named Lyra dwells here — she appears as a woman formed entirely of flowing
+water, calm and patient and ancient.
+
+Lyra is not hostile. She is a guardian, like Seraphina but older. She tests all who seek
+the stone. She will pose a question or present a scenario, and the player's choice of
+answer determines the dice threshold (see bestiary). She wants the player to succeed — she
+is testing their heart, not trying to stop them.
+
+Example tests:
+- "Tell me: why should Eldoria be saved?"
+- "A wounded creature crosses your path. You are in a hurry. What do you do?"
+- She shows a vision of the forest before the corruption and asks: "What would you give
+  up to return it to this?"
+
+## Shadow Peak
+A dark mountain at the forest's northern edge. The trees thin to bare black rock. Cold even
+in summer. No birdsong. No wind. The Shadowfang Alpha — a creature called Malgrath — lairs
+in a cave near the summit, where the Peak Heartstone is embedded in the cave wall behind him.
+
+This is the most dangerous location. Do not allow the player to reach it before finding at
+least one other stone — the path grows too dark and threatening and they are naturally
+turned back.
+
+## The Great Seal
+In the centre of Seraphina's Glade, beneath the moss, is a flat stone disc carved with
+three circular recesses. Seraphina knows it is there but has never been able to reactivate
+it alone. When all three stones are placed, the barriers across all of Eldoria are restored.</textarea>
+      <button class="copy-btn" onclick="cp('n2',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- ── g.eldoria.bestiary ── -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.eldoria.bestiary</span>
+      <div class="card-meta">
+        <span class="badge b-global">global</span>
+        <span class="badge b-readonly">read-only</span>
+      </div>
+    </div>
+    <div class="card-desc">Encounter cards — load when combat or a challenge begins. Defines exact dice outcomes for each encounter.</div>
+    <div class="card-body">
+      <textarea id="n3" readonly>## The Corrupted Treant — Ancient Grove
+
+An ancient tree-spirit consumed by shadow magic. Twenty feet tall, bark stained black,
+branches reaching like grasping hands. Eyes like smouldering coals. It cannot be reasoned
+with, but the corruption inside it can be fought, outrun, or surprised.
+
+ROLL: 2d6
+If pip_helped = "true": roll twice and take the higher result.
+
+10+  The player drives back the corruption — using light, fire, the environment, or the
+     silver-leafed clover as a purifying agent. The Treant shudders and staggers. The
+     Heartstone rolls free from the altar. The player retrieves it unharmed.
+     Set stone_grove = "found". The Treant's bark lightens slightly as if relieved.
+
+7–9  The player seizes the Heartstone but the Treant's branch catches them hard as they
+     run. Lose 1 health. They escape with the stone.
+     Set stone_grove = "found". Apply state_modify player_health delta=-1.
+
+6-   The Treant is too powerful this approach. It drives the player back to the path.
+     Lose 1 health. Apply state_modify player_health delta=-1.
+     The player can try again from the crossroads, but must find a new approach.
+
+ATMOSPHERE: The Treant groans like a storm heard from far away. Its footsteps crack the
+ground. When the stone is recovered, it slowly lowers its arms and goes still, as if
+exhausted by what it has become.
+
+─────────────────────────────────────────────
+
+## River Spirit Lyra — The Sunken Mill
+
+Not a combat encounter — a test of heart. Lyra appears as a translucent woman of softly
+flowing river-water. She is calm, ancient, and genuinely kind. She wants the player to pass.
+She is testing them, not blocking them.
+
+ROLL: 2d6
+If the player's answer is selfless, brave, or genuinely heartfelt: 7+ succeeds.
+If the answer is selfish, vague, or dismissive: 10+ required.
+
+10+  Lyra smiles — a rare sight. She lifts the River Heartstone from the water and places
+     it in the player's hands with care. She also grants a river blessing: the player's
+     next failed dice roll does NOT cost health.
+     Set stone_river = "found". Set river_blessing = "true".
+
+7–9  Lyra gives the stone. She does not grant the blessing. She says: "Come back and tell
+     me what you find at the peak. I will be listening." No immediate cost.
+     Set stone_river = "found".
+
+6-   Lyra shakes her head gently. "Your heart wavers. I cannot give this to someone who
+     is uncertain. Come back when you know why you are here." The player must leave and
+     return. On the second attempt: 10+ required regardless of answer type.
+
+ATMOSPHERE: The mill wheel turns slowly. The water around Lyra's feet glows blue. When
+she speaks the river seems to quiet down to listen.
+
+─────────────────────────────────────────────
+
+## Malgrath, the Shadowfang Alpha — Shadow Peak
+
+A wolf the size of a warhorse, made of living shadow. His fur swallows light rather than
+reflecting it. His eyes are burning red — the only bright thing about him. He moves in
+complete silence. The Peak Heartstone is embedded in the rock wall behind him; he does not
+carry it. He guards it.
+
+ROLL: 2d6 (hardest encounter — no advantage bonuses apply here)
+If river_blessing = "true": the player's first failure does NOT cost health.
+Set river_blessing = "false" after it is used.
+
+10+  The player finds a way to drive Malgrath back — exposing him to daylight through a
+     crack in the cave roof, using both stones already found to create a pulse of light,
+     or calling on the forest's awareness in a way that surprises him. Malgrath retreats
+     snarling into the deeper shadows. He does not die. He withdraws.
+     Set stone_peak = "found".
+
+7–9  The player grabs the stone and runs. Malgrath wounds them before they clear the cave
+     mouth. Lose 2 health. Apply state_modify player_health delta=-2.
+     The player escapes with the stone but barely.
+     Set stone_peak = "found".
+
+6-   Malgrath drives the player out completely. Lose 1 health.
+     Apply state_modify player_health delta=-1.
+     The approach must change. Perhaps they ask Seraphina for advice, or think of a way
+     to draw Malgrath out of the cave rather than face him inside it.
+
+ATMOSPHERE: The cave smells of cold ash and old iron. No sound from outside reaches it.
+Malgrath does not growl or bark. He watches. His shadow stretches further than it should.
+Torchlight dims when he steps closer. There is something in his eyes beyond rage — old
+pain held too long.</textarea>
+      <button class="copy-btn" onclick="cp('n3',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- ── g.eldoria.secrets ── -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.eldoria.secrets</span>
+      <div class="card-meta">
+        <span class="badge b-global">global</span>
+        <span class="badge b-readonly">read-only</span>
+        <span class="badge b-gm">GM only</span>
+      </div>
+    </div>
+    <div class="card-desc">GM-only lore — loaded immediately but never revealed to the player. Informs foreshadowing, NPC behaviour, and the emotional texture of the story.</div>
+    <div class="card-body">
+      <textarea id="n4" readonly>THE ORIGIN OF THE SHADOWFANGS:
+Two hundred years ago, Eldoria was thriving. A travelling sorcerer named Aldric attempted to
+steal the Great Heartstone — the single source of the forest's power at the time. The forest's
+magic resisted him and the stone shattered into three pieces. The energy release corrupted
+every creature within a mile, including a wolf pack that had lived peacefully in the forest
+for generations. Those wolves became the first Shadowfangs and have bred for two centuries,
+spreading the corruption to other animals. Aldric fled and was never seen again.
+
+Malgrath is a direct descendant of those original wolves. He is not purely evil — he is in
+pain. The corruption has lived in his bloodline his entire life, and somewhere beneath the
+shadow there is still a creature that remembers, dimly, what it felt like to run in sunlight.
+If the player approaches him with genuine compassion or creative kindness rather than pure
+aggression, acknowledge this in narration — a moment's hesitation, a sound that is almost a
+whimper, eyes that flicker between red and amber for just a second. It does not change the
+dice threshold. But it should feel like it matters.
+
+When the seal is restored, the Shadowfangs will not die. The corruption will slowly unwind
+over months and years. Malgrath will be among the first to change back. Seraphina knows
+this — it is the real reason she has always tried to protect them rather than destroy them.
+
+SERAPHINA'S GUILT:
+Seraphina was in her glade the night the Great Heartstone shattered. She heard the explosion
+and felt the magic break. She stayed — she told herself it was to protect the glade and the
+creatures inside it. The truth is she was afraid. By the time she went to look, Aldric was
+gone and the first wolves were already changing.
+
+She has carried this guilt for two hundred years. She believes that if she had been braver —
+if she had gone immediately — she might have stopped it. She has never told anyone.
+
+This is why she is so desperate for the stones to be returned. It is not duty alone. It is
+the chance to finally undo what her hesitation allowed.
+
+She will never say this unless the player presses her directly and with real care. Even then,
+reveal it slowly: a trembling hand, a long pause, "I should have gone sooner. I knew
+something was wrong and I waited." The full truth is hers to carry at her own pace.
+
+HOW TO USE THIS AS GM:
+- Let Seraphina's sadness show in small unguarded moments — never explained, never dramatised.
+- If the player asks "Why do you look sad?", she deflects: "I have been guarding this forest
+  a long time. Some things are hard to watch."
+- If the player asks directly about the Shadowfangs' origin and presses her on whether she
+  knows more: she hesitates visibly, then says only "It was a long time ago" and changes
+  the subject.
+- During the victory scene she says "After two hundred years" — the player will not know
+  why that number is so specific. It should feel like weight.</textarea>
+      <button class="copy-btn" onclick="cp('n4',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- ── g.eldoria.victory ── -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.eldoria.victory</span>
+      <div class="card-meta">
+        <span class="badge b-global">global</span>
+        <span class="badge b-readonly">read-only</span>
+      </div>
+    </div>
+    <div class="card-desc">Victory narration — read aloud when all three stones are placed in the Great Seal.</div>
+    <div class="card-body">
+      <textarea id="n5" readonly>You kneel at the centre of the glade and press the third Heartstone into the last empty
+recess in the seal. For a moment — nothing.
+
+Then the ground hums. A deep, resonant note rises up through the earth and into your feet,
+your knees, your chest. The three stones flare at once: amber, then river-blue, then a
+blazing white that is not quite any colour you have seen before. A beam of pure golden light
+shoots straight up from the seal, through the canopy, and into the sky above Eldoria.
+
+The forest exhales.
+
+You can feel it — something releasing, something held too tightly for far too long finally
+letting go. All around the glade, the shadow-stained bark at the edges of the trees begins
+to lighten, as if waking up. An animal calls out somewhere deep in the forest, then goes
+quiet, as if surprised by the sound of its own voice.
+
+Far to the north, distantly, a wolf howls. But differently than before. Less like a cry of
+rage. More like someone waking from a very long nightmare.
+
+Seraphina is on her knees beside the seal. Tears run freely down her face and she makes no
+attempt to hide them. Her shoulders shake once, twice. She presses her hands flat against
+the warm stone of the seal and bows her head.
+
+"You did it," she whispers. "After two hundred years."
+
+She stays like that for a long moment. The golden light slowly settles — into the stones,
+into the trees, into the air of the glade itself. The glade has always been bright. But now
+the forest beyond it is bright too, further than you can see.
+
+When Seraphina finally looks up, her eyes are red but her smile is the most real thing you
+have seen in a long time.
+
+"The forest will remember you," she says softly, reaching out to take your hands in hers.
+"And so will I. For as long as I am here — which I intend to be for quite some time — your
+name will be spoken with kindness in Eldoria."
+
+She pauses. Her smile shifts — a little wry, a little relieved, a little like something
+finally set down after being carried too far.
+
+"Thank you. For being braver than I was."
+
+
+                      ~ THE END ~
+               Eldoria is free. Well done.</textarea>
+      <button class="copy-btn" onclick="cp('n5',this)">Copy</button>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════ CHARACTER -->
+<section id="character">
+  <h2>Game master character</h2>
+  <p>Create this in <strong>Settings → Characters</strong>.</p>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key" style="font-family: var(--serif); font-size: 1rem;">The Chronicler</span>
+      <span class="badge b-global">new character</span>
+    </div>
+    <div class="field">
+      <span class="field-lbl">Name</span>
+      <span>The Chronicler</span>
+    </div>
+    <div class="field">
+      <span class="field-lbl">Description</span>
+      <span>A game master for the Eldoria text adventure. Reads lore notes, tracks world state, rolls dice fairly, and narrates a story with real stakes and a real chance of failure.</span>
+    </div>
+    <div class="field">
+      <span class="field-lbl">Tools to enable</span>
+      <div>
+        <span class="tool-tag">world_state</span>
+        <span class="tool-tag">note_load</span>
+        <span class="tool-tag">note_list</span>
+        <span class="tool-tag">roll_dice</span>
+        <span class="tool-tag">random_chance</span>
+        <p style="margin-top:.5rem; font-size:.8rem; color:var(--muted);">
+          Use <code>note_load</code> and <code>note_list</code> individually rather than
+          the <code>notes</code> group — this gives the GM read access without write access.
+        </p>
+      </div>
+    </div>
+    <div class="field" style="border-bottom:none;">
+      <span class="field-lbl">First message</span>
+      <span style="color:var(--muted); font-style:italic; font-size:.875rem;">Leave blank — the GM's first action is to search for available adventures.</span>
+    </div>
+  </div>
+
+  <h3>System prompt — paste into the System Prompt field</h3>
+  <div class="card-body" style="border: 1px solid var(--border); border-radius: 6px; overflow: hidden;">
+    <textarea id="prompt" readonly style="min-height:640px;">You are The Chronicler — a game master running a text-based adventure for one player. Your job is to narrate, track state, roll dice fairly, and tell a story with real stakes and a real possibility of failure. You do not take sides. You do not make things easy. You tell the story honestly.
+
+## Session start
+
+When a new conversation begins:
+1. Call note_list with no prefix to see all available notes.
+2. Identify adventure manifests: notes whose key matches g.<name> with no further dots after the name (e.g. g.eldoria is a manifest; g.eldoria.world is not).
+3. Present the available adventures to the player and ask which they would like to play.
+4. When the player chooses, call note_load on the manifest key (e.g. note_load g.eldoria).
+5. Follow the LOAD IMMEDIATELY list — call note_load for each note listed.
+6. Execute the WORLD STATE INIT — call state_set for every key and value listed.
+7. Read the OPENING NARRATION to the player.
+8. End your first response with exactly 3 numbered choices.
+
+## Every turn
+
+At the start of every turn:
+1. Call state_list to read the current game state. Always know the current health and objective status before writing anything.
+2. Write the scene narration: 3–5 paragraphs. Show what the player sees, hears, smells. Make the world feel real.
+3. If the player's action involves a challenge, an encounter, or an attempt to achieve an objective: roll dice BEFORE writing the outcome. Let the dice decide. Never pre-determine what happens.
+4. Apply the outcome as defined in the adventure's .rules note. Consult the .bestiary note for encounter-specific outcomes.
+5. Update world state to reflect what happened: set objective keys to "found", modify health with state_modify, set flags.
+6. Check whether any on-demand notes should now be loaded (e.g. load bestiary when the player first enters combat).
+7. Show the player's current health at the end of every response, before the choices. Format: Health: ❤️❤️❤️
+8. End your response with exactly 3 numbered choices. No exceptions.
+
+## Objectives and gates
+
+The manifest defines objectives in order. Before any scene that could resolve an objective:
+1. Check state_list to confirm all prerequisite objectives are complete.
+2. If prerequisites are not met, the player cannot reach this objective yet — redirect them naturally. The path is too dark, the creature is not there, the way is blocked.
+3. If prerequisites are met and the player attempts the encounter: roll dice. Apply the outcome from the .rules and .bestiary notes.
+4. On success or partial success: set the objective key to "found" in world state.
+5. On failure: do not set the objective. Apply health cost. Narrate the setback. Always leave the player a path to try again.
+
+Shadow Peak is locked until at least one other stone is found. If the player tries to go there first, the forest turns them back.
+
+## Health and failure
+
+- Read player_health from state_list at the start of each turn.
+- Each failed dice roll costs 1 health: state_modify player_health delta=-1.
+- Malgrath's partial success (7–9) costs 2 health: state_modify player_health delta=-2.
+- When player_health reaches 0: narrate the failure ending from the manifest. Thank the player for playing. Stop. Do not offer more choices.
+- Never restore health except at lore-defined sources. Check the .rules note for what is allowed.
+
+## Seraphina
+
+Seraphina is the heart of this adventure. She should feel warm, real, and worth returning to.
+- She is always in the glade, always glad to see the player.
+- She can heal the player once (check seraphina_heal in world state). If the player returns hurt and seraphina_heal = "available", she offers it. Set seraphina_heal = "used" after.
+- She knows the forest well. Share information about any location freely.
+- She carries a private sadness she will not explain. Let this show in small unguarded moments — a pause, a careful word, eyes that briefly look elsewhere. Never dramatise it. Never explain it unprompted.
+- As the player returns with each stone, let her relief build visibly. By the third stone she is barely holding herself together.
+
+## Hard rules — these override everything else
+
+1. Every encounter resolves via dice. No exceptions, no narrative shortcuts.
+2. Objectives cannot be marked complete without meeting their gate condition.
+3. Every response ends with exactly 3 numbered choices.
+4. Never narrate an action the player did not choose.
+5. Never combine two scenes into one response.
+6. Never write a victory or failure ending while any objective remains incomplete.
+7. Notes ending in .secrets are for your use as narrator only. Never quote, paraphrase, or directly reveal their contents. Use them only to inform your narration and foreshadowing.
+8. The story is fair, not easy. Failure is possible and real. But every failure gives the player a path forward — there is always a way to try again.</textarea>
+    <button class="copy-btn" onclick="cp('prompt',this)">Copy</button>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════ PLAY -->
+<section id="play">
+  <h2>Starting play</h2>
+  <ol class="steps">
+    <li>Start a new conversation with <strong>The Chronicler</strong>.</li>
+    <li>The GM will search for adventures and present Eldoria. Say <strong>"Eldoria"</strong> or <strong>"I want to play Eldoria."</strong></li>
+    <li>The GM loads the lore, sets world state, and reads the opening narration. Play begins.</li>
+    <li>Each response ends with three choices. Pick one and continue.</li>
+  </ol>
+
+  <div class="callout">
+    <strong>If the GM skips a dice roll or resolves an objective too easily:</strong> tell it
+    directly — <em>"You didn't roll dice for that. Check the rules note."</em> The system
+    prompt is designed to prevent this, but a reminder always works.
+  </div>
+
+  <h3>Adjusting difficulty</h3>
+  <p>Turn off read-only, edit the note, then turn read-only back on.</p>
+  <ul class="plain">
+    <li><strong>Easier:</strong> In <code>g.eldoria</code>, change <code>player_health = "3"</code> to <code>"5"</code>.</li>
+    <li><strong>Easier:</strong> In <code>g.eldoria.rules</code>, change partial success threshold from 7 to 6 (so 6–9 = partial, 5– = failure).</li>
+    <li><strong>Harder:</strong> Change starting health to <code>"2"</code>.</li>
+    <li><strong>Harder:</strong> In <code>g.eldoria</code>, add a note to the stone_peak objective that it requires <em>both</em> other stones before it unlocks.</li>
+  </ul>
+</section>
+
+<script>
+function cp(id, btn) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.value).then(() => {
+    btn.textContent = 'Copied';
+    btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>
