@@ -95,7 +95,7 @@ var toolRegistry = map[string]toolDef{
 					},
 					"max_results": map[string]any{
 						"type":        "integer",
-						"description": "Number of results to return (1–10, default 5).",
+						"description": "Number of results to return (1–40, default 10).",
 					},
 					"page": map[string]any{
 						"type":        "integer",
@@ -876,10 +876,10 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		}
 		n := args.MaxResults
 		if n <= 0 {
-			n = 5
-		}
-		if n > 10 {
 			n = 10
+		}
+		if n > 40 {
+			n = 40
 		}
 		page := args.Page
 		if page <= 0 {
