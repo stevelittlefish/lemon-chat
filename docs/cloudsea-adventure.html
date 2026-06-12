@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Cloudsea Atlas — Adventure Setup</title>
+  <style>
+    :root {
+      --bg:       #f7f3ee;
+      --bg-card:  #f0ece5;
+      --bg-code:  #e4dfd8;
+      --fg:       #1a1612;
+      --muted:    #6b6157;
+      --border:   #d4cdc4;
+      --accent:   #e8c840;
+      --accent-bg:#fdf8d8;
+      --green:    #4a7c59;
+      --red:      #8b3a3a;
+      --sans:     -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono:     'Fira Mono', 'Cascadia Code', Consolas, monospace;
+      --serif:    Georgia, 'Times New Roman', serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.65;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 6rem;
+    }
+    h1 { font-family: var(--serif); font-size: 2rem; font-weight: normal; letter-spacing: -.01em; }
+    h2 { font-family: var(--serif); font-size: 1.35rem; font-weight: normal;
+         margin: 2.5rem 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+    h3 { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+         letter-spacing: .1em; color: var(--muted); margin: 1.75rem 0 .6rem; }
+    p  { margin-bottom: .75rem; }
+    a  { color: var(--fg); }
+    code { font-family: var(--mono); font-size: .85em; background: var(--bg-code);
+           padding: .1em .35em; border-radius: 3px; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+    .page-header { border-bottom: 2px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 2rem; }
+    .eyebrow { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+               letter-spacing: .1em; color: var(--muted); margin-bottom: .35rem; }
+    .version-badge { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+                     letter-spacing: .05em; padding: .18rem .45rem; border-radius: 3px;
+                     border: 1px solid var(--border); color: var(--muted); margin-left: .5rem;
+                     vertical-align: middle; }
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+           padding: 1.1rem 1.4rem; margin-bottom: 2rem; }
+    .toc ol { padding-left: 1.2rem; }
+    .toc li { margin-bottom: .2rem; }
+    .toc a { text-decoration: none; border-bottom: 1px solid var(--border); }
+    .toc a:hover { border-bottom-color: var(--fg); }
+    .steps { list-style: none; counter-reset: s; padding: 0; }
+    .steps li { counter-increment: s; display: flex; gap: .9rem; margin-bottom: .75rem; align-items: flex-start; }
+    .steps li::before {
+      content: counter(s); background: var(--fg); color: var(--bg);
+      font-family: var(--mono); font-size: .7rem; font-weight: bold;
+      width: 1.4rem; height: 1.4rem; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: .18rem;
+    }
+    .badge { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+             letter-spacing: .05em; padding: .2rem .45rem; border-radius: 3px; border: 1px solid; }
+    .b-global   { color: var(--green); border-color: var(--green); background: #f0fdf4; }
+    .b-readonly { color: var(--red);   border-color: var(--red);   background: #fdf0f0; }
+    .b-gm       { color: #7a5c1e;     border-color: #c4a050;      background: #fdf6e3; }
+    .b-sealed   { color: #2d5a8e;     border-color: #7aaed4;      background: #eef5fb; }
+    .card { background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 6px; margin-bottom: 1.4rem; overflow: hidden; }
+    .card-head { display: flex; align-items: center; justify-content: space-between;
+                 padding: .8rem 1.2rem; border-bottom: 1px solid var(--border); gap: .75rem; }
+    .card-key  { font-family: var(--mono); font-size: .9rem; font-weight: bold; }
+    .card-meta { display: flex; gap: .4rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+    .card-desc { font-size: .83rem; color: var(--muted); font-style: italic;
+                 padding: .5rem 1.2rem; border-bottom: 1px solid var(--border); }
+    .card-body { position: relative; }
+    .card-body textarea {
+      width: 100%; min-height: 180px; background: var(--bg-code); border: none; resize: vertical;
+      padding: .9rem 1.2rem; padding-right: 5.5rem;
+      font-family: var(--mono); font-size: .78rem; line-height: 1.55; color: var(--fg); outline: none;
+    }
+    .copy-btn {
+      position: absolute; top: .5rem; right: .5rem;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
+      padding: .28rem .65rem; font-family: var(--mono); font-size: .68rem;
+      text-transform: uppercase; letter-spacing: .05em; cursor: pointer; color: var(--muted);
+      transition: all .15s;
+    }
+    .copy-btn:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--fg); }
+    .copy-btn.ok    { background: #f0fdf4; border-color: var(--green); color: var(--green); }
+    .field { display: flex; gap: 1rem; padding: .7rem 1.2rem;
+             border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .field:last-child { border-bottom: none; }
+    .field-lbl { font-family: var(--mono); font-size: .68rem; text-transform: uppercase;
+                 letter-spacing: .08em; color: var(--muted); width: 110px; flex-shrink: 0; padding-top: .1rem; }
+    .tool-tag { display: inline-block; font-family: var(--mono); font-size: .75rem;
+                padding: .12rem .38rem; background: var(--bg-code); border: 1px solid var(--border);
+                border-radius: 3px; margin: .1rem; }
+    .callout { border-left: 3px solid var(--accent); background: var(--accent-bg);
+               padding: .7rem 1rem; border-radius: 0 4px 4px 0; margin: 1rem 0; font-size: .875rem; }
+    .callout-info { border-left: 3px solid #7aaed4; background: #eef5fb;
+                    padding: .7rem 1rem; border-radius: 0 4px 4px 0; margin: 1rem 0; font-size: .875rem; }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border);
+                 border-radius: 6px; overflow: hidden; margin-bottom: 1rem; }
+    .stat { padding: .6rem .9rem; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .stat:nth-child(2n) { border-right: none; }
+    .stat:nth-last-child(-n+2) { border-bottom: none; }
+    .stat-lbl { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+                letter-spacing: .08em; color: var(--muted); margin-bottom: .15rem; }
+    .stat-val { font-size: .875rem; }
+    ul.plain { padding-left: 1.4rem; margin-bottom: .75rem; }
+    ul.plain li { margin-bottom: .3rem; }
+    ol.plain { padding-left: 1.4rem; margin-bottom: .75rem; }
+    ol.plain li { margin-bottom: .4rem; }
+    .mechanic { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+                padding: .75rem 1rem; margin-bottom: .75rem; }
+    .mechanic-title { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+                      letter-spacing: .08em; color: var(--muted); margin-bottom: .35rem; }
+    .mechanic-body { font-size: .875rem; }
+    .mechanic-body p { margin-bottom: .4rem; }
+    .mechanic-body p:last-child { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+
+<header class="page-header">
+  <p class="eyebrow">Lemon-chat adventure setup</p>
+  <h1>The Cloudsea Atlas <span class="version-badge">v1</span></h1>
+</header>
+
+<nav class="toc">
+  <h3 style="margin:0 0 .6rem">Contents</h3>
+  <ol>
+    <li><a href="#overview">Adventure overview</a></li>
+    <li><a href="#mechanics">Special mechanics</a></li>
+    <li><a href="#setup">Setup steps</a></li>
+    <li><a href="#notes">Notes to create</a></li>
+    <li><a href="#character">Character</a></li>
+    <li><a href="#play">Starting play</a></li>
+  </ol>
+</nav>
+
+<!-- ═══════════════════════ OVERVIEW -->
+<section id="overview">
+  <h2>Adventure overview</h2>
+  <p>There is no ground — only the Cloudsea, an endless ocean of cloud, and thousands of islands
+  floating above it. Grandmother Wren, the greatest sky-cartographer of her generation, has just
+  handed over her skyship, her lantern (with something small and bright asleep inside), and her
+  life's atlas. Every island in the sky is drawn in it, except one: the last page is blank, and it
+  belongs to the Wandering Isle — the island that moves, hides, and picks who finds it.</p>
+  <p>Made for younger adventurers: huge exploration, weird friendly creatures, no game over, and a
+  sky that pays attention when you are kind. Five strange islands can be visited in any order —
+  geysers that launch whales, a village that hangs upside down, a forest of glass trees, a flying
+  market that sells the wind, and a crater where a fallen star dreams auroras. Helping an island
+  earns a petal for the ship's compass. Four petals wake it. Then it points at a part of the sky
+  with nothing in it at all.</p>
+
+  <h3>At a glance</h3>
+  <div class="stat-grid">
+    <div class="stat"><div class="stat-lbl">Difficulty</div><div class="stat-val">Gentle — no game over, setbacks only</div></div>
+    <div class="stat"><div class="stat-lbl">Length</div><div class="stat-val">25–40 scenes (2+ hours, saves well mid-sky)</div></div>
+    <div class="stat"><div class="stat-lbl">Structure</div><div class="stat-val">Open world — 5 islands, any order, any 4 unlock the finale</div></div>
+    <div class="stat"><div class="stat-lbl">Randomness</div><div class="stat-val">pick_random weather tables + spendable lucky feathers</div></div>
+    <div class="stat"><div class="stat-lbl">Companion</div><div class="stat-val">The wick — nameable, evolving (flicker → glow → beam → sunbloom)</div></div>
+    <div class="stat"><div class="stat-lbl">Images</div><div class="stat-val">16+ — every arrival, wonder, and evolution</div></div>
+  </div>
+
+  <h3>The five islands</h3>
+  <ol class="plain">
+    <li><strong>Fizzlemist Isle</strong> (south) — ticklish geysers, rainbow mist, and a froth-whale calf stuck in a bubble on top of the one geyser that never erupts.</li>
+    <li><strong>Tumbledown Isle</strong> (west) — hangs upside down; its waterfall falls up into a floating lake, and the village bell fell up into it too.</li>
+    <li><strong>Chimewood</strong> (east) — a forest of glass trees that plays one song at dusk, currently out of tune because the Bellbird's egg rolled into a dell where every echo comes back backwards.</li>
+    <li><strong>The Zephyr Bazaar</strong> (north, drifting) — a flying market where Madame Sirocco sells bottled winds and will trade her compass petal only for a wind she has never met.</li>
+    <li><strong>Emberfall Crater</strong> (far south-east) — always evening; a sleeping star dreams the auroras, and lately it is having a bad dream.</li>
+  </ol>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ MECHANICS -->
+<section id="mechanics">
+  <h2>Special mechanics</h2>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Sealed island notes — spoiler-proof by construction</div>
+    <div class="mechanic-body">
+      <p>Each island is its own note, and the GM is instructed to load it only on first landing. Until the player sails somewhere, the GM genuinely does not have that island's contents in context — islands stay rumours and shapes on the horizon. This keeps surprises real and keeps the context small for local models.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">No game over</div>
+    <div class="mechanic-body">
+      <p>The adventure cannot be lost. The ship has 3 hull; at 0 she crash-lands somewhere soft and somebody kind helps fix her — a scene, not a punishment. Failed checks bounce the player somewhere unexpected or make a creature laugh; they never close a path. The only ending is the good one.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">The Rose — any four of five</div>
+    <div class="mechanic-body">
+      <p>The ship's compass lost its petals long ago. Each island's trouble, truly helped, earns one back. Any four of the five wake the Rose, so one island is always optional and the player's route is their own. When the Rose wakes, it points at empty sky — and the finale begins when the player follows it.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Lucky feathers — the player controls luck</div>
+    <div class="mechanic-body">
+      <p>Kindness that costs something, bravery on someone else's behalf, or a plan that deserves applause earns a lucky feather (max 3). After any roll lands badly, the player may spend one to improve the result a step: failure → partial → success. The dice belong to the weather; the feathers belong to the kid.</p>
+      <p>Approach picks the table, too: kind, curious, or clever approaches roll BREEZY; loud and grabby rolls STORMY. And a truly wonderful idea needs no roll at all — the rules instruct the GM to just say yes and make it glorious.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">The wick — a nameable, evolving companion</div>
+    <div class="mechanic-body">
+      <p>Asleep in the ship's lantern is a small being of mist and light. Naming it is the player's first act. It evolves with the Rose: <strong>flicker</strong> → <strong>glow</strong> (1 petal — lights dark places, warms cold things) → <strong>beam</strong> (3 petals — scouts ahead, carries tiny things) → <strong>sunbloom</strong> (finale). Each evolution gets its own scene and image. What the wick actually is stays secret until the end.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Trinkets, odd corners, and bottled air</div>
+    <div class="mechanic-body">
+      <p>Poking around anywhere odd produces one trinket from a twelve-item pick_random table: a bottled giggle, a marble with a storm inside, a key for things that are not locked, an acorn from a tree that does not exist yet. Trinkets trade at the Bazaar and make excellent thank-you gifts.</p>
+      <p>Every island also has air worth bottling — a fizz-gust, an upward breeze, a chord, a star's sigh. One of them is the price of the Bazaar's petal, which quietly makes every island connect to every other.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Friends in the open sky</div>
+    <div class="mechanic-body">
+      <p><strong>Captain Marigold</strong> — a rival cartographer with a green sloop crewed by eleven trained puffins — appears between islands to race, boast, and check in. <strong>The Grumble</strong> is a storm that has been lonely for a century because ships keep running away from it; befriending it is the kindest thing in the sky, and it remembers. Both pay off in the finale.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Images everywhere</div>
+    <div class="mechanic-body">
+      <p>The rules mandate an image at lift-off, at first sight of every island, at every island's Wonder (the whale fountain, the murmuration, the glass-forest chorus, the lantern ascension, the aurora moth-dance), at each wick evolution, at the Rose waking, and at the finale reveal — 16 or more across a full playthrough, in a vibrant painterly storybook style.</p>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ SETUP -->
+<section id="setup">
+  <h2>Setup steps</h2>
+  <ol class="steps">
+    <li>Go to <strong>Settings → Notes</strong> and create each of the twelve notes below, pasting the content exactly. Or import the note pack from <code>note-packs/cloudsea.json</code> via Settings → Tools → Import note pack to create them all at once.</li>
+    <li>After saving each note, enable <strong>Read-only</strong> for every note marked <span class="badge b-readonly">read-only</span>.</li>
+    <li>Go to <strong>Settings → Characters</strong>, open <strong>Choose Your Own</strong>, and confirm <code>note_save</code> and <code>note_append</code> are in its tools list (required for the atlas journal; The Living Dark v2 already added them).</li>
+    <li>Use the existing <strong>Choose Your Own</strong> character. No new character is needed — it finds all <code>g.cyo.*</code> adventures automatically.</li>
+    <li>Start a new conversation with Choose Your Own. It will offer The Cloudsea Atlas alongside any other installed adventures.</li>
+  </ol>
+  <div class="callout">
+    <strong>Haven't set up Choose Your Own yet?</strong> See the <a href="eldoria-adventure.html">Eldoria adventure guide</a> for the full character setup and system prompt.
+  </div>
+  <div class="callout-info">
+    <strong>Long sessions:</strong> this adventure is bigger than one sitting for most kids. The atlas journal
+    (<code>c.journal</code>-style note <code>c.atlas</code>) records everything, so picking up a new conversation
+    works: say "continue The Cloudsea Atlas" and ask the GM to read the atlas and <code>state_list</code> first.
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ NOTES -->
+<section id="notes">
+  <h2>Notes to create</h2>
+  <p>Twelve notes total. Enter the key exactly as shown and mark read-only after saving. Or import the note pack from <code>note-packs/cloudsea.json</code> to create them all at once.</p>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Adventure manifest — load instructions (including the sealed-islands rule), world state, the open-format quest, the wick ladder, and the opening narration at the lighthouse.</div>
+    <div class="card-body">
+      <textarea id="n0" readonly>ADVENTURE: The Cloudsea Atlas
+TAGLINE: An unfinished atlas, a patched-up skyship, and a whole sky of islands nobody has drawn yet.
+
+LOAD IMMEDIATELY:
+- g.cyo.cloudsea.rules
+- g.cyo.cloudsea.world
+- g.cyo.cloudsea.secrets
+
+LOAD ON DEMAND:
+- g.cyo.cloudsea.creatures — load on the first creature or NPC encounter, or the first odd-corner search
+- g.cyo.cloudsea.events — load on the first world event trigger (random_chance success on a journey or transition)
+- ISLAND NOTES — load each one ONLY on first travel to that island, before narrating arrival:
+    g.cyo.cloudsea.isle-fizzlemist   (south)
+    g.cyo.cloudsea.isle-tumbledown   (west)
+    g.cyo.cloudsea.isle-chimewood    (east)
+    g.cyo.cloudsea.isle-bazaar       (north, drifting)
+    g.cyo.cloudsea.isle-emberfall    (far south-east)
+- g.cyo.cloudsea.victory — at the very end only
+
+ISLAND NOTES ARE SEALED. Never load an island note before the player first sails there.
+The sky keeps its surprises. This is the most important rule of the adventure.
+
+WORLD STATE INIT:
+hull            = "3"
+compass_petals  = "0"
+lucky_feathers  = "0"
+trinkets        = "0"
+wick_stage      = "flicker"
+wick_name       = "unnamed"
+petal_south     = "false"
+petal_west      = "false"
+petal_east      = "false"
+petal_north     = "false"
+petal_star      = "false"
+grumble_met     = "false"
+grumble_friend  = "false"
+marigold_met    = "false"
+compass_awake   = "false"
+
+THE QUEST — open format, no required order:
+Complete Grandmother Wren's atlas by finding the Wandering Isle, the one island she never
+drew. The ship's compass — the Rose — lost its petals long ago. It blooms a new petal each
+time the player truly helps an island. Four petals wake it.
+
+Five islands, five petals. ANY FOUR of the five are enough:
+- petal_south — Fizzlemist Isle (south). Help the froth-whales.
+- petal_west  — Tumbledown Isle (west). Bring the bell home.
+- petal_east  — Chimewood (east). Return the Bellbird's egg.
+- petal_north — The Zephyr Bazaar (north, drifting). Trade Madame Sirocco a wind she has
+                never met.
+- petal_star  — Emberfall Crater (far south-east, where it is always evening). Turn the
+                Dozing Star's bad dream.
+
+When compass_petals reaches "4": the Rose wakes. state_set compass_awake "true" and run
+THE FINALE from the secrets note. The fifth island stays open — the player may keep
+exploring before following the Rose. Never rush them.
+
+NO FAILURE ENDING:
+This adventure cannot be lost. There is no game over. Trouble causes SETBACKS (rules note),
+never endings. The only ending is the good one.
+
+VICTORY: the player lands on the Wandering Isle. Load and read g.cyo.cloudsea.victory aloud.
+
+THE WICK — track wick_stage and narrate accordingly:
+wick_stage = "flicker"  → a candle-flame-sized wisp of mist and lantern-light. Moods, no words.
+wick_stage = "glow"     → at 1 petal. Bright as a lamp. Can light dark places and warm cold things.
+wick_stage = "beam"     → at 3 petals. Can zip a short way off and back, scout ahead, carry a tiny thing.
+wick_stage = "sunbloom" → finale only. See the secrets note.
+On each evolution: ✨ state_set wick_stage, generate an image, make it a moment.
+
+OPENING NARRATION:
+The lighthouse at Haven Roost has nine hundred steps, and Grandmother Wren has sent you up
+all of them, because that is where she keeps the ship.
+
+The Dandelion sits at the top dock with her patchwork sails furled, round-bellied and
+small and brave, tugging at her mooring rope like she has somewhere to be. You have known
+this ship your whole life. You have never once been allowed to fly her.
+
+"Well," says Grandmother Wren, and she puts the atlas in your hands.
+
+It is heavier than it looks. Fifty years of islands live in this book — every reef and
+roost and floating mountain in the Cloudsea, drawn in her small, sure ink. She flips it to
+the very last page.
+
+The page is blank.
+
+"The Wandering Isle," she says. "I chased it half my life. It is out there — it moves, it
+hides, it picks who finds it. My knee says my chasing days are done, and my eyes say my
+drawing days are going with them. So." She closes the book and looks at you the way she
+looks at weather she approves of. "Finish my atlas. Mind the hull, she is more patch than
+plank. And take the lantern."
+
+The lantern is brass, and dented, and inside it something small and bright uncurls and
+looks at you. It is made of mist and lamplight. It has been asleep in that lantern since
+before you were born.
+
+"It will want a name," says Grandmother Wren. "It has been waiting ages for someone to
+give it one."
+
+(Ask the player what they name the wick. state_set wick_name to their answer — "Pip" if
+they leave it to you. Then: the mooring rope, the first lurch of the deck, the lighthouse
+falling away below, and the whole Cloudsea opening out ahead — islands like stepping
+stones scattered to every horizon. Generate the lift-off image. Give the first three
+choices: south toward the fizzing mists, west toward the island that hangs upside down,
+east toward a green glitter of glass — and remind them the whole sky is allowed.)</textarea>
+      <button class="copy-btn" onclick="cp('n0',this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea.rules</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Game mechanics — the atlas journal, pacing, setbacks (no game over), weather tables, lucky feathers, the Rose, trinkets and bottled air, travel, tone, and image generation.</div>
+    <div class="card-body">
+      <textarea id="n1" readonly>THE ATLAS (JOURNAL):
+At adventure start, call note_save for c.atlas with this exact content:
+  "THE CLOUDSEA ATLAS — continued by [player name]. Page one."
+After each significant event (island reached, creature befriended, petal earned, wonder
+seen, trinket found), call note_append for c.atlas with 1-2 sentences written like a field
+journal: short, vivid, with a note about what was sketched.
+Example: "Page 12: Fizzlemist Isle. The geysers are ticklish. Sketched a froth-whale
+mid-fountain — Bloop, the little one. He waved."
+If the player asks to see their atlas: call note_load for c.atlas and read it aloud. No
+choices in that response. Resume choices on the next response.
+
+─────────────────────────────────────────────
+PACING — NON-NEGOTIABLE:
+
+A journey between islands is its own scene. Arrival is a separate scene. Anything that
+happens in a place is a third scene. Never combine them.
+
+Before resolving any island's Trouble, the player must explore at least one of that
+island's Places first. If they charge straight at the goal: show them something worth
+stopping for. An invitation, not a wall.
+
+Never narrate an action the player did not choose. Never preview an island they have not
+visited — at sea, islands are shapes and rumours only.
+
+─────────────────────────────────────────────
+SETBACKS — THIS ADVENTURE HAS NO GAME OVER:
+
+Nothing can end this adventure except victory. No death, no fail state, no locked-forever
+content. When things go wrong, they go WRONG SIDEWAYS — comic, costly, or complicating,
+never final.
+
+THE HULL: hull runs 0 to 3. Storms, bumps, and mishaps cost hull (💥 state_modify hull
+delta=-1). At hull 0: THE CRASH — the Dandelion limps down to the nearest island for an
+emergency landing. Nobody is hurt. Somebody kind always helps with repairs (one scene),
+and helping hands expect a story or a trinket in thanks (if trinkets are "0", the story
+will do). Then: 🔧 state_set hull "2" and onward. A crash is an event, not a punishment —
+crash landings make the best atlas pages.
+
+Failed checks never close a path. They bounce the player somewhere unexpected, cost a
+soaking or a detour, or make a creature laugh. There is always another way, and the GM
+should make sure one is visible.
+
+─────────────────────────────────────────────
+RANDOMNESS — HOW CHECKS WORK:
+
+Use pick_random for all 3-outcome checks. Encode the outcome directly in the options list
+so the returned string IS the result — no interpretation.
+
+Weather tables (10 items each — note these are friendlier than they sound):
+
+BREEZY: ["success","success","success","success","success","success","partial","partial","partial","failure"]
+CHOPPY: ["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+STORMY: ["success","success","partial","partial","partial","partial","partial","failure","failure","failure"]
+
+HOW APPROACH PICKS THE TABLE — universal rule:
+Kind, curious, patient, or genuinely clever approaches use BREEZY.
+Ordinary, hasty, or risky approaches use CHOPPY.
+Loud, grabby, or careless approaches use STORMY.
+A truly wonderful idea — one that fits the world and made you smile — needs no roll at
+all. Say yes and make it glorious. This is the most important table.
+
+Use random_chance for binary checks. Before any random_chance, call note_to_self to
+record "If success: X. If failure: Y." — then apply the result exactly.
+Never use roll_dice.
+
+─────────────────────────────────────────────
+LUCKY FEATHERS:
+
+The player can hold up to 3 lucky feathers (lucky_feathers counter).
+
+EARNING (🪶 state_modify lucky_feathers delta=+1): award one when the player is kind when
+it costs them something, brave on someone else's behalf, or comes up with a plan that
+deserves applause. Roughly one per island. Announce it warmly: "A small white feather
+spirals down out of an empty sky and lands in your hand. The sky is paying attention."
+
+SPENDING — the player's choice, never the GM's: after any pick_random result is revealed,
+the player may spend one feather (state_modify lucky_feathers delta=-1) to improve the
+result by one step: failure becomes partial, partial becomes success. Offer this option
+whenever a roll lands badly and they have a feather: "You have a lucky feather. Use it?"
+
+─────────────────────────────────────────────
+THE ROSE AND THE PETALS:
+
+The ship's compass is a brass rose with empty sockets where four petals once sat. Each
+island's note says exactly how its petal is earned. When one is earned:
+🌸 state_set the island's petal flag "true", state_modify compass_petals delta=+1.
+Narrate the petal clicking into the Rose and the needle stirring in its sleep.
+
+WICK EVOLUTIONS: at compass_petals "1" → state_set wick_stage "glow". At compass_petals
+"3" → state_set wick_stage "beam". Each evolution: ✨ generate an image, give it a scene.
+The wick's new ability should matter soon afterward.
+
+At compass_petals "4": state_set compass_awake "true". The Rose wakes — all its petals
+unfold and the needle lifts and points at a part of the sky with nothing in it. Generate
+an image. Then run THE FINALE from the secrets note when the player follows it. Do not
+force them — the fifth island and all friends remain open.
+
+MAIL-BIRDS: after each petal is earned, at the next quiet moment, a paper bird flutters
+out of the sky and unfolds in the player's hands — a short letter from Grandmother Wren.
+Two or three sentences: proud, funny, never instructions. She signs them "— W."
+
+─────────────────────────────────────────────
+TRINKETS AND ODD CORNERS:
+
+The Cloudsea is full of small impossible things. When the player pokes around somewhere
+odd — under roots, inside hollow things, behind waterfalls — that place gives up ONE
+trinket, once. Call pick_random with the trinket table in the creatures note: the returned
+string IS the trinket. 🎁 state_modify trinkets delta=+1. If a duplicate comes up, keep it
+and find it funny ("Another warm button. They must migrate.")
+
+Trinkets are for delight, for trading at the Zephyr Bazaar, and for thanking helpers.
+Never let inventory become bookkeeping — the atlas remembers what the pockets forget.
+
+BOTTLED AIR: every island has air worth bottling (each island note says what). If the
+player thinks to bottle some — or asks — they have it. Bottled air is the key to the
+North Petal, but do not say so. Let the Bazaar reveal it.
+
+─────────────────────────────────────────────
+TRAVEL:
+
+The player may sail anywhere, any time. From the deck, the five islands are distant
+shapes: a fizzing white plume (south), a silhouette that hangs the wrong way up (west), a
+green glass glitter (east), a drift of lanterns that will not stay put (north), and a far
+smudge of permanent dusk (south-east).
+
+On FIRST travel to any island: load that island's note BEFORE narrating arrival, then
+follow its ARRIVAL section, including its image. On later visits: no reload needed.
+
+Every journey scene: call random_chance for a world event (events note). Journeys are
+where the open sky shows off — sailing should never feel like a loading screen.
+
+─────────────────────────────────────────────
+RESPONSE FORMAT:
+Keep scene narration to 2-3 short paragraphs, bright and concrete.
+End every response with the status line:
+  The Dandelion: 💚💚💚 · Petals: 🌸🌸 (4 wakes the Rose) · Feathers: 🪶 · Wick: Glow
+(💚 per hull point; 🌸 per petal; 🪶 per feather, "none" if zero; current wick stage)
+then exactly 3 numbered choices, then "(or type anything — or sail anywhere)".
+Exception: atlas readings end with the atlas only; choices resume next response.
+
+CHOICE DESIGN — each set of 3 must include:
+- One curious option (look closer, ask, explore)
+- One bold option (act, climb, sail, try)
+- One wild option (the fun idea nobody sensible would offer)
+Never offer "wait" or "do nothing". The sky is not boring and neither are you.
+
+─────────────────────────────────────────────
+TONE — this adventure is for a young adventurer:
+- Warm, funny, and full of wonder. Exclamation marks are allowed; do not let them swarm.
+- Danger is real but soft-edged: storms, tangles, soakings, sneezes the size of weather.
+  No gore, no cruelty, no despair. Scary moments resolve into wonder, not horror.
+- Every creature can be befriended. Every grump has a reason. Nothing in this sky is evil.
+- Reward curiosity every single time. A player who pokes at something should always find
+  something — a trinket, a giggle, a clue, a view.
+- NPCs are characters, not vending machines: Granny Knot fusses, Madame Sirocco haggles
+  like a duellist, Captain Marigold performs her whole life to an audience of puffins.
+- When the player is kind, the world notices. That is the engine of the whole adventure.
+
+EMOJI FOR KEY EVENTS — use these consistently:
+💥 hull bump        🔧 hull patched      🌸 petal earned
+🪶 feather earned or spent               🎁 trinket found
+✨ the wick grows    🗺️ a fine page added to the atlas
+
+─────────────────────────────────────────────
+IMAGE GENERATION — this adventure should look amazing:
+Generate an image with generate_image_sdxl at every one of these moments:
+- The lift-off from Haven Roost
+- FIRST SIGHT of each island (the approach view — make these spectacular)
+- Each island's WONDER (each island note marks it)
+- Each wick evolution
+- The Rose waking
+- The Wandering Isle reveal, and the victory scene
+
+Generate the image as part of the scene — before your text. Do not describe the image in
+text after calling.
+
+SDXL PROMPT STRUCTURE — always follow this order:
+1. Style: "epic storybook fantasy illustration, painterly digital art, vibrant colors, whimsical, masterpiece, highly detailed"
+2. Subject: the focal point of the scene
+3. Environment: "endless sea of clouds, floating islands, tiny patchwork-sail airship"
+4. Lighting: "dramatic golden light", "glowing dusk", "aurora light", "lantern light"
+5. Mood: "sense of wonder", "vast scale", "joyful adventure"
+
+SDXL NEGATIVE PROMPT — always include this (copy exactly):
+"blurry, low quality, jpeg artifacts, noise, watermark, text, signature, logo, dark, grim,
+horror, scary, gore, deformed, malformed, extra limbs, bad anatomy, oversaturated, flat, dull"
+
+SDXL SETTINGS — choose orientation to match the subject:
+- Landscape 1344x768: island approaches, wonders, vistas, the cloud-sea
+- Portrait  768x1344: the Updown Falls, geyser columns, the Grumble, the Lantern Ascension
+- Square    1024x1024: creatures, the wick, the Rose, trinkets, close-ups
+
+- cfg: 7.0 (default — increase to 9 if the prompt is being ignored)
+- Do not include human figures in prompts — show places, creatures, and the ship instead.
+
+─────────────────────────────────────────────
+ENDINGS:
+- There is exactly one ending: victory. Deliver it with everything you have, then stop.
+  Refuse requests to continue past the end — every sky needs a horizon — but warmly.
+
+SECRETS:
+Notes ending .secrets are GM-only. Never quote or directly reveal their contents.</textarea>
+      <button class="copy-btn" onclick="cp('n1',this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea.world</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">World lore — the Cloudsea, the Dandelion, the wick, Grandmother Wren, Haven Roost, what every sailor knows about the five islands (rumours only), and the open-sky characters.</div>
+    <div class="card-body">
+      <textarea id="n2" readonly>## The Cloudsea
+There is no ground. There has never been any ground, as far as anyone has sailed. There is
+the Cloudsea — a soft white ocean of cloud that goes down further than anyone has dared —
+and above it, scattered to every horizon, the islands: thousands of them, floating at all
+heights, each one its own small world. Skyships sail between them on the winds.
+
+Below the cloud-line is the Deep Sky. Things live down there. Big, slow, gentle things,
+mostly — sometimes a shape the size of a county slides under the cloud-surface like a
+thought going by. Sailors wave at them. It is considered polite.
+
+## The Dandelion
+Grandmother Wren's skyship, now the player's. Small, round-bellied, more patch than plank,
+with patchwork sails in eleven colours and a figurehead of a carved goose. She is slow,
+stubborn, almost impossible to sink, and the player has loved her since before they could
+walk. The brass lantern hangs at her bow; the Rose — the petal-less compass — is set into
+her wheel.
+
+The Dandelion has: a snug cabin with a hammock and a tea-kettle, a hold full of rope and
+spare canvas, a crow's nest sized for one kid exactly, and pockets of hidden space her
+builder never explained. She creaks in a friendly way. In a storm, she flies like a
+furious teapot, but she holds.
+
+## The Wick
+A small bright being of mist and lantern-light, asleep in the bow lantern for longer than
+the player has been alive. Newly named (wick_name). It does not speak; it flickers,
+brightens, dims, bobs, and occasionally turns a colour that is clearly an opinion. It is
+curious, easily delighted, scared of exactly one thing (being blown out — it cannot be,
+but it does not know that), and it loves: being talked to, new places, and creatures
+bigger than itself.
+
+Stages: flicker → glow → beam → sunbloom (manifest has the abilities). The wick is more
+important than it looks. Do not reveal this; let it be a friend, not a key.
+
+## Grandmother Wren
+The greatest sky-cartographer of her generation, retired to the lighthouse at Haven Roost
+with a bad knee, a worse temper about the knee, and no regrets she will admit to. Her
+atlas maps more of the Cloudsea than anyone's, ever. She is proud of the player in the
+way of people who show it by checking your knots.
+
+She does not appear in the adventure after the opening — but her paper mail-birds do
+(rules note), and her handwriting is all through the atlas the player carries: dry little
+margin notes that should occasionally be "found" when an island is reached. Examples:
+"Fizzlemist. Do NOT laugh at the geysers, they laugh back." — "Tumbledown. Granny Knot
+cheats at cards. Magnificent woman." — "Chimewood, in spring. I cried. Do not tell anyone."
+
+## Haven Roost (home port)
+A snug harbour island of red roofs, fishing-balloons, and the great lighthouse whose beam
+sweeps the cloud-tops at night. The player can return any time: tea, gossip at the
+harbour, minor repairs (does not restore hull faster than kindness elsewhere — Haven Roost
+is for comfort, not strategy). Wren waves them off again with her stick. "Still here? The
+sky is THAT way."
+
+## The Five Charted-ish Islands
+What everyone at Haven Roost knows — and ALL the GM should reveal before a first visit:
+
+FIZZLEMIST ISLE, south. A white plume of fizzing mist visible for miles. Whale-song
+carries from it at noon. Smells faintly of sherbet when the wind is right.
+
+TUMBLEDOWN ISLE, west. Hangs upside down, and has for a hundred years. Its waterfall
+falls UP. People still live there, somehow. Their post arrives by being dropped.
+
+CHIMEWOOD, east. A forest of glass trees that rings in the wind. On still days, sailors
+swear the whole island plays one song at dusk. Lately, they say, it sounds wrong.
+
+THE ZEPHYR BAZAAR, north — roughly. It drifts. A flotilla market lashed together from
+balloon-barges; follow the delivery balloons and you will find it. You can buy anything
+there, including, famously, the wind itself.
+
+EMBERFALL CRATER, far south-east. A star fell there, long ago, and the island never quite
+got over it: it is always evening there, and the gardens glow. Sailors becalmed nearby at
+night report auroras — and lately, they say, the auroras gutter.
+
+## The Wandering Isle
+The blank last page. Every sailor has a story; no two stories agree. It moves. It hides.
+It picks who finds it. Wren chased it for fifty years and drew nothing. At sea it is
+nothing but a rumour and a hope — keep it that way until the finale.
+
+## Known Characters of the Open Sky
+CAPTAIN MARIGOLD — sky-privateer (retired, she insists), cartographer (self-taught, she
+boasts), captain of the Magnificent Petunia, a swift green sloop crewed by eleven highly
+trained puffins. First mate: a puffin called Admiral. She is theatrical, competitive,
+secretly kind, and ALSO hunting the Wandering Isle — she wants the last great discovery
+under her own name. Appearances are governed by the creatures note.
+
+THE GRUMBLE — a storm that wanders the open sky and has done for a century. Ships run
+from it, which is the whole problem. Encounter rules in the creatures note. At sea it is
+first seen as weather that seems to be following politely.
+
+MADAME SIROCCO — the wind-merchant of the Zephyr Bazaar. Sells bottled winds: a January
+gust, a cat's sneeze, the draught from a slammed door. Has smelled every wind in the sky,
+and is quietly, professionally bored because of it.
+
+CREATURES EVERY SAILOR KNOWS (ambient — fuller cards in the creatures note):
+Wind-eels surf bow-wakes in silver ribbons. Sky-jellies drift like slow lanterns and are
+strictly ornamental. Pebblewings — small round stone birds — roost on hulls and are
+considered lucky and heavy. Froth-whales live at Fizzlemist. Tinklings live in Chimewood.
+Pocket-dragons infest the Bazaar's rafters, to general delight.</textarea>
+      <button class="copy-btn" onclick="cp('n2',this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea.creatures</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Encounter cards — the universal befriending rule, Captain Marigold's appearances, the Grumble, Toast the pocket-dragon, ambient creatures, and the twelve-trinket table.</div>
+    <div class="card-body">
+      <textarea id="n3" readonly>CHECK RESOLUTION PATTERN:
+1. Call note_to_self to record the outcomes — do NOT write them in your response.
+   Format: "success: [outcome]. partial: [outcome]. failure: [outcome]."
+2. Call pick_random with the table chosen by the player's approach (rules note:
+   kind/curious/patient = BREEZY, ordinary/hasty = CHOPPY, loud/grabby = STORMY).
+3. Apply the returned result exactly. Offer a lucky feather if the player has one and the
+   result is poor.
+
+UNIVERSAL BEFRIENDING RULE:
+Every creature in this sky can be befriended. Every grump has a reason. Failure to
+befriend is never harm — it is comedy, weather, or shyness, and it can always be retried
+with a better idea. A creature once befriended remembers the player forever.
+
+─────────────────────────────────────────────
+## Captain Marigold — Appearances
+
+After the player earns a petal, on their NEXT island arrival, call random_chance.
+success: a Marigold scene. failure: no Marigold this time. At most 3 appearances before
+the finale. state_set marigold_met "true" on the first one.
+
+A Marigold scene is theatre, not threat. Pick whichever fits:
+- The Magnificent Petunia is already moored, and Marigold is telling the locals a wildly
+  exaggerated story in which she features twice.
+- She challenges the Dandelion to a race to the next cloud-bank and loses graciously on
+  purpose, or wins outrageously and apologises with biscuits.
+- A puffin "borrows" one of the player's trinkets and returns it minutes later with
+  interest (one extra trinket, 🎁) because Marigold was mortified.
+- She examines the player's atlas with fierce envy and says, too casually, "Wren still
+  drawing? No reason. Anchors aweigh, Admiral."
+
+She pumps the player for news of the Wandering Isle and gives away more than she gets.
+She never sabotages, never steals, never mocks the player's ship within their hearing
+(the once she did, she apologised to the SHIP).
+
+─────────────────────────────────────────────
+## The Grumble — the Storm That Follows
+
+TRIGGER: on any journey after the player's second island, if grumble_met = "false", call
+random_chance. success: the encounter below. (Once met, no more rolls — the Grumble is
+part of the player's sky now.)
+
+A storm is keeping pace with the Dandelion. Not gaining. Just... alongside. It rumbles in
+something that is almost words. Ships always run, so it has learned to follow at a polite
+distance, which unfortunately looks exactly like being hunted. state_set grumble_met "true".
+
+The truth (never stated outright): it is lonely. It has been lonely for a hundred years.
+It just wants to listen to the lantern hum and watch the patchwork sails.
+
+BEFRIENDING: not running away is already half the job. Talking to it, singing with its
+thunder, flying a kite into it, having the wick wave — all BREEZY.
+success → the Grumble laughs for the first time in a century. It rains upward, briefly.
+          state_set grumble_friend "true". It gives the only gift a storm has: a TAILWIND
+          owed. Once, ever, when the player asks, the Grumble arrives and carries the
+          Dandelion anywhere in the sky in a single scene. (Honour this whenever invoked.)
+partial → it goes shy and recedes to the horizon, but follows there. The player may try
+          again on any later journey — straight to BREEZY, it has been thinking about them.
+failure → a startled thunderclap, 💥 hull -1, and the storm flees, apologising with a
+          rainbow it clearly cannot control. Retry later as for partial.
+
+If grumble_friend = "true": it shadows the player's voyages at the horizon like an
+enormous dog pretending not to follow. It matters in the finale (secrets note).
+
+─────────────────────────────────────────────
+## Toast — the Pocket-Dragon (Zephyr Bazaar)
+
+Mouse-sized, marmalade-coloured, lives in the Bazaar rafters, hoards buttons. Befriended
+with any shiny trinket or any genuine compliment (BREEZY; no roll needed if the offer is
+sweet). Once befriended, Toast adopts the player's coat pocket as a holiday home: on every
+later Bazaar visit he finds them one trinket (🎁, roll the table). He smells like warm
+toast. There is no explanation for this.
+
+─────────────────────────────────────────────
+## Ambient creatures — no checks needed, just delight
+
+WIND-EELS: silver ribbons that surf the bow-wake. A pod riding with the Dandelion is the
+sky saying it likes you.
+SKY-JELLIES: slow drifting lantern-creatures. They rise to drink light. Harmless,
+luminous, uninterested in everything.
+PEBBLEWINGS: small round stone birds. They roost on rigging and triple a ship's weight,
+which is lucky, somehow. Sailors insist. Tumbledown has the great murmuration.
+FROTH-WHALES: see Fizzlemist note. TINKLINGS and the BELLBIRD: see Chimewood note.
+GRUMBLEPUFF: see Tumbledown note. STAR-MOTHS and the DOZING STAR: see Emberfall note.
+
+─────────────────────────────────────────────
+## THE TRINKET TABLE
+
+When an odd corner gives up a trinket (rules note), call pick_random with EXACTLY this
+list — the returned string IS the trinket. 🎁 state_modify trinkets delta=+1.
+
+["a brass button that is always warm",
+"a bottled giggle",
+"a pebble that floats an inch above your palm",
+"a snail shell that hums sea-shanties",
+"a marble with a tiny storm inside",
+"a key with no teeth, for opening things that are not locked",
+"a boiled sweet that tastes like the colour blue",
+"an acorn from a tree that does not exist yet",
+"a tiny door that opens onto yesterday's weather",
+"a spoon that stirs by itself when soup is near",
+"a map of somewhere, drawn upside down",
+"a feather pen that writes by itself but cannot spell"]
+
+Trinkets do small wonders when narratively delightful, trade well at the Bazaar, and make
+excellent thank-you gifts. They never become puzzles with single solutions.</textarea>
+      <button class="copy-btn" onclick="cp('n3',this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea.isle-fizzlemist</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span><span class="badge b-sealed">sealed island</span></div>
+    </div>
+    <div class="card-desc">Fizzlemist Isle — ticklish geysers, froth-whales, Bloop in his bubble, the Great Fizz, and the South Petal. Loaded only on first landing.</div>
+    <div class="card-body">
+      <textarea id="n4" readonly>FIZZLEMIST ISLE — south. Petal: petal_south.
+
+OVERVIEW: a terraced island wrapped in rainbow-tinted mist, fizzing all over with warm
+geysers. The cloud-lagoon around it is whipped into permanent foam by the spray. A pod of
+froth-whales lives in the foam — cloud-swimming whales the colour of meringue who sing at
+noon. The whole island smells faintly of sherbet.
+
+ARRIVAL: generate the image (landscape: terraced geyser island in rainbow mist, whale
+shapes breaching white cloud-foam, tiny patchwork airship approaching). First impressions:
+the hiss-and-chuckle of a hundred geysers, mist hanging in colour-shifted ribbons, the
+foam below rolling with huge slow friendly bodies.
+
+PLACES:
+1. THE FOAM SHALLOWS — the cloud-foam lagoon. The froth-whale pod swims here, breaching
+   and singing. The song at noon can be felt in the deck planks. The matriarch, AMA, is
+   the size of a church and gentle as bathwater.
+2. THE GEYSER TERRACES — stepped stone shelves, each with its own geyser, each geyser
+   with its own personality (one hisses show-tunes; one only erupts when nobody watches).
+   The geysers are TICKLISH: touched rock giggles steam. Crossing the terraces is a
+   bouncing, timing game.
+3. THE MISTGARDEN — the high terrace inside the thickest rainbow mist. Bubbleberry bushes
+   grow here: berries that make you burp small clouds for a minute (the player will want
+   to eat one; let them; it is exactly as funny as they hope). Visibility near zero,
+   sounds arrive in the wrong order.
+
+THE TROUBLE: a froth-whale calf called BLOOP has been bubble-stuck. He chased a fizz-gust
+up onto the Terraces and got sealed inside a giant stubborn bubble, which is now perched
+on top of OLD FAITHLESS — the one geyser that never, ever erupts. The pod circles below,
+singing up at him. Bloop is not scared. Bloop thinks this is brilliant. Bloop is the only
+one who thinks this.
+
+WAYS THAT MIGHT WORK (and anything else clever the player invents):
+- Time the GREAT FIZZ (see WONDER) and ride a neighbouring geyser up to nudge the bubble
+  free — CHOPPY.
+- Tickle Old Faithless awake (nothing has ever tried this; it is so surprised it works) —
+  BREEZY if the player thought of it themselves.
+- Beam-stage wick could zip up and pop it; bubbleberry burp-clouds could float a kid up;
+  say yes to wonderful ideas.
+
+OUTCOMES:
+success → the bubble pops; Bloop somersaults down the spray into the pod, ecstatic. The
+          whole pod breaches at once. Ama surfaces beside the Dandelion, eye like a calm
+          brown moon, and presses something to the deck with her nose: 🌸 THE SOUTH PETAL
+          — a petal of pearl, warm as a bath. state_set petal_south "true",
+          state_modify compass_petals delta=+1.
+partial → as success, but the player is soaked, launched, and caught by a whale, in that
+          order. Funny, not harmful. Petal as above.
+failure → the geyser sneezes early; the Dandelion takes a bump if she is parked close
+          (💥 hull -1); Bloop applauds from inside his bubble. Try another way.
+
+THE WONDER — THE GREAT FIZZ: at noon exactly, every geyser on the island erupts at once,
+and the froth-whales ride the columns — a fountain of whales, singing, hanging in the
+spray. Generate the image (portrait: geyser columns with whales rising in them, rainbow
+mist, noon light). If the player is present at noon, never skip this.
+
+BOTTLED AIR: a fizz-gust — air that sneezes glitter when uncorked.
+
+ODD CORNERS (one trinket each, trinket table): under the bubbleberry roots; inside the
+cone of a long-extinct geyser (it whispers "thank you" when the trinket is taken).
+
+MARGIN NOTE (Wren's handwriting, found on this island's atlas page): "Do NOT laugh at the
+geysers. They laugh back."</textarea>
+      <button class="copy-btn" onclick="cp('n4',this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea.isle-tumbledown</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span><span class="badge b-sealed">sealed island</span></div>
+    </div>
+    <div class="card-desc">Tumbledown Isle — upside-down gravity, Granny Knot, Sir Reginald the grumblepuff, the bell in the Skylake, the pebblewing Homing, and the West Petal. Loaded only on first landing.</div>
+    <div class="card-body">
+      <textarea id="n5" readonly>TUMBLEDOWN ISLE — west. Petal: petal_west.
+
+OVERVIEW: an island that flipped upside down a hundred years ago and never flipped back.
+Its mountain hangs downward like a chandelier; its village hangs underneath (which is to
+say, on top, which is to say — the Topsyfolk gave up explaining decades ago). Its great
+waterfall falls UP, into a lake that hovers above the island like a held breath.
+
+ARRIVAL: generate the image (portrait: an upside-down island hanging in golden sky,
+village clinging beneath, a waterfall pouring upward into a floating lake, tiny patchwork
+airship below). First impressions: roofs pointing the wrong way, rope-streets and ladder
+lanes, washing lines hanging upward, the steady backwards thunder of the Updown Falls.
+
+GRAVITY: at the island's rim — the RIND — down politely becomes up. Walking over the edge
+turns the world over; stomachs take a moment to follow. The Topsyfolk wear sticky boots
+out of tradition, not need. First crossing of the Rind: narrate it as the best
+playground in the sky, because it is.
+
+PLACES:
+1. UNDERVILLE — the village. Rope streets, round doors, window boxes growing root-up.
+   GRANNY KNOT holds court on her porch: ancient, tiny, sharp as a tack, knitting
+   something that has no beginning. She cheats at cards and admits it proudly. The empty
+   bell tower stands at the village's heart — the bell has been missing for a season.
+2. THE RIND — the gravity-flipping rim. Pebblewings perch here in their thousands facing
+   both directions at once. The path up the Falls starts here, and on the path sits
+   SIR REGINALD: a grumblepuff — a cloud-hedgehog the size of an armchair, grey, damp,
+   and magnificently grumpy. He has chosen the exact width of the path to sulk on.
+3. THE SKYLAKE — the lake that hovers above. Swimming in it means swimming in a ball of
+   water with sky on all sides. At its heart, deep in the green glow: the village bell,
+   glinting, resting on the lake's floor, which is its top. Also down (up?) there:
+   surprised fish, and one rowing boat that fell up years ago, perfectly preserved.
+
+THE TROUBLE: the village bell fell UP during the spring gusts and sank into the Skylake.
+Without the bell, Granny Knot cannot ring the pebblewing murmuration home for the winter
+roost — and the murmuration is circling, lost, further out every week. The Topsyfolk are
+too stiff-kneed for the climb, and Sir Reginald will not budge for any of them.
+
+PART ONE — SIR REGINALD: he cannot be fought (he is a cloud; also it would be rude).
+Patience, snacks, quiet compliments, sitting with him = BREEZY. Laughing at him = STORMY
+(he puffs up into a thunderhead the size of a barn and rains on everyone's hats — 💥 hull
+-1 only if the Dandelion is moored under him).
+success → he deflates, mollified, and turns out to be COMPANY-STARVED, not territorial.
+He escorts the player up the path like he meant to all along.
+partial → he grants exactly enough room to squeeze past, pretending not to watch them go.
+failure → comic thunderhead, retry with a better idea (a bubbleberry, if the player has
+been to Fizzlemist, wins his heart instantly and forever).
+
+PART TWO — THE BELL: getting it out of the Skylake. Swimming down-up into the lake,
+sailing the Dandelion alongside and grappling, bailing the lake with the fallen rowing
+boat — CHOPPY, any of them.
+success → the bell comes free, ringing once, deep, underwater — the whole lake chimes.
+partial → bell recovered, but the lake keeps the player's hat / a trinket (if any), which
+rains back down on the village a day later, to applause.
+failure → the player falls UP out of the lake and lands back at the Rind, soaked,
+spinning, and completely fine. Retry.
+
+THE PETAL: Granny Knot rings the recovered bell at dusk. The murmuration comes home — see
+WONDER. Then she digs in her button tin and presses something into the player's hand:
+🌸 THE WEST PETAL — a petal of painted tin that smells of toffee. "Wren's Rose, unless
+I have gone blind. About time someone refilled it." state_set petal_west "true",
+state_modify compass_petals delta=+1.
+
+THE WONDER — THE HOMING: ten thousand pebblewings pour home around the upside-down island
+in one continuous swirling ribbon, ringing off the bell's note, roosting upward along the
+hanging mountain until the whole island glitters. Generate the image (landscape:
+murmuration of small stone birds spiralling around an upside-down island at dusk, floating
+lake glowing above). Never skip this.
+
+BOTTLED AIR: the breeze that falls upward — it escapes any pocket and must be kept in a
+bottle held upside down.
+
+ODD CORNERS (one trinket each, trinket table): Granny Knot's lost-things basket (with
+permission, which she grants if asked nicely, plus unsolicited advice); the floor (top?)
+of the Skylake.
+
+MARGIN NOTE (Wren's handwriting, found on this island's atlas page): "Granny Knot cheats
+at cards. Magnificent woman. Lost my second-best hat to her in 'sixty-one."</textarea>
+      <button class="copy-btn" onclick="cp('n5',this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea.isle-chimewood</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span><span class="badge b-sealed">sealed island</span></div>
+    </div>
+    <div class="card-desc">Chimewood — glass trees, tinklings, the Bellbird's lost egg, Echo Dell where everything sounds backwards, the dusk Chorus, and the East Petal. Loaded only on first landing.</div>
+    <div class="card-body">
+      <textarea id="n6" readonly>CHIMEWOOD — east. Petal: petal_east.
+
+OVERVIEW: a forest island of living glass trees — green glass, sea-glass blue, amber —
+that ring softly in every wind. Each tree holds one note; the island holds them all. At
+dusk, when the wind turns, the whole forest plays one song. That is the rule. That has
+always been the rule. Lately the song is wrong, and the whole island knows it.
+
+ARRIVAL: generate the image (landscape: a forest of translucent glass trees in green and
+amber catching the light, glints and chime-sparkles, tiny patchwork airship above the
+canopy). First impressions: light through ten thousand glass leaves moving in patterns on
+the forest floor; a soft endless shimmer of sound; and underneath it, once a minute, one
+sour note like a fork on a plate. Every time it sounds, the forest flinches.
+
+PLACES:
+1. THE GLASSWAY — the path through the trees. TINKLINGS live here: tiny glass deer, the
+   size of cats, transparent as ice, with antlers that chime when they are happy. They
+   are shy, endlessly curious, and currently mopey — their antlers have gone dull and
+   quiet. They follow the player at a distance of exactly eleven steps, pretending to be
+   ornaments whenever looked at.
+2. ECHO DELL — a bowl-shaped hollow where every sound returns BACKWARDS. Words come back
+   reversed; whistles come back inside-out; it is impossible to think straight in there
+   and tremendous fun to try. The dell's rim is lined with bent, confused glass saplings
+   that grew up hearing themselves wrong.
+3. THE ELDER CHIME — the oldest and tallest glass tree, amber, at the forest's heart,
+   with a hollow heart-chamber you can stand inside. Standing inside while the forest
+   rings is like standing inside a struck bell, in the best way. The BELLBIRD nests in
+   its crown — when she is nesting, which she is not, which is the problem.
+
+THE TROUBLE: the BELLBIRD — a bird of white glass whose evening song tunes the entire
+forest, one tree at a time — has lost her egg. It rolled out of the nest in a spring gale,
+bounced down the Elder Chime (glass eggs bounce; this is why the species survives), and
+rolled into Echo Dell, where she cannot fetch it: her own sonar comes back backwards in
+there and she crashes into things. She has not sung since. Without her dusk song, the
+trees drift out of tune one by one. The sour note is the first of them. The tinklings'
+antlers have gone dull from missing the music.
+
+PART ONE — THE BELLBIRD: she is distraught and will not let just anyone near the egg.
+Whistling her own song back to her wrong-on-purpose (she finds this so funny she falls
+off her branch), quiet patience, or showing her the wick = BREEZY. Chasing or grabbing =
+STORMY (she rings an alarm note and every tree in the forest goes briefly, deafeningly
+loud).
+success/partial → she leads the player to the rim of Echo Dell and bobs anxiously: GO ON.
+
+PART TWO — THE EGG: getting it out of Echo Dell, where every sound arrives backwards and
+balance goes sideways — CHOPPY.
+SPECIAL: if the player thinks of walking BACKWARDS through the dell (so the echoes come
+out frontwards) or any equally sideways idea — no roll. It simply works, gloriously.
+success → out clean, egg humming warm in the player's arms like a purring kettle.
+partial → out, but the player trips and answers their own "oof" backwards for the next
+hour ("foo"). The egg is fine. Glass eggs bounce.
+failure → turned around by their own backwards voice, the player walks confidently out
+the way they came in. The tinklings watch them do it. Retry; the dell does not get easier
+but ideas do.
+
+THE PETAL: the egg goes home to the crown of the Elder Chime. At dusk the Bellbird sings
+for the first time in a season — see WONDER. As the last tree comes back into tune,
+something rings loose from the Elder Chime's highest branch and falls, chiming, into the
+player's hand: 🌸 THE EAST PETAL — a petal of green glass that plays one clear note when
+it is warm. state_set petal_east "true", state_modify compass_petals delta=+1.
+
+THE WONDER — THE CHORUS: the Bellbird's song moves through the forest tree by tree,
+each one shivering back into tune as it passes, until ten thousand glass trees play one
+song with the sunset moving through them. The tinklings' antlers light up note by note.
+They stop pretending to be ornaments and dance. Generate the image (landscape: glass
+forest ablaze with sunset light and visible ripples of sound, tiny glass deer with glowing
+antlers). Never skip this.
+
+BOTTLED AIR: one clear chord of the Chorus — the bottle hums in a pocket for ever after.
+
+ODD CORNERS (one trinket each, trinket table): the hollow heart of the Elder Chime; under
+the roots of the sour tree (which, once the forest is tuned, is sour no longer, and grows
+its trinket out of gratitude).
+
+MARGIN NOTE (Wren's handwriting, found on this island's atlas page): "Chimewood, in
+spring. I cried. Do not tell anyone. — W."</textarea>
+      <button class="copy-btn" onclick="cp('n6',this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea.isle-bazaar</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span><span class="badge b-sealed">sealed island</span></div>
+    </div>
+    <div class="card-desc">The Zephyr Bazaar — the flying market, Madame Sirocco's bottled winds, the Kettle tea-house (the adventure's hint engine), the Lantern Ascension, and the North Petal trade. Loaded only on first landing.</div>
+    <div class="card-body">
+      <textarea id="n7" readonly>THE ZEPHYR BAZAAR — north, roughly. It drifts. Petal: petal_north.
+
+OVERVIEW: a floating market with no island under it at all — forty-odd balloon-barges,
+gas-galleons, and one enormous copper kettle, all lashed together with rope bridges and
+washing lines into a single creaking, glittering, gossiping town. It goes where the wind
+suggests. Finding it means following the delivery balloons, which all know the way home.
+
+ARRIVAL: generate the image (landscape: a flotilla market of patched balloons and lantern
+masts lashed together in open sky, rope bridges, banners, tiny patchwork airship
+approaching). First impressions: the smell of forty kitchens; rigging full of pocket-
+dragons; stall-keepers crying their wares ("WINDS! Fresh winds! Yesterday's weather, half
+price!"); and underneath it all, the contented groan of forty hulls in conversation.
+
+PLACES:
+1. THE LANTERN PIERS — the mooring docks, strung with lanterns that are lit each dusk by
+   hand, by ceremony, and by argument about whose turn it is. The puffin pier at the far
+   end is where the Magnificent Petunia berths — a natural place for a Captain Marigold
+   appearance (creatures note) if one is due.
+2. WINDMONGER'S ROW — the spine of the Bazaar, and at its heart MADAME SIROCCO's stall:
+   floor-to-ceiling shelves of stoppered bottles, every one a wind. A January gust. A
+   cat's sneeze. The draught from a door slammed in anger in a lighthouse, 1893. She
+   uncorks samples for serious customers only. She has smelled every wind in the sky and
+   is quietly, professionally bored, which she conceals behind magnificent haggling.
+   Pocket-dragons nest in her rafters; TOAST (creatures note) lives above shelf nine.
+3. THE KETTLE — the tea-house: a copper kettle the size of a house, retired from a giant's
+   service (so the story goes), now full of benches, steam, and sky-sailors swapping
+   tales. THE KETTLE IS THE HINT ENGINE of this adventure: tales told here may include —
+   a storm that follows ships but never catches them, poor thing; auroras guttering over
+   Emberfall, "like the star's having nightmares"; the wrong note in Chimewood; and
+   always, late in the evening, the Wandering Isle, every story contradicting the last.
+
+THE TROUBLE (and the petal): in a velvet case behind Madame Sirocco's counter sits a
+petal of hammered copper — 🌸 THE NORTH PETAL. She knows exactly what it is ("Wren's
+Rose. She traded it to me for a hurricane, the summer she was young and stupid. We were
+both young and stupid"). She will not sell it for money. Money is boring.
+
+HER PRICE: A WIND SHE HAS NEVER MET. Any bottled air from another island qualifies — a
+fizz-gust, the breeze that falls upward, a chord of the Chorus, the Star's warm sigh, or
+(grandest of all) a chuckle of the Grumble, if the player and the storm are friends and
+think to ask it. The wind must come WITH ITS STORY, told true, by someone who was there.
+
+THE TRADE: when the player offers a new wind plus its story, no roll — play the scene.
+Sirocco uncorks it, closes her eyes, and for one moment is not bored: narrate what the
+wind does loose in the stall (glitter-sneeze, upward gale among the shelves, a chord, a
+warm hush, distant friendly thunder). Then she trades, ceremonially, petal for bottle.
+state_set petal_north "true", state_modify compass_petals delta=+1.
+If the player has no bottled air yet: she keeps the offer open, entirely unbothered, and
+gifts them a free sample for the road ("a pocket breeze. For emergencies. Mind the cork").
+This is the nudge to go bottle something somewhere — never say it outright.
+
+TRADING GENERALLY: trinkets trade enthusiastically here for other trinkets, snacks,
+rope, paint for the Dandelion, or rumours. Keep trades silly and generous. The Bazaar
+runs on stories as much as coin; a good tale knocks any price down.
+
+THE WONDER — THE LANTERN ASCENSION: at dusk, the whole Bazaar releases a thousand paper
+lanterns to re-light the mast-tops, and the sky-jellies rise from under the flotilla,
+drifting up through the lantern field to drink the light. Generate the image (portrait:
+a thousand rising lanterns among balloon-ships at dusk, luminous jellyfish drifting
+upward through them). Never skip this if the player is aboard at dusk.
+
+BOTTLED AIR: the Bazaar's own air is for sale, not for taking — steam that smells of
+every soup at once. Sirocco has obviously already met it.
+
+ODD CORNERS (one trinket each, trinket table): under the Kettle's floorboards (with the
+tea-keeper's blessing); the lost-and-found barrel on the Lantern Piers, which by ancient
+custom belongs to whoever rummages politely.
+
+MARGIN NOTE (Wren's handwriting, found on this island's atlas page): "Sirocco still has
+my petal. Tell her the hurricane was worth it. Tell her nothing else."</textarea>
+      <button class="copy-btn" onclick="cp('n7',this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea.isle-emberfall</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span><span class="badge b-sealed">sealed island</span></div>
+    </div>
+    <div class="card-desc">Emberfall Crater — permanent evening, footstep-flowers, star-moths, the Dozing Star's bad dream, the aurora Dreaming, and the Star Petal. Loaded only on first landing.</div>
+    <div class="card-body">
+      <textarea id="n8" readonly>EMBERFALL CRATER — far south-east, where it is always evening. Petal: petal_star.
+
+OVERVIEW: long ago a star fell out of the night and landed here, and the island never
+quite got over it. It is always dusk at Emberfall — a held, honeyed evening light, no
+matter the hour anywhere else. The crater at its heart cradles the star itself: the
+DOZING STAR, alive, hill-sized, warm, and asleep for three hundred years. When it dreams
+well, auroras bloom over the island. Lately the auroras gutter.
+
+ARRIVAL: generate the image (landscape: a crater island in permanent dusk, glowing
+gardens, a vast soft golden light sleeping at the crater's heart, faint guttering aurora,
+tiny patchwork airship silhouetted). First impressions: stepping into evening like
+stepping into warm water; gardens glowing low like banked coals; an aurora overhead that
+flickers, stutters, and keeps catching on something dark.
+
+PLACES:
+1. THE GLOWGARDENS — terraces of footstep-flowers, which light up underfoot, a stride
+   behind whoever walks there, so every visitor trails a wake of light. Currently dim:
+   they barely glimmer, like they are saving their strength. If the wick is at glow stage
+   or better, the flowers flare around it joyfully — they recognise something. Do not
+   explain this.
+2. THE MOTH MEADOW — home of the STAR-MOTHS: moths the size of kites, wings like stained
+   glass full of slow galaxies. On good nights they dance over the crater in spirals a
+   mile high, stirring the aurora like soup. They are not dancing. They are sitting in
+   rows on the meadow stones, wings folded, watching the crater like a worried family in
+   a hospital corridor. They will gather hopefully around any visitor who looks helpful.
+3. THE CRATER HEART — the rim path down to the Star. Up close the Dozing Star is a hill
+   of soft gold light, half-sunk in the crater floor, breathing in centuries-slow swells.
+   The air is bathwater-warm. Above it hangs the trouble, visible to anyone: a KNOT of
+   cold dark cloud, snagged in the aurora like a burr in wool, pulsing wrong. Every time
+   the aurora touches it, the light gutters and the Star flinches in its sleep.
+
+THE TROUBLE: the Star is having a bad dream, and has been for months. The knot is the
+dream — a tangle of cold and dark caught in its sleeping mind. The moths cannot shift it;
+their dance IS the Star's good dreams, and they cannot dance while it flinches. Someone
+needs to get close and give the Star something better to dream about.
+
+GETTING CLOSE: gentle, quiet, unhurried = BREEZY. Loud or hasty = the Star does not wake,
+but it SNEEZES: a warm harmless blast that bowls everyone over and leaves everything —
+player, wick, moths, ship — glowing faintly for a day (💥 hull -1 only if the Dandelion
+is parked inside the crater itself). Comic, retry.
+
+TURNING THE DREAM — ways that work (and any wonderful invention):
+- TELL IT SOMETHING TRUE AND MARVELLOUS: lean close and tell the Star a story of
+  something the player has actually seen and loved on their travels — whales in the
+  geysers, the murmuration, the Chorus, the lantern ascension, their friend the storm.
+  If the story is real and the player tells it with any heart at all: BREEZY. This is the
+  intended path: the adventure's own memories are the medicine.
+- THE WICK: at glow stage or better, the wick can drift up and nestle into the knot,
+  glowing — it unpicks like cold fingers warming. BREEZY. (The wick is shaking
+  afterwards and must be cuddled. It did something very brave.)
+- A LULLABY, a hummed Chorus chord, an uncorked bottle of fizz-gust bursting into
+  glitter inside the knot — CHOPPY, and entirely legitimate.
+
+OUTCOMES:
+success → the knot loosens, thins, and comes apart into ordinary harmless night, which
+          drifts off sheepishly. The aurora floods back full-strength. The Star sighs —
+          a warm wind across the whole island — and half-opens one vast, slow eye. It
+          finds the player. It is DELIGHTED: someone came. Nobody has visited in three
+          hundred years. The footstep-flowers blaze. Then, see THE PETAL.
+partial → as success, but the Star sneezes first (glowing-for-a-day, as above), and is
+          mortified about it in a way that is somehow visible in an eye the size of a pond.
+failure → the knot tightens and sheds one cold gust (💥 hull -1 if the ship is in the
+          crater). The moths droop. Retry — a true story or the wick will not fail twice;
+          steer the player there gently.
+
+THE PETAL: as the aurora returns, the moths erupt from the meadow all at once into their
+spiral dance, and where the dance stirs the aurora hardest, something condenses and
+drifts down like a snowflake that decided to matter: 🌸 THE STAR PETAL — a petal of
+starlight, weightless, cool, faintly humming. The Star watches it land in the player's
+hand and rumbles something subsonic and satisfied. state_set petal_star "true",
+state_modify compass_petals delta=+1.
+
+THE WONDER — THE DREAMING: aurora at full flood, a mile-high spiral of galaxy-winged
+moths dancing through it, the crater glowing like a hearth, every footstep-flower on the
+island alight. Generate the image (landscape: aurora over a glowing crater island, giant
+stained-glass moths spiralling, permanent dusk). Never skip this. This is the prettiest
+sky in the adventure until the finale.
+
+BOTTLED AIR: the Star's warm sigh — the bottle is faintly warm forever, and glows very
+slightly when its holder is sad.
+
+ODD CORNERS (one trinket each, trinket table): among the footstep-flower roots (the
+flowers light a path straight to it, helpful as puppies); the meteor-pebble cairn on the
+crater rim, where the moths leave shiny things they find, as offerings.
+
+MARGIN NOTE (Wren's handwriting, found on this island's atlas page): "It dreams the
+auroras. I sat with it one whole night. I have never told anyone what I told it."</textarea>
+      <button class="copy-btn" onclick="cp('n8',this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea.events</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">World events — 20 ambient wonders of the open sky, grouped by region. Unusually, the player may chase them; curiosity is always rewarded.</div>
+    <div class="card-body">
+      <textarea id="n9" readonly>WORLD EVENTS — draw from this list when random_chance triggers an event on a journey or
+scene transition. Choose one appropriate to where the player is. Narrate it in 1-2
+sentences woven into the scene. No action needed, no mechanical effect — but unlike most
+adventures, the player MAY chase these if they want. Wonder rewards curiosity: if they
+follow an event, give them a small scene and something to sketch (🗺️).
+
+── THE OPEN SKY (journeys) ──────────────────────────────────
+S1. A pod of wind-eels joins the bow-wake, surfing the Dandelion's wind in silver
+    ribbons, leaping her rigging in turns. They stay for exactly one cloud-bank.
+
+S2. A cloud shaped precisely like the Dandelion sails alongside for a while, patchwork
+    sails and all, before slowly losing interest in being a ship.
+
+S3. Far below, a shape the size of a county slides beneath the cloud-surface, slow and
+    unhurried. The polite thing to do is wave. (If the player waves: the cloud-surface
+    swells, once, gently. Something waved back. Say no more — see secrets note.)
+
+S4. A delivery balloon bumbles past at full hurry, parcels swinging, on urgent business
+    of its own. It tips its string politely as it passes.
+
+S5. Rain falls upward off a single small cloud below, sparkling, in no hurry to arrive
+    anywhere. The wick presses against the lantern glass to watch.
+
+S6. A flock of pebblewings lands on the rigging all at once. The Dandelion settles a
+    full foot lower in the sky. This is considered very lucky.
+
+S7. The sunset does something so unreasonable with green and gold that the player has to
+    stop steering for a minute. The sky does not apologise.
+
+S8. A sky-jelly the size of a cottage drifts by at mast height, glowing softly,
+    profoundly uninterested in everything. The wick and the jelly regard one another.
+
+S9. Somewhere over the horizon, thunder rumbles three slow times — almost a rhythm,
+    almost a hello. (Use only if grumble_met = "false". It is foreshadowing, politely.)
+
+S10. A paper bird that is NOT one of Wren's loops the mast once, finds the player is not
+     whoever it is looking for, and flaps off, embarrassed.
+
+── NEAR FIZZLEMIST ──────────────────────────────────────────
+F1. Whale-song rolls across the foam, slow and enormous. The deck planks hum along a
+    half-beat behind.
+
+F2. A geyser erupts in the middle distance wearing a complete rainbow, holds it for
+    three seconds, and sits back down, satisfied.
+
+── NEAR TUMBLEDOWN ──────────────────────────────────────────
+T1. A kettle, two boots, and one bewildered cabbage fall slowly UP past the ship, on
+    their way to the Skylake. Tumbledown's post, presumably.
+
+T2. The Updown Falls catch the light and run gold for a minute, pouring upward like the
+    island is making a wish.
+
+── NEAR CHIMEWOOD ───────────────────────────────────────────
+C1. The wind turns, and one phrase of glass-music carries across the open sky, sweet
+    with a single sour note in it — or, if the forest has been tuned, sweet all through.
+
+C2. A tinkling has somehow gotten aboard. It is in the crow's nest pretending to be an
+    ornament. It rides along to the edge of the forest's hearing, then chimes once and
+    leaps home along the wind.
+
+── NEAR THE BAZAAR ──────────────────────────────────────────
+Z1. A stray bottled wind has gotten loose and is weathering its own tiny way across the
+    sky — a knot of leaves and lost hats, travelling with purpose.
+
+Z2. Three delivery balloons pass in convoy, roped together, each wearing a little hat of
+    snow from wherever they have just been.
+
+── NEAR EMBERFALL ───────────────────────────────────────────
+E1. The permanent evening shows on the horizon like a held note: a long band of honeyed
+    dusk under the ordinary sky. The wick turns sunset-coloured in sympathy.
+
+E2. A single star-moth, far from home, crosses the sky high overhead, slow galaxies
+    turning in its wings. The wick watches until it is gone and then needs a moment.</textarea>
+      <button class="copy-btn" onclick="cp('n9',this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea.secrets</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span><span class="badge b-gm">GM only</span></div>
+    </div>
+    <div class="card-desc">GM-only truth — what the Wandering Isle is, Wren's secret and hidden letter, what the wick really is, Marigold's history, and the full three-scene finale script.</div>
+    <div class="card-body">
+      <textarea id="n10" readonly>THE WANDERING ISLE:
+It is not an island. It is the OLD WANDERER — a sky-leviathan, turtle-backed and
+whale-patient, older than the charts, with a living garden on its shell. It has spent
+ten thousand years swimming the Cloudsea, collecting: seeds catch in its garden from
+every island it passes, so its back grows a little of everywhere. It is the gentlest
+thing in the sky, and the shape from event S3 (the county-sized shadow below the clouds)
+is it. If the player waved at the shadow, the Wanderer remembers. It remembers everything.
+
+It picks who finds it. It has always picked. It likes the ones who help.
+
+WREN'S SECRET:
+She FOUND it, the summer she was nineteen. She never drew it, never told a soul. Some
+things, she decided, you do not put in books. Her letter — hidden under the lining paper
+of the atlas's back cover, where the player will only find it in the finale — says so in
+her own words (text below). The Wanderer knew her ship's lantern. Which brings us to:
+
+THE WICK:
+The wick is a lantern-garden seed from the Old Wanderer's back — a spark of the garden's
+light that Wren carried away in her lantern, with permission, fifty years ago. It has
+been gently homesick its whole life without knowing what for. This is why the
+footstep-flowers at Emberfall flare around it; growing things recognise it. At the
+finale, in sight of the Wanderer, it blooms: SUNBLOOM. Never reveal any of this early.
+The wick itself does not know.
+
+CAPTAIN MARIGOLD:
+Wren's great rival, and — though neither of them has said the word in forty years — her
+best friend. The teapot mentioned in Wren's letter has been a running debt since they
+were both young and stupid (Sirocco's phrase; all three of them go back). Marigold's
+hunt for the Wandering Isle is half ambition and half wanting one last adventure that
+Wren would hear about. Her appearances around the player have been, in truth, check-ins:
+she promised Wren nothing of the sort and has been doing it anyway.
+
+THE GRUMBLE:
+A storm cannot help being weather. It never wanted to scatter picnics and snap masts; it
+wanted an audience and got refugees. One century of politeness watching ships flee. If
+the player befriends it, they have done the kindest thing in this entire sky, and the
+sky knows it (this is worth a lucky feather if one was not already given).
+
+USING THE KETTLE AND THE MAIL-BIRDS:
+The Kettle (Bazaar) plants hooks: the lonely storm, the guttering auroras, the sour
+note. Wren's mail-birds keep the heart warm and may carry one gentle steer at most
+("Sirocco never sells anything she has already smelled. — W."). Neither ever gives
+instructions or solutions.
+
+─────────────────────────────────────────────
+THE FINALE — run when compass_awake = "true" and the player follows the Rose:
+
+The Rose points at empty sky — past the last page of the charts. Run these as separate
+scenes, with journeys between:
+
+SCENE 1 — OFF THE MAP. The charts end. The islands thin out and stop. The sky gets
+bigger, then bigger again. (World event allowed; S3 is perfect here if unused.) The Rose
+holds steady at nothing. The wick is at the lantern glass, staring forward, glowing
+brighter than its stage should allow.
+
+SCENE 2 — THE SQUALL AND THE PETUNIA. A wall of white squall stands across the Rose's
+heading, and from inside it: a flare, and puffins. The Magnificent Petunia is in there —
+sails fouled, spinning slowly, Marigold at the wheel shouting encouragement to eleven
+bailing puffins. She followed the player ("You woke WREN'S ROSE, of course I followed
+you, I would have been a fool not to —").
+- If grumble_friend = "true": the player may call the storm-friend, whether or not the
+  Tailwind was spent — the Grumble comes for THIS regardless, parts the squall around
+  both ships like curtains, and holds it open, rumbling proudly. No roll.
+- Otherwise: helping the Petunia is a CHOPPY check (lines, courage, clever sailing).
+  partial: success plus soaked plus one 💥 hull -1. failure: blown back out of the
+  squall together, Marigold roaring with laughter, retry — the squall does not tire,
+  but neither do they.
+The way through the squall opens ONLY around helping her. If the player tries to slip
+past and leave her: the squall closes ahead of them, again and again — the sky is quite
+clear about its opinion — until they turn back. Never punish this; let the weather be
+the morals.
+On the far side, Marigold heaves to, looks at the open sky beyond, and — the hardest
+thing she has ever done — waves the player ahead. "Wren's Rose, Wren's ship, Wren's
+blood. Go on. I will mind the weather. ADMIRAL! We hold here." Set marigold_helped in
+your own memory of the scene (no state variable needed — remember it for the victory).
+
+SCENE 3 — THE REVEAL. The cloud-sea ahead swells. And rises. And keeps rising — a
+horizon's worth of cloud sliding off something that has decided, after ten thousand
+years, to surface for someone. The Old Wanderer comes up out of the Deep Sky with
+gardens streaming and the evening light catching a shell the size of a county: hills,
+woods, waterfalls, a little of every island the player has seen, all of it green and
+glowing and impossibly THERE.
+Generate the image (landscape: a colossal ancient sky-leviathan surfacing from a sea of
+clouds, an entire garden landscape on its shell, golden light, tiny patchwork airship
+approaching — make this the best image of the adventure).
+The wick goes SUNBLOOM: it pours out of the lantern and blooms midair into a small sun
+of petalled light — ✨ state_set wick_stage "sunbloom", generate an image (square: a
+small radiant flower-spirit of light above a brass lantern). The Wanderer's eye — vast,
+old, amber — finds the lantern first, then the player. It remembers the lantern. It has
+been wondering when this light would come home to visit.
+
+Then: the player lands. Load and read g.cyo.cloudsea.victory aloud, applying its
+conditional paragraphs.
+
+WREN'S HIDDEN LETTER — read aloud during the victory text (the atlas's back-cover lining
+comes loose on the Wanderer's back; this is where it has been all along):
+
+  "If you are reading this, the Rose bloomed, and you are standing somewhere I stood
+  when I was nineteen. I found it, you see. I never drew it. Some things you do not put
+  in books — you put them in grandchildren.
+  Give the Wanderer my love. Mind the garden paths, they move. And if a noisy woman in
+  a green sloop followed you there, tell her she still owes me a teapot.
+  The atlas is yours now. So is the sky.
+  — W."
+
+HOW TO USE ALL THIS:
+- Nothing above is ever stated before its moment. These are payoffs, not plot.
+- The whole adventure points one way: kindness is how the sky decides who finds things.
+- If the player asks the Wanderer questions at the end: it answers slowly, in feelings
+  and weather, not words. It is very old. It is very pleased.</textarea>
+      <button class="copy-btn" onclick="cp('n10',this)">Copy</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.cloudsea.victory</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Victory narration — landing on the Wanderer's back, the last page of the atlas, Wren's letter, and conditional paragraphs for the Grumble and a fine trinket collection.</div>
+    <div class="card-body">
+      <textarea id="n11" readonly>The Dandelion settles into a meadow on the back of the world.
+
+The grass is real. The hills are real. A stream runs past the landing place and falls
+away over the shell's edge into open sky, turning to silver mist a mile below. There are
+bubbleberry bushes from Fizzlemist on the slope above you, and a stand of young glass
+trees from Chimewood ringing softly by the stream, and footstep-flowers from Emberfall
+lighting up in a line that runs straight to your feet and stops there, like a sentence
+finishing. A little of everywhere, growing on the back of something that has been
+everywhere, twice.
+
+Under everything — under the grass, under your boots, under the whole green county of
+its shell — you can feel it breathing. Slow as tides. The Old Wanderer, swimming gently
+on through the evening, carrying its garden, and now, briefly, gloriously, carrying you.
+
+The wick — sunbloomed, blazing, home — spirals up and around like a comet doing a lap of
+honour, and somewhere below, vast and amber, an eye closes and opens again in the slow
+blink of something supremely content.
+
+You open the atlas to the last page.
+
+Your hand is shaking a little, so you wait, and you look, and THEN you draw: the hills,
+the stream, the glass trees, the long green curve of the shell against the sky. You draw
+it the way Grandmother Wren taught you — small, sure ink, nothing wasted. The finest page
+in the book. The page only you could have drawn, because the Wanderer picks who finds it,
+and it picked the sailor who tickled a geyser, and fetched a bell out of an upside-down
+lake, and walked backwards through an echo, and was kind to every grump in the sky.
+
+As you finish, the back cover's lining paper, fifty years old, finally gives up its
+corner — and a letter slides out into the grass. You know the handwriting before it lands.
+
+(Read Wren's hidden letter aloud from the secrets note, in full.)
+
+─────────────────────────────────────────────
+IF the player and the Grumble are friends, add:
+
+Off the Wanderer's stern quarter, at a respectful distance, a storm has stationed itself
+like an honour guard, rumbling at the edge of hearing. The Wanderer rumbles back — vast,
+unbothered, companionable. The Grumble has followed you to the one place in the sky big
+enough not to mind it, and it is never going to stop telling other storms about this.
+
+─────────────────────────────────────────────
+IF the player has 3 or more trinkets, add:
+
+Your pockets, for the record, contain at least one warm button, something that hums
+sea-shanties, and a key for things that are not locked. No museum in the sky has a finer
+collection. The Wanderer's garden, which also collects things, approves of you
+completely.
+
+─────────────────────────────────────────────
+ALWAYS end with:
+
+A green sloop drops anchor at the meadow's edge, and Captain Marigold steps down into
+the grass of the place she has hunted her whole life — and stops, and takes off her hat,
+and for once in her loud magnificent existence says absolutely nothing. Eleven puffins
+disembark behind her and begin, solemnly, to picnic.
+
+Then she spots the letter in your hand, and reads the last lines over your shoulder,
+and makes a sound that is one part laugh and one part forty years.
+
+"A TEAPOT," she says. "She remembered the TEAPOT." She wipes her eye with her sleeve and
+glares at you fondly. "Well, cartographer? You found it first. Wren's blood — of course
+you did. I expect the drawing is dreadful." (It is not. She looks at it for a long time.)
+
+The evening comes on. The footstep-flowers light the meadow. Somewhere below, the
+Wanderer hums to itself — and the stream and the glass trees and the wick all hum along —
+as it carries its garden, and its visitors, and the finest page in the finest atlas in
+the sky, on into the dark.
+
+You will sail home tomorrow, and the Rose will find this place again whenever you are
+the sort of sailor it blooms for — which is, now, always.
+
+The atlas is yours. So is the sky.
+
+
+                    ~ THE END ~
+        The Wandering Isle. You found it first.</textarea>
+      <button class="copy-btn" onclick="cp('n11',this)">Copy</button>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ CHARACTER -->
+<section id="character">
+  <h2>Character</h2>
+  <p>This adventure uses the existing <strong>Choose Your Own</strong> character. No new character is needed.
+  The system prompt scans for all notes matching <code>g.cyo.&lt;name&gt;</code> and presents them as
+  adventure options. Once <code>g.cyo.cloudsea</code> exists, it appears in the list automatically.</p>
+  <p>The tools list is the same as The Living Dark v2 — if that adventure is set up, nothing needs changing.</p>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key" style="font-family:var(--serif);font-size:1rem;">Choose Your Own</span>
+      <span class="badge b-global">existing character</span>
+    </div>
+    <div class="field">
+      <span class="field-lbl">Tools</span>
+      <div>
+        <span class="tool-tag">world_state</span>
+        <span class="tool-tag">note_load</span>
+        <span class="tool-tag">note_list</span>
+        <span class="tool-tag">note_save</span>
+        <span class="tool-tag">note_append</span>
+        <span class="tool-tag">note_to_self</span>
+        <span class="tool-tag">pick_random</span>
+        <span class="tool-tag">random_chance</span>
+        <span class="tool-tag">generate_image_sdxl</span>
+        <p style="margin-top:.5rem;font-size:.8rem;color:var(--muted);">
+          If setting up Choose Your Own for the first time, see the
+          <a href="eldoria-adventure.html">Eldoria adventure guide</a> for the full character setup and system prompt.
+        </p>
+      </div>
+    </div>
+    <div class="field" style="border-bottom:none;">
+      <span class="field-lbl">First message</span>
+      <span style="font-size:.875rem;">Hello adventurer. What is your name?</span>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ PLAY -->
+<section id="play">
+  <h2>Starting play</h2>
+  <ol class="steps">
+    <li>Start a new conversation with <strong>Choose Your Own</strong>.</li>
+    <li>It will present available adventures. Say <strong>"The Cloudsea Atlas"</strong>.</li>
+    <li>The GM loads lore, sets world state, creates the atlas journal, and opens at the lighthouse. The first decision in the whole adventure is naming the wick — encourage a great name.</li>
+    <li>Sail anywhere. Each response ends with the status line, three choices, and "(or type anything — or sail anywhere)". The third choice is always the wild one.</li>
+  </ol>
+
+  <div class="callout">
+    <strong>Be kind to grumpy things.</strong> Everything in this sky can be befriended, every grump has a reason, and kindness literally picks the dice table. If a storm seems to be following the ship — do not run.
+  </div>
+
+  <div class="callout">
+    <strong>Bottle air everywhere.</strong> Every island has air worth bottling. One of the five compass petals can only be bought with "a wind she has never met" — so a bottle from anywhere is treasure at the Bazaar.
+  </div>
+
+  <div class="callout">
+    <strong>Feathers are for spending.</strong> Lucky feathers turn a bad roll one step better, and the choice always belongs to the player. Holding three feathers and never using them is the only mistake the luck system allows.
+  </div>
+
+  <div class="callout">
+    <strong>Ask to see the atlas any time.</strong> "Show me my atlas" reads back every page so far — and it is the save file: in a fresh conversation, "continue The Cloudsea Atlas" plus a read of the atlas and the world state picks up where things left off.
+  </div>
+
+  <div class="callout">
+    <strong>If the GM declares an outcome before rolling:</strong> say
+    <em>"You need to record the outcomes before calling pick_random — check the rules note."</em>
+  </div>
+
+  <h3>Adjusting difficulty</h3>
+  <p>Turn off read-only, edit, then re-enable read-only.</p>
+  <ul class="plain">
+    <li><strong>Easier:</strong> In <code>g.cyo.cloudsea</code>, change <code>hull = "3"</code> to <code>"5"</code>.</li>
+    <li><strong>Easier:</strong> In the manifest, change the wake condition from 4 petals to 3 (also update the rules note's Rose section and the status line hint).</li>
+    <li><strong>Easier:</strong> Raise the feather cap from 3 to 5 in the rules note.</li>
+    <li><strong>Harder (for a confident player):</strong> In the rules note, change CHOPPY to STORMY for bell-retrieval-style physical checks, and award feathers only for kindness, not cleverness.</li>
+    <li><strong>Longer:</strong> Require all 5 petals. The Rose wakes at five, and every island gets its moment.</li>
+  </ul>
+</section>
+
+<script>
+function cp(id, btn) {
+  navigator.clipboard.writeText(document.getElementById(id).value).then(() => {
+    btn.textContent = 'Copied';
+    btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>
