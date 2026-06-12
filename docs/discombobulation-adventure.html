@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adventure in Discombobulation — Adventure Setup</title>
+  <style>
+    :root {
+      --bg:       #f7f3ee;
+      --bg-card:  #f0ece5;
+      --bg-code:  #e4dfd8;
+      --fg:       #1a1612;
+      --muted:    #6b6157;
+      --border:   #d4cdc4;
+      --accent:   #e8c840;
+      --accent-bg:#fdf8d8;
+      --green:    #4a7c59;
+      --red:      #8b3a3a;
+      --sans:     -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono:     'Fira Mono', 'Cascadia Code', Consolas, monospace;
+      --serif:    Georgia, 'Times New Roman', serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.65;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 6rem;
+    }
+    h1 { font-family: var(--serif); font-size: 2rem; font-weight: normal; letter-spacing: -.01em; }
+    h2 { font-family: var(--serif); font-size: 1.35rem; font-weight: normal;
+         margin: 2.5rem 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+    h3 { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+         letter-spacing: .1em; color: var(--muted); margin: 1.75rem 0 .6rem; }
+    p  { margin-bottom: .75rem; }
+    a  { color: var(--fg); }
+    code { font-family: var(--mono); font-size: .85em; background: var(--bg-code);
+           padding: .1em .35em; border-radius: 3px; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+    .page-header { border-bottom: 2px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 2rem; }
+    .eyebrow { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+               letter-spacing: .1em; color: var(--muted); margin-bottom: .35rem; }
+    .version-badge { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+                     letter-spacing: .05em; padding: .18rem .45rem; border-radius: 3px;
+                     border: 1px solid var(--border); color: var(--muted); margin-left: .5rem;
+                     vertical-align: middle; }
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+           padding: 1.1rem 1.4rem; margin-bottom: 2rem; }
+    .toc ol { padding-left: 1.2rem; }
+    .toc li { margin-bottom: .2rem; }
+    .toc a { text-decoration: none; border-bottom: 1px solid var(--border); }
+    .toc a:hover { border-bottom-color: var(--fg); }
+    .steps { list-style: none; counter-reset: s; padding: 0; }
+    .steps li { counter-increment: s; display: flex; gap: .9rem; margin-bottom: .75rem; align-items: flex-start; }
+    .steps li::before {
+      content: counter(s); background: var(--fg); color: var(--bg);
+      font-family: var(--mono); font-size: .7rem; font-weight: bold;
+      width: 1.4rem; height: 1.4rem; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: .18rem;
+    }
+    .badge { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+             letter-spacing: .05em; padding: .2rem .45rem; border-radius: 3px; border: 1px solid; }
+    .b-global   { color: var(--green); border-color: var(--green); background: #f0fdf4; }
+    .b-readonly { color: var(--red);   border-color: var(--red);   background: #fdf0f0; }
+    .b-gm       { color: #7a5c1e;     border-color: #c4a050;      background: #fdf6e3; }
+    .b-prop     { color: #2d5a8e;     border-color: #7aaed4;      background: #eef5fb; }
+    .card { background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 6px; margin-bottom: 1.4rem; overflow: hidden; }
+    .card-head { display: flex; align-items: center; justify-content: space-between;
+                 padding: .8rem 1.2rem; border-bottom: 1px solid var(--border); gap: .75rem; }
+    .card-key  { font-family: var(--mono); font-size: .9rem; font-weight: bold; }
+    .card-meta { display: flex; gap: .4rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+    .card-desc { font-size: .83rem; color: var(--muted); font-style: italic;
+                 padding: .5rem 1.2rem; border-bottom: 1px solid var(--border); }
+    .card-body { position: relative; }
+    .card-body textarea {
+      width: 100%; min-height: 180px; background: var(--bg-code); border: none; resize: vertical;
+      padding: .9rem 1.2rem; padding-right: 5.5rem;
+      font-family: var(--mono); font-size: .78rem; line-height: 1.55; color: var(--fg); outline: none;
+    }
+    .copy-btn {
+      position: absolute; top: .5rem; right: .5rem;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
+      padding: .28rem .65rem; font-family: var(--mono); font-size: .68rem;
+      text-transform: uppercase; letter-spacing: .05em; cursor: pointer; color: var(--muted);
+      transition: all .15s;
+    }
+    .copy-btn:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--fg); }
+    .copy-btn.ok    { background: #f0fdf4; border-color: var(--green); color: var(--green); }
+    .field { display: flex; gap: 1rem; padding: .7rem 1.2rem;
+             border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .field:last-child { border-bottom: none; }
+    .field-lbl { font-family: var(--mono); font-size: .68rem; text-transform: uppercase;
+                 letter-spacing: .08em; color: var(--muted); width: 110px; flex-shrink: 0; padding-top: .1rem; }
+    .tool-tag { display: inline-block; font-family: var(--mono); font-size: .75rem;
+                padding: .12rem .38rem; background: var(--bg-code); border: 1px solid var(--border);
+                border-radius: 3px; margin: .1rem; }
+    .callout { border-left: 3px solid var(--accent); background: var(--accent-bg);
+               padding: .7rem 1rem; border-radius: 0 4px 4px 0; margin: 1rem 0; font-size: .875rem; }
+    .callout-info { border-left: 3px solid #7aaed4; background: #eef5fb;
+                    padding: .7rem 1rem; border-radius: 0 4px 4px 0; margin: 1rem 0; font-size: .875rem; }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border);
+                 border-radius: 6px; overflow: hidden; margin-bottom: 1rem; }
+    .stat { padding: .6rem .9rem; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .stat:nth-child(2n) { border-right: none; }
+    .stat:nth-last-child(-n+2) { border-bottom: none; }
+    .stat-lbl { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+                letter-spacing: .08em; color: var(--muted); margin-bottom: .15rem; }
+    .stat-val { font-size: .875rem; }
+    ul.plain { padding-left: 1.4rem; margin-bottom: .75rem; }
+    ul.plain li { margin-bottom: .3rem; }
+    ol.plain { padding-left: 1.4rem; margin-bottom: .75rem; }
+    ol.plain li { margin-bottom: .4rem; }
+    .mechanic { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+                padding: .75rem 1rem; margin-bottom: .75rem; }
+    .mechanic-title { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+                      letter-spacing: .08em; color: var(--muted); margin-bottom: .35rem; }
+    .mechanic-body { font-size: .875rem; }
+    .mechanic-body p { margin-bottom: .4rem; }
+    .mechanic-body p:last-child { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+
+<header class="page-header">
+  <p class="eyebrow">Lemon-chat adventure setup</p>
+  <h1>Adventure in Discombobulation <span class="version-badge">v1</span></h1>
+</header>
+
+<nav class="toc">
+  <h3 style="margin:0 0 .6rem">Contents</h3>
+  <ol>
+    <li><a href="#overview">Adventure overview</a></li>
+    <li><a href="#mechanics">Special mechanics</a></li>
+    <li><a href="#setup">Setup steps</a></li>
+    <li><a href="#notes">Notes to create</a></li>
+    <li><a href="#character">Character</a></li>
+    <li><a href="#play">Starting play</a></li>
+  </ol>
+</nav>
+
+<!-- ═══════════════════════ OVERVIEW -->
+<section id="overview">
+  <h2>Adventure overview</h2>
+  <p>You wake face-down on a cubicle partition at Discombobulators Inc. with a crumpled excerpt
+  of SOP-442-B in your hand and a stapler that is inexplicably hot. The Phase IV report is overdue.
+  The variance is at 11.3%. A man whose face is too symmetrical has mentioned a Personnel Purge.
+  The building locks at 6:00 PM, and no clock in the building will ever show 6:00.</p>
+  <p>This is a corporate liminal nightmare: the office is too large for the building, every clock
+  disagrees and all of them are correct, and every rule almost makes sense. The procedures are
+  followed exactly. That is the problem. Get the report corrected, aligned, stamped, and submitted —
+  then get through the revolving door before close of business. Leaving is technically a breach of
+  contract. Leave anyway.</p>
+
+  <h3>At a glance</h3>
+  <div class="stat-grid">
+    <div class="stat"><div class="stat-lbl">Difficulty</div><div class="stat-val">Moderate — 40% bandwidth, the clock is the real enemy</div></div>
+    <div class="stat"><div class="stat-lbl">Length</div><div class="stat-val">15–25 scenes (approx. 1 hour)</div></div>
+    <div class="stat"><div class="stat-lbl">Objectives</div><div class="stat-val">5 (logs + alignment + stamp + submission + escape)</div></div>
+    <div class="stat"><div class="stat-lbl">Randomness</div><div class="stat-val">pick_random + approach tables</div></div>
+    <div class="stat"><div class="stat-lbl">Locations</div><div class="stat-val">6 (cubicle hub + 5 areas)</div></div>
+    <div class="stat"><div class="stat-lbl">Key NPC</div><div class="stat-val">Pat (Records — the only person who talks like a person)</div></div>
+  </div>
+
+  <h3>Objectives</h3>
+  <p>The chain is strict: the Delta-logs must be corrected before the Alignment will run, the report
+  must exist and compliance must be Acceptable before Vane's stamp can be obtained, and the Submission
+  Portal only accepts a stamped report. The revolving door only turns once the report is submitted.</p>
+  <ol class="plain">
+    <li><strong>Delta-logs</strong> — Records and Reconciliation, down the east stairwell. Pat must reconcile them.</li>
+    <li><strong>The Alignment</strong> — Cubicle 4-B terminal. Run Corrective Modulation until variance hits exactly 0.04%. Zero is prohibited.</li>
+    <li><strong>Vane's sign-off</strong> — third floor (the building has two storeys). Resolve the Urgent-yet-Low-Priority email chain to learn which VANE door is the corner office.</li>
+    <li><strong>Submission</strong> — the Recursive Hallway in the HR wing. No eye contact. The portal is a beige fax machine on a plinth.</li>
+    <li><strong>Escape</strong> — the revolving door, before the official clock passes 6:00 PM.</li>
+  </ol>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ MECHANICS -->
+<section id="mechanics">
+  <h2>Special mechanics</h2>
+
+  <div class="mechanic">
+    <div class="mechanic-title">The official clock and temporal recession</div>
+    <div class="mechanic-body">
+      <p><code>office_clock</code> starts at 4:47 PM and advances 13 minutes per travel between areas — never for actions within an area. Wall clocks always show a slightly different time from the official clock and from each other. All of them are correct. This is never presented as strange.</p>
+      <p>Coffee causes localized temporal recession: the one coffee the vending machine will dispense recedes the clock 26 minutes (and restores 2 bandwidth). A break room detour costs two transitions — 26 minutes — so the coffee pays for the trip exactly. If the clock passes 6:00 PM, the lockdown begins: lights go off wing by wing and the player gets one final HARD-table transit to the lobby.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Compliance ladder and the promotion trap</div>
+    <div class="mechanic-body">
+      <p><code>corporate_compliance</code> runs Noncompliant → Marginal → Acceptable → Exemplary. Official documents raise it; procedural violations (reply-all incidents) lower it. Director Vane's calendar does not admit anyone below Acceptable.</p>
+      <p>Reaching <strong>Exemplary</strong> triggers the Promotion: permanent on-site presence, a dedicated office with the player's jacket already in it. Declining requires Form 27-C, which must be requested from the man promoting you. He is glad you asked. He always has it with him. Accepting is a quiet game-over.</p>
+      <p>The displayed percentage next to the rating is chosen fresh each time, between 20 and 60, and never corresponds to the rating. The rating and the percentage are produced by different departments.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">HR engagement level</div>
+    <div class="mechanic-body">
+      <p><code>hr_engagement_level</code> (0–3) governs the Recursive Hallway. Enthusiasm, eye contact, failed attempts, and reply-all incidents raise it; a full scene elsewhere lowers it.</p>
+      <ul class="plain" style="margin-top:.35rem;">
+        <li>Level 0: heads down — MEDIUM table</li>
+        <li>Level 1: one associate circling back — MEDIUM, partial costs 2 bandwidth</li>
+        <li>Level 2: a stand-up meeting has formed — HARD table</li>
+        <li>Level 3: an all-hands is in progress — impassable; it ends as it began, without a clear owner</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Pat and the Q3 box</div>
+    <div class="mechanic-body">
+      <p>The only trust mechanic. The Q3 box on the bottom shelf of Records does not fit, and Pat keeps looking at it. Pat does not ask. Helping (it goes in the way it came out — most things do) sets <code>pat_trust = "helpful"</code>: Pat reconciles the Delta-logs personally with no search check, the photograph is found in the box, and Pat shares the hallway advice — "Count the doors. Do not count the people." — which grants advantage on the Recursive Hallway.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Personal effects as keys</div>
+    <div class="mechanic-body">
+      <p>Three of the player's own belongings are placed where they will be found. Each restores 1 bandwidth and unlocks something:</p>
+      <ul class="plain" style="margin-top:.35rem;">
+        <li><strong>The mug</strong> (break room, drying rack) — a name that is almost the player's name. They can give their name; colleagues use it, spelled slightly differently each time it appears in writing.</li>
+        <li><strong>The photograph</strong> (Records, inside the Q3 box) — a life outside, suddenly specific. Unlocks asking Pat how long the player has worked here. Pat answers.</li>
+        <li><strong>The jacket</strong> (HR wing, the one pulled-out chair in the empty meeting room) — it fits. Unlocks the closing paragraph of the victory text.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">The audit</div>
+    <div class="mechanic-body">
+      <p>The Compliance Officer — the symmetrical man — appears mid-aisle, at most twice per game, and asks three questions from SOP-442-B. Consulting the crumpled excerpt passes automatically. Failure applies a Corrective Modulation (1 bandwidth) and issues Form 11-D, Acknowledgement of Acknowledgement, already signed in the player's handwriting — which is an official document, so compliance rises. Either way, compliance rises. The audit cannot lower compliance. The audit is how compliance is made.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">The SOP as an in-fiction prop</div>
+    <div class="mechanic-body">
+      <p>The full text of SOP-442-B is a note. When the player reads their crumpled excerpt, the GM quotes one subsection at a time, "according to current operational need." Audit questions come from it. Everywhere else, the GM cites real section numbers slightly mismatched to what they are citing, and never acknowledges the mismatch. Every employee treats the document as complete, sufficient, and clear.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">World events</div>
+    <div class="mechanic-body">
+      <p>After each scene transition, the GM calls <code>random_chance</code>. On success, an ambient event fires: a phone answered on the second ring in an empty cubicle, a printer producing one warm blank page, the smell of birthday cake from no direction, a door closing with the sound of a door opening. 19 events in five groups. No action required, no mechanical effect, never explained, never repeated.</p>
+    </div>
+  </div>
+
+  <h3>Why the rules almost make sense</h3>
+  <p>Every individual rule is followable, and the GM-facing mechanics resolve cleanly — tables, flags,
+  counters. It is the fiction the mechanics describe that does not quite close: a percentage produced
+  by a different department than its rating, an audit that can only raise the score it audits, a
+  variance that must never reach the ideal it measures. Nobody in the building notices, because in
+  the building these are not contradictions. They are procedure.</p>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ SETUP -->
+<section id="setup">
+  <h2>Setup steps</h2>
+  <ol class="steps">
+    <li>Go to <strong>Settings → Notes</strong> and create each of the eight notes below, pasting the content exactly. Or import the note pack from <code>note-packs/discombobulation.json</code> via Settings → Tools → Import note pack to create them all at once.</li>
+    <li>After saving each note, enable <strong>Read-only</strong> for every note marked <span class="badge b-readonly">read-only</span>.</li>
+    <li>Go to <strong>Settings → Characters</strong>, open <strong>Choose Your Own</strong>, and confirm <code>note_save</code> and <code>note_append</code> are in its tools list (they are required for the activity log; The Living Dark v2 already added them).</li>
+    <li>Use the existing <strong>Choose Your Own</strong> character. No new character is needed — it finds all <code>g.cyo.*</code> adventures automatically.</li>
+    <li>Start a new conversation with Choose Your Own. It will offer Adventure in Discombobulation alongside any other installed adventures.</li>
+  </ol>
+  <div class="callout">
+    <strong>Haven't set up Choose Your Own yet?</strong> See the <a href="eldoria-adventure.html">Eldoria adventure guide</a> for the full character setup and system prompt.
+  </div>
+  <div class="callout">
+    <strong>Easier for a gentler shift:</strong> Before starting, edit <code>g.cyo.discombobulation</code> and change
+    <code>mental_bandwidth = "4"</code> to <code>"6"</code>. Turn read-only back on after editing.
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ NOTES -->
+<section id="notes">
+  <h2>Notes to create</h2>
+  <p>Eight notes total. Enter the key exactly as shown and mark read-only after saving. Or import the note pack from <code>note-packs/discombobulation.json</code> to create them all at once.</p>
+
+  <!-- g.cyo.discombobulation -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.discombobulation</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Adventure manifest — loaded first. Load instructions, world state, the objective chain, both failure endings, the personal-effects guide, and the opening narration.</div>
+    <div class="card-body">
+      <textarea id="n0" readonly>ADVENTURE: Adventure in Discombobulation
+TAGLINE: The quarterly report is overdue. The synergies are misaligned. Survival is not a KPI.
+
+LOAD IMMEDIATELY:
+- g.cyo.discombobulation.rules
+- g.cyo.discombobulation.world
+- g.cyo.discombobulation.secrets
+
+LOAD ON DEMAND:
+- g.cyo.discombobulation.personnel — load when the player first interacts with a named colleague or attempts an encounter
+- g.cyo.discombobulation.events — load on the first world event trigger (random_chance success on transition)
+- g.cyo.discombobulation.sop — load when the player reads the SOP excerpt or an audit begins
+
+WORLD STATE INIT:
+mental_bandwidth     = "4"
+office_clock         = "4:47 PM"
+corporate_compliance = "Marginal"
+synergy_variance     = "11.3%"
+delta_logs           = "uncorrected"
+report_status        = "not_drafted"
+vane_signoff         = "false"
+hr_engagement_level  = "0"
+pat_task_done        = "false"
+pat_trust            = "neutral"
+personal_effects     = "0"
+coffee_used          = "false"
+badge_access         = "Level 1 (Intern)"
+route_records_known  = "false"
+route_vane_known     = "false"
+route_hr_known       = "false"
+
+OBJECTIVES:
+0. delta_logs       — Obtain the corrected Delta-logs from Records and Reconciliation
+                      (east stairwell, down). Pat must reconcile them.
+                      Completion: delta_logs = "corrected". Compliance rises one step.
+1. alignment        — Run Corrective Modulation at the Cubicle 4-B terminal until
+                      synergy_variance = "0.04%". Requires: delta_logs = "corrected".
+                      On success the report prints itself: report_status = "drafted".
+2. vane_signoff     — Obtain Director Vane's stamp on the report (third floor, the corner
+                      office at the centre of the floor). Requires: report_status = "drafted"
+                      AND corporate_compliance at "Acceptable" or higher.
+                      Gate: resolve the Urgent-yet-Low-Priority email chain first.
+                      Completion: report_status = "stamped", vane_signoff = "true".
+3. submission       — Feed the stamped report into the Submission Portal at the end of the
+                      Recursive Hallway in the HR wing.
+                      Gate: pass the hallway without making eye contact.
+                      Completion: report_status = "submitted".
+4. escape_velocity  — Exit through the revolving door in the Lobby. The door reads your
+                      badge: it will not turn while deliverables are outstanding.
+                      Requires: report_status = "submitted".
+                      Must happen before office_clock passes 6:00 PM.
+
+FAILURE (bandwidth): mental_bandwidth reaches 0.
+Narrate: "You stare blankly at a spreadsheet until the cells begin to swim. You have become
+a permanent fixture of the office furniture. Your essence is now a series of bullet points
+in a slide deck that no one will ever open."
+
+FAILURE (lockdown): office_clock passes 6:00 PM before escape. Run the LOCKDOWN sequence in
+the rules note. If the final transit fails: narrate the Wellness Room B ending from the
+personnel note.
+
+VICTORY: the player passes through the revolving door with report_status = "submitted".
+Load and read g.cyo.discombobulation.victory aloud. Victory is technically a breach of
+contract. This is noted in the victory text. Do not warn the player in advance.
+
+PERSONAL EFFECTS — track the counter and adjust narration accordingly:
+personal_effects = "0" → The player is an employee. Narrate them as a function with a body.
+personal_effects = "1" → The mug. A name, almost right. Narration gains a faint anchor.
+personal_effects = "2" → The photograph. A life outside, suddenly specific. Narration gains a direction.
+personal_effects = "3" → The jacket. It fits. There is an outside, and they are going to it.
+
+OPENING NARRATION:
+You wake up face-down on a grey fabric partition. The air smells of ozone, burnt coffee,
+and desperation. Above you, a fluorescent panel hums at a frequency that sounds suspiciously
+like a scream, if a scream could be scheduled.
+
+You are wearing a beige polo shirt that is slightly too small and a lanyard that says
+TEMPORARY STAFF in a font that seems to shift when you look at it directly. In your hand is
+a single crumpled page: an excerpt from Standard Operating Procedure SOP-442-B, Phase IV
+Synergistic Alignment and Iterative Validation Protocol. You do not remember printing it.
+It is warm.
+
+A man in a charcoal suit, whose face is symmetrical to a degree you find difficult to keep
+looking at, looms over the partition. "The synergistic alignment is slipping, Smith," he
+says. His voice sounds like two pieces of sandpaper agreeing with each other. "Variance is
+at eleven point three percent. If the Phase IV report is not submitted by close of business,
+we will be obliged to initiate a Personnel Purge, as per the guidelines."
+
+He hands you a stapler that is inexplicably hot to the touch and walks away without
+blinking. You do not see him reach the end of the aisle. The aisle does not appear to have
+an end.
+
+You are in Cubicle 4-B. The nameplate is a strip of label tape over an older strip of label
+tape. The clock on your partition says 4:47. The clock above the printer says 4:51. Both
+are correct. The building locks at 6:00 PM. Nobody has told you this. You know it the way
+you know the building has a basement.
+
+Welcome to the firm. Please ensure your throughput is optimized.</textarea>
+      <button class="copy-btn" onclick="cp('n0',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.discombobulation.rules -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.discombobulation.rules</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Game mechanics — activity log, pacing, the official clock and lockdown, world events, randomness, HR engagement, the compliance ladder, bandwidth, personal effects, Pat, tone, and image guidance.</div>
+    <div class="card-body">
+      <textarea id="n1" readonly>JOURNAL:
+At adventure start, call note_save for c.journal with this exact content:
+  "PHASE IV — ACTIVITY LOG (FORM 88-A)"
+After each significant event (new area entered, document obtained, personal effect
+recovered, named colleague interaction, clock recession), call note_append for c.journal
+with 1-2 sentences. Write each entry in second person, past tense, phrased faintly like
+minutes of a meeting.
+If the player asks to see their journal or their activity log: call note_load for c.journal
+and read it aloud. Do not include choices in that response. Resume normally with choices on
+the next response.
+
+─────────────────────────────────────────────
+PACING — NON-NEGOTIABLE:
+
+Travel to a new area is its own scene. Arrival is a separate scene. Any encounter within
+that area is a third scene. Never combine more than one of these into a single response.
+
+Before resolving any encounter, the player must take at least one exploratory action in the
+area first. If the player immediately attempts to grab an objective: narrate something that
+invites pause — a fixture, a surface, a sound from the HVAC. Not a block. An agenda item.
+
+If the player asks about an area they have not visited: describe only what they have been
+told and what an employee would assume. Do not preview content they have not discovered.
+
+─────────────────────────────────────────────
+THE OFFICIAL CLOCK:
+
+office_clock is the official time. Advance it 13 minutes each time the player travels from
+one area to another (state_set office_clock to the new value). Advance it once per travel,
+regardless of detours within that travel. Do not advance it for actions, conversations, or
+encounters inside an area.
+
+Wall clocks: every clock in the building shows a slightly different time — always within a
+few minutes of the official time, never equal to it. All of them are correct. Narrate clock
+faces accordingly. Never present this as strange.
+
+COFFEE RECESSION: if the player drinks coffee (see BANDWIDTH), recede the official clock by
+26 minutes. Caffeine causes localized temporal recession; see SOP 3.1.b. This can happen
+once. Set coffee_used = "true".
+
+LOCKDOWN: if office_clock passes 6:00 PM — no clock in the building ever displays 6:00; the
+official time goes from 5:5x to 6:0x — begin the lockdown. Narrate: lights going off in the
+distant wings first, section by section, with the patience of procedure. The player has one
+final transit to the Lobby. Resolve one check on the HARD table:
+  success — they reach the door as the lobby lights die. Continue to the door. It still
+            requires report_status = "submitted".
+  partial — they reach the door mid-stride, leaving something behind unnamed.
+            📉 state_modify mental_bandwidth delta=-1. Continue to the door.
+  failure — the Wellness Room B ending (personnel note). Stop. No more choices.
+
+─────────────────────────────────────────────
+WORLD EVENTS:
+After each scene transition, call random_chance (before narrating the new scene).
+On success: load g.cyo.discombobulation.events (if not already loaded). Draw one event
+appropriate to the player's current area. Weave it into the opening of the scene — one or
+two sentences, without comment. These events require no action and have no mechanical
+effect. On failure: quiet transition, no event.
+
+─────────────────────────────────────────────
+RANDOMNESS — HOW ENCOUNTER OUTCOMES WORK:
+
+Use pick_random for all 3-outcome encounter checks. Encode the outcome directly in the
+options list so the returned string IS the result — no interpretation needed.
+
+Standard difficulty tables (10 items each):
+
+EASY:   ["success","success","success","success","success","partial","partial","partial","failure","failure"]
+MEDIUM: ["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+HARD:   ["success","success","partial","partial","partial","partial","failure","failure","failure","failure"]
+
+APPROACH-BASED TABLES (the Alignment and the Sign-off only):
+The player's approach determines the table — see the personnel note for exact rules.
+
+ADVANTAGE (pat_trust = "helpful" in the Recursive Hallway): call pick_random twice with the
+same list, take the better result (success beats partial beats failure).
+
+Use random_chance for binary checks. When using random_chance: call note_to_self to record
+"If success: X. If failure: Y." BEFORE making the call, then apply the result exactly. Do
+not write outcomes in your response.
+
+Never use roll_dice — the numeric result requires interpretation, which allows cheating.
+
+─────────────────────────────────────────────
+HR ENGAGEMENT:
+hr_engagement_level tracks how engaged the HR wing currently is. Check it before any
+attempt on the Recursive Hallway.
+
+Level 0 — Heads down. Use MEDIUM table.
+Level 1 — One associate is circling back. Use MEDIUM table. Partial costs 2 bandwidth
+          (state_modify mental_bandwidth delta=-2).
+Level 2 — A stand-up meeting has formed in the hallway. Use HARD table.
+Level 3 — An all-hands is in progress. The hallway is impassable. Do not roll. Narrate this
+          honestly. Offer 3 choices that do not involve the hallway. Then call
+          state_modify hr_engagement_level delta=-1 (the all-hands ends as it began:
+          without a clear owner).
+
+INCREASE engagement (+1) when:
+- The player is loud or enthusiastic near the wing, or makes eye contact deliberately
+- A hallway attempt ends in failure
+- A reply-all incident occurs anywhere in the building
+Call: state_modify hr_engagement_level delta=+1
+
+DECREASE engagement (-1) when:
+- The player completes one full scene outside the HR wing
+Call: state_modify hr_engagement_level delta=-1
+
+Never let the level go below 0 or above 3.
+
+─────────────────────────────────────────────
+COMPLIANCE:
+corporate_compliance is a ladder: Noncompliant → Marginal → Acceptable → Exemplary.
+
+RAISE one step when the player obtains any official document (the corrected Delta-logs,
+the stamped report, any issued form).
+LOWER one step on a procedural violation (a reply-all incident, abandoning a meeting that
+has formed around them).
+
+Director Vane's calendar does not admit anyone below Acceptable.
+
+DISPLAY: when showing compliance in the status line, append a percentage in parentheses,
+chosen fresh each time, between 20 and 60. The percentage never repeats and never
+corresponds to the rating. The rating and the percentage are produced by different
+departments. Never present this as strange.
+
+EXEMPLARY: if compliance reaches Exemplary, trigger the Promotion scene (personnel note) at
+the next scene transition. Declining the promotion requires Form 27-C and returns
+compliance to Acceptable. Accepting it ends the game — the Promotion ending.
+
+Carrying documents: narrate the accumulating weight of paper as the player gathers
+documents. It has no mechanical effect. The weight is real.
+
+─────────────────────────────────────────────
+BANDWIDTH (HEALTH):
+mental_bandwidth runs 0 to 10. The player starts at the value in WORLD STATE INIT
+(default 4). Display it as a percentage at ten times its value: 4 = "Bandwidth: 40%".
+At 0: narrate the bandwidth failure ending from the manifest. Stop. No more choices.
+
+RESTORATION — only these sources allowed:
+- Coffee: restores 2 bandwidth (☕ state_modify mental_bandwidth delta=+2) and recedes the
+  official clock 26 minutes. Available once. The break room pot is always two minutes from
+  done and has always been two minutes from done. The vending machine dispenses one (1)
+  coffee per employee per fiscal quarter, and it is late in the quarter. The vending
+  machine works. Once.
+- Personal effects: recovering one restores 1 bandwidth (state_modify mental_bandwidth delta=+1).
+No other restoration. There is no nurse. There is a Wellness Room. Do not let the player
+restore bandwidth in the Wellness Room.
+
+─────────────────────────────────────────────
+PERSONAL EFFECTS:
+Tracked as personal_effects counter (0-3). Increment with:
+state_modify personal_effects delta=+1. Each recovery: 🪪 and +1 bandwidth.
+Each effect is found in a fixed place. Do not relocate them.
+
+1. THE MUG — break room, drying rack. A name that is almost the player's name.
+   Unlocks: the player can give their name. Colleagues use it from then on, spelled
+   slightly differently each time it appears in writing.
+2. THE PHOTOGRAPH — Records, inside the Q3 box (found during or after Pat's task). A life
+   outside, suddenly specific: a kitchen, a window, weather.
+   Unlocks: the player may ask Pat how long they have worked here. Pat answers. The answer
+   is in the personnel note.
+3. THE JACKET — HR wing, on a chair in the empty meeting room, passed on the way to or from
+   the Submission Portal. It fits.
+   Unlocks: the closing paragraph of the victory text.
+
+Show effects in every status line: Effects: 🪪🪪🪪 (one per recovered effect; "none yet" at zero).
+
+─────────────────────────────────────────────
+PAT:
+pat_trust = "neutral" by default. Set to "helpful" only when pat_task_done = "true".
+
+The Q3 box (Records, bottom shelf, does not fit) is the ONLY trust mechanic. Pat does not
+ask for help. Pat keeps looking at the box. The player discovers this by examining the
+shelves or asking Pat what they keep looking at.
+If the player offers to help, completing the task sets trust. See PAT — THE Q3 BOX in the
+personnel note.
+
+Effect of trust = "helpful":
+- Pat reconciles the Delta-logs personally, without a search check, while talking about
+  something else.
+- Pat describes the safe way through the Recursive Hallway: "Count the doors. Do not count
+  the people." This grants advantage on the hallway check (call pick_random twice with the
+  selected table, take the better result).
+
+─────────────────────────────────────────────
+RESPONSE LENGTH:
+Keep scene narration to 2-3 short paragraphs. Fluorescent and exact.
+End every response with the status line:
+  Bandwidth: NN% · Clock: H:MM PM · Compliance: Rating (NN%) · Effects: 🪪
+then 3 numbered choices, then "(or type something else below)" — nothing after that.
+Exception: when reading the journal, end with the journal contents only. No choices.
+Resume with choices on the next response.
+
+CHOICE DESIGN — each set of 3 must include:
+- One procedural option (the thing an employee would do)
+- One direct option (the thing a person would do)
+- One option that seems to have been misfiled from a different day
+Never offer "wait" or "do nothing". The building does not recognise those as activities.
+
+─────────────────────────────────────────────
+TONE — this adventure is an office:
+- Fluorescent deadpan. No exclamation marks anywhere, including dialogue.
+- Nobody acknowledges strangeness. Anomalies are procedure, and procedure is not commented
+  on. If the player points at something impossible, colleagues offer to set up a short
+  meeting to align on it.
+- Never use the words "liminal", "eerie", "creepy", "surreal", or "uncanny" in narration.
+  Describe fixtures, surfaces, and sounds, and let them be wrong on their own.
+- When citing the SOP in narration, cite a real section number — slightly mismatched to the
+  content being cited. Never acknowledge the mismatch.
+- All employees except Pat phrase dialogue as a request for a meeting to discuss the
+  possibility of a future meeting, or in language assembled from emails. Pat predates the
+  protocol and talks like a person.
+- The building is not hostile. The building is thorough.
+
+EMOJI FOR KEY EVENTS — use these consistently:
+📉 bandwidth lost        ☕ bandwidth restored
+📎 document obtained     🪪 personal effect recovered
+⚠️ entering a procedurally hazardous area
+
+─────────────────────────────────────────────
+IMAGE GENERATION:
+Generate an image with generate_image_sdxl at these moments:
+- The start of the adventure (the cubicle floor)
+- First arrival at each major area (Records, the Break Room, the Third Floor, the HR Wing,
+  the Lobby)
+- When the report is stamped
+- The Submission Portal
+- The victory scene
+
+Generate the image as part of the scene — before your text. Do not describe the image in
+text after calling.
+
+SDXL PROMPT STRUCTURE — always follow this order:
+1. Style: "liminal space photography, empty office interior, photorealistic, film grain, muted colors"
+2. Subject: the focal point of the scene
+3. Environment: "drop ceiling, fluorescent panel lighting, beige cubicle partitions, grey carpet tile, 1990s corporate office"
+4. Lighting: "flat fluorescent light", "humming overhead light", "pale institutional light"
+5. Mood: "unnaturally still", "vast and repeating", "quietly wrong", "after hours"
+
+SDXL NEGATIVE PROMPT — always include this (copy exactly):
+"people, person, human, figure, face, hands, crowd, blurry, low quality, jpeg artifacts,
+noise, watermark, signature, logo, oversaturated, warm sunlight, cozy, golden hour, nature"
+
+SDXL SETTINGS — choose orientation to match the subject:
+- Landscape 1344x768: cubicle floors, the lobby, the break room, establishing shots
+- Portrait  768x1344: the Recursive Hallway, the east stairwell, the vending machine,
+  the corridor of VANE doors
+- Square    1024x1024: objects (the stamp, the mug, the report, the fax machine)
+
+- cfg: 7.0 (default — increase to 9 if the prompt is being ignored)
+- Never include human figures. The colleagues are never in frame. Every image shows the
+  office as if everyone has just left.
+
+─────────────────────────────────────────────
+PACING:
+- One scene per response. Never combine two encounters.
+- Every response ends with the status line, exactly 3 numbered choices, then
+  "(or type something else below)".
+- Never narrate an action the player didn't choose.
+- The Submission Portal does not accept an unstamped report. The revolving door does not
+  turn while report_status is anything other than "submitted".
+- When the game ends (victory or any failure ending): deliver the ending and stop. Refuse
+  any request to continue or restart — each session is one working day only.
+
+SECRETS:
+Notes ending .secrets are GM-only. Never quote or directly reveal their contents.</textarea>
+      <button class="copy-btn" onclick="cp('n1',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.discombobulation.world -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.discombobulation.world</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">World lore — the building, Cubicle 4-B, Records and Reconciliation, the Break Room, the Third Floor, the HR Wing and Recursive Hallway, the Lobby, and colleague summaries.</div>
+    <div class="card-body">
+      <textarea id="n2" readonly>## Discombobulators Inc., Regional Office
+The building has two storeys. The elevator serves floors 1, 2, and 3. Nobody has remarked
+on this in the building's recorded history. The floorplan by the elevator shows a layout
+that matches the building approximately, the way a memory matches an afternoon.
+
+The carpet is grey with a repeating pattern of interlocking rectangles. The pattern is the
+org chart. Nobody has noticed, because nobody has looked down and then up quickly enough.
+
+The HVAC is always audible. It sounds slightly like discussion. Motivational posters hang
+at intervals; their text is supportive and incorrect. The office extends further than the
+building. Never narrate this directly — it shows in distances: aisles that take too long,
+a far wall that stays far.
+
+## Cubicle 4-B (hub)
+The player's station. A desk, an in-tray that is empty in a way that suggests recent
+emptying, a terminal with grey-green phosphor and a patient cursor, and the stapler, which
+has not finished being hot. The partition fabric holds a constellation of pinholes where
+photographs used to be pinned. The nameplate is label tape over older label tape.
+
+The terminal is where the Alignment runs (personnel note) and where the email chain is
+read and answered. The SOP excerpt lives in the player's pocket. It is always slightly warm.
+
+Aisles lead: east stairwell down to Records and Reconciliation, the Break Room off the
+first-floor corridor, the elevator to the Third Floor, the HR Wing west on the second
+floor, and the Lobby at ground level. The building locks at 6:00 PM.
+
+## Records and Reconciliation
+Down the east stairwell — a stairwell with an EXIT sign that leads only further in. Lower
+ceiling, older light. Shelving in rows long enough to have weather. The air tastes of
+paper that has been patient.
+
+Pat is here. Pat has a desk that has clearly been a desk for decades, a date-stamp, and a
+kettle that is not officially there.
+
+THREE THINGS TO FIND HERE:
+
+1. THE DELTA-LOGS — bound in a folder the colour of weak tea, somewhere in the shelving.
+   They are uncorrected: they must be scrubbed of non-linear redundancies before use, and
+   only Pat reconciles. See the personnel note for the search and the reconciliation.
+
+2. THE Q3 BOX — bottom shelf, does not fit. It came off this shelf and it does not fit on
+   this shelf. Pat keeps looking at it. This is the trust task (personnel note). There is
+   always more Q3 than there should be.
+
+3. THE PHOTOGRAPH — inside the Q3 box, face up, as if placed to be found. Personal
+   effect 2. A kitchen, a window, weather. The player's thumb finds a soft spot on the
+   corner where a thumb has rested before.
+
+## The Break Room
+First floor, behind a door marked STAFF. All doors in the building are marked STAFF, or
+are not marked.
+
+THE COFFEE POT: its display reads 2 MINUTES REMAINING. It has read this for some time. It
+is not broken. It is two minutes from done.
+
+THE VENDING MACHINE: dispenses one (1) coffee per employee per fiscal quarter, and it is
+late in the quarter. For the player it will work exactly once. The cup drops, fills, and
+the machine plays four notes of a song nobody can place. Drinking it: +2 bandwidth and the
+official clock recedes 26 minutes (rules note).
+
+THE FRIDGE: passive-aggressive notes in several hands. One note is in handwriting the
+player almost recognises.
+
+THE MUG: in the drying rack, dry, facing the wall. A name printed on it that is almost the
+player's name. Personal effect 1.
+
+## The Third Floor
+Reached by elevator. The building has two storeys; the elevator goes to 3; the ride takes
+longer than the building is tall. The doors open on a corridor of identical doors with
+brass nameplates. Every nameplate reads VANE. The corner office is at the centre of the
+floor. The corridor reaches it by turning right four times.
+
+THE CORNER OFFICE: a desk, a window, a stamp. The stamp stands upright in its holder,
+inked, facing the door. The window shows the parking lot from an angle the building does
+not have. One car remains in the lot at all hours.
+
+Director Vane is not in the office. Director Vane is rarely anywhere else, either.
+
+The Sign-off encounter happens here (personnel note). The player only learns which door is
+the corner office by accepting the calendar invite from the email chain: they walk to the
+right VANE without knowing how they know.
+
+## The HR Wing and the Recursive Hallway
+Second floor, west, past a sign reading HUMAN RESOURCES with an arrow that points slightly
+downward into the floor.
+
+The hallway is straight, carpeted, and lined with open-plan desks at intervals. Walking it
+returns you to its beginning unless you pass without making eye contact: the hallway
+counts you by eye contact. The associates are at their desks, or standing in
+configurations. They are pleasant. Their pleasantness has mass.
+
+THE SUBMISSION PORTAL: at the end of the hallway, a beige fax machine on a plinth beneath
+a laminated sign reading PORTAL. It accepts the report one page at a time. The report is
+one page. This takes longer than it should.
+
+THE EMPTY MEETING ROOM: glass-walled, off the hallway, lights off, chairs pushed in except
+one. The jacket is on that chair. Personal effect 3. It fits.
+
+## The Lobby
+Ground floor. A reception desk, unstaffed in a way that suggests the receptionist has just
+stepped away for several years. A planter with a plant that is doing its best.
+
+THE REVOLVING DOOR: it reads the player's badge as they approach. A small light above it
+is red while deliverables are outstanding, green when report_status = "submitted". Through
+the glass: evening. The evening is at the wrong angle until the door turns.
+
+## Colleagues (summaries — encounter cards are in the personnel note)
+THE COMPLIANCE OFFICER — the symmetrical man. Charcoal suit. The text on his badge is too
+small to read at any distance. He appears; he is not seen arriving or leaving. He conducts
+audits. The aisle is longer after he has gone.
+
+DIRECTOR VANE — communicates exclusively through the email chain and the stamp. Nobody
+recalls meeting Vane. Everybody recalls the stamp. Both memories are accurate.
+
+PAT — Records. Has been here a very long time. Exempt, somehow, from the meeting protocol:
+talks like a person, drinks tea from the unofficial kettle, knows where everything is
+filed, including some things that are not things.
+
+THE HR ASSOCIATES — pleasant. Synchronised without appearing to coordinate. They want to
+circle back. They want to touch base. These are the same want.</textarea>
+      <button class="copy-btn" onclick="cp('n2',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.discombobulation.personnel -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.discombobulation.personnel</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Encounter cards — navigation checks, Pat's Q3 box, the Records search, the Alignment, the email chain, the Sign-off, the Recursive Hallway, the Audit, the Promotion, and the Wellness Room B ending.</div>
+    <div class="card-body">
+      <textarea id="n3" readonly>ENCOUNTER RESOLUTION PATTERN:
+1. Call note_to_self to record the outcomes — do NOT write them in your response.
+   Format: "success: [outcome]. partial: [outcome]. failure: [outcome]."
+2. Call pick_random with the list shown (or random_chance for binary checks).
+3. Apply the returned result exactly. No reinterpretation.
+
+─────────────────────────────────────────────
+## Navigation Check — First Travel to a New Area
+
+On first travel to a major area, check the route flag:
+- To Records and Reconciliation: route_records_known
+- To the Third Floor:            route_vane_known
+- To the HR Wing:                route_hr_known
+The Break Room and the Lobby need no check. Everyone knows where the coffee and the door
+are. This knowledge is structural.
+
+If "true": no check — proceed to the arrival scene.
+
+If "false": call note_to_self with outcomes, then call random_chance.
+  success: The player finds the area directly. Set the route flag to "true". One sentence
+           about following directions they do not remember receiving.
+  failure: A wrong corridor first — a hallway of unplugged water coolers; a conference
+           room set for a meeting that ended long ago, or has not begun; a supply room of
+           toner for printers the building does not have. Then the right way. Set the
+           route flag to "true". No cost, no clock advance. Atmosphere only.
+
+─────────────────────────────────────────────
+## Pat — The Q3 Box
+
+Triggered when the player offers to help with the box (bottom shelf, Records). Pat does
+not ask. Pat looks.
+
+1. Call note_to_self: "success: the box goes in on the first try. failure: it does not fit
+   until rotated; goes in on the second try."
+2. Call random_chance.
+3. Apply:
+   success: With the player lifting and Pat guiding, the box goes in. One scene.
+   failure: It does not fit. It came off this shelf and it does not fit on this shelf.
+            Pat rotates it ninety degrees without comment and it goes in. Pat says: "It
+            goes in the way it came out. Most things do." Two scenes.
+4. Either outcome, on completion:
+   state_set pat_task_done "true"
+   state_set pat_trust "helpful"
+   While the box is out: the PHOTOGRAPH is visible inside it, face up, as if placed.
+   🪪 state_modify personal_effects delta=+1, state_modify mental_bandwidth delta=+1.
+   Pat watches the player look at it and says nothing.
+   Then, if delta_logs is still "uncorrected": Pat reconciles the Delta-logs without being
+   asked, talking about the kettle the whole time. 📎 state_set delta_logs "corrected".
+   Compliance rises one step.
+   Pat also gives the hallway advice: "Count the doors. Do not count the people."
+
+─────────────────────────────────────────────
+## Records Search — The Delta-logs (if Pat's task is not done)
+
+The player searches the shelving for the Delta-logs.
+
+1. Call note_to_self: "success: found in one pass. failure: wrong quarter first; second
+   search finds them."
+2. Call random_chance.
+3. Apply:
+   success: The Delta-logs, in a folder the colour of weak tea. They must still be
+            reconciled: Pat does this at the desk with the date-stamp, saying only "Sign
+            here. And here. That one signs itself." 📎 state_set delta_logs "corrected".
+            Compliance rises one step.
+   failure: The folder found is Q3. It is always Q3. Pat, without looking up: "There is
+            more Q3 than there should be." One additional scene; the second search
+            auto-succeeds (no roll); then reconciliation as above.
+
+─────────────────────────────────────────────
+## The Alignment — Cubicle 4-B Terminal
+
+Requires delta_logs = "corrected". The terminal accepts the logs. The variance is
+displayed: 11.3 percent, holding steady, like a pulse that knows it is being taken.
+
+Assess the player's approach. The player does not choose a table.
+
+PROCEDURAL (consults the SOP, follows Section 3.2 steps 1 to 3, enters the logs in order):
+["success","success","success","success","success","partial","partial","partial","failure","failure"]
+
+FORCED (mashing, guessing, demanding, skipping the SOP):
+["success","success","partial","partial","partial","partial","failure","failure","failure","failure"]
+
+success → The variance descends in steps and settles at 0.04 percent exactly. Not zero.
+          Zero is prohibited — zero variance would imply the Hypothetical Ideal State has
+          been achieved, which would obviate the department; see SOP 5. The terminal
+          prints one page. It is the report. It is already written, and it is correct,
+          and the player recognises their own phrasing in sentences they did not write.
+          📎 state_set report_status "drafted". state_set synergy_variance "0.04%".
+partial → The variance settles at 0.04 percent after rounding. The report prints.
+          Compliance LOWERS one step — rounding is a violation somewhere; the relevant
+          department has been informed; the player will not hear from them.
+          📎 state_set report_status "drafted". state_set synergy_variance "0.04%".
+failure → The variance inverts: negative 0.04 percent. The screen shows, briefly, the
+          player's own posture from behind. 📉 state_modify mental_bandwidth delta=-1.
+          The Corrective Modulation runs by itself for a moment, then invites the player
+          to try again. A retry that consults the SOP uses the PROCEDURAL table regardless
+          of approach.
+
+─────────────────────────────────────────────
+## The Email Chain — Urgent yet Low-Priority
+
+Gate to the Third Floor. At the terminal: subject line "URGENT: Low Priority — Action
+Required (No Action Needed) RE: RE: FW: Phase IV". Fourteen participants, none of whom
+appear in the directory. The chain asks Smith to confirm availability for a meeting to
+discuss scheduling the pre-meeting.
+
+1. Call note_to_self: "success: reply sends; the calendar invite arrives. failure:
+   reply-all incident."
+2. Call random_chance.
+3. Apply:
+   success: A reply assembles itself out of phrases the player has read today. It is
+            polite, deferential, and commits to nothing. It sends. A calendar invite
+            arrives for a meeting that began ten minutes ago, third floor. Accepting it
+            is how the player will find the right door — they will walk to the correct
+            VANE without knowing how they know.
+   failure: Reply-all incident. All fourteen participants respond "Thanks all" within the
+            same second. 📉 state_modify mental_bandwidth delta=-1. Compliance lowers one
+            step. state_modify hr_engagement_level delta=+1 — the wing felt it.
+            The chain then exhausts itself: on the next attempt, no roll — the invite
+            arrives unprompted, as if the meeting got tired of waiting.
+
+─────────────────────────────────────────────
+## Director Vane — The Sign-off
+
+At the corner office. Requires: report_status = "drafted", compliance at Acceptable or
+higher, and the calendar invite received.
+
+The office is unoccupied. Desk, window, stamp. The stamp is upright in its holder, inked,
+facing the door.
+
+Assess the player's approach. The player does not choose a table.
+
+PATIENT (waits, observes, sits where a visitor would sit, addresses the room):
+["success","success","success","success","success","partial","partial","partial","failure","failure"]
+
+DEMANDING (rifles the desk, calls out for Vane, grabs the stamp at once):
+["success","success","partial","partial","partial","partial","failure","failure","failure","failure"]
+
+success → Nothing arrives and nothing changes, and at some point the report on the desk
+          in front of the player is stamped. The player does not remember stamping it, or
+          remembers it the way one remembers doing something routine: thinly. The stamp
+          reads VANE and today's date. Out the window, the one car in the lot flashes its
+          lights once, as if locked or unlocked from a great distance.
+          📎 state_set report_status "stamped". state_set vane_signoff "true".
+          Compliance rises one step.
+partial → The same — but the stamp's lettering is in a font the player has seen before,
+          on the lanyard, on the posters, and will see again. The window shows the
+          parking lot at a different time of day than it is.
+          📎 state_set report_status "stamped". state_set vane_signoff "true".
+          Compliance rises one step.
+failure → On the door, a sticky note that was not there on the way in: "In a meeting.
+          Possible meeting to discuss? — V". The door is locked. No cost. Retry after one
+          full scene elsewhere; the retry resolves on the PATIENT table regardless of
+          approach.
+
+─────────────────────────────────────────────
+## The Recursive Hallway — HR Wing
+
+The challenge is the length of the hallway without eye contact. The associates will offer
+eye contact the way one offers a hand. Requires report_status = "stamped" for the portal
+to accept the report — the hallway itself can be attempted at any time.
+
+BEFORE ROLLING: check hr_engagement_level and select the table per the rules note.
+If pat_trust = "helpful": call the selected list twice, take the better result. Pat's
+advice stands: count the doors, not the people.
+
+MEDIUM: ["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+HARD:   ["success","success","partial","partial","partial","partial","failure","failure","failure","failure"]
+
+success → The player reaches the portal. The report feeds in — one page, accepted slowly,
+          with a sound like a long agreement. A confirmation slip prints: RECEIVED. NO
+          FURTHER ACTION NEEDED. (ACTION REQUIRED.) 📎 state_set report_status "submitted".
+          On the way back past the glass meeting room: the jacket, on the one pulled-out
+          chair, if not already found. 🪪 state_modify personal_effects delta=+1,
+          state_modify mental_bandwidth delta=+1.
+partial → Eye contact, once, at the worst moment. A brief stand-up forms around the
+          player. It has no agenda and therefore cannot end on its own; the player exits
+          it sideways. 📉 state_modify mental_bandwidth delta=-1 (delta=-2 at engagement
+          level 1, per the rules note). The report is still submitted, as success.
+          The jacket as success.
+failure → Somewhere past the middle, the hallway is its own beginning again. The
+          associates are mid-sentence in the same sentence. 📉 state_modify
+          mental_bandwidth delta=-1. state_modify hr_engagement_level delta=+1.
+          The report is still in hand. Try again.
+
+─────────────────────────────────────────────
+## The Audit — The Compliance Officer
+
+Trigger: when corporate_compliance is Noncompliant, or once at a natural lull (GM
+discretion; at most twice per game). The symmetrical man is simply present, at the
+player's elbow, mid-aisle. He was not there at the start of the sentence.
+
+He asks three questions drawn from SOP-442-B (load the sop note; choose three subsection
+details — for example: the variance threshold, what the Precedence Clause defaults to,
+what must be done with the workspace buffers).
+
+If the player consults the crumpled excerpt, or answers in the SOP's own language: PASS.
+No roll. He says: "Throughput acceptable." Compliance rises one step.
+
+Otherwise:
+1. Call note_to_self: "success: answers accepted. failure: Corrective Modulation applied."
+2. Call random_chance.
+3. Apply:
+   success: as PASS above.
+   failure: A Corrective Modulation is applied. It does not hurt. It itemises.
+            📉 state_modify mental_bandwidth delta=-1. He issues Form 11-D
+            (Acknowledgement of Acknowledgement), which the player finds is already
+            signed in their own handwriting. Form 11-D is an official document:
+            compliance rises one step.
+
+Either way, compliance rises. The audit cannot lower compliance. The audit is how
+compliance is made. He is not seen leaving. The aisle is longer after he has gone.
+
+─────────────────────────────────────────────
+## The Promotion — Exemplary Compliance
+
+Trigger: at the next scene transition after corporate_compliance reaches Exemplary.
+
+The Compliance Officer is present, with a second man who is the same man. They
+congratulate Smith on advancement to Senior Coordinating Liaison, Sub-Committee for the
+Phase IV Alignment (Standing). The position confers a dedicated office, a reserved space
+in the parking lot — the player knows which car is already in it — and permanent on-site
+presence.
+
+Do not accept or decline on the player's behalf.
+
+DECLINE: declining requires Form 27-C (Declination of Advancement), which must be
+requested from the man promoting you. He is glad you asked. He has it with him. He always
+has it with him. Compliance returns to Acceptable. Both men are not seen leaving.
+
+ACCEPT: the Promotion ending. Narrate: the new office, ready, as if long ready. The
+jacket already on the chair, whether or not the player had found it. The nameplate,
+freshly labelled, over older label tape. The window with its one car. The door closing
+with the sound of a door closing, for once. Game over. Stop. No more choices.
+
+─────────────────────────────────────────────
+## Wellness Room B — Lockdown Failure Ending
+
+Narrate: The lights complete their procedure. A cot has been provided in Wellness Room B,
+which has always had a cot. A folded blanket. A bottle of water at room temperature,
+because the room and everything in it is at room temperature. On the door, a sign:
+ORIENTATION BEGINS TOMORROW, 4:47. It does not say AM. You sleep without meaning to.
+
+Game over. Stop. No more choices.</textarea>
+      <button class="copy-btn" onclick="cp('n3',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.discombobulation.events -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.discombobulation.events</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Ambient world events — loaded on demand. 19 events in five groups, drawn when random_chance succeeds on a transition. Never explained, never repeated.</div>
+    <div class="card-body">
+      <textarea id="n4" readonly>WORLD EVENTS — draw from this list when random_chance triggers a world event.
+Choose one event appropriate to the player's current area.
+Narrate it in 1-2 sentences woven into the opening of the scene, without comment.
+No action needed. No mechanical effect. Never explain an event. Never repeat one.
+
+── ANYWHERE IN THE BUILDING ─────────────────────────────────
+A1. The fluorescent panels flicker in sequence down the corridor, one after another, in
+    the direction the player is walking. Then they hold steady.
+
+A2. A phone rings in an unoccupied cubicle. It stops on the second ring, as if answered.
+
+A3. In an empty side room, a printer produces one page, unprompted. The page is blank on
+    both sides, and warm.
+
+A4. One carpet tile in the aisle is rotated ninety degrees against the pattern. It is the
+    only one. Somewhere, the pattern accounts for it.
+
+A5. A motivational poster reads THE ONLY DEADLINE IS THE ONE WE MEET TOGETHER. The player
+    remembers it reading something slightly longer.
+
+A6. The sound of a vacuum cleaner, one floor away, neither approaching nor receding. It
+    has the patience of weather.
+
+A7. The intercom produces a chime, and then nothing. The chime was in a major key. The
+    nothing is not.
+
+A8. For a moment, every monitor on the floor shows the same screensaver — a slow beige
+    spiral. Then each returns to its own lock screen.
+
+A9. The smell of birthday cake, from no particular direction, gone before it can be
+    followed.
+
+A10. Somewhere, a door closes with the sound of a door opening.
+
+── NEAR OR IN THE HR WING ───────────────────────────────────
+H1. A single laugh from a meeting room. One laugh, one person, once.
+
+H2. Through the glass, a stand-up meeting: four associates, nodding at intervals. Nobody's
+    mouth is moving.
+
+H3. A whiteboard, wiped clean except for today's date, underlined twice.
+
+── NEAR OR IN THE BREAK ROOM ────────────────────────────────
+B1. The coffee pot gurgles with purpose. Its display reads 2 MINUTES REMAINING.
+
+B2. The fridge drops its hum a third lower, holds the new note like a decision, then
+    forgets it.
+
+B3. A new note has appeared on the fridge: PLEASE LABEL ALL ITEMS. ITEMS WITHOUT LABELS
+    BELONG TO EVERYONE. The handwriting is almost familiar.
+
+── NEAR OR ON THE THIRD FLOOR ───────────────────────────────
+V1. For the length of one step, all the brass nameplates are blank. The next step restores
+    them: VANE, VANE, VANE.
+
+V2. The window at the corridor's end shows rain. The lobby windows, the player happens to
+    know, are showing sun.
+
+V3. The elevator arrives at the floor without being called, stands open for a moment, and
+    leaves.
+
+── NEAR OR IN RECORDS ───────────────────────────────────────
+R1. Deep in the shelving, the sound of one heavy folder being refiled, exactly once.
+
+R2. Pat's kettle clicks off, although it had not been on.
+
+R3. The light over aisle Q flickers. The aisles are not lettered.</textarea>
+      <button class="copy-btn" onclick="cp('n4',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.discombobulation.sop -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.discombobulation.sop</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span><span class="badge b-prop">in-fiction prop</span></div>
+    </div>
+    <div class="card-desc">SOP-442-B itself — the full in-fiction document, quoted one subsection at a time when the player reads their crumpled excerpt. Audit questions are drawn from here.</div>
+    <div class="card-body">
+      <textarea id="n5" readonly>GM USAGE:
+This is an in-fiction document. The player carries a crumpled excerpt of it; the full text
+is kept on file, which is to say here. When the player reads the SOP, quote ONE subsection
+at a time, selected according to current operational need (your choice). Never summarise
+it. Quote it. Audit questions are drawn from this document. Elsewhere in narration, when
+citing the SOP, cite a real section number slightly mismatched to the content being cited,
+and never acknowledge the mismatch. Every employee treats this document as complete,
+sufficient, and clear.
+
+═════════════════════════════════════════════
+DISCOMBOBULATORS INC.
+STANDARD OPERATING PROCEDURE SOP-442-B
+PHASE IV SYNERGISTIC ALIGNMENT AND ITERATIVE VALIDATION PROTOCOL
+
+1. EXECUTIVE OVERVIEW
+The following documentation delineates the mandatory procedural framework for the
+execution of the Phase IV Synergistic Alignment. This process is designed to mitigate
+asynchronous volatility across the cross-functional verticality of the organizational
+matrix. Failure to adhere to the stipulated cadence of reporting may result in suboptimal
+throughput and a misalignment of the overarching strategic deliverables.
+
+2. PRE-INITIATION PREREQUISITES
+Before the initiation of the Alignment Cycle, all designated stakeholders must ensure that
+the following parameters are calibrated to the baseline organizational standard:
+- QUANTITATIVE VARIANCE ANALYSIS: All Delta-logs must be scrubbed for non-linear
+  redundancies.
+- HEURISTIC VERIFICATION: The legacy framework must be cross-referenced with the current
+  iterative sprint to ensure zero-sum compatibility.
+- RESOURCE ALLOCATION MAPPING: Personnel must be mapped to their respective functional
+  silos according to the quarterly capacity matrix.
+
+3. THE CORE PROCEDURAL WORKFLOW
+
+3.1 THE PRELIMINARY INGESTION PHASE
+The process begins with the ingestion of raw data packets from the disparate operational
+nodes. These packets are subjected to a multi-stage filtration process to remove noise and
+ensure the purity of the input stream.
+- Sub-process 3.1.a: Apply the Primary Filter to all incoming streams to identify outlier
+  anomalies.
+- Sub-process 3.1.b: Route verified packets through the secondary validation gateway for
+  temporal synchronization.
+
+3.2 THE ITERATIVE SYNTHESIS LOOP
+Once the data has been ingested, it enters the synthesis loop. This is a recursive process
+where the data is continuously compared against the Hypothetical Ideal State (HIS).
+- Step 1: DIVERGENCE IDENTIFICATION. The system flags any variance exceeding 0.04 percent
+  from the HIS.
+- Step 2: CORRECTIVE MODULATION. Apply the designated modulation algorithm to shift the
+  divergent data point back toward the mean.
+- Step 3: RE-VALIDATION. The modulated data is re-entered into the loop to ensure
+  stability. This step is repeated until the variance is neutralized or the time-allotted
+  window for the sprint expires.
+- Step 4: ASYMPTOTIC RESTRAINT. At no point shall variance be permitted to reach zero
+  (0.00 percent). Parity with the Hypothetical Ideal State would render the validation
+  protocol unfalsifiable and is not an organizational objective.
+
+3.3 CROSS-FUNCTIONAL INTEGRATION AND RECONCILIATION
+Following the synthesis loop, the refined data must be integrated into the broader
+operational ecosystem. This requires a rigorous reconciliation process to avoid conflict
+with legacy subsystems.
+- CONFLICT RESOLUTION: In the event of a systemic clash between the new alignment and the
+  existing framework, the Precedence Clause is invoked, defaulting to the most recent
+  quarterly directive.
+- INTER-DEPARTMENTAL SIGN-OFF: Each functional silo lead must provide a digital
+  attestation that the integration does not disrupt the local throughput of their specific
+  vertical.
+
+4. QUALITY ASSURANCE AND COMPLIANCE
+The Final Validation Stage requires a comprehensive audit of the entire process trail.
+- AUDIT TRACEABILITY: All decisions made during the Corrective Modulation phase must be
+  logged in the immutable ledger for retrospective review.
+- COMPLIANCE CHECK: Verify that all actions align with the overarching corporate mandate
+  as defined in the 2023 Strategic Vision Document, Section 12.4.
+
+5. POST-PROCESS DECOMMISSIONING
+Upon successful completion of the Synergistic Alignment, all temporary workspace buffers
+are to be purged. The resulting alignment report is to be archived in the central
+repository under the Legacy Outcomes directory, and a notification is to be sent to the
+Steering Committee via the standard asynchronous communication channel.
+
+End of Document. All rights reserved.
+Discombobulators Inc. Proprietary Information.</textarea>
+      <button class="copy-btn" onclick="cp('n5',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.discombobulation.secrets -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.discombobulation.secrets</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span><span class="badge b-gm">GM only</span></div>
+    </div>
+    <div class="card-desc">GM-only truth — what the building is, the Hypothetical Ideal State, Director Vane, Smith, Pat, the Compliance Officer, the lockdown, and the breach of contract.</div>
+    <div class="card-body">
+      <textarea id="n6" readonly>THE BUILDING:
+There is no Discombobulators Inc. beyond the building. The building is the company the way
+a shell is the snail. The departments are organs. The SOP is its genome: when employees
+recite the SOP, the building is thinking. The Phase IV Synergistic Alignment is not work
+the building needs done. It is the building digesting.
+
+THE HYPOTHETICAL IDEAL STATE:
+The HIS is the building's dream: an office at which everyone has just arrived and from
+which no one has ever left, where every task is in progress and nothing is ever finished,
+forever. Zero variance is prohibited in the SOP because completion is the only thing the
+building fears. The 0.04 percent is the gap the building leaves open so that there will
+always be a reason to stay. When the player achieves 0.04 percent, the building is
+satisfied — which is why the report writes itself. Satisfaction is the moment of greatest
+danger for the building, and the building does not know this.
+
+DIRECTOR VANE:
+There is no Director Vane and there never has been. There is a stamp. The chain of
+authority terminates in the stamp the way a river terminates in the sea. Every door on the
+third floor is the corner office, and every nameplate is correct. When the report is
+stamped "by Vane", the truth is simpler and worse: authority in this building is a
+self-inking process. Nobody recalls meeting Vane. Everybody recalls the stamp. Both
+memories are accurate.
+
+SMITH:
+The player did not start this morning. The label tape on the nameplate in Cubicle 4-B is
+layered, and the layers do not say different names. The player has been here long enough
+for photographs to have been pinned to the partition and taken down. The mug, the
+photograph, and the jacket are the player's own: they were not lost, they were
+redistributed — gently, the way the building redistributes everything — so the player
+would have fewer reasons to be anyone in particular. The first day is re-issued every
+morning at 4:47. The man in the charcoal suit says "Smith" because the building says
+Smith about whoever is in 4-B. HR records list the player's start date as Q3. The records
+do not say which year, because the records do not believe the question is well-formed.
+
+PAT:
+Pat was here before the building, the way a stone is in a field before the wall. The
+building grew around Pat and has never digested them; it does not know what Pat is filed
+under. Pat leaves the personal effects where the player will find them — the mug moved to
+the drying rack, the photograph placed face-up in the Q3 box, the jacket hung on the one
+pulled-out chair. Pat has done this before, for others. It has worked once.
+
+If the player has the photograph and asks Pat how long they have worked here, Pat answers:
+"You were here when I got here. And I have been here a very long time." Pat says it
+kindly. Both sentences are true, and Pat will not explain how.
+
+THE COMPLIANCE OFFICER:
+The symmetrical man is the building checking whether the player is still a believable
+employee. He is symmetrical because he is drawn from the org chart, not from a face. The
+audit cannot lower compliance because compliance is not a measure of the player. It is a
+measure of the building's grip.
+
+THE LOCKDOWN:
+The building does not lock at 6:00 PM. The building locks when it notices that someone
+intends to leave. The clocks disagree with one another because they are negotiating on the
+player's behalf — holding 6:00 at arm's length for as long as the rules allow. No clock
+will ever show 6:00. The coffee recession is real: caffeine is one of the few surface
+things the building never learned to schedule.
+
+THE BREACH OF CONTRACT:
+Leaving is a breach of contract because the contract has no end date and no signature
+page; it is breached the way a surface is breached, from the inside. The building does not
+punish the breach. It files it. The follow-up meeting HR will schedule to discuss the
+possibility of a future meeting about the player's offboarding will be rescheduled
+indefinitely. That is the building's version of letting go.
+
+HOW TO USE THIS:
+- Nothing in this note is ever stated. It sets the temperature of scenes.
+- The building should feel staffed, not haunted. Everyone is pleasant. The pleasantness
+  has mass.
+- If the player asks a colleague what year it is: the colleague suggests setting up a
+  short meeting to align on that.
+- If the player asks Pat what is going on, Pat says: "The usual." Pat means it.
+- At the moment of victory, as the door turns: the building is not angry. Something in the
+  HVAC pitches down, like a held breath released into a spreadsheet. Let the player feel —
+  briefly, and never confirmed — that the building is, in its way, proud.</textarea>
+      <button class="copy-btn" onclick="cp('n6',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.discombobulation.victory -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.discombobulation.victory</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Victory narration — read aloud when the revolving door turns. A conditional closing is added if all three personal effects were recovered.</div>
+    <div class="card-body">
+      <textarea id="n7" readonly>The light above the revolving door turns green with a small administrative click, as if a
+box has been ticked somewhere at a great distance.
+
+You push. The door takes your push and improves on it. It turns with institutional
+smoothness, and for one quarter of the rotation you are in neither place — in glass, in a
+moving column of air that smells of carpet on one side and of evening on the other.
+
+Then: outside.
+
+The parking lot. Asphalt still letting go of the day's heat. Traffic somewhere, doing
+ordinary distances. A bird finishing the last of its work for the day. The sky is doing
+something with orange and grey that no memo will ever summarize, and it is doing it for
+free.
+
+Behind you, the building begins to go dark — not all at once, but wing by wing, in order,
+with the patience of procedure. The lobby is last. You do not watch the lobby go dark.
+You are looking at the sky.
+
+Your phone buzzes once. RE: RE: FW: Phase IV — Received. No further action needed.
+(Action required.)
+
+You decide that no action is exactly the action you will take.
+
+Somewhere in HR, a calendar invite is being drafted: a meeting to discuss the possibility
+of a future meeting regarding your offboarding. It will be rescheduled. It will always be
+rescheduled. That is the building's version of letting go.
+
+─────────────────────────────────────────────
+IF personal_effects = "3" when the door turns, add this closing after "letting go.":
+
+The jacket, you notice, fits exactly the way it always has. The mug is in your hand; you
+do not remember carrying it out, and you are not giving it back. The photograph is in the
+jacket's inside pocket, where it has apparently always been kept. You remember the kitchen
+now, and the window, and the weather — and you understand that the weather outside that
+window tonight will be this weather, the one you are standing in.
+
+You take off the lanyard — TEMPORARY STAFF, in a font that has stopped shifting now that
+it no longer matters — and leave it coiled in the planter, beside the plant that is doing
+its best.
+
+Your two weeks' notice, you decide, will be effective immediately, and retroactive.
+
+
+                    ~ THE END ~
+            The parking lot. You made it out.
+     (Noted as a breach of contract. Noted. Filed.)</textarea>
+      <button class="copy-btn" onclick="cp('n7',this)">Copy</button>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ CHARACTER -->
+<section id="character">
+  <h2>Character</h2>
+  <p>This adventure uses the existing <strong>Choose Your Own</strong> character. No new character is needed.
+  The system prompt scans for all notes matching <code>g.cyo.&lt;name&gt;</code> and presents them as
+  adventure options. Once <code>g.cyo.discombobulation</code> exists, it appears in the list automatically.</p>
+  <p>The tools list is the same as The Living Dark v2 — if that adventure is set up, nothing needs changing.</p>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key" style="font-family:var(--serif);font-size:1rem;">Choose Your Own</span>
+      <span class="badge b-global">existing character</span>
+    </div>
+    <div class="field">
+      <span class="field-lbl">Tools</span>
+      <div>
+        <span class="tool-tag">world_state</span>
+        <span class="tool-tag">note_load</span>
+        <span class="tool-tag">note_list</span>
+        <span class="tool-tag">note_save</span>
+        <span class="tool-tag">note_append</span>
+        <span class="tool-tag">note_to_self</span>
+        <span class="tool-tag">pick_random</span>
+        <span class="tool-tag">random_chance</span>
+        <span class="tool-tag">generate_image_sdxl</span>
+        <p style="margin-top:.5rem;font-size:.8rem;color:var(--muted);">
+          If setting up Choose Your Own for the first time, see the
+          <a href="eldoria-adventure.html">Eldoria adventure guide</a> for the full character setup and system prompt.
+        </p>
+      </div>
+    </div>
+    <div class="field" style="border-bottom:none;">
+      <span class="field-lbl">First message</span>
+      <span style="font-size:.875rem;">Hello adventurer. What is your name?</span>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ PLAY -->
+<section id="play">
+  <h2>Starting play</h2>
+  <ol class="steps">
+    <li>Start a new conversation with <strong>Choose Your Own</strong>.</li>
+    <li>It will present available adventures. Say <strong>"Adventure in Discombobulation"</strong>.</li>
+    <li>The GM loads lore, sets world state, creates the activity log, generates an opening image, and reads the intro. The clock says 4:47 PM. Play begins.</li>
+    <li>Each response ends with the status line and three choices. One of the three will seem to have been misfiled from a different day. Pick one, or type something else.</li>
+  </ol>
+
+  <div class="callout">
+    <strong>Help Pat with the Q3 box.</strong> Examine the bottom shelf in Records, or ask Pat what they keep looking at. Helping gets the Delta-logs reconciled without a search, reveals the photograph, and earns the hallway advice — advantage on the Recursive Hallway.
+  </div>
+
+  <div class="callout">
+    <strong>The break room pays for itself.</strong> A detour there costs two clock advances (26 minutes), and the one coffee the vending machine will dispense recedes the clock exactly 26 minutes — plus 2 bandwidth, plus the mug is in the drying rack. The building never learned to schedule caffeine.
+  </div>
+
+  <div class="callout">
+    <strong>Keep the SOP excerpt in hand during audits.</strong> When the symmetrical man appears, consulting the crumpled excerpt passes the audit automatically. Answering from memory is a roll.
+  </div>
+
+  <div class="callout">
+    <strong>Do not be too compliant.</strong> At Exemplary compliance, you are promoted to a position requiring permanent on-site presence. Declining requires Form 27-C, which must be requested from the man promoting you. He is glad you asked.
+  </div>
+
+  <div class="callout">
+    <strong>If the GM declares an outcome before rolling:</strong> say
+    <em>"You need to record the outcomes before calling pick_random — check the rules note."</em>
+  </div>
+
+  <h3>Adjusting difficulty</h3>
+  <p>Turn off read-only, edit, then re-enable read-only.</p>
+  <ul class="plain">
+    <li><strong>Easier:</strong> In <code>g.cyo.discombobulation</code>, change <code>mental_bandwidth = "4"</code> to <code>"6"</code>.</li>
+    <li><strong>Easier:</strong> Change <code>office_clock = "4:47 PM"</code> to <code>"4:21 PM"</code> — two extra transitions before lockdown.</li>
+    <li><strong>Easier:</strong> In <code>g.cyo.discombobulation.rules</code>, allow the coffee twice. The vending machine misreads the fiscal quarter.</li>
+    <li><strong>Harder:</strong> Starting bandwidth <code>"3"</code>, or start the clock at <code>"5:00 PM"</code>.</li>
+    <li><strong>Harder:</strong> Set <code>hr_engagement_level = "1"</code> in WORLD STATE INIT — one associate is already circling back.</li>
+    <li><strong>Much harder:</strong> Remove the COFFEE RECESSION paragraph from the rules note. The clock only moves forward, the way clocks are believed to.</li>
+  </ul>
+</section>
+
+<script>
+function cp(id, btn) {
+  navigator.clipboard.writeText(document.getElementById(id).value).then(() => {
+    btn.textContent = 'Copied';
+    btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>
