@@ -79,6 +79,20 @@ function renderPage() {
       </div>
     </div>
     <div class="section">
+      <h2>Note packs</h2>
+      <div class="tool-row">
+        <div class="tool-row-info">
+          <div class="tool-row-name">Import note pack</div>
+          <div class="tool-row-desc">Load a .json note pack — creates or updates all notes in the pack. Existing notes with the same key are overwritten.</div>
+        </div>
+        <div>
+          <input type="file" id="note-pack-file" accept=".json" style="display:none">
+          <button class="btn btn-secondary btn-sm" id="btn-import-note-pack">Choose file</button>
+        </div>
+      </div>
+      <div id="note-pack-result" class="tool-result hidden"></div>
+    </div>
+    <div class="section">
       <h2>Database</h2>
       <div class="tool-row" id="tool-orphaned-messages">
         <div class="tool-row-info">
@@ -91,7 +105,48 @@ function renderPage() {
     </div>
   `;
 
+  document.getElementById('btn-import-note-pack').addEventListener('click', () => {
+    document.getElementById('note-pack-file').click();
+  });
+  document.getElementById('note-pack-file').addEventListener('change', runImportNotePack);
   document.getElementById('btn-orphaned-messages').addEventListener('click', runDeleteOrphanedMessages);
+}
+
+async function runImportNotePack(e) {
+  const file   = e.target.files[0];
+  const btn    = document.getElementById('btn-import-note-pack');
+  const result = document.getElementById('note-pack-result');
+  if (!file) return;
+
+  e.target.value = '';
+  btn.disabled    = true;
+  btn.textContent = 'Importing…';
+  result.className = 'tool-result hidden';
+
+  let pack;
+  try {
+    pack = JSON.parse(await file.text());
+  } catch {
+    result.className   = 'tool-result tool-result--error';
+    result.textContent = 'Failed: could not parse JSON file.';
+    result.classList.remove('hidden');
+    btn.disabled    = false;
+    btn.textContent = 'Choose file';
+    return;
+  }
+
+  try {
+    const data = await admin.notePacks.import(pack);
+    result.className   = 'tool-result tool-result--ok';
+    result.textContent = `Imported ${data.imported} note${data.imported === 1 ? '' : 's'} from "${data.pack_name}" v${data.pack_version}.`;
+  } catch (err) {
+    result.className   = 'tool-result tool-result--error';
+    result.textContent = 'Failed: ' + (err.message || 'unknown error');
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = 'Choose file';
+    result.classList.remove('hidden');
+  }
 }
 
 async function runDeleteOrphanedMessages() {

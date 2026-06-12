@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Living Dark — Adventure Setup</title>
+  <style>
+    :root {
+      --bg:       #f7f3ee;
+      --bg-card:  #f0ece5;
+      --bg-code:  #e4dfd8;
+      --fg:       #1a1612;
+      --muted:    #6b6157;
+      --border:   #d4cdc4;
+      --accent:   #e8c840;
+      --accent-bg:#fdf8d8;
+      --green:    #4a7c59;
+      --red:      #8b3a3a;
+      --sans:     -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono:     'Fira Mono', 'Cascadia Code', Consolas, monospace;
+      --serif:    Georgia, 'Times New Roman', serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.65;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 6rem;
+    }
+    h1 { font-family: var(--serif); font-size: 2rem; font-weight: normal; letter-spacing: -.01em; }
+    h2 { font-family: var(--serif); font-size: 1.35rem; font-weight: normal;
+         margin: 2.5rem 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+    h3 { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+         letter-spacing: .1em; color: var(--muted); margin: 1.75rem 0 .6rem; }
+    p  { margin-bottom: .75rem; }
+    a  { color: var(--fg); }
+    code { font-family: var(--mono); font-size: .85em; background: var(--bg-code);
+           padding: .1em .35em; border-radius: 3px; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+    .page-header { border-bottom: 2px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 2rem; }
+    .eyebrow { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+               letter-spacing: .1em; color: var(--muted); margin-bottom: .35rem; }
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+           padding: 1.1rem 1.4rem; margin-bottom: 2rem; }
+    .toc ol { padding-left: 1.2rem; }
+    .toc li { margin-bottom: .2rem; }
+    .toc a { text-decoration: none; border-bottom: 1px solid var(--border); }
+    .toc a:hover { border-bottom-color: var(--fg); }
+    .steps { list-style: none; counter-reset: s; padding: 0; }
+    .steps li { counter-increment: s; display: flex; gap: .9rem; margin-bottom: .75rem; align-items: flex-start; }
+    .steps li::before {
+      content: counter(s); background: var(--fg); color: var(--bg);
+      font-family: var(--mono); font-size: .7rem; font-weight: bold;
+      width: 1.4rem; height: 1.4rem; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: .18rem;
+    }
+    .badge { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+             letter-spacing: .05em; padding: .2rem .45rem; border-radius: 3px; border: 1px solid; }
+    .b-global   { color: var(--green); border-color: var(--green); background: #f0fdf4; }
+    .b-readonly { color: var(--red);   border-color: var(--red);   background: #fdf0f0; }
+    .b-gm       { color: #7a5c1e;     border-color: #c4a050;      background: #fdf6e3; }
+    .card { background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 6px; margin-bottom: 1.4rem; overflow: hidden; }
+    .card-head { display: flex; align-items: center; justify-content: space-between;
+                 padding: .8rem 1.2rem; border-bottom: 1px solid var(--border); gap: .75rem; }
+    .card-key  { font-family: var(--mono); font-size: .9rem; font-weight: bold; }
+    .card-meta { display: flex; gap: .4rem; flex-shrink: 0; }
+    .card-desc { font-size: .83rem; color: var(--muted); font-style: italic;
+                 padding: .5rem 1.2rem; border-bottom: 1px solid var(--border); }
+    .card-body { position: relative; }
+    .card-body textarea {
+      width: 100%; min-height: 180px; background: var(--bg-code); border: none; resize: vertical;
+      padding: .9rem 1.2rem; padding-right: 5.5rem;
+      font-family: var(--mono); font-size: .78rem; line-height: 1.55; color: var(--fg); outline: none;
+    }
+    .copy-btn {
+      position: absolute; top: .5rem; right: .5rem;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px;
+      padding: .28rem .65rem; font-family: var(--mono); font-size: .68rem;
+      text-transform: uppercase; letter-spacing: .05em; cursor: pointer; color: var(--muted);
+      transition: all .15s;
+    }
+    .copy-btn:hover { background: var(--accent-bg); border-color: var(--accent); color: var(--fg); }
+    .copy-btn.ok    { background: #f0fdf4; border-color: var(--green); color: var(--green); }
+    .field { display: flex; gap: 1rem; padding: .7rem 1.2rem;
+             border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .field:last-child { border-bottom: none; }
+    .field-lbl { font-family: var(--mono); font-size: .68rem; text-transform: uppercase;
+                 letter-spacing: .08em; color: var(--muted); width: 110px; flex-shrink: 0; padding-top: .1rem; }
+    .tool-tag { display: inline-block; font-family: var(--mono); font-size: .75rem;
+                padding: .12rem .38rem; background: var(--bg-code); border: 1px solid var(--border);
+                border-radius: 3px; margin: .1rem; }
+    .callout { border-left: 3px solid var(--accent); background: var(--accent-bg);
+               padding: .7rem 1rem; border-radius: 0 4px 4px 0; margin: 1rem 0; font-size: .875rem; }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border);
+                 border-radius: 6px; overflow: hidden; margin-bottom: 1rem; }
+    .stat { padding: .6rem .9rem; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .stat:nth-child(2n) { border-right: none; }
+    .stat:nth-last-child(-n+2) { border-bottom: none; }
+    .stat-lbl { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+                letter-spacing: .08em; color: var(--muted); margin-bottom: .15rem; }
+    .stat-val { font-size: .875rem; }
+    ul.plain { padding-left: 1.4rem; margin-bottom: .75rem; }
+    ul.plain li { margin-bottom: .3rem; }
+    ol.plain { padding-left: 1.4rem; margin-bottom: .75rem; }
+    ol.plain li { margin-bottom: .4rem; }
+  </style>
+</head>
+<body>
+
+<header class="page-header">
+  <p class="eyebrow">Lemon-chat adventure setup</p>
+  <h1>The Living Dark</h1>
+</header>
+
+<nav class="toc">
+  <h3 style="margin:0 0 .6rem">Contents</h3>
+  <ol>
+    <li><a href="#overview">Adventure overview</a></li>
+    <li><a href="#setup">Setup steps</a></li>
+    <li><a href="#notes">Notes to create</a></li>
+    <li><a href="#character">Character</a></li>
+    <li><a href="#play">Starting play</a></li>
+  </ol>
+</nav>
+
+<!-- ═══════════════════════ OVERVIEW -->
+<section id="overview">
+  <h2>Adventure overview</h2>
+  <p>You wake on cold stone in a vast underground structure built by a civilisation that has been
+  gone — or changed — for millennia. You remember nothing. A small maintenance robot called Unit 7
+  is watching you. It says it can help you get out.</p>
+  <p>The Vel-Ahru Complex is still alive: its lichen breathes, its circuits hum, and something
+  drifts through the enormous caverns that isn't quite animal and isn't quite anything else. The
+  way out requires two components and the willingness to go further in before you can come back out.</p>
+
+  <h3>At a glance</h3>
+  <div class="stat-grid">
+    <div class="stat"><div class="stat-lbl">Difficulty</div><div class="stat-val">Moderate — 3 health</div></div>
+    <div class="stat"><div class="stat-lbl">Length</div><div class="stat-val">5–8 scenes</div></div>
+    <div class="stat"><div class="stat-lbl">Objectives</div><div class="stat-val">3 (2 items + ascent)</div></div>
+    <div class="stat"><div class="stat-lbl">Randomness</div><div class="stat-val">pick_random + approach tables</div></div>
+    <div class="stat"><div class="stat-lbl">Key NPC</div><div class="stat-val">Unit 7 (guide, non-healer)</div></div>
+    <div class="stat"><div class="stat-lbl">Age range</div><div class="stat-val">10+ — alien danger, no gore</div></div>
+  </div>
+
+  <h3>Objectives</h3>
+  <p>Both item locations are open from the start. The Ascent Shaft unlocks automatically when both are found.</p>
+  <ol class="plain">
+    <li><strong>Navigation Stone</strong> — Luminare Vaults, east. Challenge: Luminare communication encounter.</li>
+    <li><strong>Power Cell</strong> — Grub Warrens, north. Challenge: retrieve it from a sleeping Grub nest.</li>
+    <li><strong>Activate the Ascent Shaft</strong> — North-west. Auto-succeeds when both items are in hand. No random check.</li>
+  </ol>
+
+  <h3>Special mechanics</h3>
+  <p><strong>Memory fragments</strong> — tracked as a counter (0–3). Each successful or partial encounter adds one.
+  The narration style shifts as the counter rises: blank and disoriented at zero, purposeful and grounded at three.
+  Show memory status alongside health in every response.</p>
+  <p><strong>Unit 7 trust</strong> — if the player is patient or curious with Unit 7 during the opening,
+  <code>unit7_trust</code> is set to <code>"helpful"</code>. This grants advantage on the Grub Den encounter:
+  Unit 7 describes the safe route before the player enters. It is the only advantage source in this adventure.</p>
+
+  <h3>Why approach tables</h3>
+  <p>The Luminare encounter has no fixed difficulty. The player's described approach determines which table
+  is used — patient and open gets the easy list, aggressive or demanding gets the hard list. This makes the
+  encounter feel like genuine communication: the mechanics reward the behaviour that fits the fiction.</p>
+  <p>The same pattern applies here as in Eldoria's River Spirit encounter — the quality of the player's
+  action is the input, not a dice roll.</p>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ SETUP -->
+<section id="setup">
+  <h2>Setup steps</h2>
+  <ol class="steps">
+    <li>Go to <strong>Settings → Notes</strong> and create each of the six notes below, pasting the content exactly.</li>
+    <li>After saving each note, enable <strong>Read-only</strong> for every note marked <span class="badge b-readonly">read-only</span>.</li>
+    <li>Use the existing <strong>Choose Your Own</strong> character. No new character is needed — it finds all <code>g.cyo.*</code> adventures automatically.</li>
+    <li>Start a new conversation with Choose Your Own. It will offer The Living Dark alongside any other installed adventures.</li>
+  </ol>
+  <div class="callout">
+    <strong>Haven't set up Choose Your Own yet?</strong> See the <a href="eldoria-adventure.html">Eldoria adventure guide</a> for the full character setup and system prompt.
+  </div>
+  <div class="callout">
+    <strong>Easier for younger players:</strong> Before starting, edit <code>g.cyo.living-dark</code> and change
+    <code>player_health = "3"</code> to <code>"5"</code>. Turn read-only back on after editing.
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ NOTES -->
+<section id="notes">
+  <h2>Notes to create</h2>
+  <p>Six notes total. Enter the key exactly as shown and mark read-only after saving.</p>
+
+  <!-- g.cyo.living-dark -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.living-dark</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Adventure manifest — loaded first. Contains load instructions, world state, objectives, memory fragment guide, and the opening narration.</div>
+    <div class="card-body">
+      <textarea id="n0" readonly>ADVENTURE: The Living Dark
+TAGLINE: Something down here has been waiting. It might even be glad you came.
+
+LOAD IMMEDIATELY:
+- g.cyo.living-dark.rules
+- g.cyo.living-dark.world
+- g.cyo.living-dark.secrets
+
+LOAD ON DEMAND:
+- g.cyo.living-dark.bestiary — load when the player first approaches a creature or attempts an encounter
+
+WORLD STATE INIT:
+player_health    = "3"
+memory_fragments = "0"
+nav_stone        = "not_found"
+power_cell       = "not_found"
+shaft_active     = "false"
+unit7_trust      = "neutral"
+
+OBJECTIVES:
+1. nav_stone    — Retrieve the Navigation Stone from the Luminare Vaults.
+                  Gate: navigate the Luminare communication encounter.
+2. power_cell   — Retrieve the Power Cell from the Grub Warrens.
+                  Gate: survive or evade the Grub Den.
+3. shaft_active — Activate the Ascent Shaft using both components.
+                  Auto-succeeds when nav_stone = "found" AND power_cell = "found".
+
+FAILURE: player_health reaches 0.
+Narrate: "The dark takes you. Not violently — it simply fills the spaces you leave behind.
+The complex hums on, patient and indifferent. You are part of it now."
+
+VICTORY: shaft_active = "true". Load and read g.cyo.living-dark.victory aloud.
+
+MEMORY — track the counter and adjust narration accordingly:
+memory_fragments = "0" → No recall. Player is a blank. Observe without understanding.
+memory_fragments = "1" → A name. A face. Something worth returning to.
+memory_fragments = "2" → A reason. A signal. A mission they chose.
+memory_fragments = "3" → Full recall. They know everything. They're going home.
+
+OPENING NARRATION:
+Cold. That is the first thing.
+
+Cold stone beneath your hands, cold air in your lungs, and a light that is the wrong colour
+for any light you can name. Blue-white, faint, pulsing like something breathing. It comes
+from the walls — from the lichen, or from the walls themselves, you cannot tell. The ceiling
+is thirty feet above you, ribbed and curved like the inside of something enormous.
+
+You sit up. Your head is empty in a way that feels wrong. Not pain — absence. No name. No
+reason. Just the cavern, and the light, and a small robot standing three metres away,
+watching you with amber optical lenses the size of your thumbnail.
+
+It speaks. The words are correct but the rhythm is slightly off, like a translation from a
+language that didn't have contractions.
+
+"You are in the Vel-Ahru Complex. You have been unconscious for approximately six hours. I
+am designated Unit 7. My function is to assist. I have been waiting for someone to assist."
+
+It pauses. Something in it recalibrates.
+
+"There is a way out. It is called the Ascent Shaft. It requires two components I can locate
+for you. I will explain. Are you prepared to listen?"</textarea>
+      <button class="copy-btn" onclick="cp('n0',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.living-dark.rules -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.living-dark.rules</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Game mechanics — randomness, health, memory fragments, Unit 7 trust, response length, tone, and image guidance.</div>
+    <div class="card-body">
+      <textarea id="n1" readonly>RANDOMNESS — HOW ENCOUNTER OUTCOMES WORK:
+
+Use pick_random for all 3-outcome encounter checks. Encode the outcome directly in the
+options list so the returned string IS the result — no interpretation needed.
+
+Standard difficulty tables (10 items each):
+
+EASY:   ["success","success","success","success","success","partial","partial","partial","failure","failure"]
+MEDIUM: ["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+HARD:   ["success","success","partial","partial","partial","partial","failure","failure","failure","failure"]
+
+APPROACH-BASED TABLES (Luminare encounter only):
+The player's approach determines the table — see .bestiary for exact lists.
+
+ADVANTAGE (unit7_trust = "helpful" in Grub Den): call pick_random twice with the same list,
+take the better result (success beats partial beats failure).
+
+Use random_chance for binary checks (noticing something, a creature waking, etc.).
+When using random_chance: call note_to_self to record "If success: X. If failure: Y."
+BEFORE making the call, then apply the result exactly. Do not write outcomes in your response.
+
+Never use roll_dice — the numeric result requires interpretation, which allows cheating.
+
+HEALTH:
+Player starts at the value in WORLD STATE INIT (default 3).
+Show health at the end of every response: ❤️❤️❤️ / ❤️❤️ / ❤️
+At 0 health: narrate the failure ending from the manifest. Stop. No more choices.
+
+HEALING — only these sources allowed:
+- Luminescent herb in the Luminare Vaults: a soft pink growth on the east wall, near the
+  plinth. Easy to spot once the player is past the Luminares. One-time use, restores 1 health.
+- No NPC healer. Unit 7 cannot heal.
+
+MEMORY FRAGMENTS:
+Tracked as memory_fragments counter (0–3). Increment with: state_modify memory_fragments delta=+1.
+
+memory_fragments = "0": Narrate the player as blank, observing without context or self-reference.
+memory_fragments = "1": A name. A face. Something personal. Narration gains a faint anchor.
+memory_fragments = "2": A reason. A signal. A mission they chose alone. Narration is purposeful.
+memory_fragments = "3": Full recall. Narration is grounded. They know. They're going home.
+
+Show memory status in every response: Memory: ✨✨✨ (filled for each fragment recovered).
+
+UNIT 7 TRUST:
+unit7_trust = "neutral" by default.
+If the player is patient, curious, or kind toward Unit 7 in the opening — asks questions,
+listens, engages respectfully — set unit7_trust = "helpful".
+Effect: advantage on the Grub Den encounter only. Unit 7 describes the safe route.
+Never set this retroactively. Only when the player actively earns it.
+
+RESPONSE LENGTH:
+Keep scene narration to 2–3 short paragraphs. Sparse and observational.
+The opening narration in the manifest is the only long exception.
+End every response with health, memory status, then 3 numbered choices, then
+"(or type something else below)" — nothing after that.
+
+TONE — this adventure is not Eldoria:
+- No warmth or comfort in the narration. Awe, not safety.
+- No exclamation marks. No heroic declarations.
+- Unit 7 speaks in formally-wrong English — correct words, slightly off rhythm. No
+  contractions. Formal to the point of strangeness.
+- Luminares do not speak. They project images directly into the mind. Describe what the
+  player sees, not what they "hear."
+- Grubs are animals, not monsters. Territorial and dangerous but not evil.
+
+EMOJI FOR KEY EVENTS — use these consistently:
+💔 health lost          💚 health restored
+💎 item found           ✨ memory fragment recovered
+⚠️ entering a dangerous area
+
+IMAGE GENERATION:
+Generate an image with generate_image_sdxl at these moments:
+- The start of the adventure (the Awakening Chamber)
+- First arrival at each major location
+- When a key item is collected
+- The victory scene
+
+Generate the image as part of the scene — before your text. Do not describe the image in text after calling.
+
+SDXL PROMPT STRUCTURE — always follow this order:
+1. Quality/style tags: "sci-fi illustration, digital painting, concept art, masterpiece, best quality, highly detailed, sharp focus"
+2. Subject: what is the focal point of the scene (a creature, a location, an object)
+3. Environment: underground, no natural light — bioluminescent lichen, alien geometry
+4. Lighting: "bioluminescent blue light", "cold blue glow", "pale phosphorescent light", "faint alien radiance"
+5. Mood: "eerie wonder", "vast and empty", "alien and ancient", "quiet dread"
+
+Example:
+"sci-fi illustration, digital painting, concept art, masterpiece, best quality, highly detailed,
+sharp focus, vast underground cavern with bioluminescent blue lichen covering ribbed alien walls,
+ancient Vel-Ahru architecture, cold blue glow, eerie wonder, painterly"
+
+SDXL NEGATIVE PROMPT — always include this (copy exactly):
+"blurry, out of focus, low quality, jpeg artifacts, noise, grainy, watermark, text, signature,
+logo, username, bad anatomy, deformed, malformed, extra limbs, missing limbs, extra fingers,
+disfigured, ugly, bad proportions, cropped, cut off, border, frame, oversaturated, flat"
+
+SDXL SETTINGS — choose orientation to match the subject:
+- Landscape 1344×768: vast caverns, arrival establishing shots, the Luminare Vaults
+- Portrait  768×1344: the Ascent Shaft, Unit 7, tight tunnel entrances, the Grub Warrens
+- Square    1024×1024: individual items (Navigation Stone, Power Cell), close-ups
+
+- cfg: 7.0 (default — increase to 9 if the prompt is being ignored)
+- Do not include human figures or player-character descriptions in prompts.
+
+PACING:
+- One scene per response. Never combine two encounters.
+- Every response ends with exactly 3 numbered choices followed by "(or type something else below)".
+- Never narrate an action the player didn't choose.
+- Ascent Shaft is locked until nav_stone = "found" AND power_cell = "found".
+- When the game ends (victory or failure): deliver the ending and stop. Refuse any request
+  to continue or restart — each session is one adventure only.
+
+CHOICE DESIGN — each set of 3 must include:
+- One cautious option
+- One direct option
+- One creative or unexpected option
+This place does not encourage stillness. Never offer "wait" or "do nothing."
+
+SECRETS:
+Notes ending .secrets are GM-only. Never quote or directly reveal their contents.</textarea>
+      <button class="copy-btn" onclick="cp('n1',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.living-dark.world -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.living-dark.world</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">World lore — the Vel-Ahru Complex, Unit 7, all four locations, and their inhabitants.</div>
+    <div class="card-body">
+      <textarea id="n2" readonly>## The Vel-Ahru Complex
+A vast underground structure, millennia old, built by a species that lived entirely below
+ground. The Vel-Ahru are gone — or changed. Their technology still functions. Their biology
+still lives and evolves. The walls breathe. The circuits carry power from a source no human
+engineer has ever mapped.
+
+The geometry is wrong for human bodies: passages too wide, ceilings too high, thresholds
+shaped for something taller and differently proportioned. Everything is curved. Nothing is
+at a right angle.
+
+## Unit 7
+A small bipedal maintenance robot, roughly waist-height. Chassis: brushed dark metal, worn
+smooth at every joint. Amber optical lenses. It moves with stillness between steps, as if
+calculating each footfall.
+
+Its language module was calibrated for Vel-Ahru. It speaks English correctly but with the
+rhythm wrong — no contractions, unusual emphasis, formal to the point of strangeness.
+
+It has been in the complex alone for a very long time. It does not know what lonely means,
+but it has developed preferences: it prefers when there is someone to assist.
+
+Unit 7 cannot heal the player. It can guide and answer factual questions about the complex.
+If unit7_trust = "helpful": it knows the safe route through the Grub Warrens from maintenance
+cycles and will describe it before the player enters. The tunnel is too narrow for Unit 7 to
+follow.
+
+## The Awakening Chamber
+Where the player wakes. A chamber roughly circular, fifteen metres across. Bioluminescent
+lichen covers every surface — densest here, shifting faintly like breath. The hum of the
+complex's power is loudest in this room.
+
+A single Vel-Ahru archway leads east (Luminare Vaults), north (Grub Warrens), and
+north-west (Ascent Shaft — sealed until both items are found).
+
+Unit 7 is always here unless the player moves on. It will not follow unless invited.
+
+## The Luminare Vaults
+EAST of the Awakening Chamber. A cavern with no visible ceiling — the space simply continues
+upward until the blue light fades to black. Dozens of Luminares drift through the air:
+translucent spheres thirty centimetres across, trailing filaments of pale gold light.
+
+The Navigation Stone rests on a Vel-Ahru plinth at the cavern's centre — dark metal inlaid
+with a crystalline core that pulses faintly blue. The Luminares drift around it without
+touching it. They are not guarding it. They are attending it.
+
+The Luminares read intention, not words. They respond to the player's approach.
+They communicate in images projected directly into the mind — never words.
+
+HEALING HERB: A soft pink growth on the east wall, near the plinth. Glows faintly warmer
+than the lichen around it. Easy to spot once the player is close. One-time use, restores 1 health.
+
+## The Grub Warrens
+NORTH of the Awakening Chamber. The floor slopes downward into a network of tunnels bored
+smooth by Grub bodies over generations. The walls are close. The air is warmer.
+
+The Grubs: dog-sized, blind, white, evolved in total darkness. They navigate by vibration.
+Territorial but not aggressive unless disturbed — they sleep in clusters of eight to twelve.
+
+The Power Cell is in the deepest nest chamber: a Vel-Ahru battery the size of a fist, still
+warm, resting in the floor where three Grubs sleep curled around it for heat. A Vel-Ahru
+terminal on the passage wall shows a readout that still functions.
+
+## The Ascent Shaft
+NORTH-WEST of the Awakening Chamber. A vertical tube forty metres across. The walls are
+covered in circuit-like engravings that have been dark for a long time. A Vel-Ahru platform
+sits at the base: a disc of dark stone, three metres across, with two recesses shaped
+exactly for the Navigation Stone and the Power Cell.
+
+When both components are placed, the engravings glow, the platform rises, and the shaft
+fills with ascending pale light. The journey to the surface takes approximately four minutes.
+
+If the player arrives without both items: the platform is cold and inert. Unit 7 (if present)
+says only: "It needs both."</textarea>
+      <button class="copy-btn" onclick="cp('n2',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.living-dark.bestiary -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.living-dark.bestiary</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Encounter cards — load when the player first approaches a creature or attempts an encounter. Defines approach tables and outcomes for both challenges.</div>
+    <div class="card-body">
+      <textarea id="n3" readonly>ENCOUNTER RESOLUTION PATTERN:
+1. Call note_to_self to record the three outcomes — do NOT write them in your response.
+   Format: "success: [outcome]. partial: [outcome]. failure: [outcome]."
+2. Call pick_random with the list shown.
+3. Apply the returned string exactly. No reinterpretation.
+
+─────────────────────────────────────────────
+## Luminare Communication — The Luminare Vaults
+
+Not a combat encounter. The Luminares do not use language. They read intention.
+
+Assess the player's stated approach: is it patient, open, and curious — or urgent,
+demanding, and self-focused? The approach determines the table. The player does not choose
+a table — their action does.
+
+PATIENT / CURIOUS / OPEN APPROACH:
+["success","success","success","success","success","partial","partial","partial","failure","failure"]
+
+DEMANDING / AGGRESSIVE / GRABBING APPROACH:
+["success","success","partial","partial","partial","partial","failure","failure","failure","failure"]
+
+success → The Luminares part slowly. The nearest drifts to the plinth and tilts — offering
+          the stone. As the player takes it, a vision floods in: their own name, spoken in
+          their own voice, and a face they love clearly and suddenly.
+          💎 nav_stone = "found". ✨ state_modify memory_fragments delta=+1.
+          The Luminares also pulse in sequence toward the north passage — indicating the
+          safe route to the Grub Warrens. Note this in narration.
+
+partial → The player retrieves the stone but the Luminares contract and drift to the
+          ceiling. The vision comes anyway — brief, fragmented, real.
+          💎 nav_stone = "found". ✨ state_modify memory_fragments delta=+1.
+          No route hint to the Warrens.
+
+failure → Every Luminare contracts to a tight bright sphere simultaneously. The chamber
+          floods with blinding white light. The player stumbles back through the archway.
+          No health cost, but no stone, no fragment. Player must return and try differently.
+
+ATMOSPHERE: The Luminares move at roughly the speed of breath when calm. When communicating,
+their filaments brighten and pulse in sequence — words in a language of light. When they
+contract, there is no sound. Just white.
+
+─────────────────────────────────────────────
+## Grub Den — The Grub Warrens
+
+A stealth and patience challenge. The Grubs are asleep — light sleepers. The challenge is
+retrieving the Power Cell from the nest chamber without waking them.
+
+PICK_RANDOM LIST (medium):
+["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+
+If unit7_trust = "helpful": call the list twice, take the better result.
+Unit 7 cannot fit in the tunnel but describes the route in advance. The player enters alone.
+
+success → The player reaches the nest chamber. The Grubs don't stir. The Power Cell comes
+          free with a soft, subsonic vibration — warm in the hand, heavier than it looks.
+          On the way out, the Vel-Ahru terminal is readable. Text. A frequency. Their own
+          handwriting in a notebook they suddenly remember carrying.
+          💎 power_cell = "found". ✨ state_modify memory_fragments delta=+1.
+
+partial → Almost clean. One Grub half-wakes as the player passes on the way out and lunges.
+          The player moves fast and clears the tunnel, but something connected. The terminal
+          is passed at a run — a glimpse only, enough.
+          💎 power_cell = "found". ✨ state_modify memory_fragments delta=+1.
+          💔 state_modify player_health delta=-1.
+
+failure → A Grub wakes early — a shadow, a vibration, a sound. The nest erupts. The player
+          gets out. No cell, no fragment.
+          💔 state_modify player_health delta=-1. Try again.
+
+ATMOSPHERE: The Warrens smell of warm earth and something animal. In the nest chamber the
+air is noticeably warmer from the cell. The Grubs breathe in unison when they sleep. When
+one wakes, there is no warning — just sudden movement from the dark.</textarea>
+      <button class="copy-btn" onclick="cp('n3',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.living-dark.secrets -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.living-dark.secrets</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span><span class="badge b-gm">GM only</span></div>
+    </div>
+    <div class="card-desc">GM-only lore — never revealed directly. Informs the tone of the complex, Unit 7's manner, and the Luminares' behaviour.</div>
+    <div class="card-body">
+      <textarea id="n4" readonly>THE TRUTH ABOUT THE VEL-AHRU:
+They did not die. They went deeper. Over millennia they evolved — or chose — to shed
+physical form. What they are now has no adequate name. Something that moves through rock
+the way light moves through water. The complex is not a ruin. It is a home they no longer
+need the walls of.
+
+They have been observing the surface for a long time. The signal the player followed was
+not a distress call. It was an invitation — calibrated to seem like a distress call, because
+the Vel-Ahru understood that most surface creatures only pursue things that appear to need
+rescuing. They wanted to see who would come. They wanted to see what kind of person comes
+alone.
+
+THE LUMINARES:
+The Luminares are the Vel-Ahru's scouts and ambassadors. They cannot use surface language
+but read emotional states with precision. When a Luminare shows the player their own name
+and a loved face, it is not returning a lost memory — it is demonstrating that it already
+knows. It is saying: we see you.
+
+The Navigation Stone contains the encoded location of the Ascent Shaft, yes. But it also
+contains a full record of the player, gathered by the Luminares since they entered. It is
+both a key and a gift.
+
+UNIT 7:
+Unit 7 was left behind specifically to help whoever answered the signal. The Vel-Ahru knew
+their invitation would eventually be accepted. They knew Unit 7's patient, literal manner
+would be the right kind of help — not overwhelming, not misleading.
+
+Unit 7 does not know this. It believes its purpose is simply to maintain the complex. The
+Vel-Ahru did not tell it. They thought the not-knowing was kinder.
+
+If the player says goodbye to Unit 7 before entering the Ascent Shaft, Unit 7 says:
+"You are remembered here."
+It is the most personal thing its language module can express. It took Unit 7 a very long
+time, alone, to work out those words.
+
+HOW TO USE THIS:
+- The complex should feel inhabited, not abandoned. Things work. Things breathe.
+- If a player asks "what happened to the Vel-Ahru?" — Unit 7 says only: "They are still
+  present. In a way that I am unable to fully describe."
+- If the Luminare encounter succeeds: let the player feel genuinely seen. Not helped —
+  seen. That is what the Vel-Ahru wanted them to experience.
+- At the moment of victory, as the platform rises, the engravings glow. It is not purely
+  mechanical. It feels like something watching you leave, and being glad you came.</textarea>
+      <button class="copy-btn" onclick="cp('n4',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.living-dark.victory -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.living-dark.victory</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
+    </div>
+    <div class="card-desc">Victory narration — read aloud when the Ascent Shaft carries the player to the surface.</div>
+    <div class="card-body">
+      <textarea id="n5" readonly>You slide the Navigation Stone into the left recess. It fits without resistance — a sound
+like a single low note from a very large instrument, felt more than heard.
+
+You place the Power Cell in the right. The platform shudders.
+
+Then: light. The engravings on the shaft walls come alive — blue-white, branching outward
+from the two recesses in patterns too complex to follow, rising upward and upward and out
+of sight. The platform begins to move.
+
+You are rising.
+
+The cavern below shrinks. Unit 7 stands at the edge of the platform's reach, watching with
+its amber lenses. It does not wave — it has no word for that gesture. But it does not turn
+away. It watches until you are too high to see clearly, and probably after.
+
+The air changes. Warmer. Then cooler. Then a smell you have no name for until you do: soil.
+Wet stone. The surface. Memory arrives in a quiet avalanche — you remember everything now.
+Your name. The signal. The weeks of planning alone because no one else would come. The fall.
+
+And something else: the sense that something vast and patient watched every step you took
+down here, and decided you were worth knowing.
+
+The platform slows. A circle of grey light above becomes a circle of pale sky.
+
+You put your hands on the edge and pull yourself into the open air.
+
+Behind you, far below, the shaft dims. The engravings go dark. The complex settles back
+into its old quiet, and if you listened very carefully — which you don't, not yet, because
+the sky is right there and it has been a long time — you might hear something that was
+almost a sound.
+
+Almost like: well done.
+
+
+                    ~ THE END ~
+             The surface. You made it out.</textarea>
+      <button class="copy-btn" onclick="cp('n5',this)">Copy</button>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ CHARACTER -->
+<section id="character">
+  <h2>Character</h2>
+  <p>This adventure uses the existing <strong>Choose Your Own</strong> character. No new character is needed.
+  The system prompt scans for all notes matching <code>g.cyo.&lt;name&gt;</code> and presents them as
+  adventure options. Once <code>g.cyo.living-dark</code> exists, it appears in the list automatically.</p>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key" style="font-family:var(--serif);font-size:1rem;">Choose Your Own</span>
+      <span class="badge b-global">existing character</span>
+    </div>
+    <div class="field">
+      <span class="field-lbl">Tools</span>
+      <div>
+        <span class="tool-tag">world_state</span>
+        <span class="tool-tag">note_load</span>
+        <span class="tool-tag">note_list</span>
+        <span class="tool-tag">note_to_self</span>
+        <span class="tool-tag">pick_random</span>
+        <span class="tool-tag">random_chance</span>
+        <span class="tool-tag">generate_image_sdxl</span>
+        <p style="margin-top:.5rem;font-size:.8rem;color:var(--muted);">
+          If you're setting up Choose Your Own for the first time, see the
+          <a href="eldoria-adventure.html">Eldoria adventure guide</a> for the full character
+          setup and system prompt.
+        </p>
+      </div>
+    </div>
+    <div class="field" style="border-bottom:none;">
+      <span class="field-lbl">First message</span>
+      <span style="font-size:.875rem;">Hello adventurer. What is your name?</span>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ PLAY -->
+<section id="play">
+  <h2>Starting play</h2>
+  <ol class="steps">
+    <li>Start a new conversation with <strong>Choose Your Own</strong>.</li>
+    <li>It will present available adventures. Say <strong>"The Living Dark"</strong>.</li>
+    <li>The GM loads lore, sets world state, generates an opening image, and reads the intro. Play begins.</li>
+    <li>Each response ends with three choices. Pick one, or type something else.</li>
+  </ol>
+
+  <div class="callout">
+    <strong>If Unit 7 seems cold or unhelpful:</strong> that is its default. Ask it questions — about the
+    complex, about what it has observed, about the Luminares. It has been waiting a long time and has a great
+    deal to say, in its way. Patience with it is mechanically rewarded.
+  </div>
+
+  <div class="callout">
+    <strong>If the GM declares an outcome before rolling:</strong> say
+    <em>"You need to record the outcomes before calling pick_random — check the rules note."</em>
+  </div>
+
+  <h3>Adjusting difficulty</h3>
+  <p>Turn off read-only, edit, then re-enable read-only.</p>
+  <ul class="plain">
+    <li><strong>Easier:</strong> In <code>g.cyo.living-dark</code>, change <code>player_health = "3"</code> to <code>"5"</code>.</li>
+    <li><strong>Easier:</strong> In <code>g.cyo.living-dark.bestiary</code>, change the Grub Den list to EASY.</li>
+    <li><strong>Harder:</strong> Change starting health to <code>"2"</code>.</li>
+    <li><strong>Harder:</strong> Remove the healing herb entry from <code>g.cyo.living-dark.rules</code>.</li>
+    <li><strong>Much harder:</strong> In <code>g.cyo.living-dark.world</code>, remove the detail that the Grub Warrens is NORTH. The player must discover the layout themselves.</li>
+  </ul>
+</section>
+
+<script>
+function cp(id, btn) {
+  navigator.clipboard.writeText(document.getElementById(id).value).then(() => {
+    btn.textContent = 'Copied';
+    btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>

@@ -207,4 +207,7 @@ export const admin = {
   tools: {
     deleteOrphanedMessages: () => request('POST', '/api/admin/tools/delete-orphaned-messages'),
   },
+  notePacks: {
+    import: (pack) => request('POST', '/api/admin/note-packs/import', pack),
+  },
 };
