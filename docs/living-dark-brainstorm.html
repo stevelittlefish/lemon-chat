@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Living Dark — Brainstorm: Making It Longer</title>
+  <style>
+    :root {
+      --bg:       #f7f3ee;
+      --bg-card:  #f0ece5;
+      --bg-code:  #e4dfd8;
+      --fg:       #1a1612;
+      --muted:    #6b6157;
+      --border:   #d4cdc4;
+      --accent:   #e8c840;
+      --accent-bg:#fdf8d8;
+      --sans:     -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --mono:     'Fira Mono', 'Cascadia Code', Consolas, monospace;
+      --serif:    Georgia, 'Times New Roman', serif;
+
+      /* Category colours */
+      --c1:       #3d6b4f;  /* existing tools — forest green */
+      --c1-bg:    #eef7f1;
+      --c1-border:#a8d4b7;
+      --c2:       #8a6510;  /* simple new tools — warm amber */
+      --c2-bg:    #fdf5e0;
+      --c2-border:#d4b060;
+      --c3:       #4a4880;  /* free reign — deep indigo */
+      --c3-bg:    #eeedf8;
+      --c3-border:#a8a6d4;
+
+      /* Impact */
+      --high:     #8b3a3a;
+      --high-bg:  #fdf0f0;
+      --med:      #6b6157;
+      --med-bg:   #f0ece5;
+      --low-bg:   #f7f3ee;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.65;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 8rem;
+    }
+    h1 { font-family: var(--serif); font-size: 2rem; font-weight: normal; letter-spacing: -.01em; }
+    h2 { font-family: var(--serif); font-size: 1.35rem; font-weight: normal;
+         margin: 3rem 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
+    h3 { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+         letter-spacing: .1em; color: var(--muted); margin: 1.75rem 0 .75rem; }
+    p  { margin-bottom: .75rem; }
+    a  { color: var(--fg); }
+    code { font-family: var(--mono); font-size: .85em; background: var(--bg-code);
+           padding: .1em .35em; border-radius: 3px; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+    ul.plain { padding-left: 1.4rem; margin-bottom: .75rem; }
+    ul.plain li { margin-bottom: .35rem; }
+    ol.plain { padding-left: 1.4rem; margin-bottom: .75rem; }
+    ol.plain li { margin-bottom: .4rem; }
+
+    .page-header { border-bottom: 2px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 2rem; }
+    .eyebrow { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+               letter-spacing: .1em; color: var(--muted); margin-bottom: .35rem; }
+    .subtitle { font-size: .95rem; color: var(--muted); margin-top: .4rem; }
+
+    .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+           padding: 1.1rem 1.4rem; margin-bottom: 2.5rem; }
+    .toc ol { padding-left: 1.2rem; }
+    .toc li { margin-bottom: .2rem; font-size: .9rem; }
+    .toc a { text-decoration: none; border-bottom: 1px solid var(--border); }
+    .toc a:hover { border-bottom-color: var(--fg); }
+
+    /* Problem analysis */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .problem-cell {
+      background: var(--bg-card);
+      padding: .85rem 1rem;
+    }
+    .problem-cell:not(:nth-child(3n)) { border-right: 1px solid var(--border); }
+    .problem-lbl { font-family: var(--mono); font-size: .63rem; text-transform: uppercase;
+                   letter-spacing: .08em; color: var(--muted); margin-bottom: .3rem; }
+    .problem-val { font-size: .875rem; }
+
+    /* Category header bands */
+    .cat-header {
+      padding: .9rem 1.2rem;
+      border-radius: 6px;
+      margin-bottom: 1.25rem;
+      margin-top: 2.5rem;
+    }
+    .cat-header.c1 { background: var(--c1-bg); border: 1px solid var(--c1-border); }
+    .cat-header.c2 { background: var(--c2-bg); border: 1px solid var(--c2-border); }
+    .cat-header.c3 { background: var(--c3-bg); border: 1px solid var(--c3-border); }
+    .cat-label { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+                 letter-spacing: .08em; margin-bottom: .25rem; }
+    .cat-label.c1 { color: var(--c1); }
+    .cat-label.c2 { color: var(--c2); }
+    .cat-label.c3 { color: var(--c3); }
+    .cat-title { font-family: var(--serif); font-size: 1.15rem; margin-bottom: .2rem; }
+    .cat-desc { font-size: .85rem; color: var(--muted); }
+
+    /* Idea cards */
+    .idea-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .idea-grid.wide { grid-template-columns: 1fr; }
+
+    .idea-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .idea-card.starred { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+
+    .idea-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: .75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      gap: .5rem;
+    }
+    .idea-title { font-size: .9rem; font-weight: 600; }
+    .idea-badges { display: flex; gap: .3rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+
+    .badge {
+      font-family: var(--mono); font-size: .6rem; text-transform: uppercase;
+      letter-spacing: .04em; padding: .18rem .4rem; border-radius: 3px; border: 1px solid;
+      white-space: nowrap;
+    }
+    .b-high   { color: var(--high); border-color: var(--high);  background: var(--high-bg); }
+    .b-med    { color: var(--muted); border-color: var(--border); background: var(--med-bg); }
+    .b-low    { color: var(--muted); border-color: var(--border); background: var(--low-bg); }
+    .b-star   { color: #7a5c1e; border-color: #c4a050; background: #fdf6e3; }
+    .b-c1     { color: var(--c1); border-color: var(--c1-border); background: var(--c1-bg); }
+    .b-c2     { color: var(--c2); border-color: var(--c2-border); background: var(--c2-bg); }
+    .b-c3     { color: var(--c3); border-color: var(--c3-border); background: var(--c3-bg); }
+
+    .idea-body { padding: .75rem 1rem; font-size: .875rem; }
+    .idea-body p { margin-bottom: .5rem; }
+    .idea-body p:last-child { margin-bottom: 0; }
+    .idea-impl {
+      background: var(--bg-code); border-top: 1px solid var(--border);
+      padding: .6rem 1rem; font-size: .78rem; color: var(--muted);
+      font-family: var(--mono); line-height: 1.5;
+    }
+    .impl-label { font-size: .63rem; text-transform: uppercase; letter-spacing: .08em;
+                  color: var(--muted); display: block; margin-bottom: .2rem; }
+
+    /* Scene count estimate */
+    .scene-count {
+      display: inline-block;
+      font-family: var(--mono); font-size: .7rem;
+      background: var(--bg-code); border: 1px solid var(--border);
+      border-radius: 3px; padding: .1em .45em; margin-left: .4rem;
+      color: var(--muted); vertical-align: middle;
+    }
+
+    /* Summary section */
+    .top-pick {
+      border-left: 3px solid var(--accent);
+      background: var(--accent-bg);
+      padding: .7rem 1rem;
+      border-radius: 0 4px 4px 0;
+      margin-bottom: .75rem;
+      font-size: .875rem;
+    }
+    .top-pick strong { font-size: .8rem; font-family: var(--mono); display: block;
+                       text-transform: uppercase; letter-spacing: .06em; margin-bottom: .2rem;
+                       color: var(--muted); }
+
+    .revised-structure {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .rs-row {
+      display: flex;
+      gap: 1rem;
+      padding: .65rem 1.1rem;
+      border-bottom: 1px solid var(--border);
+      align-items: flex-start;
+      font-size: .875rem;
+    }
+    .rs-row:last-child { border-bottom: none; }
+    .rs-num {
+      font-family: var(--mono); font-size: .68rem; background: var(--fg); color: var(--bg);
+      width: 1.3rem; height: 1.3rem; border-radius: 50%; display: flex;
+      align-items: center; justify-content: center; flex-shrink: 0; margin-top: .1rem;
+    }
+    .rs-loc { font-weight: 600; width: 160px; flex-shrink: 0; }
+    .rs-desc { color: var(--muted); font-size: .83rem; flex: 1; }
+    .rs-type { font-family: var(--mono); font-size: .6rem; text-transform: uppercase;
+               letter-spacing: .05em; color: var(--muted); width: 70px; flex-shrink: 0;
+               padding-top: .15rem; }
+
+    @media (max-width: 700px) {
+      .idea-grid { grid-template-columns: 1fr; }
+      .problem-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="page-header">
+  <p class="eyebrow">The Living Dark — design document</p>
+  <h1>Making it last an hour</h1>
+  <p class="subtitle">Why the adventure ends in 5 minutes, and many ways to fix that.</p>
+</header>
+
+<nav class="toc">
+  <h3 style="margin:0 0 .6rem">Contents</h3>
+  <ol>
+    <li><a href="#problem">The problem: why it's over so fast</a></li>
+    <li><a href="#c1">Category 1 — existing tools only</a></li>
+    <li><a href="#c2">Category 2 — simple new tools</a></li>
+    <li><a href="#c3">Category 3 — free reign</a></li>
+    <li><a href="#synthesis">Synthesis: a proposed revised structure</a></li>
+  </ol>
+</nav>
+
+<!-- ═══════════════════════ PROBLEM -->
+<section id="problem">
+  <h2>The problem: why it's over so fast</h2>
+
+  <p>The adventure currently has a pipeline structure: two parallel fetch quests feeding into a single exit trigger. Once that shape is understood, the LLM has nothing to do except execute it as quickly as possible. There are no reasons to linger, no costs to rushing, and no rewards for curiosity.</p>
+
+  <div class="problem-grid">
+    <div class="problem-cell">
+      <div class="problem-lbl">Scene count now</div>
+      <div class="problem-val">~5 meaningful scenes</div>
+    </div>
+    <div class="problem-cell">
+      <div class="problem-lbl">Scene count needed</div>
+      <div class="problem-val">~30–40 scenes</div>
+    </div>
+    <div class="problem-cell">
+      <div class="problem-lbl">Gap</div>
+      <div class="problem-val">6–8× more content</div>
+    </div>
+    <div class="problem-cell">
+      <div class="problem-lbl">Encounters now</div>
+      <div class="problem-val">2 (one per objective)</div>
+    </div>
+    <div class="problem-cell">
+      <div class="problem-lbl">Locations now</div>
+      <div class="problem-val">4 (hub + 3 destinations)</div>
+    </div>
+    <div class="problem-cell">
+      <div class="problem-lbl">Optional content</div>
+      <div class="problem-val">None</div>
+    </div>
+  </div>
+
+  <h3>Six root causes</h3>
+  <ul class="plain">
+    <li><strong>Linear pipeline structure.</strong> Objective A → Objective B → Trigger C has no branches. The shortest path through it is the only path.</li>
+    <li><strong>Locations are waiting rooms.</strong> Each area contains exactly one thing to do. Once it's done, there's no reason to stay or return.</li>
+    <li><strong>Memory fragments are passive.</strong> They accumulate but don't unlock anything. There's no mechanical reason to pursue them — they just happen during encounters the player has to do anyway.</li>
+    <li><strong>Unit 7 is nearly inert.</strong> The trust mechanic is a single decision in the opening. After that Unit 7 has no role except to stand there and occasionally say useful things if asked.</li>
+    <li><strong>No friction between nodes.</strong> Travel between locations is free and instant. Nothing happens on the way. No consequence, no cost, no discovery.</li>
+    <li><strong>No optional content.</strong> Everything in the adventure is required. Curious players have nothing to pursue. Cautious players have no way to prepare. There is only one path.</li>
+  </ul>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ CATEGORY 1 -->
+<section id="c1">
+  <div class="cat-header c1">
+    <div class="cat-label c1">Category 1</div>
+    <div class="cat-title">Existing tools only</div>
+    <div class="cat-desc">Everything here is achievable with world_state, pick_random, random_chance, note_load, and note_to_self — no new code required.</div>
+  </div>
+
+  <h3>More locations and sub-zones <span class="scene-count">+8–12 scenes</span></h3>
+
+  <div class="idea-grid">
+    <div class="idea-card starred">
+      <div class="idea-head">
+        <div class="idea-title">Sub-zones within each area</div>
+        <div class="idea-badges"><span class="badge b-star">★ top pick</span><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>Each major location is currently a single room. Split them into 2–3 sub-zones the player must navigate in sequence. The Luminare Vaults becomes: Entrance → Main Atrium → The Plinth. The Grub Warrens becomes: Tunnel Entrance → Branching Chamber → Nest. The player can't skip straight to the objective — they must pass through intervening space, each of which has its own character and potential events.</p>
+        <p>Each sub-zone is a short note loaded on demand. The GM describes the sub-zone and offers choices about how to proceed before the encounter begins.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State variables: <code>vaults_zone = "entrance"</code>, <code>warrens_zone = "tunnel"</code>. Load sub-zone notes on demand as the player progresses. Each sub-zone note describes the environment and any events that can occur there.
+      </div>
+    </div>
+
+    <div class="idea-card starred">
+      <div class="idea-head">
+        <div class="idea-title">The Vel-Ahru Archive</div>
+        <div class="idea-badges"><span class="badge b-star">★ top pick</span><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>A new required location between the Awakening Chamber and the two objective areas — a vast Vel-Ahru library of crystalline data-slabs. The player must visit it to learn <em>where</em> the Navigation Stone and Power Cell actually are. Without the Archive, Unit 7 only knows they exist somewhere — it can't pinpoint them.</p>
+        <p>The Archive is full of readable records, requiring time and exploration. Lore about the Vel-Ahru reveals itself here. Two specific records (the Stone's location and the Cell's location) must be found. This turns passive information into an active discovery.</p>
+        <p>Optional: the Archive also contains a third data-slab with something unexpected — a personal record that triggers a deep memory fragment and recontextualises the adventure.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        New note: <code>g.cyo.living-dark.archive</code>. State: <code>archive_visited = "false"</code>, <code>stone_location_known = "false"</code>, <code>cell_location_known = "false"</code>. Gate both objective areas behind knowing the location. The Archive itself has 3–4 sub-encounters.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">The Junction Hall</div>
+        <div class="idea-badges"><span class="badge b-med">medium impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>A large transitional space connecting the Awakening Chamber to all three destinations. Currently travel is instantaneous and free. Make it a real location: a five-way junction of curved Vel-Ahru corridors with its own hazards, discoveries, and atmosphere. Grubs sometimes wander through it. Luminares occasionally drift in from the east. A damaged section requires navigation (random_chance — does the unstable floor hold?).</p>
+        <p>The Junction Hall has a Vel-Ahru map-plinth that shows a partial schematic of the complex — giving the player their first real sense of scale.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        New note loaded on first entry. <code>junction_visited = "false"</code>, <code>map_plinth_read = "false"</code>. Random_chance on the unstable section each time the player passes through until <code>floor_reinforced = "true"</code>.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">A fourth optional location</div>
+        <div class="idea-badges"><span class="badge b-med">medium impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>A "Specimen Chamber" south of the Awakening Chamber — not mentioned by Unit 7, discovered through exploration. The Vel-Ahru preserved biological specimens here: creatures frozen in crystalline suspension, including an ancestor of the Grubs before the millennia of underground evolution changed them. Visiting it is optional but delivers the single richest piece of lore in the adventure and grants the third memory fragment early (if the player hasn't already found it).</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        New note loaded on discovery. Not listed by Unit 7 in the briefing. The player finds it by exploring south rather than following instructions. Rewards curiosity directly.
+      </div>
+    </div>
+  </div>
+
+  <h3>Making mechanics have teeth <span class="scene-count">+4–8 scenes per mechanic</span></h3>
+
+  <div class="idea-grid">
+    <div class="idea-card starred">
+      <div class="idea-head">
+        <div class="idea-title">Memory fragments as keys</div>
+        <div class="idea-badges"><span class="badge b-star">★ top pick</span><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>Currently memories accumulate passively and only affect narration tone. Give them mechanical power:</p>
+        <ul class="plain" style="margin-top:.4rem;">
+          <li><strong>Fragment 1 (your name):</strong> Lets you introduce yourself to Unit 7 by name. Unit 7's manner subtly changes — it refers to you by name from then on. Small but meaningful.</li>
+          <li><strong>Fragment 2 (the signal):</strong> Unlocks a specific dialogue with Unit 7 about the signal frequency. Unit 7 recognises it. This opens a new topic tree and eventually leads Unit 7 to share something it was not going to say otherwise.</li>
+          <li><strong>Fragment 3 (full recall):</strong> You remember someone. Gives the player a specific personal reason to escape rather than a generic survival drive. Also unlocks the ability to commune with the Luminares on a second visit — they respond differently to someone who now knows exactly who they are.</li>
+        </ul>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State: <code>memory_1_content = "name"</code>, <code>memory_2_content = "signal_77ghz"</code>. Each fragment unlocks specific world_state flags. The bestiary checks these flags before determining available options.
+      </div>
+    </div>
+
+    <div class="idea-card starred">
+      <div class="idea-head">
+        <div class="idea-title">Unit 7 as companion and questgiver</div>
+        <div class="idea-badges"><span class="badge b-star">★ top pick</span><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>Unit 7 currently has one purpose: explain the briefing and grant advantage if you were nice to it. Expand this substantially:</p>
+        <ul class="plain" style="margin-top:.4rem;">
+          <li><strong>Unit 7 has a task of its own:</strong> A damaged maintenance hatch near the Awakening Chamber that it has been unable to open for an indeterminate amount of time. It cannot ask for help — that's not in its language. But it keeps returning to it. If the player notices and offers to help, it's a short puzzle (random_chance + problem solving). Completing it is the actual way to earn unit7_trust = "helpful", replacing the vague "be nice" trigger.</li>
+          <li><strong>Unit 7 can be invited to follow:</strong> If trust is helpful, the player can ask Unit 7 to accompany them. In each location, Unit 7 observes things the player can't (its sensors see differently) and adds brief comments. These are not hints — they're perspective.</li>
+          <li><strong>Unit 7 has a moment at the Shaft:</strong> If Unit 7 accompanies the player to the Ascent Shaft, it stops at the base and says something — and for the first time it is not formal. This is a small but carefully written scene that reframes everything the player has learned about it.</li>
+        </ul>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State: <code>unit7_following = "false"</code>, <code>unit7_task_complete = "false"</code>, <code>unit7_shaft_farewell = "false"</code>. New note section: Unit 7's personal task details and the farewell text. Load the farewell note on demand.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">Grub alertness level</div>
+        <div class="idea-badges"><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>The Grubs are a single pick_random encounter right now. Make them a persistent presence throughout the adventure. Track <code>grub_alert_level</code> from 0 to 3. Noisy actions anywhere near the Warrens increase it:</p>
+        <ul class="plain" style="margin-top:.4rem;">
+          <li>Level 0: Grubs asleep. Normal MEDIUM table.</li>
+          <li>Level 1: One Grub patrolling the outer tunnels. MEDIUM table but partial costs 2 health.</li>
+          <li>Level 2: Three Grubs awake and agitated. HARD table.</li>
+          <li>Level 3: Full alert. The outer tunnels are impassable until alert drops.</li>
+        </ul>
+        <p>Alert drops by 1 each time the player leaves the Warrens area and waits. Waiting is a valid choice — it has a cost (time, in scenes) and a benefit (safer approach). This single mechanic makes every action in the Warrens area feel weighty.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State: <code>grub_alert_level = "0"</code>. Modify with <code>state_modify grub_alert_level delta=+1</code> on noisy actions. Bestiary uses alert level to select the correct table. Waiting in a safe area decreases it.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">The Luminares remember</div>
+        <div class="idea-badges"><span class="badge b-med">medium impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>The Luminares currently have a binary encounter — you succeed or fail or partly succeed, and that's the end of it. Give them a reputation track: <code>luminare_trust</code> from -2 to +3. Actions in the Vaults shift this number. The pick_random table is selected by trust level rather than a binary patient/aggressive choice.</p>
+        <p>At trust +3: on a second visit (after getting Fragment 1), the Luminares show something additional — a second vision that reveals something about the Vel-Ahru. This is the richest lore moment in the adventure and only players who invest in the relationship get to see it.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State: <code>luminare_trust = "0"</code>. Five tables in the bestiary corresponding to trust levels -2 through +3. The GM selects the table based on current trust rather than a single approach assessment.
+      </div>
+    </div>
+  </div>
+
+  <h3>A living world and travel friction <span class="scene-count">+5–10 scenes</span></h3>
+
+  <div class="idea-grid">
+    <div class="idea-card starred">
+      <div class="idea-head">
+        <div class="idea-title">Between-scene world events</div>
+        <div class="idea-badges"><span class="badge b-star">★ top pick</span><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>After every scene transition, the GM rolls <code>random_chance</code> (50/50) to determine whether a world event occurs. Events are drawn from a list in a dedicated note and are appropriate to the player's current location and state. Examples:</p>
+        <ul class="plain" style="margin-top:.4rem;">
+          <li>A Grub has wandered away from the Warrens and is moving through the Junction Hall — the player must decide how to handle it.</li>
+          <li>The lichen dims suddenly across the whole complex, then recovers. The hum changes pitch.</li>
+          <li>A section of ceiling releases a cascade of bioluminescent spores — brief, beautiful, and distracting.</li>
+          <li>Unit 7 (if following) pauses and looks at a wall for a long moment. Then continues. Says nothing.</li>
+          <li>A sound from somewhere below the complex — something vast, moving once, then silence.</li>
+        </ul>
+        <p>None of these require a roll or an action. They're atmospheric, they make the world feel inhabited, and they force the player to pause and engage with the environment rather than sprinting to the next objective.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        New note: <code>g.cyo.living-dark.events</code>. Loaded at adventure start. List of 10–15 atmospheric events keyed to location and state. GM draws from this list after rolling random_chance for each transition.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">Navigation challenges</div>
+        <div class="idea-badges"><span class="badge b-med">medium impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>The complex is enormous. Without the map-plinth or Unit 7's guidance, finding the locations isn't trivial — it requires exploration and dead ends. The first time the player tries to reach the Luminare Vaults, a random_chance determines whether they find the right archway directly or end up in an unexpected sub-location first.</p>
+        <p>Once a route is navigated successfully, it's known — subsequent trips are direct. But the first pass creates discovery, wrong turns, and the satisfying click of "now I know where that is."</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State flags: <code>route_vaults_known = "false"</code>, <code>route_warrens_known = "false"</code>. Random_chance on first navigation. Known routes skip the navigation check.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">Consequences that persist</div>
+        <div class="idea-badges"><span class="badge b-med">medium impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>Currently, every encounter resets. Win or lose, the area is identical on return. Make outcomes stick:</p>
+        <ul class="plain" style="margin-top:.4rem;">
+          <li>Failed Luminare attempt: the Vaults are still bright. The Luminares are contracted. They need time. The player must do something else and return — the world doesn't pause for them.</li>
+          <li>Failed Grub attempt: the Warrens are now alerted. The area narration changes. The Grubs are no longer asleep. New approach required.</li>
+          <li>Helped Unit 7 with the hatch: the hatch is now open, revealing a small storage area with a usable item.</li>
+        </ul>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State flags for each consequence: <code>luminare_recovery = "needed"</code>, <code>warrens_aftermath = "alerted"</code>. Notes for each area check these flags and render different narration based on current state.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">Items with uses (not just pickups)</div>
+        <div class="idea-badges"><span class="badge b-med">medium impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>Find several items throughout the complex that have optional uses beyond being carried. The healing herb is the only item right now. Add:</p>
+        <ul class="plain" style="margin-top:.4rem;">
+          <li><strong>Vel-Ahru resonance chip</strong> (found in Archive): can be used on any Vel-Ahru terminal to extract additional data — unlocks lore and potentially reveals shortcuts.</li>
+          <li><strong>Grub pheromone marker</strong> (found in Warrens if Grub Den is partial success): can be used at the tunnel entrance to make the Grubs ignore the player's next pass. Single use.</li>
+          <li><strong>Bioluminescent moss sample</strong> (found anywhere): can be scattered to create a distraction — Grubs investigate it, giving a window. Or given to Unit 7, which processes it and reveals something about the complex's biology.</li>
+        </ul>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State: <code>inventory_resonance_chip = "0"</code>, <code>inventory_pheromone_marker = "0"</code>, etc. Bestiary and world notes describe what happens when each item is used in each context. Simple conditional logic via GM reading state.
+      </div>
+    </div>
+  </div>
+
+  <h3>Pacing rules to prevent railroading <span class="scene-count">structural</span></h3>
+
+  <div class="idea-grid wide">
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">Anti-rush instructions in the rules note</div>
+        <div class="idea-badges"><span class="badge b-high">high impact</span><span class="badge b-low">zero cost</span></div>
+      </div>
+      <div class="idea-body">
+        <p>The simplest fix. Add explicit instructions to <code>g.cyo.living-dark.rules</code> that actively discourage the LLM from rushing:</p>
+        <ul class="plain" style="margin-top:.4rem;">
+          <li><em>"Do not allow the player to reach an encounter location in the same scene they set out for it. Travel is a scene. Arrival is a scene. The encounter is a scene."</em></li>
+          <li><em>"Each location must be described as if the player has never seen it before. Do not summarise. Give it space."</em></li>
+          <li><em>"Unit 7 should speak at least once per scene if it is present. It notices things."</em></li>
+          <li><em>"If the player makes a beeline for an objective without exploring, the GM should present something unexpected along the way — not an obstacle, but an invitation to pause."</em></li>
+          <li><em>"Before resolving any encounter, the player must take at least one exploratory action in the area first."</em></li>
+        </ul>
+        <p>This won't fully fix the structural problems, but it immediately buys 3–5 extra scenes per run without any other changes.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        Edit <code>g.cyo.living-dark.rules</code>. Add a "PACING — NON-NEGOTIABLE" section above the existing PACING block. No tools changes needed.
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ CATEGORY 2 -->
+<section id="c2">
+  <div class="cat-header c2">
+    <div class="cat-label c2">Category 2</div>
+    <div class="cat-title">Simple new tools</div>
+    <div class="cat-desc">Ideas that need one small new backend capability. Each is a plausible addition to the tools system with minimal implementation cost.</div>
+  </div>
+
+  <h3>Information and memory tools</h3>
+
+  <div class="idea-grid">
+    <div class="idea-card starred">
+      <div class="idea-head">
+        <div class="idea-title">note_append (already exists — just enable it)</div>
+        <div class="idea-badges"><span class="badge b-star">★ top pick</span><span class="badge b-high">high impact</span><span class="badge b-low">zero new code</span></div>
+      </div>
+      <div class="idea-body">
+        <p><code>note_append</code> already exists in the tools system. It's just not enabled for Choose Your Own. Enabling it unlocks a persistent player-visible journal at <code>c.journal</code>.</p>
+        <p>The GM appends an entry each time something significant happens: a location visited, an item found, a memory recovered, something Unit 7 said. The player can ask "show me my journal" at any time and get a clean record of everything they've discovered.</p>
+        <p>This makes the adventure feel <em>accumulative</em>. Small discoveries feel meaningful when they're recorded. The player starts to feel like an explorer with a record, not a cursor in a menu.</p>
+        <p>Equally useful: the GM can read the journal to recap state without calling <code>state_list</code> constantly. Context-window friendly.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        Add <code>note_append</code> to the Choose Your Own character's tools list. Add instructions to the rules note: "Append one brief entry to c.journal each time something significant is discovered or decided." Player can ask to read it at any time.
+      </div>
+    </div>
+
+    <div class="idea-card starred">
+      <div class="idea-head">
+        <div class="idea-title">Turn counter / scene pressure</div>
+        <div class="idea-badges"><span class="badge b-star">★ top pick</span><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>A simple integer counter tracking scenes elapsed. Each scene increments it by 1 via <code>state_modify</code>. The counter itself isn't shown to the player (it would feel gamey), but it drives two things:</p>
+        <p><strong>Option A — Soft pressure:</strong> Every 5 scenes, the complex "reacts." Lights shift. Something moves. A distant sound. These are pre-written event strings the GM selects based on turn count. They escalate in intensity: turn 5 is atmospheric, turn 15 feels like something is waking up, turn 25 feels like urgency.</p>
+        <p><strong>Option B — Hard pressure:</strong> The power core is failing (hinted at by Unit 7 early on, not announced). At turn count 30, a real consequence occurs — certain sections become inaccessible, a secondary route must be found. This creates a soft deadline without being punishing: it doesn't end the game, it changes it.</p>
+        <p>Even soft pressure dramatically changes player behaviour: they stop treating the world as infinite and start making real choices about where to spend time.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State: <code>scene_count = "0"</code>. Rules note instructs GM to call <code>state_modify scene_count delta=+1</code> each turn and check against event thresholds. Event text stored in the events note.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">A map tool</div>
+        <div class="idea-badges"><span class="badge b-med">medium impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>A tool that renders a simple ASCII map of the complex as currently known. Initially shows only the Awakening Chamber. Each new location discovered adds to it. The player can ask "show me the map" at any time.</p>
+        <p>The map is stored as a note (<code>c.map</code>) and updated with <code>note_save</code> as new areas are found. It doesn't need to be sophisticated — a labelled ASCII layout of connected boxes is enough. But it makes the space feel real and navigable.</p>
+        <p>Discovering a new location adds a satisfying moment: the map updates. The player sees the space they're in relative to where they've been.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        Uses existing <code>note_save</code>. Rules note includes the initial map template and instructions for updating it. No new tool required — just a convention. Alternatively, a dedicated <code>update_map</code> tool could do this more cleanly.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">Inspect tool</div>
+        <div class="idea-badges"><span class="badge b-med">medium impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>A lightweight tool: <code>inspect(target)</code>. The player says "look at the wall markings" or "examine the terminal" and the GM calls <code>inspect</code> with the target. The tool returns one of several pre-written results from a note, keyed to the location and target.</p>
+        <p>This formalises and rewards careful attention to the environment. Currently, the GM can describe things when asked, but there's no signal to the player that looking carefully at things is worthwhile. A distinct tool call makes it feel like a real game mechanic.</p>
+        <p>More practically: it gives the GM a structure for delivering optional lore without front-loading it. Players who look find things. Players who rush don't.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        New tool: <code>inspect(target: string)</code>. Returns a result string drawn from the current location's note. Simple backend: load the current area's note and return the matching inspect result. Cost: one new tool + inspection results added to each area note.
+      </div>
+    </div>
+  </div>
+
+  <h3>Communication and interaction tools</h3>
+
+  <div class="idea-grid">
+    <div class="idea-card starred">
+      <div class="idea-head">
+        <div class="idea-title">dialogue_option tool</div>
+        <div class="idea-badges"><span class="badge b-star">★ top pick</span><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>A structured tool for NPC conversations: <code>dialogue_option(character, topic)</code>. The GM calls it when the player initiates conversation, and it returns which topics are currently available and what they unlock.</p>
+        <p>Unit 7 has 6 topics. Some are always available. Some unlock after specific state conditions (memory fragments, locations visited). Each topic can only be visited once, marked as done in state. This makes talking to Unit 7 feel like genuine discovery — the player uncovers information through conversation, not just by asking random questions.</p>
+        <p>Without this: Unit 7 answers anything, so players either ask nothing (boring) or ask everything in one go (also boring, and anti-climactic). With structured topics, conversation is a resource: you have limited time, topics unlock sequentially, and you have to decide what matters most to you.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State tracks which topics are done: <code>unit7_topic_signal = "unasked"</code>, etc. The tool returns available topics based on state. Could be implemented as a structured note section rather than a true new tool — the GM reads the note and presents available topics. Medium implementation cost.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">Deferred reveal tool</div>
+        <div class="idea-badges"><span class="badge b-med">medium impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>A tool that stores a piece of information and reveals it only when a specific condition is met: <code>reveal_when(info, condition)</code>. Used by the GM to plant foreshadowing that pays off later.</p>
+        <p>Example: when the player first enters the Warrens, the GM calls <code>reveal_when("The Grubs breathe in unison, as if sharing a single nervous system", "power_cell=found")</code>. When the player finds the Power Cell, this detail surfaces again in a new light — the Grubs were connected to the Cell all along.</p>
+        <p>This is essentially a structured version of what good fiction does: seed details early, pay them off late. The tool makes it mechanical and reliable.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        Stored as a note (<code>c.deferred_reveals</code>) with conditions. The GM checks this note each turn and triggers reveals when conditions are met. Alternatively a dedicated tool with cleaner syntax. Medium cost.
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ CATEGORY 3 -->
+<section id="c3">
+  <div class="cat-header c3">
+    <div class="cat-label c3">Category 3</div>
+    <div class="cat-title">Free reign</div>
+    <div class="cat-desc">If you could build anything. Ideas that would require significant new mechanics, backend tools, or structural design work — but could be extraordinary.</div>
+  </div>
+
+  <h3>Alternative endings and branching structure</h3>
+
+  <div class="idea-grid">
+    <div class="idea-card starred">
+      <div class="idea-head">
+        <div class="idea-title">The Contact ending</div>
+        <div class="idea-badges"><span class="badge b-star">★ top pick</span><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>A second victory condition: instead of escaping, the player makes direct contact with the Vel-Ahru. This requires finding 5 "resonance fragments" hidden throughout the complex — not items in the traditional sense, but moments. A pattern on a wall the player decides to touch. A Luminare the player approaches alone, at night (mechanically: when the scene_count is even). A terminal that shows the player their own face, recorded before they fell.</p>
+        <p>Finding all 5 allows the player to enter the Resonance Chamber — a location that doesn't exist until unlocked, behind a door Unit 7 has always noted but never been able to open. The Vel-Ahru speak through the Luminares directly. The player learns everything. They must then decide: leave, or stay and become part of the complex the way the Vel-Ahru did.</p>
+        <p>Staying is not death — it's transformation. The ending is written as something genuinely beautiful and alien. Leaving after the Contact is a third ending: leaving having been truly changed, knowing everything, choosing the surface anyway.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State: <code>resonance_fragments = "0"</code> (counter 0–5). Each fragment is a non-encounter moment scattered across all locations. The Resonance Chamber is a new location, locked until all 5 found. Requires significant new notes and two new endings. High effort, highest reward.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">The Unit 7 ending</div>
+        <div class="idea-badges"><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>A third victory condition: bring Unit 7 to the surface. Unit 7 cannot take the Ascent Shaft as-is — the platform supports biological mass but its power grid would fry Unit 7's systems. The player must find a way to insulate or reroute Unit 7's power connections before the shaft activates.</p>
+        <p>This requires finding a specific component (the resonance chip from the Archive), understanding the problem (Unit 7 mentions it once, quietly, if directly asked whether it can come), and solving it (a puzzle encounter). If solved: Unit 7 reaches the surface. Its reaction — seeing sky for the first time, experiencing sunlight — is the most human moment in the adventure. The ending text changes completely.</p>
+        <p>Most players will never do this. The ones who care enough to figure it out deserve an extraordinary payoff.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State: <code>unit7_surface_capable = "false"</code>. New puzzle encounter. New victory note. The "standard" exit still works — this is purely additive. High effort but very targeted.
+      </div>
+    </div>
+  </div>
+
+  <h3>Procedural and emergent systems</h3>
+
+  <div class="idea-grid">
+    <div class="idea-card starred">
+      <div class="idea-head">
+        <div class="idea-title">Procedural room generation</div>
+        <div class="idea-badges"><span class="badge b-star">★ top pick</span><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>The complex is enormous. What if not all of it was pre-written? A procedural room system: when the player enters an unknown area, the GM rolls <code>pick_random</code> from a list of room types (laboratory, transit corridor, specimen chamber, power junction, meditation alcove, collapsed section) and cross-references with a content table (item, lore fragment, creature, hazard, nothing). The result is combined into a scene.</p>
+        <p>This means the map is different every run. Players can explore indefinitely without hitting a wall. Optional areas become genuinely exploratory rather than authored set-pieces.</p>
+        <p>The key insight: the required areas (Archive, Vaults, Warrens) are still authored and fixed. The procedural system only fills the space between them — the vast unnamed corridors and chambers that a real complex of this size would have. It makes the scale feel real without requiring infinite writing.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        Requires a room-type matrix note and a content table. The GM picks_random to determine room type and content, then narrates the combination. State tracks which rooms exist and what was found there. Could be implemented in notes alone with clever formatting. Medium-high effort.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">The complex as a character</div>
+        <div class="idea-badges"><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>The complex responds to the player across the whole adventure: not through encounters, but through environment. A <code>complex_awareness</code> state variable tracks how much the Vel-Ahru presence has noticed the player. It starts at 0 and increases with meaningful actions: treating Unit 7 with respect, approaching the Luminares with patience, examining things instead of grabbing them.</p>
+        <p>At different awareness levels, the complex behaves differently: lights guide the player down right corridors (awareness 2), a Luminare appears alone in an unexpected place and shows something specific (awareness 4), the Ascent Shaft powers up the moment the player approaches it with both items — before they even slot them in (awareness 6).</p>
+        <p>The complex is welcoming them or not, depending on who they've been. Players who rush and take will have a harder time. Players who are curious and careful will find the complex subtly helping.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State: <code>complex_awareness = "0"</code>. Rules note specifies which actions increase it and what each threshold unlocks. Requires careful calibration — the effects must feel magical, not mechanical. Medium effort, very high atmospheric impact.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">Multi-round encounters</div>
+        <div class="idea-badges"><span class="badge b-med">medium impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>Currently each encounter is a single pick_random. Make significant encounters last 2–3 rounds, each with its own roll. The strategy changes between rounds: partial success in round 1 changes the options in round 2. A round 1 failure might mean round 2 is from a harder table, or offers different options entirely.</p>
+        <p>The Grub Den in particular would benefit: Round 1 is entering the tunnels, Round 2 is reaching the nest, Round 3 is the retrieval. The player chooses their approach at each round based on what happened before. Three decisions instead of one. Nine meaningful scenes in the Warrens instead of three.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        State: <code>grub_encounter_round = "0"</code>. Each round in the bestiary has its own set of options, tables, and outcomes. The GM tracks round state and narrates each phase separately. Moderate effort, significant scene expansion.
+      </div>
+    </div>
+
+    <div class="idea-card">
+      <div class="idea-head">
+        <div class="idea-title">A reputation web</div>
+        <div class="idea-badges"><span class="badge b-med">medium impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>Instead of binary trust/neutral states for Unit 7 and the Luminares, a full web of relationships. Actions with one faction affect others: approaching the Luminares aggressively makes Unit 7 slightly colder — it noticed, even from the Awakening Chamber, and it draws its own conclusions about what kind of person the player is.</p>
+        <p>High trust with both Unit 7 AND the Luminares unlocks a unique scene: the two of them interact, briefly, in the player's presence. Unit 7 acknowledges the Luminares in a way that suggests it knows exactly what they are. This is the one moment in the adventure where the full truth almost surfaces without being stated directly.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        Expand state model to use numeric trust values for both factions. Add cross-faction influence rules to the rules note. The combined-high-trust scene is a new note loaded on demand. High design effort, moderate implementation cost.
+      </div>
+    </div>
+  </div>
+
+  <h3>Full structural redesigns</h3>
+
+  <div class="idea-grid wide">
+    <div class="idea-card starred">
+      <div class="idea-head">
+        <div class="idea-title">The knowledge-first structure</div>
+        <div class="idea-badges"><span class="badge b-star">★ top pick</span><span class="badge b-high">high impact</span></div>
+      </div>
+      <div class="idea-body">
+        <p>Redesign the entire adventure around information as the primary resource. The player can't solve anything without first understanding it. The new structure has three phases:</p>
+        <p><strong>Phase 1 — Learn:</strong> The player has no idea where anything is or what to do. Unit 7 knows a great deal but shares it in fragments. The Archive has the rest. Phase 1 is entirely about gathering knowledge — talking, reading, exploring. No encounters yet. No items. Just understanding. This phase alone should be 8–10 scenes.</p>
+        <p><strong>Phase 2 — Act:</strong> Armed with knowledge, the player pursues objectives in an order of their choosing. But the knowledge they have (or haven't gathered) affects every encounter. Players who rushed Phase 1 go in blind. Players who were thorough have specific advantages the rules note codifies precisely.</p>
+        <p><strong>Phase 3 — Escape (or choose otherwise):</strong> The Ascent Shaft, but now with options. The player may have unlocked alternative endings during Phase 1 or 2. The exit is available, but so is the Contact path if they found the resonance fragments. The final choice is real and earned.</p>
+        <p>This structure naturally produces a much longer adventure and rewards the behaviour we want (curiosity, patience, attention) at a structural level rather than trying to incentivise it with mechanical nudges.</p>
+      </div>
+      <div class="idea-impl">
+        <span class="impl-label">Implementation</span>
+        Major redesign of the world and rules notes. Phase 1 requires substantially more Unit 7 content, Archive content, and discoverable lore. Phase 2 is the current adventure, enhanced. Phase 3 requires the Contact ending to be built. This is a full version 2 of the adventure, not a patch.
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- ═══════════════════════ SYNTHESIS -->
+<section id="synthesis">
+  <h2>Synthesis: a proposed revised structure</h2>
+
+  <p>If you wanted to dramatically improve the adventure without a full redesign, here is a recommended combination of the above ideas in rough priority order:</p>
+
+  <div class="top-pick">
+    <strong>1 — Enable note_append (zero effort)</strong>
+    Add <code>note_append</code> to the character's tools. Add journal instructions to the rules note. Immediate improvement to feel and longevity with no code changes.
+  </div>
+  <div class="top-pick">
+    <strong>2 — Add anti-rush pacing rules to g.cyo.living-dark.rules (zero effort)</strong>
+    Explicit instructions: one scene for travel, one for arrival, one for the encounter. At minimum one exploratory action before any encounter resolves. This alone adds 6–10 scenes per run.
+  </div>
+  <div class="top-pick">
+    <strong>3 — Vel-Ahru Archive as a required first stop</strong>
+    Gate objective locations behind knowing where they are. Forces 3–5 Archive scenes before the fetch quests begin.
+  </div>
+  <div class="top-pick">
+    <strong>4 — Unit 7's maintenance task as the trust unlock</strong>
+    Replace the vague "be nice" trigger with a specific, observable puzzle. Adds a scene, makes the reward feel earned.
+  </div>
+  <div class="top-pick">
+    <strong>5 — Sub-zones (3 zones per major location)</strong>
+    Each major location becomes a 3-scene journey rather than a 1-scene encounter. Triples the encounter content.
+  </div>
+  <div class="top-pick">
+    <strong>6 — Grub alertness state</strong>
+    Makes every action in the Warrens consequential. Adds replay variation. Noisy failures create new problems rather than just repeating the same encounter.
+  </div>
+  <div class="top-pick">
+    <strong>7 — Between-scene world events</strong>
+    50/50 chance of an atmospheric event on each transition. Makes the world feel inhabited. Adds 5–8 unexpected scenes per run.
+  </div>
+  <div class="top-pick">
+    <strong>8 — Memory fragments as keys</strong>
+    Fragment 2 unlocks a Unit 7 topic. Fragment 3 changes how the Luminares respond on a second visit. Memory becomes something you want, not just something that happens.
+  </div>
+
+  <h3>Estimated scene count with these changes</h3>
+
+  <div class="revised-structure">
+    <div class="rs-row" style="background:var(--bg-code);border-bottom:1px solid var(--border);">
+      <div class="rs-num" style="background:var(--muted);">#</div>
+      <div class="rs-loc" style="font-weight:700;font-size:.78rem;font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;">Location</div>
+      <div class="rs-desc" style="font-weight:700;font-size:.78rem;font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;">What happens</div>
+      <div class="rs-type" style="font-weight:700;font-size:.78rem;font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;">Type</div>
+    </div>
+    <div class="rs-row">
+      <div class="rs-num">1</div>
+      <div class="rs-loc">Awakening Chamber</div>
+      <div class="rs-desc">Wake up. Unit 7 briefing. Initial orientation. First choice of direction.</div>
+      <div class="rs-type">opening</div>
+    </div>
+    <div class="rs-row">
+      <div class="rs-num">2</div>
+      <div class="rs-loc">Awakening Chamber</div>
+      <div class="rs-desc">Unit 7's maintenance task — the stuck hatch. Player notices and chooses whether to help. Resolution scene.</div>
+      <div class="rs-type">optional</div>
+    </div>
+    <div class="rs-row">
+      <div class="rs-num">3</div>
+      <div class="rs-loc">Junction Hall</div>
+      <div class="rs-desc">First transit. The scale of the complex. Map plinth. World event possible. Navigation check.</div>
+      <div class="rs-type">explore</div>
+    </div>
+    <div class="rs-row">
+      <div class="rs-num">4–6</div>
+      <div class="rs-loc">Vel-Ahru Archive</div>
+      <div class="rs-desc">Three sub-rooms. Find stone location, cell location, optional personal record (early memory fragment). Unit 7 can comment on records. World events possible.</div>
+      <div class="rs-type">required</div>
+    </div>
+    <div class="rs-row">
+      <div class="rs-num">7</div>
+      <div class="rs-loc">Junction Hall</div>
+      <div class="rs-desc">Return transit. World event possible. Choice: Vaults or Warrens first.</div>
+      <div class="rs-type">transit</div>
+    </div>
+    <div class="rs-row">
+      <div class="rs-num">8–10</div>
+      <div class="rs-loc">Luminare Vaults</div>
+      <div class="rs-desc">Three sub-zones: Entrance, Main Atrium, The Plinth. World events. Healing herb available. Encounter at plinth. Memory fragment 1.</div>
+      <div class="rs-type">required</div>
+    </div>
+    <div class="rs-row">
+      <div class="rs-num">11</div>
+      <div class="rs-loc">Specimen Chamber</div>
+      <div class="rs-desc">Optional discovery south of Awakening Chamber. Rich lore. Possible early memory fragment.</div>
+      <div class="rs-type">optional</div>
+    </div>
+    <div class="rs-row">
+      <div class="rs-num">12–15</div>
+      <div class="rs-loc">Grub Warrens</div>
+      <div class="rs-desc">Three sub-zones with alertness system. Unit 7 safe-route briefing (if trust). Encounter over 2–3 rounds. Terminal. Memory fragment 2. Possible failure loop.</div>
+      <div class="rs-type">required</div>
+    </div>
+    <div class="rs-row">
+      <div class="rs-num">16</div>
+      <div class="rs-loc">Luminare Vaults</div>
+      <div class="rs-desc">Optional return visit with Fragment 2. If memory unlocks deeper communion: new vision, additional lore.</div>
+      <div class="rs-type">optional</div>
+    </div>
+    <div class="rs-row">
+      <div class="rs-num">17</div>
+      <div class="rs-loc">Ascent Shaft</div>
+      <div class="rs-desc">Arrival. Unit 7 farewell scene if accompanying. Memory fragment 3 as platform rises. Victory.</div>
+      <div class="rs-type">ending</div>
+    </div>
+    <div class="rs-row" style="background:var(--bg-code);">
+      <div class="rs-num" style="background:var(--muted);">~</div>
+      <div class="rs-loc" style="font-weight:600;">Total (typical)</div>
+      <div class="rs-desc">15–25 core scenes plus world events, optional content, and failure loops.</div>
+      <div class="rs-type">~45 min</div>
+    </div>
+  </div>
+
+  <p>With world events, failure loops, optional locations, and repeat visits, a thorough run reaches 30–40 scenes — roughly an hour at typical play pace. A player who rushes can still finish in 20–25 scenes, but the world will feel emptier and the ending will feel less earned.</p>
+  <p>The goal is not to block the exit, but to make lingering rewarding enough that the player chooses to stay.</p>
+</section>
+
+</body>
+</html>

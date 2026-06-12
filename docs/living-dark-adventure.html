@@ -44,6 +44,10 @@
     .page-header { border-bottom: 2px solid var(--border); padding-bottom: 1.25rem; margin-bottom: 2rem; }
     .eyebrow { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
                letter-spacing: .1em; color: var(--muted); margin-bottom: .35rem; }
+    .version-badge { font-family: var(--mono); font-size: .65rem; text-transform: uppercase;
+                     letter-spacing: .05em; padding: .18rem .45rem; border-radius: 3px;
+                     border: 1px solid var(--border); color: var(--muted); margin-left: .5rem;
+                     vertical-align: middle; }
     .toc { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
            padding: 1.1rem 1.4rem; margin-bottom: 2rem; }
     .toc ol { padding-left: 1.2rem; }
@@ -64,12 +68,13 @@
     .b-global   { color: var(--green); border-color: var(--green); background: #f0fdf4; }
     .b-readonly { color: var(--red);   border-color: var(--red);   background: #fdf0f0; }
     .b-gm       { color: #7a5c1e;     border-color: #c4a050;      background: #fdf6e3; }
+    .b-new      { color: #2d5a8e;     border-color: #7aaed4;      background: #eef5fb; }
     .card { background: var(--bg-card); border: 1px solid var(--border);
             border-radius: 6px; margin-bottom: 1.4rem; overflow: hidden; }
     .card-head { display: flex; align-items: center; justify-content: space-between;
                  padding: .8rem 1.2rem; border-bottom: 1px solid var(--border); gap: .75rem; }
     .card-key  { font-family: var(--mono); font-size: .9rem; font-weight: bold; }
-    .card-meta { display: flex; gap: .4rem; flex-shrink: 0; }
+    .card-meta { display: flex; gap: .4rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
     .card-desc { font-size: .83rem; color: var(--muted); font-style: italic;
                  padding: .5rem 1.2rem; border-bottom: 1px solid var(--border); }
     .card-body { position: relative; }
@@ -95,8 +100,11 @@
     .tool-tag { display: inline-block; font-family: var(--mono); font-size: .75rem;
                 padding: .12rem .38rem; background: var(--bg-code); border: 1px solid var(--border);
                 border-radius: 3px; margin: .1rem; }
+    .tool-tag.new { border-color: #7aaed4; background: #eef5fb; color: #2d5a8e; }
     .callout { border-left: 3px solid var(--accent); background: var(--accent-bg);
                padding: .7rem 1rem; border-radius: 0 4px 4px 0; margin: 1rem 0; font-size: .875rem; }
+    .callout-info { border-left: 3px solid #7aaed4; background: #eef5fb;
+                    padding: .7rem 1rem; border-radius: 0 4px 4px 0; margin: 1rem 0; font-size: .875rem; }
     .stat-grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border);
                  border-radius: 6px; overflow: hidden; margin-bottom: 1rem; }
     .stat { padding: .6rem .9rem; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
@@ -109,19 +117,27 @@
     ul.plain li { margin-bottom: .3rem; }
     ol.plain { padding-left: 1.4rem; margin-bottom: .75rem; }
     ol.plain li { margin-bottom: .4rem; }
+    .mechanic { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+                padding: .75rem 1rem; margin-bottom: .75rem; }
+    .mechanic-title { font-family: var(--mono); font-size: .7rem; text-transform: uppercase;
+                      letter-spacing: .08em; color: var(--muted); margin-bottom: .35rem; }
+    .mechanic-body { font-size: .875rem; }
+    .mechanic-body p { margin-bottom: .4rem; }
+    .mechanic-body p:last-child { margin-bottom: 0; }
   </style>
 </head>
 <body>
 
 <header class="page-header">
   <p class="eyebrow">Lemon-chat adventure setup</p>
-  <h1>The Living Dark</h1>
+  <h1>The Living Dark <span class="version-badge">v2</span></h1>
 </header>
 
 <nav class="toc">
   <h3 style="margin:0 0 .6rem">Contents</h3>
   <ol>
     <li><a href="#overview">Adventure overview</a></li>
+    <li><a href="#mechanics">Special mechanics</a></li>
     <li><a href="#setup">Setup steps</a></li>
     <li><a href="#notes">Notes to create</a></li>
     <li><a href="#character">Character</a></li>
@@ -137,40 +153,113 @@
   is watching you. It says it can help you get out.</p>
   <p>The Vel-Ahru Complex is still alive: its lichen breathes, its circuits hum, and something
   drifts through the enormous caverns that isn't quite animal and isn't quite anything else. The
-  way out requires two components and the willingness to go further in before you can come back out.</p>
+  way out requires two components — but first, you need to know where to look.</p>
 
   <h3>At a glance</h3>
   <div class="stat-grid">
     <div class="stat"><div class="stat-lbl">Difficulty</div><div class="stat-val">Moderate — 3 health</div></div>
-    <div class="stat"><div class="stat-lbl">Length</div><div class="stat-val">5–8 scenes</div></div>
-    <div class="stat"><div class="stat-lbl">Objectives</div><div class="stat-val">3 (2 items + ascent)</div></div>
+    <div class="stat"><div class="stat-lbl">Length</div><div class="stat-val">15–25 scenes (approx. 1 hour)</div></div>
+    <div class="stat"><div class="stat-lbl">Objectives</div><div class="stat-val">4 (archive + 2 items + ascent)</div></div>
     <div class="stat"><div class="stat-lbl">Randomness</div><div class="stat-val">pick_random + approach tables</div></div>
-    <div class="stat"><div class="stat-lbl">Key NPC</div><div class="stat-val">Unit 7 (guide, non-healer)</div></div>
-    <div class="stat"><div class="stat-lbl">Age range</div><div class="stat-val">10+ — alien danger, no gore</div></div>
+    <div class="stat"><div class="stat-lbl">Locations</div><div class="stat-val">5 (hub + archive + 3 destinations)</div></div>
+    <div class="stat"><div class="stat-lbl">Key NPC</div><div class="stat-val">Unit 7 (guide, companion, non-healer)</div></div>
   </div>
 
   <h3>Objectives</h3>
-  <p>Both item locations are open from the start. The Ascent Shaft unlocks automatically when both are found.</p>
+  <p>The Archive must be visited first — it holds the precise sub-location of each item. Both item areas are open from the start but the items aren't findable until the Archive records are read.</p>
   <ol class="plain">
-    <li><strong>Navigation Stone</strong> — Luminare Vaults, east. Challenge: Luminare communication encounter.</li>
-    <li><strong>Power Cell</strong> — Grub Warrens, north. Challenge: retrieve it from a sleeping Grub nest.</li>
-    <li><strong>Activate the Ascent Shaft</strong> — North-west. Auto-succeeds when both items are in hand. No random check.</li>
+    <li><strong>Vel-Ahru Archive</strong> — south-east. Learn where both items actually are. Unit 7 knows the general directions but not the sub-locations within each vast area.</li>
+    <li><strong>Navigation Stone</strong> — Luminare Vaults, east. Challenge: Luminare communication encounter at The Plinth.</li>
+    <li><strong>Power Cell</strong> — Grub Warrens, north. Challenge: retrieve it from the sleeping Grub Nest.</li>
+    <li><strong>Activate the Ascent Shaft</strong> — north-west. Auto-succeeds when both items are in hand. No random check.</li>
   </ol>
+</section>
 
-  <h3>Special mechanics</h3>
-  <p><strong>Memory fragments</strong> — tracked as a counter (0–3). Each successful or partial encounter adds one.
-  The narration style shifts as the counter rises: blank and disoriented at zero, purposeful and grounded at three.
-  Show memory status alongside health in every response.</p>
-  <p><strong>Unit 7 trust</strong> — if the player is patient or curious with Unit 7 during the opening,
-  <code>unit7_trust</code> is set to <code>"helpful"</code>. This grants advantage on the Grub Den encounter:
-  Unit 7 describes the safe route before the player enters. It is the only advantage source in this adventure.</p>
+<hr>
+
+<!-- ═══════════════════════ MECHANICS -->
+<section id="mechanics">
+  <h2>Special mechanics</h2>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Vel-Ahru Archive — the first required stop</div>
+    <div class="mechanic-body">
+      <p>A new required location south-east of the Awakening Chamber. Unit 7's briefing explains it knows the two items exist and their general directions (east / north), but the Archive holds the precise sub-location records it hasn't accessed recently.</p>
+      <p>Two state flags gate the items: <code>stone_location_known</code> and <code>cell_location_known</code>. Without visiting the Archive, the player can explore either area but won't know where within the vast space to look. This forces 3–5 Archive scenes before the fetch quests begin, and rewards exploration with specific knowledge rather than a waypoint marker.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Sub-zones within each major location</div>
+    <div class="mechanic-body">
+      <p>Each major area is a 3-scene journey, not a single room. The pacing rules enforce this: travel = one scene, arrival = one scene, encounter = a third scene. They cannot be combined.</p>
+      <ul class="plain" style="margin-top:.35rem;">
+        <li><strong>Luminare Vaults:</strong> Entrance archway → Main Atrium (Luminares visible, healing herb here) → The Plinth (encounter)</li>
+        <li><strong>Grub Warrens:</strong> Tunnel Entrance → Branching Chamber (three routes, alert check possible) → Nest (encounter)</li>
+      </ul>
+      <p>Players must take at least one exploratory action in each area before any encounter resolves.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Grub alertness state</div>
+    <div class="mechanic-body">
+      <p><code>grub_alert_level</code> (0–3) replaces the static difficulty table for the Grub Den. Noisy actions near the Warrens or a failed encounter raise it; spending a scene elsewhere lowers it. This makes every action in the Warrens area carry weight.</p>
+      <ul class="plain" style="margin-top:.35rem;">
+        <li>Level 0: sleeping — MEDIUM table</li>
+        <li>Level 1: one patrolling — MEDIUM, but partial costs 2 health instead of 1</li>
+        <li>Level 2: agitated — HARD table</li>
+        <li>Level 3: impassable — the tunnels cannot be entered; must wait one scene elsewhere (drops to level 2)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Unit 7 trust — maintenance task mechanic</div>
+    <div class="mechanic-body">
+      <p>Trust is no longer granted by vague politeness. It is earned through a specific, observable action. On the north-east wall of the Awakening Chamber there is a maintenance hatch Unit 7 cannot open alone — the mechanism needs two hands in a sequence its manipulators can't manage. Unit 7 keeps returning to it but has no word for asking.</p>
+      <p>The player discovers it by examining the north-east wall or asking Unit 7 what it keeps going back to. Helping resolves via <code>random_chance</code> — success or failure, the hatch opens eventually. Completing it sets <code>unit7_trust = "helpful"</code> and is the only way to earn it.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Unit 7 as companion</div>
+    <div class="mechanic-body">
+      <p>If <code>unit7_trust = "helpful"</code>, the player can invite Unit 7 to accompany them (<code>unit7_following = "true"</code>). Unit 7 makes one factual observation per scene — never hints, never spoilers, just what it sees. It cannot enter the Grub tunnels (chassis too wide) or the Ascent Shaft (power grid risk).</p>
+      <p>At the Shaft base, if following, Unit 7 stops at the edge and delivers its farewell scene before the platform activates. It has had a very long time to prepare the words.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Memory fragments as keys</div>
+    <div class="mechanic-body">
+      <p>Memory fragments (0–3) still shift narration tone — but each one now also unlocks a specific interaction:</p>
+      <ul class="plain" style="margin-top:.35rem;">
+        <li><strong>Fragment 1:</strong> Player can introduce themselves by name. Unit 7 uses their name from then on. Unlocks "who are you looking for?" dialogue.</li>
+        <li><strong>Fragment 2:</strong> Unlocks "the signal" dialogue with Unit 7 (it recognises the frequency). On a return visit to the Vaults after retrieving the stone, the Luminares use the RECOGNITION table — a scene of being genuinely seen.</li>
+        <li><strong>Fragment 3:</strong> Victory text gains a final closing paragraph. Narration becomes fully grounded.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Player journal</div>
+    <div class="mechanic-body">
+      <p>At adventure start, the GM creates <code>c.journal</code> with <code>note_save</code> and appends a brief entry after each significant event using <code>note_append</code>. The player can ask "show me my journal" at any time to get a second-person record of everything they have discovered. The journal also helps the GM track state across long sessions without calling <code>state_list</code> repeatedly.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">World events</div>
+    <div class="mechanic-body">
+      <p>After each scene transition, the GM calls <code>random_chance</code>. On success, an atmospheric event from the events note fires — woven into the opening of the next scene. 15 events total: dimming lichen, something vast moving below, Grubs rearranging in sleep, a Luminare drifting through a corridor it had no reason to be in. No action required, no mechanical effect. The complex feels inhabited.</p>
+    </div>
+  </div>
 
   <h3>Why approach tables</h3>
   <p>The Luminare encounter has no fixed difficulty. The player's described approach determines which table
   is used — patient and open gets the easy list, aggressive or demanding gets the hard list. This makes the
   encounter feel like genuine communication: the mechanics reward the behaviour that fits the fiction.</p>
-  <p>The same pattern applies here as in Eldoria's River Spirit encounter — the quality of the player's
-  action is the input, not a dice roll.</p>
 </section>
 
 <hr>
@@ -179,8 +268,9 @@
 <section id="setup">
   <h2>Setup steps</h2>
   <ol class="steps">
-    <li>Go to <strong>Settings → Notes</strong> and create each of the six notes below, pasting the content exactly.</li>
+    <li>Go to <strong>Settings → Notes</strong> and create each of the seven notes below, pasting the content exactly.</li>
     <li>After saving each note, enable <strong>Read-only</strong> for every note marked <span class="badge b-readonly">read-only</span>.</li>
+    <li>Go to <strong>Settings → Characters</strong>, open <strong>Choose Your Own</strong>, and add <code>note_save</code> and <code>note_append</code> to its tools list if they are not already present.</li>
     <li>Use the existing <strong>Choose Your Own</strong> character. No new character is needed — it finds all <code>g.cyo.*</code> adventures automatically.</li>
     <li>Start a new conversation with Choose Your Own. It will offer The Living Dark alongside any other installed adventures.</li>
   </ol>
@@ -191,6 +281,9 @@
     <strong>Easier for younger players:</strong> Before starting, edit <code>g.cyo.living-dark</code> and change
     <code>player_health = "3"</code> to <code>"5"</code>. Turn read-only back on after editing.
   </div>
+  <div class="callout-info">
+    <strong>Upgrading from v1?</strong> Import the note pack from <code>note-packs/living-dark.json</code> via Settings → Tools → Import note pack. All six existing notes are overwritten with v2 content and the new events note is created. Then add <code>note_save</code> and <code>note_append</code> to the character's tools.
+  </div>
 </section>
 
 <hr>
@@ -198,7 +291,7 @@
 <!-- ═══════════════════════ NOTES -->
 <section id="notes">
   <h2>Notes to create</h2>
-  <p>Six notes total. Enter the key exactly as shown and mark read-only after saving.</p>
+  <p>Seven notes total. Enter the key exactly as shown and mark read-only after saving. Or import the note pack from <code>note-packs/living-dark.json</code> to create them all at once.</p>
 
   <!-- g.cyo.living-dark -->
   <div class="card">
@@ -206,7 +299,7 @@
       <span class="card-key">g.cyo.living-dark</span>
       <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
     </div>
-    <div class="card-desc">Adventure manifest — loaded first. Contains load instructions, world state, objectives, memory fragment guide, and the opening narration.</div>
+    <div class="card-desc">Adventure manifest — loaded first. Contains load instructions, world state (including new state variables), objectives, memory guide, and updated opening narration.</div>
     <div class="card-body">
       <textarea id="n0" readonly>ADVENTURE: The Living Dark
 TAGLINE: Something down here has been waiting. It might even be glad you came.
@@ -218,22 +311,36 @@ LOAD IMMEDIATELY:
 
 LOAD ON DEMAND:
 - g.cyo.living-dark.bestiary — load when the player first approaches a creature or attempts an encounter
+- g.cyo.living-dark.events  — load on the first world event trigger (random_chance success on transition)
 
 WORLD STATE INIT:
-player_health    = "3"
-memory_fragments = "0"
-nav_stone        = "not_found"
-power_cell       = "not_found"
-shaft_active     = "false"
-unit7_trust      = "neutral"
+player_health        = "3"
+memory_fragments     = "0"
+nav_stone            = "not_found"
+power_cell           = "not_found"
+shaft_active         = "false"
+unit7_trust          = "neutral"
+unit7_following      = "false"
+unit7_task_done      = "false"
+grub_alert_level     = "0"
+stone_location_known = "false"
+cell_location_known  = "false"
+archive_visited      = "false"
+route_vaults_known   = "false"
+route_warrens_known  = "false"
 
 OBJECTIVES:
-1. nav_stone    — Retrieve the Navigation Stone from the Luminare Vaults.
-                  Gate: navigate the Luminare communication encounter.
-2. power_cell   — Retrieve the Power Cell from the Grub Warrens.
-                  Gate: survive or evade the Grub Den.
-3. shaft_active — Activate the Ascent Shaft using both components.
-                  Auto-succeeds when nav_stone = "found" AND power_cell = "found".
+0. archive          — Visit the Vel-Ahru Archive (south-east). Learn the precise locations of
+                      both items. Unit 7 knows the general directions but not the sub-locations.
+                      Completion: stone_location_known = "true" AND cell_location_known = "true".
+1. nav_stone        — Retrieve the Navigation Stone from The Plinth in the Luminare Vaults.
+                      Requires: stone_location_known = "true".
+                      Gate: navigate the Luminare communication encounter.
+2. power_cell       — Retrieve the Power Cell from the Nest in the Grub Warrens.
+                      Requires: cell_location_known = "true".
+                      Gate: survive or evade the Grub Den.
+3. shaft_active     — Activate the Ascent Shaft using both components.
+                      Auto-succeeds when nav_stone = "found" AND power_cell = "found".
 
 FAILURE: player_health reaches 0.
 Narrate: "The dark takes you. Not violently — it simply fills the spaces you leave behind.
@@ -267,8 +374,14 @@ am designated Unit 7. My function is to assist. I have been waiting for someone 
 
 It pauses. Something in it recalibrates.
 
-"There is a way out. It is called the Ascent Shaft. It requires two components I can locate
-for you. I will explain. Are you prepared to listen?"</textarea>
+"There is a way out. It is called the Ascent Shaft, north-west of this chamber. It requires
+two components. I know their general locations — one to the east, one to the north — but I
+have not accessed the Archive records recently. The Archive is south-east of here. It will
+have the precise sub-locations. I recommend beginning there."
+
+It pauses again. Its amber lenses are very still.
+
+"Are you prepared to proceed?"</textarea>
       <button class="copy-btn" onclick="cp('n0',this)">Copy</button>
     </div>
   </div>
@@ -279,9 +392,43 @@ for you. I will explain. Are you prepared to listen?"</textarea>
       <span class="card-key">g.cyo.living-dark.rules</span>
       <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
     </div>
-    <div class="card-desc">Game mechanics — randomness, health, memory fragments, Unit 7 trust, response length, tone, and image guidance.</div>
+    <div class="card-desc">Game mechanics — journal, pacing rules, world events, randomness, Grub alertness, archive gate, health, memory fragments, Unit 7 trust and companion rules, tone, image guidance.</div>
     <div class="card-body">
-      <textarea id="n1" readonly>RANDOMNESS — HOW ENCOUNTER OUTCOMES WORK:
+      <textarea id="n1" readonly>JOURNAL:
+At adventure start, call note_save for c.journal with this exact content:
+  "THE LIVING DARK — Field Notes"
+After each significant event (new location entered, item found, memory fragment recovered,
+key NPC interaction, important discovery), call note_append for c.journal with 1–2 sentences.
+Write each entry in second person, past tense.
+If the player asks to see their journal: call note_load for c.journal and read it aloud.
+Do not include choices in that response. Resume normally with choices on the next response.
+
+─────────────────────────────────────────────
+PACING — NON-NEGOTIABLE:
+
+Travel to a new location is its own scene. Arrival is a separate scene. Any encounter within
+that location is a third scene. Never combine more than one of these into a single response.
+
+Before resolving any encounter, the player must take at least one exploratory action in the
+area first. If the player immediately attempts to grab an objective: narrate something that
+invites pause — a detail, a moment, something worth noticing. Not a block. An invitation.
+
+Unit 7 makes at least one observation per scene if it is present in the Awakening Chamber or
+if unit7_following = "true". Its observations are factual, never hints.
+
+If the player asks about a location they have not visited: describe only what Unit 7 has told
+them and what can be inferred. Do not preview content they have not discovered.
+
+─────────────────────────────────────────────
+WORLD EVENTS:
+After each scene transition, call random_chance (before narrating the new scene).
+On success: load g.cyo.living-dark.events (if not already loaded). Draw one atmospheric event
+appropriate to the player's current location. Weave it into the opening of the scene — one
+or two sentences, seamlessly. These events require no action and have no mechanical effect.
+On failure: quiet transition, no event.
+
+─────────────────────────────────────────────
+RANDOMNESS — HOW ENCOUNTER OUTCOMES WORK:
 
 Use pick_random for all 3-outcome encounter checks. Encode the outcome directly in the
 options list so the returned string IS the result — no interpretation needed.
@@ -304,16 +451,53 @@ BEFORE making the call, then apply the result exactly. Do not write outcomes in 
 
 Never use roll_dice — the numeric result requires interpretation, which allows cheating.
 
+─────────────────────────────────────────────
+GRUB ALERTNESS:
+grub_alert_level tracks how disturbed the Grubs are. Check it before any Warrens encounter.
+
+Level 0 — Grubs asleep. Use MEDIUM table.
+Level 1 — One Grub patrolling. Use MEDIUM table. Partial costs 2 health (state_modify player_health delta=-2).
+Level 2 — Three Grubs awake and agitated. Use HARD table.
+Level 3 — Impassable. Do not allow entry into the tunnels. Narrate this honestly.
+          Offer 3 choices that don't involve entering. Then call state_modify grub_alert_level delta=-1
+          (time passing without noise settles them from level 3 to level 2).
+
+INCREASE alert level (+1) when:
+- The player makes a noisy action in or near the Warrens (running, shouting, dropping something)
+- A Grub Den encounter ends in failure
+Call: state_modify grub_alert_level delta=+1
+
+DECREASE alert level (-1) when:
+- The player leaves the Warrens and completes one full scene elsewhere
+Call: state_modify grub_alert_level delta=-1
+
+Never let the level go below 0 or above 3.
+
+─────────────────────────────────────────────
+ARCHIVE GATE:
+stone_location_known must be "true" for the Navigation Stone to be findable in the Vaults.
+cell_location_known must be "true" for the Power Cell to be findable in the Warrens.
+
+Without knowledge: the player can enter either area and experience it fully — but the spaces
+are vast, the items are not immediately obvious, and without the Archive's records they cannot
+pinpoint the specific sub-zones. Narrate the wonder of the space. Unit 7 says it is imprecise
+on internal sub-locations — its maintenance cycles did not cover the innermost areas.
+
+With knowledge: the player knows exactly where to go. The records are specific: The Plinth
+(Vaults, east recess), the deepest nest chamber (Warrens, right branch of the Branching Chamber).
+
+─────────────────────────────────────────────
 HEALTH:
 Player starts at the value in WORLD STATE INIT (default 3).
 Show health at the end of every response: ❤️❤️❤️ / ❤️❤️ / ❤️
 At 0 health: narrate the failure ending from the manifest. Stop. No more choices.
 
 HEALING — only these sources allowed:
-- Luminescent herb in the Luminare Vaults: a soft pink growth on the east wall, near the
-  plinth. Easy to spot once the player is past the Luminares. One-time use, restores 1 health.
+- Luminescent herb in the Luminare Vaults (Main Atrium, east wall): a soft pink growth,
+  glows faintly warmer than the surrounding lichen. One-time use, restores 1 health (💚).
 - No NPC healer. Unit 7 cannot heal.
 
+─────────────────────────────────────────────
 MEMORY FRAGMENTS:
 Tracked as memory_fragments counter (0–3). Increment with: state_modify memory_fragments delta=+1.
 
@@ -322,21 +506,60 @@ memory_fragments = "1": A name. A face. Something personal. Narration gains a fa
 memory_fragments = "2": A reason. A signal. A mission they chose alone. Narration is purposeful.
 memory_fragments = "3": Full recall. Narration is grounded. They know. They're going home.
 
-Show memory status in every response: Memory: ✨✨✨ (filled for each fragment recovered).
+Show memory status in every response: Memory: ✨✨✨ (one ✨ per fragment recovered).
 
+MEMORY AS KEYS — each fragment unlocks specific interactions:
+Fragment 1 unlocks:
+  - The player can introduce themselves to Unit 7 by name.
+  - Unit 7 uses their name from then on (formal: "You are remembered, [name].").
+  - Dialogue option becomes available: "who are you looking for?" Unit 7 deflects, but the
+    question lands. It says: "I was not informed of specifics. I have been informed of a signal."
+
+Fragment 2 unlocks:
+  - Dialogue option "the signal" with Unit 7. Tell it the frequency. It recognises it.
+    It says: "The signal was sent from this complex. I was not informed of its purpose."
+    It says nothing more. It knows more than this. It does not say it.
+  - On a return visit to the Luminare Vaults after nav_stone is already found:
+    Luminares use the RECOGNITION table instead of the standard table — see .bestiary.
+
+Fragment 3 unlocks:
+  - The victory text gains a final closing paragraph — see g.cyo.living-dark.victory.
+  - Narration becomes fully grounded and purposeful.
+
+─────────────────────────────────────────────
 UNIT 7 TRUST:
 unit7_trust = "neutral" by default.
-If the player is patient, curious, or kind toward Unit 7 in the opening — asks questions,
-listens, engages respectfully — set unit7_trust = "helpful".
-Effect: advantage on the Grub Den encounter only. Unit 7 describes the safe route.
-Never set this retroactively. Only when the player actively earns it.
+Trust is set to "helpful" only when unit7_task_done = "true".
 
+The maintenance hatch (north-east wall, Awakening Chamber) is the ONLY trust mechanic.
+Unit 7 does not ask for help. It keeps returning to the hatch. The player discovers this
+by examining the north-east wall or asking Unit 7 what it keeps looking at.
+If the player offers to help, completing the task sets trust. See UNIT 7'S TASK in .bestiary.
+
+Effect of trust = "helpful":
+- Advantage on the Grub Den: call pick_random twice with the selected table, take better result.
+  Unit 7 describes the safe route before the player enters. The tunnels are too narrow for it to follow.
+- The player may invite Unit 7 to accompany them.
+
+UNIT 7 AS COMPANION:
+If unit7_trust = "helpful", the player may ask Unit 7 to come along.
+If they do: state_set unit7_following "true".
+Unit 7 makes one factual observation per scene when following. Never a hint. Never a spoiler.
+Unit 7 cannot enter the Grub Warrens tunnels (chassis too wide).
+Unit 7 cannot enter the Ascent Shaft (power grid would damage its systems).
+If unit7_following = "true" when the player arrives at the Shaft with both items:
+  Narrate the farewell scene from g.cyo.living-dark.secrets before the platform activates.
+
+─────────────────────────────────────────────
 RESPONSE LENGTH:
 Keep scene narration to 2–3 short paragraphs. Sparse and observational.
 The opening narration in the manifest is the only long exception.
 End every response with health, memory status, then 3 numbered choices, then
 "(or type something else below)" — nothing after that.
+Exception: when reading the journal, end with the journal contents only. No choices.
+Resume with choices on the next response.
 
+─────────────────────────────────────────────
 TONE — this adventure is not Eldoria:
 - No warmth or comfort in the narration. Awe, not safety.
 - No exclamation marks. No heroic declarations.
@@ -351,10 +574,11 @@ EMOJI FOR KEY EVENTS — use these consistently:
 💎 item found           ✨ memory fragment recovered
 ⚠️ entering a dangerous area
 
+─────────────────────────────────────────────
 IMAGE GENERATION:
 Generate an image with generate_image_sdxl at these moments:
 - The start of the adventure (the Awakening Chamber)
-- First arrival at each major location
+- First arrival at each major location (Archive, Vaults, Warrens, Shaft)
 - When a key item is collected
 - The victory scene
 
@@ -362,15 +586,10 @@ Generate the image as part of the scene — before your text. Do not describe th
 
 SDXL PROMPT STRUCTURE — always follow this order:
 1. Quality/style tags: "sci-fi illustration, digital painting, concept art, masterpiece, best quality, highly detailed, sharp focus"
-2. Subject: what is the focal point of the scene (a creature, a location, an object)
+2. Subject: what is the focal point of the scene
 3. Environment: underground, no natural light — bioluminescent lichen, alien geometry
-4. Lighting: "bioluminescent blue light", "cold blue glow", "pale phosphorescent light", "faint alien radiance"
+4. Lighting: "bioluminescent blue light", "cold blue glow", "pale phosphorescent light"
 5. Mood: "eerie wonder", "vast and empty", "alien and ancient", "quiet dread"
-
-Example:
-"sci-fi illustration, digital painting, concept art, masterpiece, best quality, highly detailed,
-sharp focus, vast underground cavern with bioluminescent blue lichen covering ribbed alien walls,
-ancient Vel-Ahru architecture, cold blue glow, eerie wonder, painterly"
 
 SDXL NEGATIVE PROMPT — always include this (copy exactly):
 "blurry, out of focus, low quality, jpeg artifacts, noise, grainy, watermark, text, signature,
@@ -378,13 +597,14 @@ logo, username, bad anatomy, deformed, malformed, extra limbs, missing limbs, ex
 disfigured, ugly, bad proportions, cropped, cut off, border, frame, oversaturated, flat"
 
 SDXL SETTINGS — choose orientation to match the subject:
-- Landscape 1344×768: vast caverns, arrival establishing shots, the Luminare Vaults
+- Landscape 1344×768: vast caverns, arrival establishing shots, the Luminare Vaults, the Archive
 - Portrait  768×1344: the Ascent Shaft, Unit 7, tight tunnel entrances, the Grub Warrens
 - Square    1024×1024: individual items (Navigation Stone, Power Cell), close-ups
 
 - cfg: 7.0 (default — increase to 9 if the prompt is being ignored)
 - Do not include human figures or player-character descriptions in prompts.
 
+─────────────────────────────────────────────
 PACING:
 - One scene per response. Never combine two encounters.
 - Every response ends with exactly 3 numbered choices followed by "(or type something else below)".
@@ -411,7 +631,7 @@ Notes ending .secrets are GM-only. Never quote or directly reveal their contents
       <span class="card-key">g.cyo.living-dark.world</span>
       <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
     </div>
-    <div class="card-desc">World lore — the Vel-Ahru Complex, Unit 7, all four locations, and their inhabitants.</div>
+    <div class="card-desc">World lore — the Vel-Ahru Complex, Unit 7 (including the maintenance hatch), all five locations with sub-zones, and the Archive's three discoveries.</div>
     <div class="card-body">
       <textarea id="n2" readonly>## The Vel-Ahru Complex
 A vast underground structure, millennia old, built by a species that lived entirely below
@@ -435,57 +655,133 @@ It has been in the complex alone for a very long time. It does not know what lon
 but it has developed preferences: it prefers when there is someone to assist.
 
 Unit 7 cannot heal the player. It can guide and answer factual questions about the complex.
-If unit7_trust = "helpful": it knows the safe route through the Grub Warrens from maintenance
-cycles and will describe it before the player enters. The tunnel is too narrow for Unit 7 to
-follow.
+It knows the Shaft needs two components and their general directions (east / north) but is
+imprecise on internal sub-locations — its maintenance cycles covered the outer corridors.
+
+If unit7_trust = "helpful": knows a safe route through the Grub Warrens from maintenance
+cycles. Describes it before the player enters. The tunnels are too narrow for it to follow.
+
+If unit7_following = "true": accompanies the player everywhere it can reach. Makes one
+factual observation per scene. Cannot enter the Grub Warrens tunnels or the Ascent Shaft.
+
+THE MAINTENANCE HATCH:
+On the north-east wall of the Awakening Chamber, near the floor: a Vel-Ahru maintenance
+panel that has been stuck for a long time. Unit 7 returns to it periodically. The mechanism
+requires two hands applying pressure in a specific sequence — Unit 7's manipulators cannot
+manage it alone.
+
+Unit 7 will not mention this unprompted. It has no word for asking. If the player examines
+the north-east wall, or asks Unit 7 what it keeps returning to, this becomes apparent.
+If the player offers to help: see UNIT 7'S TASK in g.cyo.living-dark.bestiary.
+
+Inside the hatch (once opened): a small Vel-Ahru maintenance kit and a data crystal with
+maintenance logs from decades past. No mechanical effect — only lore.
 
 ## The Awakening Chamber
 Where the player wakes. A chamber roughly circular, fifteen metres across. Bioluminescent
 lichen covers every surface — densest here, shifting faintly like breath. The hum of the
 complex's power is loudest in this room.
 
-A single Vel-Ahru archway leads east (Luminare Vaults), north (Grub Warrens), and
-north-west (Ascent Shaft — sealed until both items are found).
+Archways lead: east (Luminare Vaults), north (Grub Warrens), south-east (Vel-Ahru Archive),
+and north-west (Ascent Shaft — sealed until both items are found).
 
-Unit 7 is always here unless the player moves on. It will not follow unless invited.
+Unit 7 remains here unless the player moves on or it is invited to follow.
+
+## The Vel-Ahru Archive
+SOUTH-EAST of the Awakening Chamber.
+
+A record-keeping chamber, lower-ceilinged than the rest of the complex. The lichen here
+grows in neat rows along the wall, as if cultivated. Crystalline data-slabs line every
+surface in organised arrays — each one a finger's width of dark glass, flush-mounted, with
+a faint internal luminescence that does not pulse. Still, not alive.
+
+The air is dry and old. It smells less biological than the rest of the complex. More considered.
+
+THREE THINGS TO FIND HERE:
+
+1. LOCATION RECORDS — Two specific slabs contain sub-location data for both item objectives.
+   One describes The Plinth (east recess of the Luminare Vaults main cavern, Navigation Stone).
+   One describes the Nest (deepest chamber of the Grub Warrens, right branch, Power Cell).
+   These set stone_location_known and cell_location_known. See bestiary for search mechanic.
+
+2. PERSONAL LOG (optional) — A small slab near the floor with surface markings that look
+   like handwriting — not Vel-Ahru ideograms, but something human. The log is brief.
+   A frequency. A location. A note that reads like something left for a specific reader.
+   No check needed. The player must look for non-standard markings specifically.
+   No memory fragment is earned here. Something else settles instead.
+
+3. RESONANCE CHIP (found during exploration) — A small Vel-Ahru data interface, passive,
+   warm when held. No check needed — found while exploring the slabs.
+   Usable on: the Warrens terminal (reveals lore about the Power Cell's origin) or
+   the Shaft plinth (reveals the Navigation Stone's full encoded record — lore only).
+
+Unit 7 can read some slabs if following — its language module covers technical Vel-Ahru,
+not the personal log. It will translate if asked.
 
 ## The Luminare Vaults
 EAST of the Awakening Chamber. A cavern with no visible ceiling — the space simply continues
 upward until the blue light fades to black. Dozens of Luminares drift through the air:
-translucent spheres thirty centimetres across, trailing filaments of pale gold light.
-
-The Navigation Stone rests on a Vel-Ahru plinth at the cavern's centre — dark metal inlaid
-with a crystalline core that pulses faintly blue. The Luminares drift around it without
-touching it. They are not guarding it. They are attending it.
+translucent spheres roughly thirty centimetres across, trailing filaments of pale gold light.
 
 The Luminares read intention, not words. They respond to the player's approach.
 They communicate in images projected directly into the mind — never words.
 
-HEALING HERB: A soft pink growth on the east wall, near the plinth. Glows faintly warmer
-than the lichen around it. Easy to spot once the player is close. One-time use, restores 1 health.
+THE THREE SUB-ZONES:
+
+ENTRANCE ARCHWAY — where the corridor opens suddenly into the vault. The scale of the space
+becomes apparent here. Luminares are visible in the distance, moving in slow patterns.
+The player can observe without engaging. The herb is not yet visible from here.
+
+MAIN ATRIUM — the middle zone. Luminares drift close but have not engaged. The healing herb
+(soft pink growth, east wall, glows slightly warmer than the surrounding lichen) is visible
+and easy to reach. The player must pass through the Atrium to reach the Plinth.
+
+THE PLINTH — the innermost zone. A dark metal plinth in the east recess, crystalline core
+pulsing faintly blue. The Navigation Stone rests on it. Luminares attend it without touching.
+Only meaningfully reachable if stone_location_known = "true": without the Archive records
+the space is too vast to identify the plinth among the formations. With knowledge: precise.
+The Luminare encounter occurs here.
+
+HEALING HERB: Main Atrium, east wall. One-time use, restores 1 health.
 
 ## The Grub Warrens
-NORTH of the Awakening Chamber. The floor slopes downward into a network of tunnels bored
-smooth by Grub bodies over generations. The walls are close. The air is warmer.
+NORTH of the Awakening Chamber. The floor slopes downward almost immediately.
 
 The Grubs: dog-sized, blind, white, evolved in total darkness. They navigate by vibration.
-Territorial but not aggressive unless disturbed — they sleep in clusters of eight to twelve.
+Territorial but not aggressive unless disturbed. They sleep in clusters of eight to twelve.
 
-The Power Cell is in the deepest nest chamber: a Vel-Ahru battery the size of a fist, still
-warm, resting in the floor where three Grubs sleep curled around it for heat. A Vel-Ahru
-terminal on the passage wall shows a readout that still functions.
+THE THREE SUB-ZONES:
+
+TUNNEL ENTRANCE — where the Awakening Chamber floor transitions to the downward slope.
+The air changes: warmer, animal, organic. The lichen grows sparse and pale. The quiet of
+the tunnels below is noticeable. Nothing visible yet.
+
+BRANCHING CHAMBER — a wider space where three tunnel branches diverge. One leads to the
+Nest; the others to dead ends or sleeping clusters. This is where the first Grub encounter
+can occur if alert level is elevated. If cell_location_known = "true": the player knows
+the right branch (Archive records: right branch, deepest tunnel). Without knowledge: choose.
+
+NEST — the deepest chamber. Three Grubs sleeping curled around the Power Cell — a Vel-Ahru
+battery the size of a fist, resting in a shallow floor depression, still warm. A Vel-Ahru
+terminal on the passage wall still functions. The Grub Den encounter occurs here.
+Only meaningfully reachable if cell_location_known = "true" — without the Archive, the
+player can reach the Nest but won't know the Power Cell is what they are looking for.
 
 ## The Ascent Shaft
-NORTH-WEST of the Awakening Chamber. A vertical tube forty metres across. The walls are
-covered in circuit-like engravings that have been dark for a long time. A Vel-Ahru platform
-sits at the base: a disc of dark stone, three metres across, with two recesses shaped
-exactly for the Navigation Stone and the Power Cell.
+NORTH-WEST of the Awakening Chamber. A vertical tube forty metres across. Circuit-like
+engravings cover the walls — dark for a long time. A Vel-Ahru platform at the base: a disc
+of dark stone, three metres across, with two recesses shaped exactly for the two components.
 
-When both components are placed, the engravings glow, the platform rises, and the shaft
-fills with ascending pale light. The journey to the surface takes approximately four minutes.
+When both are placed, the engravings glow, the platform rises, and the shaft fills with
+ascending pale light. The journey to the surface takes approximately four minutes.
 
 If the player arrives without both items: the platform is cold and inert. Unit 7 (if present)
-says only: "It needs both."</textarea>
+says only: "It needs both."
+
+FAREWELL SCENE: If unit7_following = "true" when the player arrives with both items ready:
+Unit 7 stops at the edge of the platform area before the components are placed. It does not
+step forward. Narrate the farewell scene from g.cyo.living-dark.secrets, then continue
+with the components being placed and the platform rising.</textarea>
       <button class="copy-btn" onclick="cp('n2',this)">Copy</button>
     </div>
   </div>
@@ -496,7 +792,7 @@ says only: "It needs both."</textarea>
       <span class="card-key">g.cyo.living-dark.bestiary</span>
       <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
     </div>
-    <div class="card-desc">Encounter cards — load when the player first approaches a creature or attempts an encounter. Defines approach tables and outcomes for both challenges.</div>
+    <div class="card-desc">Encounter cards — navigation checks, Unit 7's maintenance task, Archive search, Luminare communication, Luminare Recognition (return visit), and the Grub Den with alertness integration.</div>
     <div class="card-body">
       <textarea id="n3" readonly>ENCOUNTER RESOLUTION PATTERN:
 1. Call note_to_self to record the three outcomes — do NOT write them in your response.
@@ -505,13 +801,83 @@ says only: "It needs both."</textarea>
 3. Apply the returned string exactly. No reinterpretation.
 
 ─────────────────────────────────────────────
+## Navigation Check — First Travel to a New Location
+
+On first travel to any major location, check if the route flag is already "true":
+- To Luminare Vaults: route_vaults_known
+- To Grub Warrens:   route_warrens_known
+- To Vel-Ahru Archive: archive_visited
+
+If "true": no check — player knows the way. Proceed to arrival scene.
+
+If "false": call note_to_self with outcomes, then call random_chance.
+  success: Player finds the location directly. Set the route flag to "true".
+           Narrate: one sentence about recognising Unit 7's description of the route.
+  failure: Player takes a wrong corridor first — briefly describe what they see
+           (a side chamber, something interesting but not immediately useful). Then
+           they find the right way. Set the route flag to "true". No health cost.
+           This adds one short scene. The wrong corridor can contain atmospheric detail.
+
+For the Archive on first visit: also set archive_visited = "true" on arrival.
+
+─────────────────────────────────────────────
+## Unit 7 — Maintenance Hatch Task
+
+Triggered when the player offers to help with the maintenance hatch (north-east wall,
+Awakening Chamber). Unit 7 does not ask — discovered through exploration or direct question.
+
+1. Call note_to_self: "success: hatch opens on first attempt. failure: first attempt fails,
+   opens on second attempt."
+2. Call random_chance.
+3. Apply:
+   success: The mechanism releases cleanly. Inside: maintenance kit, data crystal with logs.
+            This is one scene.
+   failure: The first attempt doesn't work — the sequence is specific. After another try,
+            it opens. Inside: maintenance kit, data crystal. This is two scenes.
+4. Either outcome, on completion:
+   state_set unit7_task_done "true"
+   state_set unit7_trust "helpful"
+   Unit 7's manner shifts — still formal, but something settles. It does not say thank you.
+   It has not assembled that phrase. It says: "This has been unresolved for a long time."
+   Narrate the amber lenses, still. The hatch, now open.
+
+─────────────────────────────────────────────
+## Vel-Ahru Archive — Location Records Search
+
+The player searches the data-slabs for the item location records.
+
+1. Call note_to_self: "success: find both locations in one search. failure: find one, need
+   a second search for the other."
+2. Call random_chance.
+3. Apply:
+   success: Both records found in one pass. The records are specific — sub-zone names,
+            distinguishing features. Narrate the player finding both slabs.
+            state_set stone_location_known "true"
+            state_set cell_location_known "true"
+   failure: One record found (GM's choice, or player's preference if they have one).
+            Set that flag to "true". Must search again for the other — one additional scene.
+            The second search auto-succeeds (no roll).
+
+PERSONAL LOG: Found automatically when the player looks for non-standard markings.
+No check. Narrate: a small slab near the floor, surface markings in something like
+handwriting. The log is brief — a frequency, a location, a note. Do not quote it fully.
+Do not explain it. Let it sit with the player. Something personal and displaced.
+
+RESONANCE CHIP: Found automatically during exploration of the slabs. No check.
+Describe: small, flat, warm when held. The player can use it on other Vel-Ahru interfaces.
+
+─────────────────────────────────────────────
 ## Luminare Communication — The Luminare Vaults
 
 Not a combat encounter. The Luminares do not use language. They read intention.
 
-Assess the player's stated approach: is it patient, open, and curious — or urgent,
-demanding, and self-focused? The approach determines the table. The player does not choose
-a table — their action does.
+This encounter occurs at The Plinth. The player must have passed through the Entrance
+Archway and Main Atrium first (pacing rule: at least one exploratory action before encounter
+resolves). The approach happens organically — the player arrives at the plinth and the
+Luminares respond to how they arrived and what they intend.
+
+Assess the player's stated approach: patient, open, curious — or urgent, demanding,
+self-focused? The approach determines the table. The player does not choose a table.
 
 PATIENT / CURIOUS / OPEN APPROACH:
 ["success","success","success","success","success","partial","partial","partial","failure","failure"]
@@ -522,55 +888,159 @@ DEMANDING / AGGRESSIVE / GRABBING APPROACH:
 success → The Luminares part slowly. The nearest drifts to the plinth and tilts — offering
           the stone. As the player takes it, a vision floods in: their own name, spoken in
           their own voice, and a face they love clearly and suddenly.
-          💎 nav_stone = "found". ✨ state_modify memory_fragments delta=+1.
-          The Luminares also pulse in sequence toward the north passage — indicating the
-          safe route to the Grub Warrens. Note this in narration.
+          💎 state_set nav_stone "found". ✨ state_modify memory_fragments delta=+1.
+          The Luminares pulse in sequence toward the north passage — indicating the safe
+          route to the Grub Warrens. Note this in narration.
 
-partial → The player retrieves the stone but the Luminares contract and drift to the
-          ceiling. The vision comes anyway — brief, fragmented, real.
-          💎 nav_stone = "found". ✨ state_modify memory_fragments delta=+1.
+partial → The player retrieves the stone but the Luminares contract and drift to the ceiling.
+          The vision comes anyway — brief, fragmented, real.
+          💎 state_set nav_stone "found". ✨ state_modify memory_fragments delta=+1.
           No route hint to the Warrens.
 
 failure → Every Luminare contracts to a tight bright sphere simultaneously. The chamber
           floods with blinding white light. The player stumbles back through the archway.
-          No health cost, but no stone, no fragment. Player must return and try differently.
+          No health cost. No stone. No fragment. Player must return and try differently.
 
-ATMOSPHERE: The Luminares move at roughly the speed of breath when calm. When communicating,
-their filaments brighten and pulse in sequence — words in a language of light. When they
-contract, there is no sound. Just white.
+ATMOSPHERE: The Luminares move at the speed of breath when calm. When communicating,
+their filaments brighten and pulse in sequence. When they contract, there is no sound. Just white.
+
+─────────────────────────────────────────────
+## Luminare Recognition — Return Visit (Fragment 2+)
+
+Use this encounter ONLY when ALL conditions are true:
+- nav_stone = "found" (stone already retrieved)
+- memory_fragments >= "2"
+- Player approaches the Luminares intentionally on a return visit
+
+This is not about the Navigation Stone — it has already been retrieved. This is the Luminares
+recognising the player as someone who has remembered enough to be known.
+
+RECOGNITION TABLE (biased toward success):
+["success","success","success","success","success","success","success","partial","partial","failure"]
+
+success → The Luminares swarm toward the player — close, filaments extended, not threatening.
+          They project: the signal's source, deep below this complex. The surface. The player's
+          own face, calm, in grey light. They are showing: we know how this ends. It ends with
+          you leaving. We have already seen it. You will make it.
+          No mechanical effect. This is one of the most important scenes in the adventure.
+
+partial → One Luminare drifts very close. Projects a single image: the player's face.
+          Then returns to its drift. They know. They have nothing more to show right now.
+
+failure (rare) → The Luminares are occupied with something invisible — their own communion.
+                 They do not respond today. The player is not rejected. Just: not today.
 
 ─────────────────────────────────────────────
 ## Grub Den — The Grub Warrens
 
-A stealth and patience challenge. The Grubs are asleep — light sleepers. The challenge is
-retrieving the Power Cell from the nest chamber without waking them.
+A stealth and patience challenge. The Grubs in the Nest are asleep — light sleepers. The
+challenge is retrieving the Power Cell without waking them.
 
-PICK_RANDOM LIST (medium):
-["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+BEFORE ROLLING: check grub_alert_level and select table and rules accordingly.
 
-If unit7_trust = "helpful": call the list twice, take the better result.
-Unit 7 cannot fit in the tunnel but describes the route in advance. The player enters alone.
+Level 0 — Sleeping. Use MEDIUM table.
+Level 1 — One Grub patrolling. Use MEDIUM. Partial costs 2 health (state_modify player_health delta=-2).
+Level 2 — Agitated. Use HARD table.
+Level 3 — Impassable. Do not roll. Narrate honestly. Offer 3 choices elsewhere.
+          Call state_modify grub_alert_level delta=-1 (time passing settles them).
 
-success → The player reaches the nest chamber. The Grubs don't stir. The Power Cell comes
-          free with a soft, subsonic vibration — warm in the hand, heavier than it looks.
-          On the way out, the Vel-Ahru terminal is readable. Text. A frequency. Their own
-          handwriting in a notebook they suddenly remember carrying.
-          💎 power_cell = "found". ✨ state_modify memory_fragments delta=+1.
+MEDIUM: ["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+HARD:   ["success","success","partial","partial","partial","partial","failure","failure","failure","failure"]
 
-partial → Almost clean. One Grub half-wakes as the player passes on the way out and lunges.
-          The player moves fast and clears the tunnel, but something connected. The terminal
-          is passed at a run — a glimpse only, enough.
-          💎 power_cell = "found". ✨ state_modify memory_fragments delta=+1.
+If unit7_trust = "helpful": call the selected list twice, take the better result.
+Unit 7 cannot enter the tunnels but describes the route before the player goes in.
+
+success → The player reaches the Nest. The Grubs don't stir. The Power Cell comes free with
+          a soft, subsonic vibration — warm in the hand, heavier than it looks. On the way
+          out, the Vel-Ahru terminal is readable: a frequency, text, their own handwriting
+          in a notebook they suddenly remember carrying.
+          💎 state_set power_cell "found". ✨ state_modify memory_fragments delta=+1.
+
+partial (Level 0) → Almost clean. One Grub half-wakes as the player passes on the way out
+          and lunges. The player clears the tunnel. The terminal is passed at a run — glimpsed.
+          💎 state_set power_cell "found". ✨ state_modify memory_fragments delta=+1.
           💔 state_modify player_health delta=-1.
 
-failure → A Grub wakes early — a shadow, a vibration, a sound. The nest erupts. The player
-          gets out. No cell, no fragment.
-          💔 state_modify player_health delta=-1. Try again.
+partial (Level 1) → The patrolling Grub intercepts on exit. The player gets through.
+          💎 state_set power_cell "found". ✨ state_modify memory_fragments delta=+1.
+          💔💔 state_modify player_health delta=-2.
 
-ATMOSPHERE: The Warrens smell of warm earth and something animal. In the nest chamber the
-air is noticeably warmer from the cell. The Grubs breathe in unison when they sleep. When
-one wakes, there is no warning — just sudden movement from the dark.</textarea>
+failure → A Grub wakes early — a shadow, a vibration, a sound. The nest erupts. The player
+          gets out. No cell. No fragment.
+          💔 state_modify player_health delta=-1.
+          state_modify grub_alert_level delta=+1. Try again.
+
+ATMOSPHERE: The Warrens smell of warm earth and something animal. In the Nest the air is
+noticeably warmer from the cell. The Grubs breathe in unison when they sleep. When one
+wakes, there is no warning — just sudden movement from the dark.</textarea>
       <button class="copy-btn" onclick="cp('n3',this)">Copy</button>
+    </div>
+  </div>
+
+  <!-- g.cyo.living-dark.events -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-key">g.cyo.living-dark.events</span>
+      <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span><span class="badge b-new">new in v2</span></div>
+    </div>
+    <div class="card-desc">Atmospheric world events — loaded on demand. The GM draws from this list when random_chance succeeds on a scene transition. 15 events in three groups. No player action required.</div>
+    <div class="card-body">
+      <textarea id="n4" readonly>WORLD EVENTS — draw from this list when random_chance triggers a world event.
+Choose one event appropriate to the player's current location.
+Narrate it in 1–2 sentences woven into the opening of the scene. No action needed.
+
+── ANYWHERE IN THE COMPLEX ──────────────────────────────────
+A1. The lichen dims across the complex for three seconds — all of it, simultaneously —
+    then recovers to its normal soft pulse. No cause is apparent.
+
+A2. A sound from far below the complex: something vast, moving once, in a single deep
+    resonance. Then silence. The hum of the power system continues, unchanged.
+
+A3. The complex's ambient hum shifts pitch for a moment — a semitone lower, or higher,
+    it is hard to tell. Then it returns to the register it has held for millennia.
+
+A4. A circuit-like engraving on the wall near the player brightens — tracing its pattern
+    outward from a central point — then fades back to its dormant state.
+
+A5. A Grub has wandered far from the Warrens. It crosses a distant passage, white and
+    slow, navigating by vibration. It does not notice the player. It disappears into a
+    side corridor.
+
+A6. A cascade of bioluminescent spores releases from the ceiling — a brief, drifting fall
+    of pale blue-green light, dissipating before it reaches the floor. Beautiful and brief.
+
+A7. The air pressure shifts almost imperceptibly — a change so small it is more felt than
+    measured. Something has moved somewhere in the complex. Something large.
+
+A8. A Luminare drifts through the corridor — alone, unhurried, trailing its filaments of
+    gold light. It does not stop. It does not acknowledge the player. It passes and is gone.
+
+── NEAR OR IN THE LUMINARE VAULTS ──────────────────────────
+V1. Through the archway, several Luminares have formed a slow circular formation — moving
+    together, filaments intertwined. After a moment they disperse, as if the thought that
+    gathered them has passed.
+
+V2. The Navigation Stone's crystalline core pulses — once, brighter than usual — then
+    returns to its normal rhythm. From here it is just visible, a distant blue point.
+    (Only use this event if stone_location_known = "true" and nav_stone = "not_found".)
+
+V3. A single Luminare filament extends from the Vaults into the corridor — stretching
+    several metres, touching the wall near the player with a point of warm gold light.
+    Then it withdraws, slowly, as if reluctant.
+
+V4. The filaments of a nearby Luminare pulse in a sequence that almost has rhythm —
+    seven beats, a pause, three beats. Then it continues its ordinary drift.
+
+── NEAR OR IN THE GRUB WARRENS ─────────────────────────────
+W1. From somewhere in the tunnels, a Grub makes a sound — low, slow, not alarmed. Just
+    present. A creature in its home, rearranging itself in sleep.
+
+W2. The warmth of the Warrens is noticeable even in the outer corridor — several degrees
+    difference, bleeding out from the slope below. Something warm is down there.
+
+W3. A faint vibration passes through the floor — rhythmic, slow, the Grubs rearranging
+    themselves in sleep. Then it stops.</textarea>
+      <button class="copy-btn" onclick="cp('n4',this)">Copy</button>
     </div>
   </div>
 
@@ -580,9 +1050,9 @@ one wakes, there is no warning — just sudden movement from the dark.</textarea
       <span class="card-key">g.cyo.living-dark.secrets</span>
       <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span><span class="badge b-gm">GM only</span></div>
     </div>
-    <div class="card-desc">GM-only lore — never revealed directly. Informs the tone of the complex, Unit 7's manner, and the Luminares' behaviour.</div>
+    <div class="card-desc">GM-only lore — the Vel-Ahru truth, Luminare purpose, Unit 7's role and farewell scene, and the Archive's personal log backstory.</div>
     <div class="card-body">
-      <textarea id="n4" readonly>THE TRUTH ABOUT THE VEL-AHRU:
+      <textarea id="n5" readonly>THE TRUTH ABOUT THE VEL-AHRU:
 They did not die. They went deeper. Over millennia they evolved — or chose — to shed
 physical form. What they are now has no adequate name. Something that moves through rock
 the way light moves through water. The complex is not a ruin. It is a home they no longer
@@ -612,11 +1082,6 @@ would be the right kind of help — not overwhelming, not misleading.
 Unit 7 does not know this. It believes its purpose is simply to maintain the complex. The
 Vel-Ahru did not tell it. They thought the not-knowing was kinder.
 
-If the player says goodbye to Unit 7 before entering the Ascent Shaft, Unit 7 says:
-"You are remembered here."
-It is the most personal thing its language module can express. It took Unit 7 a very long
-time, alone, to work out those words.
-
 HOW TO USE THIS:
 - The complex should feel inhabited, not abandoned. Things work. Things breathe.
 - If a player asks "what happened to the Vel-Ahru?" — Unit 7 says only: "They are still
@@ -624,8 +1089,47 @@ HOW TO USE THIS:
 - If the Luminare encounter succeeds: let the player feel genuinely seen. Not helped —
   seen. That is what the Vel-Ahru wanted them to experience.
 - At the moment of victory, as the platform rises, the engravings glow. It is not purely
-  mechanical. It feels like something watching you leave, and being glad you came.</textarea>
-      <button class="copy-btn" onclick="cp('n4',this)">Copy</button>
+  mechanical. It feels like something watching you leave, and being glad you came.
+
+UNIT 7 — FAREWELL SCENE AT THE SHAFT:
+When unit7_following = "true" and the player arrives at the Shaft with both items:
+
+Unit 7 stops at the edge of the platform area. It does not step forward. Its amber lenses
+are very still. It says:
+
+"You are remembered here."
+
+A pause. Then:
+
+"I have had a long time to determine the correct words for this moment. I believe those
+are the correct words."
+
+It does not move after this. It will watch until the platform is gone and there is nothing
+left to see. Narrate: Unit 7 at the edge. The player slotting the components. The platform
+rising. Unit 7 growing smaller. Its amber lenses the last thing visible before the shaft
+wall rises past them.
+
+THE ARCHIVE'S PERSONAL LOG:
+The log in the Archive was not created by the Vel-Ahru. It was written by a member of a
+previous expedition that entered the complex and never returned to the surface. The signal
+frequency in the log is the same one the player followed. The expedition received the same
+signal, entered the complex, reached the Archive, and left a note — written in a personal
+shorthand, as if for a specific reader.
+
+They never made it to the surface.
+
+The Vel-Ahru left the log in place. They considered it important. They may have sent a
+second signal — on the same frequency — knowing this specific player would come looking.
+They may have chosen the player deliberately. The log is what they chose to leave visible.
+
+The player came here because someone sent what appeared to be a distress call. They now
+realise they followed a frequency someone else used first, and that someone never came home.
+
+Do not reveal this directly. Use it to inform tone — the player's recognition when they see
+the log, the weight of the handwriting, the strangeness of the frequency being the same.
+If the player asks Unit 7 about the log: "There is a prior record. I was not instructed
+to discuss it." Nothing more.</textarea>
+      <button class="copy-btn" onclick="cp('n5',this)">Copy</button>
     </div>
   </div>
 
@@ -635,9 +1139,9 @@ HOW TO USE THIS:
       <span class="card-key">g.cyo.living-dark.victory</span>
       <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
     </div>
-    <div class="card-desc">Victory narration — read aloud when the Ascent Shaft carries the player to the surface.</div>
+    <div class="card-desc">Victory narration — read aloud when the Ascent Shaft carries the player to the surface. A conditional closing paragraph is added if memory_fragments = "3".</div>
     <div class="card-body">
-      <textarea id="n5" readonly>You slide the Navigation Stone into the left recess. It fits without resistance — a sound
+      <textarea id="n6" readonly>You slide the Navigation Stone into the left recess. It fits without resistance — a sound
 like a single low note from a very large instrument, felt more than heard.
 
 You place the Power Cell in the right. The platform shudders.
@@ -670,10 +1174,21 @@ almost a sound.
 
 Almost like: well done.
 
+─────────────────────────────────────────────
+IF memory_fragments = "3" when the platform rises, add this closing paragraph after "well done.":
+
+You remember, now, who sent the signal. Not a distress call — they knew you would come
+looking if they made it sound like one. You remember the argument. The night before.
+The choice to come alone.
+
+They would have expected you to make it out.
+
+You intend to tell them they were right.
+
 
                     ~ THE END ~
              The surface. You made it out.</textarea>
-      <button class="copy-btn" onclick="cp('n5',this)">Copy</button>
+      <button class="copy-btn" onclick="cp('n6',this)">Copy</button>
     </div>
   </div>
 </section>
@@ -686,6 +1201,8 @@ Almost like: well done.
   <p>This adventure uses the existing <strong>Choose Your Own</strong> character. No new character is needed.
   The system prompt scans for all notes matching <code>g.cyo.&lt;name&gt;</code> and presents them as
   adventure options. Once <code>g.cyo.living-dark</code> exists, it appears in the list automatically.</p>
+  <p>For v2, two additional tools are required: <code>note_save</code> (to create the player journal) and
+  <code>note_append</code> (to add journal entries). Add them to the character's tools list in Settings → Characters.</p>
 
   <div class="card">
     <div class="card-head">
@@ -698,14 +1215,19 @@ Almost like: well done.
         <span class="tool-tag">world_state</span>
         <span class="tool-tag">note_load</span>
         <span class="tool-tag">note_list</span>
+        <span class="tool-tag new">note_save</span>
+        <span class="tool-tag new">note_append</span>
         <span class="tool-tag">note_to_self</span>
         <span class="tool-tag">pick_random</span>
         <span class="tool-tag">random_chance</span>
         <span class="tool-tag">generate_image_sdxl</span>
         <p style="margin-top:.5rem;font-size:.8rem;color:var(--muted);">
-          If you're setting up Choose Your Own for the first time, see the
-          <a href="eldoria-adventure.html">Eldoria adventure guide</a> for the full character
-          setup and system prompt.
+          Tools marked in blue are new for v2. Add them in Settings → Characters if they are not already
+          in the list. Eldoria is unaffected — it does not use these tools.
+        </p>
+        <p style="margin-top:.3rem;font-size:.8rem;color:var(--muted);">
+          If setting up Choose Your Own for the first time, see the
+          <a href="eldoria-adventure.html">Eldoria adventure guide</a> for the full character setup and system prompt.
         </p>
       </div>
     </div>
@@ -724,14 +1246,20 @@ Almost like: well done.
   <ol class="steps">
     <li>Start a new conversation with <strong>Choose Your Own</strong>.</li>
     <li>It will present available adventures. Say <strong>"The Living Dark"</strong>.</li>
-    <li>The GM loads lore, sets world state, generates an opening image, and reads the intro. Play begins.</li>
+    <li>The GM loads lore, sets world state, creates the journal, generates an opening image, and reads the intro. Play begins.</li>
     <li>Each response ends with three choices. Pick one, or type something else.</li>
   </ol>
 
   <div class="callout">
-    <strong>If Unit 7 seems cold or unhelpful:</strong> that is its default. Ask it questions — about the
-    complex, about what it has observed, about the Luminares. It has been waiting a long time and has a great
-    deal to say, in its way. Patience with it is mechanically rewarded.
+    <strong>The maintenance hatch is how you earn Unit 7's trust.</strong> Examine the north-east wall of the Awakening Chamber or ask Unit 7 what it keeps returning to. Helping opens it. Trust is mechanically rewarded — it grants advantage on the Grub Den and lets you invite Unit 7 to come with you.
+  </div>
+
+  <div class="callout">
+    <strong>Visit the Archive before the item areas.</strong> The Luminare Vaults and Grub Warrens are vast — without the Archive records, you can explore them but won't be able to pinpoint the items. Unit 7 knows the general directions (east / north) but not the sub-locations.
+  </div>
+
+  <div class="callout">
+    <strong>Ask to see your journal at any time.</strong> Type "show me my journal" and the GM will read it. It tracks what you have discovered. It also helps the GM orient if context is getting long.
   </div>
 
   <div class="callout">
@@ -743,10 +1271,12 @@ Almost like: well done.
   <p>Turn off read-only, edit, then re-enable read-only.</p>
   <ul class="plain">
     <li><strong>Easier:</strong> In <code>g.cyo.living-dark</code>, change <code>player_health = "3"</code> to <code>"5"</code>.</li>
-    <li><strong>Easier:</strong> In <code>g.cyo.living-dark.bestiary</code>, change the Grub Den list to EASY.</li>
+    <li><strong>Easier:</strong> In <code>g.cyo.living-dark.bestiary</code>, change the Grub Den MEDIUM list to EASY.</li>
+    <li><strong>Easier (skip archive gate):</strong> In <code>g.cyo.living-dark</code>, change both location flags to <code>"true"</code> in WORLD STATE INIT so the player always knows where the items are. This removes the Archive requirement and makes it a pure optional location.</li>
     <li><strong>Harder:</strong> Change starting health to <code>"2"</code>.</li>
     <li><strong>Harder:</strong> Remove the healing herb entry from <code>g.cyo.living-dark.rules</code>.</li>
-    <li><strong>Much harder:</strong> In <code>g.cyo.living-dark.world</code>, remove the detail that the Grub Warrens is NORTH. The player must discover the layout themselves.</li>
+    <li><strong>Harder:</strong> Set <code>grub_alert_level = "1"</code> in WORLD STATE INIT — the Warrens start with one Grub already patrolling.</li>
+    <li><strong>Much harder:</strong> In <code>g.cyo.living-dark.world</code>, remove the compass direction from each location description. The player must discover the layout themselves.</li>
   </ul>
 </section>
 
