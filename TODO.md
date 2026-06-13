@@ -51,7 +51,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 
 ### Bugs
 
-- [ ] **`title_prompt` is dead — wire it up or remove it** (`internal/tasks/titles.go:299`)
+- [x] **`title_prompt` is dead — wire it up or remove it** (`internal/tasks/titles.go:299`)
   The column is stored, editable in the character editor, and exposed via `GetConversationTitlePrompt`, but the title worker uses a hardcoded prompt and never reads it. Either use the per-character title prompt in `generateTitle`, or remove the field, `GetConversationTitlePrompt`, and the UI control.
 
 - [ ] **Research SSE subscribe-after-finish race** (`internal/server/research.go:499`)

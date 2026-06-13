@@ -296,6 +296,8 @@ func buildTranscript(msgs []store.Message) string {
 	return strings.TrimSpace(transcript)
 }
 
+const defaultTitlePrompt = "Generate a short title (at most 6 words) for the following conversation. Respond with only the title — no quotes, no trailing punctuation, no explanation."
+
 func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID int64, responseTimeout time.Duration) (string, error) {
 	msgs, err := st.ListMessages(convID)
 	if err != nil {
@@ -307,20 +309,19 @@ func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID in
 
 	transcript := buildTranscript(msgs)
 
+	systemPrompt := defaultTitlePrompt
+	if custom, err := st.GetConversationTitlePrompt(convID); err == nil && custom != "" {
+		systemPrompt = custom
+	}
+
 	type chatMsg struct {
 		Role    string `json:"role"`
 		Content string `json:"content"`
 	}
 
 	out := []chatMsg{
-		{
-			Role:    "system",
-			Content: "Generate a short title (at most 6 words) for the following conversation. Respond with only the title — no quotes, no trailing punctuation, no explanation.",
-		},
-		{
-			Role:    "user",
-			Content: transcript,
-		},
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: transcript},
 	}
 
 	payload, _ := json.Marshal(map[string]any{

@@ -312,7 +312,7 @@ function renderForm(character, modelsData) {
         </div>` : ''}
         <div class="character-form-row">
           <label class="character-form-lbl" for="char-title-prompt">Title generation prompt</label>
-          <textarea id="char-title-prompt" class="input" rows="3" placeholder="Leave empty to use the default prompt…">${escapeHtml(titlePrompt)}</textarea>
+          <textarea id="char-title-prompt" class="input" rows="3" placeholder="Leave empty to use the default prompt…" title="Default: Generate a short title (at most 6 words) for the following conversation. Respond with only the title — no quotes, no trailing punctuation, no explanation.">${escapeHtml(titlePrompt)}</textarea>
           <div class="character-form-hint">Default: "Generate a short title (at most 6 words) for the following conversation. Respond with only the title — no quotes, no trailing punctuation, no explanation."</div>
         </div>
         ${isOwnerOrAdmin ? `
