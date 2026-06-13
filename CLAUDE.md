@@ -76,6 +76,11 @@ internal/
     config.go          # TOML struct definitions and loading
   debug/
     debug.go           # debug logging flag (debug.Enabled, debug.Log)
+  research/
+    researcher.go      # research engine: phase loop, state, checkpointing
+    prompts.go         # all research prompts (ported from docs/deep_research_spec.html)
+    llm.go             # LLM calls, think-tag stripping, robust JSON parsing, injection guard
+    web.go             # SearXNG search, page fetch, goal-based extraction
   server/
     server.go          # router setup, static serving
     auth.go            # login / logout / me / profile / password handlers
@@ -85,6 +90,7 @@ internal/
     models.go          # model list handler
     characters.go      # character CRUD handlers
     completions.go     # completions CRUD + streaming handlers
+    research.go        # research job manager, handlers, SSE progress, crash recovery
     tools.go           # tool registry, executors, attachment helpers
     attachments.go     # attachment serve handler
     admin.go           # admin user-management handlers
@@ -98,6 +104,7 @@ internal/
     messages.go        # message queries
     characters.go      # character queries
     completions.go     # completion queries
+    research.go        # research job queries (incl. resume checkpoints)
     attachments.go     # attachment queries
   tasks/
     titles.go          # background title-generation worker
@@ -105,6 +112,7 @@ internal/
 static/
   index.html           # main chat app shell
   complete.html        # completions app shell
+  research.html        # research page shell
   menu.html            # mobile/navigation menu shell
   js/
     app.js             # entry, wires modules together
@@ -118,6 +126,7 @@ static/
     utils.js           # shared frontend utilities (e.g. escapeHtml)
     ws.js              # WebSocket client, auto-reconnect, event dispatch
     complete-app.js    # completions page entry
+    research-app.js    # research page entry (job list, live progress, report view)
     modal.js           # shared modal scaffold utility
     settings-auth.js   # auth guard (requireAuth)
     settings-account.js       # account settings page
@@ -134,6 +143,7 @@ static/
     components.css        # buttons, inputs, cards, bubbles, toggles
     app.css               # layout and app-specific overrides
     complete.css          # completions page layout and overrides
+    research.css          # research page layout and overrides
     menu.css              # menu page styles
     settings.css          # settings pages layout and overrides
     katex.min.css         # KaTeX math rendering CSS (vendored)
@@ -203,6 +213,14 @@ Compound group IDs expand to multiple tools:
 ### Attachments
 
 Tools that produce files (`create_document`, `generate_image_sdxl`, `generate_image_flux`) create an `attachment` DB record and write the file under `<data_dir>/attachments/<random-id>/`. They return an `AttachmentResult` JSON struct; `messages.go` detects this shape and emits an `attachment` SSE event so the frontend can render a download card. Attachments are served by `handleGetAttachment` in `attachments.go` — `?download=1` forces a download, otherwise the file is served inline.
+
+## Research
+
+The research feature (reachable from `/menu` → research) runs iterative LLM-driven web research: Plan → Classify → (Think → Search → Extract → Synthesise → Decide)* → Final Report. It was ported from `docs/deep_research_spec.html`; the engine lives in `internal/research/`, handlers in `internal/server/research.go`.
+
+- Requires `[searxng] url` in `lemon.toml`; tuning lives in the optional `[research]` section (model, rounds, timeouts — see `lemon.toml.example`).
+- Jobs are rows in the `research_job` table. The engine checkpoints its full state (plan, evolving report, findings, queries, analyzed URLs, elapsed time) after planning and after every round; `Server.ResumeResearchJobs()` is called at startup and resumes any job left in `pending`/`running` from its last checkpoint, so a server crash mid-job loses at most one round.
+- Progress streams over SSE from `GET /api/research/{id}/events`; the run itself is detached from the HTTP request, so closing the page does not stop the job.
 
 ## Not yet implemented
 

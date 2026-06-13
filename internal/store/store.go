@@ -501,6 +501,43 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v20 → v21 complete")
 	}
 
+	if version < 22 {
+		log.Println("store: migrating v21 → v22 (create research_job table)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE research_job (
+				id            INTEGER PRIMARY KEY,
+				user_id       INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+				query         TEXT    NOT NULL,
+				model         TEXT    NOT NULL,
+				status        TEXT    NOT NULL DEFAULT 'pending'
+					CHECK (status IN ('pending', 'running', 'done', 'error', 'cancelled')),
+				phase         TEXT,
+				round         INTEGER NOT NULL DEFAULT 0,
+				empty_rounds  INTEGER NOT NULL DEFAULT 0,
+				elapsed_ms    INTEGER NOT NULL DEFAULT 0,
+				category      TEXT,
+				plan          TEXT,
+				report        TEXT,
+				final_report  TEXT,
+				findings      TEXT,
+				queries_used  TEXT,
+				analyzed_urls TEXT,
+				error         TEXT,
+				created_at    TEXT    NOT NULL,
+				updated_at    TEXT    NOT NULL
+			);
+			CREATE INDEX idx_research_job_user_id ON research_job(user_id);
+			CREATE INDEX idx_research_job_status  ON research_job(status);
+		`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (22, ?)`, now()); err != nil {
+			return err
+		}
+		version = 22
+		log.Println("store: migration v21 → v22 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

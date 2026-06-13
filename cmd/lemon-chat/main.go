@@ -56,6 +56,7 @@ func main() {
 	tasks.StartCleanupWorker(st, hub.BroadcastConversationListChanged)
 
 	srv := server.New(cfg, st, hub)
+	srv.ResumeResearchJobs()
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("lemon-chat listening on http://localhost%s", addr)
 	if err := http.ListenAndServe(addr, srv.Handler()); err != nil {

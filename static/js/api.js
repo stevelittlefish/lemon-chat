@@ -196,6 +196,31 @@ export const completions = {
   },
 };
 
+// Research
+export const research = {
+  list: () => request('GET', '/api/research'),
+  get: (id) => request('GET', `/api/research/${id}`),
+  start: (query, model) => request('POST', '/api/research', { query, ...(model ? { model } : {}) }),
+  cancel: (id) => request('POST', `/api/research/${id}/cancel`),
+  delete: (id) => request('DELETE', `/api/research/${id}`),
+  // Streams progress events for a job. onEvent receives each parsed event;
+  // a terminal event has a `status` field. Returns an abort() function.
+  events: (id, { onEvent, onDone, onError }) => {
+    const ctrl = new AbortController();
+    fetch(`/api/research/${id}/events`, { signal: ctrl.signal }).then(async (res) => {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        onError?.(new Error(data.error || res.statusText));
+        return;
+      }
+      await consumeSSE(res, (ev) => { onEvent?.(ev); }, onDone);
+    }).catch((err) => {
+      if (err.name !== 'AbortError') onError?.(err);
+    });
+    return () => ctrl.abort();
+  },
+};
+
 // Admin
 export const admin = {
   users: {

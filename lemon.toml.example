@@ -54,9 +54,24 @@ display_name = "Mistral 7B"
 model_server = "local"
 
 # Optional: SearXNG web search integration.
-# When set, the web_search tool becomes available to characters.
+# When set, the searxng tool becomes available to characters and the
+# research feature can be used.
 # [searxng]
 # url = "http://localhost:8181"
+
+# Optional: research feature tuning. Research also requires [searxng] above.
+# All keys are optional; the values shown are the defaults.
+# [research]
+# model = ""                  # model for research jobs (falls back to default_model)
+# max_rounds = 8              # hard upper bound on research rounds
+# max_time_seconds = 600      # wall-clock budget, checked at the start of each round
+# max_urls_per_round = 3      # URLs fetched per query per round
+# max_content_chars = 15000   # page content truncation limit before extraction
+# max_report_tokens = 8192    # max_tokens for synthesis and final report calls
+# extraction_concurrency = 3  # concurrent URL fetch+extract tasks
+# min_rounds = 2              # stop-check is skipped until this many rounds complete
+# max_empty_rounds = 2        # consecutive zero-finding rounds before aborting
+# synthesis_window = 10       # only the last N findings are passed to each synthesis call
 
 # Optional: ComfyUI image generation integration.
 # Set url plus whichever workflow files you have. Each enables a separate tool:

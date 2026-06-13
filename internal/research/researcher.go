@@ -1,0 +1,564 @@
+// Package research implements the iterative research engine: an
+// LLM-in-the-loop Plan → Classify → (Think → Search → Extract → Synthesise →
+// Decide)* → Final Report pipeline producing a long-form, cited markdown
+// report. Ported from the Python deep research spec (docs/deep_research_spec.html).
+package research
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
+)
+
+// Per-phase LLM timeouts (spec §5).
+const (
+	planningTimeout   = 90 * time.Second
+	classifyTimeout   = 15 * time.Second
+	queryTimeout      = 120 * time.Second
+	extractionTimeout = 90 * time.Second
+	// Synthesis and final report are heavy generation tasks — local models
+	// routinely need >60s; a shorter timeout would discard a whole round.
+	synthesisTimeout = 180 * time.Second
+	stopTimeout      = 60 * time.Second
+)
+
+var validCategories = map[string]bool{"product": true, "comparison": true, "howto": true, "factcheck": true}
+
+// Finding is one successfully extracted page.
+type Finding struct {
+	URL      string `json:"url"`
+	Title    string `json:"title"`
+	OGImage  string `json:"og_image,omitempty"`
+	Rational string `json:"rational,omitempty"`
+	Evidence string `json:"evidence,omitempty"`
+	Summary  string `json:"summary"`
+}
+
+// AnalyzedURL is any URL the engine attempted to read, whether or not
+// extraction succeeded.
+type AnalyzedURL struct {
+	URL   string `json:"url"`
+	Title string `json:"title"`
+}
+
+// State is the resumable engine state. It is checkpointed after planning and
+// after every completed round; a job restarted from a persisted State picks
+// up at the next round.
+type State struct {
+	Round        int           `json:"round"`
+	EmptyRounds  int           `json:"empty_rounds"`
+	ElapsedMS    int64         `json:"elapsed_ms"`
+	Category     string        `json:"category"`
+	Plan         string        `json:"plan"`
+	Report       string        `json:"report"`
+	Findings     []Finding     `json:"findings"`
+	QueriesUsed  []string      `json:"queries_used"`
+	AnalyzedURLs []AnalyzedURL `json:"analyzed_urls"`
+}
+
+// Config carries everything a run needs; all tuning parameters come from the
+// [research] section of lemon.toml.
+type Config struct {
+	Query      string
+	Model      string
+	APIBase    string
+	APIKey     string
+	SearXNGURL string
+	Location   *time.Location
+
+	MaxRounds             int
+	MaxTime               time.Duration
+	MaxURLsPerRound       int
+	MaxContentChars       int
+	MaxReportTokens       int
+	ExtractionConcurrency int
+	MinRounds             int
+	MaxEmptyRounds        int
+	SynthesisWindow       int
+}
+
+// Progress is emitted at each phase transition.
+type Progress struct {
+	Phase         string   `json:"phase"` // planning | searching | reading | analyzing | writing | warning
+	Round         int      `json:"round,omitempty"`
+	Message       string   `json:"message,omitempty"`
+	URL           string   `json:"url,omitempty"`
+	Title         string   `json:"title,omitempty"`
+	Queries       []string `json:"queries,omitempty"`
+	TotalSources  int      `json:"total_sources,omitempty"`
+	TotalFindings int      `json:"total_findings,omitempty"`
+}
+
+type Researcher struct {
+	cfg    Config
+	state  State
+	client *http.Client
+
+	startTime   time.Time
+	baseElapsed int64 // ms accumulated by previous runs of a resumed job
+
+	// onProgress is called at each phase transition; onCheckpoint persists
+	// the state so the run can be resumed after a crash. Both may be nil.
+	onProgress   func(Progress)
+	onCheckpoint func(State)
+}
+
+// New creates a researcher. Pass a zero State for a fresh run or a persisted
+// State to resume an interrupted one.
+func New(cfg Config, state State, onProgress func(Progress), onCheckpoint func(State)) *Researcher {
+	if cfg.Location == nil {
+		cfg.Location = time.Local
+	}
+	return &Researcher{cfg: cfg, state: state, client: http.DefaultClient, onProgress: onProgress, onCheckpoint: onCheckpoint}
+}
+
+func (r *Researcher) progress(p Progress) {
+	if r.onProgress != nil {
+		r.onProgress(p)
+	}
+}
+
+func (r *Researcher) checkpoint() {
+	r.state.ElapsedMS = r.elapsedMS()
+	if r.onCheckpoint != nil {
+		r.onCheckpoint(r.state)
+	}
+}
+
+// elapsedMS includes time accumulated in previous runs of a resumed job.
+func (r *Researcher) elapsedMS() int64 {
+	return r.baseElapsed + time.Since(r.startTime).Milliseconds()
+}
+
+// State returns a copy of the current engine state.
+func (r *Researcher) State() State { return r.state }
+
+// Run executes the research loop and returns the formatted composite report.
+func (r *Researcher) Run(ctx context.Context) (string, error) {
+	r.startTime = time.Now()
+	r.baseElapsed = r.state.ElapsedMS
+
+	// Phases 1–2 only run before the first round (fresh job, or a job that
+	// crashed before completing round 1 with no plan persisted).
+	if r.state.Round == 0 && r.state.Plan == "" {
+		r.progress(Progress{Phase: "planning"})
+		r.state.Plan = r.plan(ctx)
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+	}
+	if r.state.Round == 0 && r.state.Category == "" {
+		r.state.Category = r.classify(ctx)
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		r.checkpoint()
+	}
+
+	for round := r.state.Round + 1; round <= r.cfg.MaxRounds; round++ {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		if time.Duration(r.elapsedMS())*time.Millisecond > r.cfg.MaxTime {
+			r.progress(Progress{Phase: "warning", Message: "time budget exhausted — writing report with findings so far"})
+			break
+		}
+
+		queries := r.generateQueries(ctx, round)
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		if len(queries) == 0 {
+			r.progress(Progress{Phase: "warning", Round: round, Message: "no new search queries generated — stopping"})
+			break
+		}
+		r.state.QueriesUsed = append(r.state.QueriesUsed, queries...)
+		r.progress(Progress{Phase: "searching", Round: round, Queries: queries, TotalSources: len(r.state.AnalyzedURLs)})
+
+		newURLs := r.searchAll(ctx, queries)
+		findings := r.extractAll(ctx, round, newURLs)
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+
+		if len(findings) == 0 {
+			r.state.EmptyRounds++
+			if r.state.EmptyRounds >= r.cfg.MaxEmptyRounds {
+				if len(r.state.Findings) == 0 {
+					return "", fmt.Errorf("search returned no usable results after %d round(s) — check that SearXNG is running and reachable", round)
+				}
+				r.progress(Progress{Phase: "warning", Round: round, Message: "consecutive empty rounds — writing report with findings so far"})
+				r.state.Round = round
+				r.checkpoint()
+				break
+			}
+		} else {
+			r.state.EmptyRounds = 0
+			r.state.Findings = append(r.state.Findings, findings...)
+			r.progress(Progress{Phase: "analyzing", Round: round, TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
+			r.synthesize(ctx, findings)
+			if ctx.Err() != nil {
+				return "", ctx.Err()
+			}
+		}
+
+		r.state.Round = round
+		r.checkpoint()
+
+		if round >= r.cfg.MinRounds && r.shouldStop(ctx, round) {
+			break
+		}
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+	}
+
+	if r.state.Report == "" {
+		if len(r.state.Findings) == 0 {
+			return "", fmt.Errorf("research produced no findings")
+		}
+		// Synthesis never succeeded — fall back to formatted raw findings.
+		r.state.Report = "## Research Findings\n\nSynthesis was unavailable; the raw findings are listed below.\n\n" + formatFindings(r.state.Findings)
+	}
+
+	r.progress(Progress{Phase: "writing", TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
+	final := r.finalReport(ctx)
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	return r.formatCompositeReport(final), nil
+}
+
+// ── Phase 1: Plan ────────────────────────────────────────────
+
+func (r *Researcher) plan(ctx context.Context) string {
+	prompt := currentDateContext(r.cfg.Location) + fmt.Sprintf(researchPlanPrompt, r.cfg.Query)
+	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, 1024, planningTimeout)
+	if err != nil {
+		r.progress(Progress{Phase: "warning", Message: "planning failed: " + err.Error()})
+		return ""
+	}
+	var plan struct {
+		SubQuestions    []string `json:"sub_questions"`
+		KeyTopics       []string `json:"key_topics"`
+		SuccessCriteria string   `json:"success_criteria"`
+	}
+	if parseJSONObject(out, &plan) != nil {
+		// JSON parsing failed — use the raw text as the plan.
+		return out
+	}
+	return fmt.Sprintf("Sub-questions: %s\nKey topics: %s\nSuccess: %s",
+		strings.Join(plan.SubQuestions, "; "), strings.Join(plan.KeyTopics, ", "), plan.SuccessCriteria)
+}
+
+// ── Phase 2: Classify ────────────────────────────────────────
+
+// classify returns the report category, or "general" when none fits. The
+// "general" value also marks the job as classified so a resumed run does not
+// repeat this phase.
+func (r *Researcher) classify(ctx context.Context) string {
+	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(classifyPrompt, r.cfg.Query)}}, 0, 20, classifyTimeout)
+	if err != nil {
+		return "general"
+	}
+	first := strings.ToLower(strings.Trim(strings.Fields(out + " x")[0], ".,!:;\"'"))
+	if validCategories[first] {
+		return first
+	}
+	for _, word := range strings.Fields(strings.ToLower(out)) {
+		if validCategories[strings.Trim(word, ".,!:;\"'")] {
+			return strings.Trim(word, ".,!:;\"'")
+		}
+	}
+	return "general"
+}
+
+// ── Phase 3: Think (query generation) ────────────────────────
+
+func (r *Researcher) generateQueries(ctx context.Context, round int) []string {
+	numQueries, instruction := 4, queryGenFirstRoundInstruction
+	if round > 1 {
+		numQueries, instruction = 3, queryGenFollowUpInstruction
+	}
+	report := r.state.Report
+	if report == "" {
+		report = "(No findings yet.)"
+	}
+	prompt := currentDateContext(r.cfg.Location) +
+		fmt.Sprintf(queryGenPrompt, r.cfg.Query, r.state.Plan, report, round, numQueries, instruction)
+	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, 4096, queryTimeout)
+	if err != nil {
+		r.progress(Progress{Phase: "warning", Round: round, Message: "query generation failed: " + err.Error()})
+		return nil
+	}
+
+	used := make(map[string]bool, len(r.state.QueriesUsed))
+	for _, q := range r.state.QueriesUsed {
+		used[strings.ToLower(q)] = true
+	}
+	var queries []string
+	for _, q := range parseJSONStringArray(out) {
+		q = strings.TrimSpace(q)
+		if q == "" || used[strings.ToLower(q)] {
+			continue
+		}
+		used[strings.ToLower(q)] = true
+		queries = append(queries, q)
+	}
+	return queries
+}
+
+// ── Phase 4: Search ──────────────────────────────────────────
+
+// searchAll runs all queries in parallel and returns new (unseen) URLs,
+// capped at MaxURLsPerRound × len(queries).
+func (r *Researcher) searchAll(ctx context.Context, queries []string) []AnalyzedURL {
+	results := make([][]searchResult, len(queries))
+	var wg sync.WaitGroup
+	for i, q := range queries {
+		wg.Add(1)
+		go func(i int, q string) {
+			defer wg.Done()
+			res, err := r.search(ctx, q)
+			if err != nil {
+				r.progress(Progress{Phase: "warning", Message: fmt.Sprintf("search failed for %q: %v", q, err)})
+				return
+			}
+			results[i] = res
+		}(i, q)
+	}
+	wg.Wait()
+
+	seen := make(map[string]bool, len(r.state.AnalyzedURLs))
+	for _, u := range r.state.AnalyzedURLs {
+		seen[u.URL] = true
+	}
+	limit := r.cfg.MaxURLsPerRound * len(queries)
+	var newURLs []AnalyzedURL
+	for _, res := range results {
+		for _, sr := range res {
+			if len(newURLs) >= limit {
+				break
+			}
+			if sr.URL == "" || seen[sr.URL] {
+				continue
+			}
+			seen[sr.URL] = true
+			newURLs = append(newURLs, AnalyzedURL{URL: sr.URL, Title: sr.Title})
+		}
+	}
+	return newURLs
+}
+
+// ── Phase 5: Extract ─────────────────────────────────────────
+
+// extractAll fetches and extracts all URLs concurrently, bounded by
+// ExtractionConcurrency. Every attempted URL is recorded in AnalyzedURLs.
+func (r *Researcher) extractAll(ctx context.Context, round int, urls []AnalyzedURL) []Finding {
+	r.state.AnalyzedURLs = append(r.state.AnalyzedURLs, urls...)
+
+	sem := make(chan struct{}, r.cfg.ExtractionConcurrency)
+	findings := make([]*Finding, len(urls))
+	var wg sync.WaitGroup
+	for i, u := range urls {
+		wg.Add(1)
+		go func(i int, u AnalyzedURL) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			if ctx.Err() != nil {
+				return
+			}
+			r.progress(Progress{Phase: "reading", Round: round, URL: u.URL, Title: u.Title,
+				TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
+			findings[i] = r.fetchAndExtract(ctx, u.URL, u.Title)
+		}(i, u)
+	}
+	wg.Wait()
+
+	var out []Finding
+	for _, f := range findings {
+		if f != nil {
+			out = append(out, *f)
+		}
+	}
+	return out
+}
+
+// ── Phase 6: Synthesise ──────────────────────────────────────
+
+func (r *Researcher) synthesize(ctx context.Context, newFindings []Finding) {
+	if len(newFindings) > r.cfg.SynthesisWindow {
+		newFindings = newFindings[len(newFindings)-r.cfg.SynthesisWindow:]
+	}
+	report := r.state.Report
+	if report == "" {
+		report = "(First round — no report yet.)"
+	}
+	prompt := fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, formatFindings(newFindings))
+	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout)
+	if err != nil || out == "" {
+		// Keep the current report unchanged.
+		r.progress(Progress{Phase: "warning", Message: "synthesis failed — keeping previous report"})
+		return
+	}
+	r.state.Report = out
+}
+
+// ── Phase 7: Decide ──────────────────────────────────────────
+
+func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
+	prompt := fmt.Sprintf(stopPrompt, r.cfg.Query, r.state.Report, round, r.cfg.MaxRounds)
+	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 128, stopTimeout)
+	if err != nil {
+		return false
+	}
+	out = strings.ToUpper(strings.TrimLeft(out, "*_`\"'>#- \t\n"))
+	return strings.HasPrefix(out, "YES")
+}
+
+// ── Phase 8: Final report ────────────────────────────────────
+
+func (r *Researcher) finalReport(ctx context.Context) string {
+	prompt := fmt.Sprintf(finalReportPrompt, r.cfg.Query, r.state.Report)
+	if override, ok := categoryPrompts[r.state.Category]; ok {
+		prompt += override
+	}
+	report, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout)
+	if err != nil || report == "" {
+		// Never return empty — fall back to the evolving synthesis.
+		return r.state.Report
+	}
+
+	// Minimum-length retry: ask the model to expand reports under 400 words.
+	if len(strings.Fields(report)) < 400 {
+		expanded, err := r.llmCall(ctx, []chatMsg{
+			{Role: "user", Content: prompt},
+			{Role: "assistant", Content: report},
+			{Role: "user", Content: expandReportPrompt},
+		}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout)
+		if err == nil && len(expanded) > len(report) {
+			report = expanded
+		}
+	}
+	return report
+}
+
+// ── Report formatting ────────────────────────────────────────
+
+// formatFindings serialises findings for the synthesis prompt.
+func formatFindings(findings []Finding) string {
+	var sb strings.Builder
+	for i, f := range findings {
+		text := f.Summary
+		if text == "" {
+			text = f.Evidence
+			if len(text) > 1000 {
+				text = text[:1000]
+			}
+		}
+		fmt.Fprintf(&sb, "**Finding %d** — [%s](%s)\n%s\n\n", i+1, f.Title, f.URL, text)
+	}
+	return strings.TrimSpace(sb.String())
+}
+
+// formatCompositeReport wraps the final LLM report in the composite markdown
+// document: stats header, curated sources, all analyzed URLs, and the raw
+// findings in a collapsible section.
+func (r *Researcher) formatCompositeReport(final string) string {
+	var sb strings.Builder
+
+	duration := float64(r.elapsedMS()) / 1000.0
+	sb.WriteString("---\n\n## Research Summary\n\n")
+	fmt.Fprintf(&sb, "**Duration:** %.1fs | **Rounds:** %d | **Queries:** %d | **URLs analyzed:** %d | **Model:** %s",
+		duration, r.state.Round, len(r.state.QueriesUsed), len(r.state.AnalyzedURLs), r.cfg.Model)
+	if cat := r.state.Category; cat != "" && cat != "general" {
+		fmt.Fprintf(&sb, " | **Category:** %s%s", strings.ToUpper(cat[:1]), cat[1:])
+	}
+	sb.WriteString("\n\n---\n\n")
+
+	sb.WriteString(final)
+
+	// Curated sources: quality-filtered findings, each URL at most once.
+	seen := map[string]bool{}
+	var sources []Finding
+	for _, f := range r.state.Findings {
+		if seen[f.URL] || isLowQuality(f.Summary) {
+			continue
+		}
+		seen[f.URL] = true
+		sources = append(sources, f)
+	}
+	if len(sources) > 0 {
+		sb.WriteString("\n\n### Sources\n\n")
+		for _, f := range sources {
+			fmt.Fprintf(&sb, "- [%s](%s)\n", f.Title, f.URL)
+		}
+	}
+
+	if len(r.state.AnalyzedURLs) > 0 {
+		sb.WriteString("\n### Analyzed URLs\n\n")
+		seen = map[string]bool{}
+		n := 0
+		for _, u := range r.state.AnalyzedURLs {
+			if seen[u.URL] {
+				continue
+			}
+			seen[u.URL] = true
+			n++
+			title := u.Title
+			if title == "" {
+				title = u.URL
+			}
+			fmt.Fprintf(&sb, "%d. [%s](%s)\n", n, title, u.URL)
+		}
+	}
+
+	if len(r.state.Findings) > 0 {
+		fmt.Fprintf(&sb, "\n<details>\n<summary><strong>Raw collected findings (%d sources)</strong></summary>\n\n", len(r.state.Findings))
+		for i, f := range r.state.Findings {
+			fmt.Fprintf(&sb, "**%d. [%s](%s)**\n\n%s\n\n", i+1, f.Title, f.URL, f.Summary)
+		}
+		sb.WriteString("</details>\n")
+	}
+
+	return sb.String()
+}
+
+// MarshalState JSON-encodes the slices of a State for checkpoint storage.
+func MarshalState(st State) (findings, queries, urls string) {
+	f, _ := json.Marshal(st.Findings)
+	q, _ := json.Marshal(st.QueriesUsed)
+	u, _ := json.Marshal(st.AnalyzedURLs)
+	return string(f), string(q), string(u)
+}
+
+// UnmarshalState rebuilds a State from persisted job columns. Nil pointers
+// and invalid JSON yield empty slices, so a partially persisted job still
+// resumes cleanly.
+func UnmarshalState(round, emptyRounds int, elapsedMS int64, category, plan, report, findings, queries, urls *string) State {
+	st := State{Round: round, EmptyRounds: emptyRounds, ElapsedMS: elapsedMS}
+	if category != nil {
+		st.Category = *category
+	}
+	if plan != nil {
+		st.Plan = *plan
+	}
+	if report != nil {
+		st.Report = *report
+	}
+	if findings != nil {
+		json.Unmarshal([]byte(*findings), &st.Findings) //nolint:errcheck
+	}
+	if queries != nil {
+		json.Unmarshal([]byte(*queries), &st.QueriesUsed) //nolint:errcheck
+	}
+	if urls != nil {
+		json.Unmarshal([]byte(*urls), &st.AnalyzedURLs) //nolint:errcheck
+	}
+	return st
+}

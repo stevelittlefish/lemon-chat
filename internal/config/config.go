@@ -17,6 +17,20 @@ type Config struct {
 	Models       []Model       `toml:"model"`
 	SearXNG      SearXNG       `toml:"searxng"`
 	ComfyUI      ComfyUI       `toml:"comfyui"`
+	Research     Research      `toml:"research"`
+}
+
+type Research struct {
+	Model                 string `toml:"model"`                  // default model for research jobs (falls back to server.default_model)
+	MaxRounds             int    `toml:"max_rounds"`             // hard upper bound on research rounds
+	MaxTimeSeconds        int    `toml:"max_time_seconds"`       // wall-clock budget, checked at the start of each round
+	MaxURLsPerRound       int    `toml:"max_urls_per_round"`     // URLs fetched per query per round
+	MaxContentChars       int    `toml:"max_content_chars"`      // page content truncation limit before extraction
+	MaxReportTokens       int    `toml:"max_report_tokens"`      // max_tokens for synthesis and final report calls
+	ExtractionConcurrency int    `toml:"extraction_concurrency"` // concurrent URL fetch+extract tasks
+	MinRounds             int    `toml:"min_rounds"`             // stop-check is skipped until this many rounds complete
+	MaxEmptyRounds        int    `toml:"max_empty_rounds"`       // consecutive zero-finding rounds before aborting
+	SynthesisWindow       int    `toml:"synthesis_window"`       // only the last N findings are passed to each synthesis call
 }
 
 type SearXNG struct {
@@ -85,6 +99,17 @@ func Load(path string) (*Config, error) {
 		},
 		Bootstrap: Bootstrap{
 			AdminUsername: "admin",
+		},
+		Research: Research{
+			MaxRounds:             8,
+			MaxTimeSeconds:        600,
+			MaxURLsPerRound:       3,
+			MaxContentChars:       15000,
+			MaxReportTokens:       8192,
+			ExtractionConcurrency: 3,
+			MinRounds:             2,
+			MaxEmptyRounds:        2,
+			SynthesisWindow:       10,
 		},
 	}
 

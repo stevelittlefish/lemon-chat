@@ -16,6 +16,7 @@ type Server struct {
 	store       *store.Store
 	hub         *Hub
 	modelClient *http.Client
+	research    *researchManager
 }
 
 func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
@@ -28,7 +29,7 @@ func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
 		},
 	}
 	InitTools(cfg)
-	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client}
+	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client, research: newResearchManager()}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -97,6 +98,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/admin/tools/delete-orphaned-messages", s.requireAdmin(s.handleAdminDeleteOrphanedMessages))
 	mux.HandleFunc("POST /api/admin/note-packs/import", s.requireAdmin(s.handleAdminImportNotePack))
 
+	// Research
+	mux.HandleFunc("GET /api/research", s.requireAuth(s.handleListResearch))
+	mux.HandleFunc("POST /api/research", s.requireAuth(s.handleStartResearch))
+	mux.HandleFunc("GET /api/research/{id}", s.requireAuth(s.handleGetResearch))
+	mux.HandleFunc("GET /api/research/{id}/events", s.requireAuth(s.handleResearchEvents))
+	mux.HandleFunc("POST /api/research/{id}/cancel", s.requireAuth(s.handleCancelResearch))
+	mux.HandleFunc("DELETE /api/research/{id}", s.requireAuth(s.handleDeleteResearch))
+
 	// WebSocket
 	mux.HandleFunc("GET /ws", s.handleWS)
 
@@ -117,6 +126,7 @@ func (s *Server) Handler() http.Handler {
 	// Menu and feature pages
 	mux.HandleFunc("GET /menu", serveFile("static/menu.html"))
 	mux.HandleFunc("GET /complete", serveFile("static/complete.html"))
+	mux.HandleFunc("GET /research", serveFile("static/research.html"))
 
 	// Settings pages
 	mux.HandleFunc("GET /settings", func(w http.ResponseWriter, r *http.Request) {
