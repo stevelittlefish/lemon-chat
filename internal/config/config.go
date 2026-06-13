@@ -38,9 +38,9 @@ type SearXNG struct {
 }
 
 type ComfyUI struct {
-	URL      string `toml:"url"`
-	SDXLFile string `toml:"sdxl_file"`
-	FluxFile string `toml:"flux_file"`
+	URL          string `toml:"url"`
+	SDXLWorkflow string `toml:"sdxl_workflow"`
+	FluxWorkflow string `toml:"flux_workflow"`
 }
 
 type Server struct {

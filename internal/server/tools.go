@@ -1613,21 +1613,21 @@ func InitTools(cfg *config.Config) {
 	}
 	allTools = append(allTools, ToolMeta{"searxng", "SearXNG", "Searches the web via SearXNG and returns the top results.", searxngConfigured, searxngHint})
 
-	sdxlConfigured := cfg.ComfyUI.URL != "" && cfg.ComfyUI.SDXLFile != ""
+	sdxlConfigured := cfg.ComfyUI.URL != "" && cfg.ComfyUI.SDXLWorkflow != ""
 	sdxlHint := ""
 	if !sdxlConfigured {
-		sdxlHint = "Add [comfyui] url and sdxl_file to lemon.toml to enable SDXL image generation."
+		sdxlHint = "Add [comfyui] url and sdxl_workflow to lemon.toml to enable SDXL image generation."
 	} else {
-		executors["generate_image_sdxl"] = makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.SDXLFile, 30, 7.0)
+		executors["generate_image_sdxl"] = makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.SDXLWorkflow, 30, 7.0)
 	}
 	allTools = append(allTools, ToolMeta{"generate_image_sdxl", "Generate image (SDXL)", toolRegistry["generate_image_sdxl"].Function.Description, sdxlConfigured, sdxlHint})
 
-	fluxConfigured := cfg.ComfyUI.URL != "" && cfg.ComfyUI.FluxFile != ""
+	fluxConfigured := cfg.ComfyUI.URL != "" && cfg.ComfyUI.FluxWorkflow != ""
 	fluxHint := ""
 	if !fluxConfigured {
-		fluxHint = "Add [comfyui] url and flux_file to lemon.toml to enable Flux Schnell image generation."
+		fluxHint = "Add [comfyui] url and flux_workflow to lemon.toml to enable Flux Schnell image generation."
 	} else {
-		executors["generate_image_flux"] = makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.FluxFile, 4, 1.0)
+		executors["generate_image_flux"] = makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.FluxWorkflow, 4, 1.0)
 	}
 	allTools = append(allTools, ToolMeta{"generate_image_flux", "Generate image (Flux Schnell)", toolRegistry["generate_image_flux"].Function.Description, fluxConfigured, fluxHint})
 }

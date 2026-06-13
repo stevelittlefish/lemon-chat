@@ -196,8 +196,8 @@ Available tools and their config requirements:
 | `wikipedia_search` | Wikipedia search | — |
 | `wikipedia_get_page` | Wikipedia get page | — |
 | `searxng` | SearXNG | `[searxng] url` in `lemon.toml` |
-| `generate_image_sdxl` | Generate image (SDXL) | `[comfyui] url` + `sdxl_file` in `lemon.toml` |
-| `generate_image_flux` | Generate image (Flux Schnell) | `[comfyui] url` + `flux_file` in `lemon.toml` |
+| `generate_image_sdxl` | Generate image (SDXL) | `[comfyui] url` + `sdxl_workflow` in `lemon.toml` |
+| `generate_image_flux` | Generate image (Flux Schnell) | `[comfyui] url` + `flux_workflow` in `lemon.toml` |
 | `note_save` | Note: save | — |
 | `note_load` | Note: load | — |
 | `note_list` | Note: list | — |
