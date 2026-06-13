@@ -126,3 +126,6 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 
 - [ ] **Add "set as background" button to inline images** (`static/js/thread.js:187`)
   `buildInlineImage` shows only a download button on hover. Add a second hover button (image/wallpaper icon) that calls `setBackground(att.id)` so users can set any generated image as the conversation background without asking the model to use `background: true`.
+
+- [ ] **Size image placeholder to match final image dimensions** (`static/js/thread.js:64`)
+  `buildImagePlaceholder` uses a fixed 320×160 box, but a loaded image can be taller (inline images are capped at 320×240). When an async image resolves it grows past the placeholder, pushing text down and forcing a manual scroll while the content jumps. The tool-call `args` carry the requested width/height (defaulting 1024×1024) — compute the rendered box size against the same max-width/max-height constraints and apply it to the placeholder so the swap is seamless.
