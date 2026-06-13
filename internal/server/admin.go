@@ -2,14 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 
-	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -68,18 +65,12 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	existing, err := s.store.UserByID(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 
@@ -199,9 +190,8 @@ func (s *Server) handleAdminImportNotePack(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	if id == currentUser(r).ID {
@@ -209,11 +199,7 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	target, err := s.store.UserByID(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	} else if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	if target.AvatarFilename != nil {

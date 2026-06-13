@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
@@ -190,18 +189,12 @@ func (s *Server) handleDeleteUserAvatar(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleServeUserAvatar(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	u, err := s.store.UserByID(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	if u.AvatarFilename == nil {

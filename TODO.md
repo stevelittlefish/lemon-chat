@@ -90,7 +90,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Unify conversation/completion title generation** (`internal/tasks/titles.go`)
   Near-duplicate function pairs for the two entity types.
 
-- [ ] **Add a handler helper for the parse-id → Get → 404/500 pattern** (`internal/server/`)
+- [x] **Add a handler helper for the parse-id → Get → 404/500 pattern** (`internal/server/`)
   Repeated dozens of times across the conversation/character/completion/research/notes handlers.
 
 ### Organisation & maintainability

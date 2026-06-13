@@ -2,10 +2,8 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
@@ -41,18 +39,12 @@ func (s *Server) handleListNotes(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetNote(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	n, err := s.store.GetNoteByID(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	if !s.checkNoteAccess(w, n.ID, user) {
@@ -103,19 +95,13 @@ func (s *Server) handleUpsertNote(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteNote(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 
 	n, err := s.store.GetNoteByID(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	if !s.checkNoteAccess(w, n.ID, user) {
@@ -136,9 +122,8 @@ func (s *Server) handleDeleteNote(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSetNoteReadOnly(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 
@@ -151,12 +136,7 @@ func (s *Server) handleSetNoteReadOnly(w http.ResponseWriter, r *http.Request) {
 	}
 
 	n, err := s.store.GetNoteByID(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	if !s.checkNoteAccess(w, n.ID, user) {

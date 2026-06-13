@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -33,17 +32,12 @@ func (s *Server) handleListCompletions(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetCompletion(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	item, err := s.store.GetCompletion(id, user.ID)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	} else if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, item)
@@ -72,9 +66,8 @@ func (s *Server) handleCreateCompletion(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleUpdateCompletion(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	var req struct {
@@ -91,20 +84,12 @@ func (s *Server) handleUpdateCompletion(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if req.Title != nil {
-		if err := s.store.UpdateCompletionTitle(id, user.ID, *req.Title); errors.Is(err, store.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "not found")
-			return
-		} else if err != nil {
-			internalError(w, err)
+		if err := s.store.UpdateCompletionTitle(id, user.ID, *req.Title); notFoundOr500(w, err) {
 			return
 		}
 	}
 	if req.Content != nil {
-		if err := s.store.UpdateCompletionContent(id, user.ID, *req.Content); errors.Is(err, store.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "not found")
-			return
-		} else if err != nil {
-			internalError(w, err)
+		if err := s.store.UpdateCompletionContent(id, user.ID, *req.Content); notFoundOr500(w, err) {
 			return
 		}
 	}
@@ -113,11 +98,7 @@ func (s *Server) handleUpdateCompletion(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusBadRequest, "model cannot be empty")
 			return
 		}
-		if err := s.store.UpdateCompletionModel(id, user.ID, *req.Model); errors.Is(err, store.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "not found")
-			return
-		} else if err != nil {
-			internalError(w, err)
+		if err := s.store.UpdateCompletionModel(id, user.ID, *req.Model); notFoundOr500(w, err) {
 			return
 		}
 	}
@@ -126,16 +107,11 @@ func (s *Server) handleUpdateCompletion(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleRegenerateCompletionTitle(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
-	if _, err := s.store.GetCompletion(id, user.ID); errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	} else if err != nil {
-		internalError(w, err)
+	if _, err := s.store.GetCompletion(id, user.ID); notFoundOr500(w, err) {
 		return
 	}
 	tasks.GenerateTitleForCompletion(s.store, s.cfg, id, func(compID int64, title string) {
@@ -146,9 +122,8 @@ func (s *Server) handleRegenerateCompletionTitle(w http.ResponseWriter, r *http.
 
 func (s *Server) handleUndoCompletion(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	content, err := s.store.UndoCompletion(id, user.ID)
@@ -164,9 +139,8 @@ func (s *Server) handleUndoCompletion(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRedoCompletion(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	content, err := s.store.RedoCompletion(id, user.ID)
@@ -182,16 +156,11 @@ func (s *Server) handleRedoCompletion(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteCompletion(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
-	if err := s.store.DeleteCompletion(id, user.ID); errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	} else if err != nil {
-		internalError(w, err)
+	if err := s.store.DeleteCompletion(id, user.ID); notFoundOr500(w, err) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -199,17 +168,12 @@ func (s *Server) handleDeleteCompletion(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	comp, err := s.store.GetCompletion(id, user.ID)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	} else if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 

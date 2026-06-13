@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -76,9 +75,8 @@ func (s *Server) handleCreateConversation(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleUpdateConversation(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	var req struct {
@@ -88,11 +86,7 @@ func (s *Server) handleUpdateConversation(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	if _, err := s.store.GetConversation(id, user.ID); errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	} else if err != nil {
-		internalError(w, err)
+	if _, err := s.store.GetConversation(id, user.ID); notFoundOr500(w, err) {
 		return
 	}
 	if req.Title != nil {
@@ -108,16 +102,11 @@ func (s *Server) handleUpdateConversation(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleRegenerateTitle(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
-	if _, err := s.store.GetConversation(id, user.ID); errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	} else if err != nil {
-		internalError(w, err)
+	if _, err := s.store.GetConversation(id, user.ID); notFoundOr500(w, err) {
 		return
 	}
 	log.Printf("Regenerating title conversation_id=%d user_id=%d", id, user.ID)
@@ -129,9 +118,8 @@ func (s *Server) handleRegenerateTitle(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleForkConversation(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	var req struct {
@@ -143,11 +131,7 @@ func (s *Server) handleForkConversation(w http.ResponseWriter, r *http.Request) 
 	}
 	log.Printf("Forking conversation id=%d user_id=%d", id, user.ID)
 	conv, err := s.store.ForkConversation(id, user.ID, req.MessageID)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	} else if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	s.hub.BroadcastConversationListChanged()
@@ -229,18 +213,13 @@ func (s *Server) handleImportConversation(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleDeleteConversation(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	log.Printf("Deleting conversation id=%d user_id=%d", id, user.ID)
 	attPaths, err := s.store.DeleteConversation(id, user.ID)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	} else if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	for _, p := range attPaths {

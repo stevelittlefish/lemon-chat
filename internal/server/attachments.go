@@ -6,19 +6,18 @@ import (
 	"mime"
 	"net/http"
 	"path/filepath"
-	"strconv"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
 func (s *Server) handleGetAttachment(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	var att *store.Attachment
+	var err error
 	if user.IsAdmin {
 		att, err = s.store.GetAttachment(id)
 	} else {

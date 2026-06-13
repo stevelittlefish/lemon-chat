@@ -2,9 +2,11 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
@@ -164,6 +166,33 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 func internalError(w http.ResponseWriter, err error) {
 	log.Printf("error: %v", err)
 	writeError(w, http.StatusInternalServerError, "internal error")
+}
+
+// pathID parses the "id" path parameter as an int64. On failure it writes a
+// 400 response and returns ok=false; callers should return immediately.
+func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return 0, false
+	}
+	return id, true
+}
+
+// notFoundOr500 maps a store error to an HTTP response: store.ErrNotFound
+// becomes 404, any other non-nil error becomes 500. It returns true when it
+// wrote a response (err was non-nil), so callers can write
+// `if notFoundOr500(w, err) { return }`.
+func notFoundOr500(w http.ResponseWriter, err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not found")
+		return true
+	}
+	internalError(w, err)
+	return true
 }
 
 func serveFile(path string) http.HandlerFunc {

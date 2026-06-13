@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -474,18 +473,12 @@ func (s *Server) handleListResearch(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetResearch(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	job, err := s.store.GetResearchJob(id, user.ID)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	writeJSON(w, http.StatusOK, job)
@@ -495,18 +488,12 @@ func (s *Server) handleGetResearch(w http.ResponseWriter, r *http.Request) {
 // finished job it emits the terminal status immediately.
 func (s *Server) handleResearchEvents(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	job, err := s.store.GetResearchJob(id, user.ID)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 
@@ -550,9 +537,8 @@ func (s *Server) handleResearchEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCancelResearch(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	if _, err := s.store.GetResearchJob(id, user.ID); err != nil {
@@ -571,9 +557,8 @@ func (s *Server) handleCancelResearch(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteResearch(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	if s.research.get(id) != nil {

@@ -99,9 +99,8 @@ func (s *Server) resolveCharacter(w http.ResponseWriter, user *store.User, charI
 
 func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	if _, err := s.store.GetConversation(id, user.ID); err != nil {
@@ -194,9 +193,8 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	convID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	convID, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	conv, err := s.store.GetConversation(convID, user.ID)
@@ -617,9 +615,8 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetMessageContext(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	convID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	convID, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	msgID, err := strconv.ParseInt(r.PathValue("msgId"), 10, 64)
@@ -678,9 +675,8 @@ func writeSSEError(w io.Writer, msg string) {
 
 func (s *Server) handleFirstMessage(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	convID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	convID, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	conv, err := s.store.GetConversation(convID, user.ID)

@@ -2,11 +2,9 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
@@ -31,18 +29,12 @@ func (s *Server) handleListCharacters(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetCharacter(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	char, err := s.store.GetCharacter(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	if char.Visibility == "private" && char.CreatedBy != user.ID && !user.IsAdmin {
@@ -101,18 +93,12 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	existing, err := s.store.GetCharacter(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 
@@ -178,18 +164,12 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteCharacter(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	existing, err := s.store.GetCharacter(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	// Only owner or admin may delete.
@@ -209,18 +189,12 @@ func (s *Server) handleDeleteCharacter(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleServeCharacterAvatar(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	char, err := s.store.GetCharacter(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	if char.AvatarFilename == nil {
@@ -232,18 +206,12 @@ func (s *Server) handleServeCharacterAvatar(w http.ResponseWriter, r *http.Reque
 
 func (s *Server) handleUploadCharacterAvatar(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	existing, err := s.store.GetCharacter(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	if existing.CreatedBy != user.ID && !user.IsAdmin && existing.Visibility != "readwrite" {
@@ -276,18 +244,12 @@ func (s *Server) handleUploadCharacterAvatar(w http.ResponseWriter, r *http.Requ
 
 func (s *Server) handleDeleteCharacterAvatar(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	existing, err := s.store.GetCharacter(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	if existing.CreatedBy != user.ID && !user.IsAdmin && existing.Visibility != "readwrite" {
@@ -306,18 +268,12 @@ func (s *Server) handleDeleteCharacterAvatar(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) handleSetDefaultCharacter(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid id")
+	id, ok := pathID(w, r)
+	if !ok {
 		return
 	}
 	char, err := s.store.GetCharacter(id)
-	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not found")
-		return
-	}
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return
 	}
 	if char.Visibility == "private" {
