@@ -26,6 +26,7 @@ html, body {
 .research-eyebrow {
   font-family: var(--font-mono);
   font-size: 10px;
+  line-height: 13px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--fg-faint);

@@ -25,6 +25,20 @@ function stopEvents() {
   if (abortEvents) { abortEvents(); abortEvents = null; }
 }
 
+function setBackBtn(toList) {
+  const btn = document.getElementById('back-to-menu');
+  if (!btn) return;
+  if (toList) {
+    btn.href = '#';
+    btn.onclick = (e) => { e.preventDefault(); location.hash = ''; };
+    document.getElementById('back-label').textContent = 'research';
+  } else {
+    btn.href = '/menu';
+    btn.onclick = null;
+    document.getElementById('back-label').textContent = 'menu';
+  }
+}
+
 function formatDuration(ms) {
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
@@ -52,6 +66,7 @@ function statusBadge(status) {
 
 async function showList() {
   stopEvents();
+  setBackBtn(false);
   const jobs = await research.list();
 
   const options = ['<option value="">default model</option>']
@@ -253,6 +268,7 @@ function removeStream() {
 
 async function showDetail(id) {
   stopEvents();
+  setBackBtn(true);
   let job;
   try {
     job = await research.get(id);
