@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 )
 
 const wsGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -147,6 +148,7 @@ func wsAcceptKey(key string) string {
 }
 
 func sendTextFrame(conn net.Conn, payload []byte) error {
+	conn.SetWriteDeadline(time.Now().Add(5 * time.Second)) //nolint:errcheck
 	n := len(payload)
 	var header []byte
 	switch {

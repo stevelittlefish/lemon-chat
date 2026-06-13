@@ -57,7 +57,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Research SSE subscribe-after-finish race** (`internal/server/research.go:499`)
   If `run.finish()` runs between `get(id)` and `subscribe()`, the new channel is never closed and the client never receives `[DONE]` (hung SSE connection). Have `subscribe()` detect the finished state and return a channel that's closed after replaying `last`.
 
-- [ ] **WebSocket broadcast has no write deadline** (`internal/server/ws.go:43`)
+- [x] **WebSocket broadcast has no write deadline** (`internal/server/ws.go:43`)
   One slow/half-dead client blocks the broadcast loop, stalling notifications for everyone. Set a write deadline per `conn.Write`, or push to a per-client buffered channel with a drop policy (as the research hub does).
 
 - [ ] **User message persisted before model reachability is confirmed** (`internal/server/messages.go:274`)
