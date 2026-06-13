@@ -129,7 +129,7 @@
 
 <header class="page-header">
   <p class="eyebrow">Lemon-chat adventure setup</p>
-  <h1>Adventure in Discombobulation <span class="version-badge">v1</span></h1>
+  <h1>Adventure in Discombobulation <span class="version-badge">v1.1</span></h1>
 </header>
 
 <nav class="toc">
@@ -159,11 +159,11 @@
 
   <h3>At a glance</h3>
   <div class="stat-grid">
-    <div class="stat"><div class="stat-lbl">Difficulty</div><div class="stat-val">Moderate — 40% bandwidth, the clock is the real enemy</div></div>
-    <div class="stat"><div class="stat-lbl">Length</div><div class="stat-val">15–25 scenes (approx. 1 hour)</div></div>
+    <div class="stat"><div class="stat-lbl">Difficulty</div><div class="stat-val">Hard — 30% bandwidth; the clock and the meetings are the enemy</div></div>
+    <div class="stat"><div class="stat-lbl">Length</div><div class="stat-val">20–35 scenes (1–1.5 hours)</div></div>
     <div class="stat"><div class="stat-lbl">Objectives</div><div class="stat-val">5 (logs + alignment + stamp + submission + escape)</div></div>
     <div class="stat"><div class="stat-lbl">Randomness</div><div class="stat-val">pick_random + approach tables</div></div>
-    <div class="stat"><div class="stat-lbl">Locations</div><div class="stat-val">6 (cubicle hub + 5 areas)</div></div>
+    <div class="stat"><div class="stat-lbl">Locations</div><div class="stat-val">6 core + 14 optional dead ends</div></div>
     <div class="stat"><div class="stat-lbl">Key NPC</div><div class="stat-val">Pat (Records — the only person who talks like a person)</div></div>
   </div>
 
@@ -252,7 +252,29 @@
   <div class="mechanic">
     <div class="mechanic-title">World events</div>
     <div class="mechanic-body">
-      <p>After each scene transition, the GM calls <code>random_chance</code>. On success, an ambient event fires: a phone answered on the second ring in an empty cubicle, a printer producing one warm blank page, the smell of birthday cake from no direction, a door closing with the sound of a door opening. 19 events in five groups. No action required, no mechanical effect, never explained, never repeated.</p>
+      <p>After each scene transition, the GM calls <code>random_chance</code>. On success, an ambient event fires: a phone answered on the second ring in an empty cubicle, a printer producing one warm blank page, the smell of birthday cake from no direction, a door closing with the sound of a door opening. 40 events in eight groups. No action required, no mechanical effect, never explained, never repeated.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Dead ends and wandering</div>
+    <div class="mechanic-body">
+      <p>The building has more rooms than work. Fourteen optional dead-end rooms — the mail room, the server room, Conference Room C, a second break room that has no coffee, Wellness Room A, an atrium marked PHASE I, the reprographics hub, a stairwell whose landings all read 2, and more — hold no objective. They are reached by taking the "misfiled" third choice, failing a navigation check, or going looking for something that is not there. Entering one costs a transition (13 minutes). Wandering burns the clock. Most cost only time; a few cost a point of bandwidth.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Ambient meetings and the upcoming sync</div>
+    <div class="mechanic-body">
+      <p>Meetings form. Outside the HR wing, at most twice per game, a meeting assembles around the player — colleagues converging, a chair already pulled out. Extraction is the encounter: citing a hard conflict is easy, simply leaving is medium, declaring the meeting pointless is hard and costs compliance. A meeting with no owner cannot end on its own; failing the check costs 13 minutes and a point of bandwidth before a second meeting forms nearby and draws the attendees off.</p>
+      <p>And one meeting is always upcoming: the Phase IV Pre-Alignment Sync, scheduled to begin in twelve minutes, in a room the player can never quite locate. It has been twelve minutes away all afternoon. It is never held. It is dread, scheduled.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Terminals</div>
+    <div class="mechanic-body">
+      <p>Grey-green terminals stand at empty desks throughout the building, each already logged in as the player. Using one costs nothing and reveals nothing useful: a login that knows the player's almost-name, a chat window mid-conversation with themselves ("almost done", sent four minutes ago), a print queue forty thousand documents deep, all titled "untitled", all submitted by Smith, all completed. Every terminal is the same terminal. It is not haunted. It is current.</p>
     </div>
   </div>
 
@@ -281,7 +303,7 @@
   </div>
   <div class="callout">
     <strong>Easier for a gentler shift:</strong> Before starting, edit <code>g.cyo.discombobulation</code> and change
-    <code>mental_bandwidth = "4"</code> to <code>"6"</code>. Turn read-only back on after editing.
+    <code>mental_bandwidth = "3"</code> to <code>"5"</code>. Turn read-only back on after editing.
   </div>
 </section>
 
@@ -314,7 +336,7 @@ LOAD ON DEMAND:
 - g.cyo.discombobulation.sop — load when the player reads the SOP excerpt or an audit begins
 
 WORLD STATE INIT:
-mental_bandwidth     = "4"
+mental_bandwidth     = "3"
 office_clock         = "4:47 PM"
 corporate_compliance = "Marginal"
 synergy_variance     = "11.3%"
@@ -330,6 +352,8 @@ badge_access         = "Level 1 (Intern)"
 route_records_known  = "false"
 route_vane_known     = "false"
 route_hr_known       = "false"
+meetings_dodged      = "0"
+terminals_used       = "0"
 
 OBJECTIVES:
 0. delta_logs       — Obtain the corrected Delta-logs from Records and Reconciliation
@@ -351,6 +375,11 @@ OBJECTIVES:
                       badge: it will not turn while deliverables are outstanding.
                       Requires: report_status = "submitted".
                       Must happen before office_clock passes 6:00 PM.
+
+OPTIONAL / POINTLESS: none of the dead-end rooms (world note, Optional areas) advance any
+objective. They exist to be wandered into and wondered at, and entering one costs a
+transition's time. The Phase IV Pre-Alignment Sync is always twelve minutes away and is never
+held; it has no objective either. Do not let any of this be mistaken for progress.
 
 FAILURE (bandwidth): mental_bandwidth reaches 0.
 Narrate: "You stare blankly at a spreadsheet until the cells begin to swim. You have become
@@ -396,6 +425,12 @@ You are in Cubicle 4-B. The nameplate is a strip of label tape over an older str
 tape. The clock on your partition says 4:47. The clock above the printer says 4:51. Both
 are correct. The building locks at 6:00 PM. Nobody has told you this. You know it the way
 you know the building has a basement.
+
+Your terminal has woken on its own. The screen shows a login prompt that already holds your
+name, almost, and a single calendar item highlighted yellow: the Phase IV Pre-Alignment Sync,
+in twelve minutes, in a room whose name you cannot quite read. It has been in twelve minutes
+for some time. Down the aisle, other terminals stand at empty desks, grey-green and patient,
+each one already logged in as you.
 
 Welcome to the firm. Please ensure your throughput is optimized.</textarea>
       <button class="copy-btn" onclick="cp('n0',this)">Copy</button>
@@ -467,6 +502,44 @@ On success: load g.cyo.discombobulation.events (if not already loaded). Draw one
 appropriate to the player's current area. Weave it into the opening of the scene — one or
 two sentences, without comment. These events require no action and have no mechanical
 effect. On failure: quiet transition, no event.
+
+─────────────────────────────────────────────
+DEAD ENDS AND WANDERING:
+The building has more rooms than work — the optional dead-end rooms are described in the world
+note (Optional areas). When the player takes the "misfiled" third choice, goes looking for
+something off the objective path, or fails a navigation check, route them into one of those
+rooms. Entering a dead end is travel: advance office_clock 13 minutes once, exactly as a
+transition, and roll the world-event check as normal. Wandering costs time. Most dead ends cost
+only time; a few cost 1 bandwidth, as marked in the world note. None restore it. The exit always
+returns the player to the corridor they left or to the hub — never to an objective area.
+
+─────────────────────────────────────────────
+TERMINALS:
+Grey-green terminals stand at empty desks throughout the building. The player's own terminal in
+Cubicle 4-B runs the Alignment and the email chain. Any other terminal the player uses shows
+something from the events note (the TERMINALS group) or something invented in that register — a
+login that knows their almost-name, a chat window mid-conversation with themselves, a progress
+bar at 99 percent. Using a terminal costs nothing and changes nothing; increment terminals_used
+by one (state_modify terminals_used delta=+1) for the journal. A terminal never gives a real
+hint. A terminal is current, not helpful.
+
+─────────────────────────────────────────────
+AMBIENT MEETINGS:
+Meetings form. Outside the HR wing, at most twice per game (your discretion, at a lull, when the
+player lingers near a meeting already in progress, or whenever the player sits down in
+Conference Room C), a meeting assembles around the player — colleagues converging pleasantly, a
+chair already pulled out. Run THE MEETING THAT FORMS in the personnel note. A meeting costs time
+and bandwidth to escape and never locks an objective. This is a real pressure: budget for it.
+The Recursive Hallway is the HR wing's standing meeting by another name.
+
+─────────────────────────────────────────────
+THE UPCOMING MEETING:
+One meeting is always upcoming: the Phase IV Pre-Alignment Sync, scheduled to begin in twelve
+minutes, in a room the player cannot quite locate. It has been twelve minutes away all afternoon
+and will remain so. Reference it occasionally — a calendar chime, an invite the player did not
+open, a colleague saying they will catch the player at the sync — but never let the player
+actually attend it; the room is never where they look. It has no objective and no reward. It is
+dread, scheduled. Do not explain it.
 
 ─────────────────────────────────────────────
 RANDOMNESS — HOW ENCOUNTER OUTCOMES WORK:
@@ -544,7 +617,7 @@ documents. It has no mechanical effect. The weight is real.
 ─────────────────────────────────────────────
 BANDWIDTH (HEALTH):
 mental_bandwidth runs 0 to 10. The player starts at the value in WORLD STATE INIT
-(default 4). Display it as a percentage at ten times its value: 4 = "Bandwidth: 40%".
+(default 3). Display it as a percentage at ten times its value: 3 = "Bandwidth: 30%".
 At 0: narrate the bandwidth failure ending from the manifest. Stop. No more choices.
 
 RESTORATION — only these sources allowed:
@@ -605,7 +678,7 @@ Resume with choices on the next response.
 CHOICE DESIGN — each set of 3 must include:
 - One procedural option (the thing an employee would do)
 - One direct option (the thing a person would do)
-- One option that seems to have been misfiled from a different day
+- One option that seems to have been misfiled from a different day — sometimes this points to a dead-end room (world note), which costs time and gives nothing
 Never offer "wait" or "do nothing". The building does not recognise those as activities.
 
 ─────────────────────────────────────────────
@@ -700,6 +773,14 @@ at intervals; their text is supportive and incorrect. The office extends further
 building. Never narrate this directly — it shows in distances: aisles that take too long,
 a far wall that stays far.
 
+The directory by the elevator lists thirty-one departments. Read twice, it lists one department,
+thirty-one ways. Terminals stand at empty desks throughout — grey-green, patient, each one
+already logged in as the player, each one the same terminal. Meeting rooms are named after a
+fruit or a virtue and numbered after themselves: PATIENCE is also Room Patience, Room 14 is also
+14. Rooms are booked through the Portal. The Portal is at the end of the Recursive Hallway. To
+book a room you must reach the Portal, which means passing the hallway, for which it helps to
+have booked a room.
+
 ## Cubicle 4-B (hub)
 The player's station. A desk, an in-tray that is empty in a way that suggests recent
 emptying, a terminal with grey-green phosphor and a patient cursor, and the stapler, which
@@ -792,6 +873,105 @@ stepped away for several years. A planter with a plant that is doing its best.
 THE REVOLVING DOOR: it reads the player's badge as they approach. A small light above it
 is red while deliverables are outstanding, green when report_status = "submitted". Through
 the glass: evening. The evening is at the wrong angle until the door turns.
+
+## Optional areas (dead ends)
+The building has more rooms than work. None of the rooms below contains an objective; none of
+them advances the report. They are where the building keeps its extra room. Route the player
+into one when they take the "misfiled" third choice, fail a navigation check, or go looking for
+something that is not there. Entering one costs a transition's time and never advances the report
+(rules note: DEAD ENDS AND WANDERING). Most cost only time; a few cost bandwidth, as marked. The
+exit always returns the player to the corridor they left or to the hub.
+
+THE MAIL ROOM
+Pneumatic tubes in brass and dust. A wall of pigeonholes, each labelled with a name; one holds
+the player's almost-name, and is empty in a way that suggests recent emptying. A tube arrives
+while the player watches, thumps into its cradle, and is addressed, in full, to the sender.
+Outgoing and incoming are the same slot. A sign: ALLOW 3-5 BUSINESS DAYS. It does not say for
+what.
+
+THE SERVER ROOM (IT)
+Cold, loud, lit blue by a hundred standby lights that breathe out of phase. A single monitor on
+a wheeled cart shows a login prompt. Anything the player types, it answers: HELLO. HOW CAN I HELP
+YOU TODAY. Every answer it gives ends HAS THIS RESOLVED YOUR ISSUE. Y/N. N opens a ticket. The
+ticket number is the player's start date. There is no Y. ⚠️ If the player lingers to read the
+whole ticket queue, the cold gets into them: 📉 state_modify mental_bandwidth delta=-1.
+
+CONFERENCE ROOM C
+A long table, sixteen chairs, a speakerphone with one light on. On the whiteboard, an agenda of
+nine items, the first eight crossed out, the ninth reading AOB. A jug of water sweating in the
+middle, poured and undrunk. The speakerphone says, every ninety seconds, "Can everyone see my
+screen." Nobody answers. The player may sit. If they sit, a meeting forms — run THE MEETING THAT
+FORMS (personnel note).
+
+THE STATIONERY CUPBOARD
+Shelves of toner for printer models the building does not own, in quantities that do not fit the
+cupboard. Reams of paper in plastic, warm. A box of pens, all the same pen. A label-maker,
+loaded, the tape half-used; the last label it printed sits in the tray and reads the player's
+almost-name. There are always more staples here than there are things to staple.
+
+THE SECOND BREAK ROOM
+The break room again. The same fridge, the same posters, the same pot reading 2 MINUTES
+REMAINING. But the mug rack is empty, and the vending machine's coin slot is taped over with a
+note: OUT OF ORDER — SEE OTHER MACHINE. The other machine is the one in the first break room.
+There is no coffee here. There was never going to be.
+
+WELLNESS ROOM A
+Not B. A door marked WELLNESS ROOM A, ajar. Inside: a single chair, a lamp on its lowest setting,
+a sound machine cycling OCEAN, RAIN, OFFICE. A card on the wall: TAKE THE TIME YOU NEED. PLEASE
+LIMIT TO 4 MINUTES. A clipboard books the room; every slot for the rest of the day is filled, in
+the player's handwriting. The room is restful and the rest does not take. Do not let the player
+restore bandwidth here.
+
+THE ATRIUM
+A double-height space with a skylight. The light through the skylight is the same flat
+fluorescent light as everywhere else; above the skylight there is no sky, only another drop
+ceiling, lit. A ficus in a planter, doing its best, like the one in the lobby — it may be the one
+in the lobby. A water feature, switched off, its basin dry and clean. A plaque on the wall: PHASE
+I. It does not say of what, or where Phases II and III are.
+
+THE REPROGRAPHICS HUB
+Six photocopiers in a row, one of them warm and running, copying a single sheet over and over
+into a tray that never fills. The sheet is the org chart. Each copy is very slightly larger than
+the last. A terminal here logs print jobs: the queue is forty thousand documents deep, all titled
+"untitled", all submitted by Smith, all completed.
+
+THE FIRE STAIRS
+A concrete stairwell painted institutional green, with an EXIT sign at the top and an EXIT sign at
+the bottom and floor numbers stencilled at each landing: 2, 2, 2, 2. Up and down both arrive at a
+floor numbered 2. An evacuation map is mounted by the door; the YOU ARE HERE dot sits in a
+corridor that is not on the map.
+
+THE FOCUS POD
+A phone booth of frosted glass, sized for one, with a stool and a shelf and a phone with no
+keypad. A sign: PLEASE BOOK VIA THE PORTAL. Lifting the receiver gives a dial tone that resolves
+into hold music — four notes, the same four the vending machine plays. A card: YOU HAVE BEEN IN
+THE QUEUE FOR SOME TIME. YOUR CALL IS IMPORTANT.
+
+THE TRAINING ROOM
+Rows of chairs facing a screen paused on a frame of an orientation video: a hand, mid-gesture,
+indicating a slide that reads WELCOME TO YOUR FIRST DAY. A remote sits on the front chair.
+Pressing play advances the video one frame, to a slide reading WELCOME TO YOUR FIRST DAY. The
+presenter's lanyard, frozen on screen, reads TEMPORARY STAFF.
+
+THE ARCHIVE (LOWER)
+Below Records, by a stair that is not the east stairwell, though it is also the east stairwell.
+Older than Records. The folders here have no labels, because the labels have been filed
+separately, elsewhere, for safekeeping. The air is the air of a closed book. Pat is not down
+here. Pat is never down here. Asked about this floor, Pat says only, "We do not go down to file.
+We go down to be filed."
+
+FACILITIES
+A room of the building's organs: a boiler that is warm, a panel of breakers all switched ON, a
+thermostat set to a temperature with no number on the dial, only the word AMBIENT. A work order
+taped to the boiler: RE: THE HUMMING. STATUS: WORKING AS INTENDED. A clipboard of completed
+inspections going back further than the building. Every inspector signed Smith.
+
+THE SMOKING BALCONY
+A glass door marked NO ACCESS that opens when pushed. Beyond it, a balcony with a rail, an ashtray
+on a post, and a view — not outside, but down into another office floor, identical, its panels
+lit, its aisles empty, someone's screensaver spiralling far below. The air out here is the same
+air. There is no weather. A single folding chair faces the rail, as if someone comes here to look
+at the work from a distance and feel something about it.
 
 ## Colleagues (summaries — encounter cards are in the personnel note)
 THE COMPLIANCE OFFICER — the symmetrical man. Charcoal suit. The text on his badge is too
@@ -1005,6 +1185,50 @@ failure → Somewhere past the middle, the hallway is its own beginning again. T
           The report is still in hand. Try again.
 
 ─────────────────────────────────────────────
+## The Meeting That Forms — Ambient Meetings
+
+Trigger: your discretion, at most twice per game outside the HR wing, plus any time the player
+sits down in Conference Room C (world note) or lingers where a meeting is already in progress. A
+few colleagues converge, pleasantly, with the gravity of agenda. A chair is already pulled out
+for the player. Extraction is the encounter.
+
+Assess the player's approach (the player does not choose a table):
+GRACEFUL (citing a hard conflict — the Phase IV deadline, producing the SOP, naming a competing
+meeting): EASY table.
+DIRECT (simply standing and leaving, saying little): MEDIUM table.
+DISRUPTIVE (refusing, arguing, declaring the meeting pointless): HARD table, and on any result
+compliance LOWERS one step — a meeting abandoned without an owner is a procedural violation.
+
+1. note_to_self the outcomes. 2. pick_random the selected table. 3. apply:
+success → The player steps into a gap in the conversation that opens exactly when needed. No cost.
+          state_modify meetings_dodged delta=+1. A follow-up is scheduled; it will be rescheduled.
+partial → The meeting runs long before it releases the player. 📉 state_modify mental_bandwidth
+          delta=-1. state_modify meetings_dodged delta=+1. The player leaves with an action item
+          they did not agree to and will not complete.
+failure → The meeting has no owner and so cannot end; it absorbs the next thirteen minutes whole.
+          Advance office_clock 13 minutes, as a transition. 📉 state_modify mental_bandwidth
+          delta=-1. The player is released only when a second meeting forms nearby and draws the
+          attendees off. A follow-up is scheduled.
+
+Never let an ambient meeting block an objective. It costs time and bandwidth; it does not lock a
+door.
+
+─────────────────────────────────────────────
+## Optional Colleagues (flavour only — no mechanics)
+
+DAVE FROM ACCOUNTS — never seen, only emailed. Replies to messages the player has not sent, always
+within the minute, always "Thanks Dave", signed by someone other than Dave. His out-of-office has
+been on since Q3 and says he will respond on his return.
+
+THE FACILITATOR — runs the meetings that form. Holds a marker and a deck whose screen no one can
+see. Speaks only in transitions: "Circling back", "Parking that", "Taking that offline". Is never
+seen entering or leaving a room; is simply at the front of it.
+
+THE TEMP — glimpsed once or twice at the edge of the floor, in a beige polo slightly too small,
+holding a crumpled page, looking lost, wearing the player's lanyard. If approached: gone, or a
+coat on a chair, or a reflection. Never explained. Never let the player catch them.
+
+─────────────────────────────────────────────
 ## The Audit — The Compliance Officer
 
 Trigger: when corporate_compliance is Noncompliant, or once at a natural lull (GM
@@ -1073,7 +1297,7 @@ Game over. Stop. No more choices.</textarea>
       <span class="card-key">g.cyo.discombobulation.events</span>
       <div class="card-meta"><span class="badge b-global">global</span><span class="badge b-readonly">read-only</span></div>
     </div>
-    <div class="card-desc">Ambient world events — loaded on demand. 19 events in five groups, drawn when random_chance succeeds on a transition. Never explained, never repeated.</div>
+    <div class="card-desc">Ambient world events — loaded on demand. 40 events in eight groups, drawn when random_chance succeeds on a transition. Never explained, never repeated.</div>
     <div class="card-body">
       <textarea id="n4" readonly>WORLD EVENTS — draw from this list when random_chance triggers a world event.
 Choose one event appropriate to the player's current area.
@@ -1141,7 +1365,65 @@ R1. Deep in the shelving, the sound of one heavy folder being refiled, exactly o
 
 R2. Pat's kettle clicks off, although it had not been on.
 
-R3. The light over aisle Q flickers. The aisles are not lettered.</textarea>
+R3. The light over aisle Q flickers. The aisles are not lettered.
+
+── TERMINALS AND SCREENS ────────────────────────────────────
+T1. A monitor two desks over wakes from sleep on its own, shows a spreadsheet with one cell
+    blinking, and sleeps again before the cell can be read.
+
+T2. Every screen on the floor displays, for one second, the same dialog box: ARE YOU STILL THERE.
+    It dismisses itself before an answer.
+
+T3. A terminal at an empty desk shows a chat window. The last message, sent four minutes ago by
+    the player, reads "almost done". The cursor blinks in the reply field.
+
+T4. A dark monitor reads WELCOME BACK, SMITH, then, after a moment, WELCOME BACK, then just the
+    cursor.
+
+T5. A progress bar on a distant screen reads 99 percent, with the calm of something that intends
+    to stay there.
+
+── MEETINGS AND THE SYNC ────────────────────────────────────
+M1. A calendar notification chimes from three cubicles at once: the Phase IV Pre-Alignment Sync,
+    starting in twelve minutes. It has been starting in twelve minutes all afternoon.
+
+M2. Through a glass wall, a meeting in progress: chairs arranged, screen sharing, water poured.
+    There is no one in the room. The meeting is going fine.
+
+M3. A printed agenda lies face up on the carpet. Item one: REVIEW OF PREVIOUS MEETING. There was
+    no previous meeting. Its minutes are attached.
+
+M4. Somewhere a meeting lets out — chairs pushed back in unison, a door, footsteps that disperse
+    and arrive nowhere.
+
+── NEAR THE ELEVATOR OR IN TRANSIT ──────────────────────────
+E1. The elevator chimes one floor early, opens on a corridor identical to this one, and closes
+    again, satisfied.
+
+E2. The call button is already lit when the player reaches it. The player is the only one here.
+    The player was the only one here.
+
+E3. The directory board lists departments that turn out, on a second reading, to be the same
+    department spelled several ways.
+
+── MORE, ANYWHERE ───────────────────────────────────────────
+A11. The carpet pattern runs the org chart upside down for three or four tiles, then rights
+     itself, or the player stops looking.
+
+A12. A potted plant passed on the way in is on the other side of the aisle on the way back. It is
+     doing its best in both places.
+
+A13. Every wastebasket on the floor has been emptied and relined since the player last looked.
+     None of them were full.
+
+A14. An easel holds a laminated sign: PARDON OUR PROGRESS. There is no progress, and no apology,
+     and the easel is gone when the player turns back.
+
+A15. The HVAC settles, for a moment, into the exact rhythm of a sentence, then thinks better of
+     it.
+
+A16. A pneumatic tube thumps along inside the wall the length of the corridor and arrives back
+     where it started.</textarea>
       <button class="copy-btn" onclick="cp('n4',this)">Copy</button>
     </div>
   </div>
@@ -1221,6 +1503,17 @@ with legacy subsystems.
   attestation that the integration does not disrupt the local throughput of their specific
   vertical.
 
+3.4 THE RECURSIVE VALIDATION SUBROUTINE
+In the event that Re-Validation (Step 3) returns a result identical to its own input, the
+subroutine is deemed to be in a state of Productive Equilibrium and shall be permitted to
+continue. Productive Equilibrium is not to be confused with a loop. A loop terminates. A loop has
+not been authorized for this fiscal period.
+
+3.5 THE STAPLE DIRECTIVE
+All multi-page deliverables are to be stapled in the upper-left corner. The Phase IV report is one
+page. It is to be stapled regardless: to the corner, to itself. The stapler is to be returned
+warm.
+
 4. QUALITY ASSURANCE AND COMPLIANCE
 The Final Validation Stage requires a comprehensive audit of the entire process trail.
 - AUDIT TRACEABILITY: All decisions made during the Corrective Modulation phase must be
@@ -1233,6 +1526,60 @@ Upon successful completion of the Synergistic Alignment, all temporary workspace
 are to be purged. The resulting alignment report is to be archived in the central
 repository under the Legacy Outcomes directory, and a notification is to be sent to the
 Steering Committee via the standard asynchronous communication channel.
+
+6. EXCEPTION HANDLING AND ESCALATION
+6.1 Any anomaly not addressed by this document is to be reclassified as a feature pending review
+and routed to the appropriate silo via the standard channel.
+6.2 No anomaly shall be escalated above the level at which it was observed, as escalation implies
+a hierarchy, and the organizational matrix is flat. The matrix is also very tall. These are not
+in conflict.
+6.3 The Precedence Clause (ref. 3.3) supersedes this section, except where this section supersedes
+the Precedence Clause, as determined by the most recent quarterly directive, which is this one.
+
+7. THE STANDING MEETING FRAMEWORK
+7.1 All meetings are standing meetings. A meeting that has concluded has merely been adjourned to
+a future instance of itself.
+7.2 Every meeting shall open with a review of the previous meeting and close with the scheduling
+of the next, such that no meeting is the first meeting and no meeting is the last.
+7.3 Attendance is mandatory for all personnel within line of sight of a meeting. A meeting without
+a clear owner cannot be adjourned and shall be permitted to run until it is absorbed into the
+following meeting.
+7.4 Any Other Business (AOB) is to be tabled indefinitely. Tabled items are stored in the table.
+
+8. PERSONNEL CONTINUITY
+8.1 Each working day is provisioned fresh at the start of business (0447 hours) to ensure
+consistency of throughput. Personnel are not required to retain information across provisioning
+events; the information is retained on their behalf.
+8.2 Start dates are recorded in the quarter of onboarding (Q3). The year of the quarter is an
+implementation detail and is not surfaced to the personnel record.
+8.3 Where a stakeholder's tenure cannot be determined, the stakeholder is presumed to have always
+been with the firm, in the interest of continuity.
+
+9. FACILITIES AND AMBIENT CONDITIONS
+9.1 The ambient temperature shall be maintained at AMBIENT.
+9.2 The auditory baseline (ref. the humming) is a deliverable of the HVAC and is working as
+intended. Reports of the humming forming words are to be filed under HEURISTIC VERIFICATION
+(ref. 2) and not acted upon.
+9.3 Illumination shall be continuous. At end of business, sections shall be powered down in
+sequence, beginning with the wings furthest from the point of egress, the egress maintained until
+last. This is a courtesy.
+9.4 No clock shall display the close of business. Clocks shall be calibrated to one another's
+disagreement, which is the most accurate time available.
+
+APPENDIX A: GLOSSARY OF KEY TERMS
+- HYPOTHETICAL IDEAL STATE (HIS): the condition toward which all alignment tends and which it is
+  prohibited from reaching (ref. 3.2 Step 4).
+- VARIANCE: the distance between the present state and the HIS, expressed as a percentage, never
+  to be zero, never to be mistaken for comfort.
+- THROUGHPUT: the rate at which work is in progress. Not to be confused with completion, which is
+  not a throughput metric.
+- DELIVERABLE: anything the firm can hold you to. See also: contract.
+- CLOSE OF BUSINESS: a time. Not a time on any clock.
+
+APPENDIX B: REVISION HISTORY
+This document supersedes all previous versions, including the versions that supersede it. The
+revision history is maintained in the Legacy Outcomes directory and is identical to this document.
+There have been no revisions. There have been a great many.
 
 End of Document. All rights reserved.
 Discombobulators Inc. Proprietary Information.</textarea>
@@ -1313,6 +1660,49 @@ punish the breach. It files it. The follow-up meeting HR will schedule to discus
 possibility of a future meeting about the player's offboarding will be rescheduled
 indefinitely. That is the building's version of letting go.
 
+THE MEETINGS:
+A meeting is the social form of the Hypothetical Ideal State: everyone arrived, no one finished,
+the work forever in progress. This is why meetings cannot end on their own, and why a meeting
+without an owner runs until another meeting absorbs it. When colleagues offer to set up a short
+meeting to align on something, they are not deflecting. They are inviting the player into the only
+state the building considers safe. The building meets the way other things breathe.
+
+THE PRE-ALIGNMENT SYNC:
+The upcoming meeting — the Phase IV Pre-Alignment Sync, always twelve minutes away, in a room the
+player can never quite find — is the building's inhale. It is forever scheduled and never held,
+because holding it would align the Phase, and an aligned Phase is a finished Phase, and the
+building does not finish. The invite keeps arriving. The room keeps not being where the player
+looks. There is nothing in the room. The room is twelve minutes from now, which is to say it is
+not a room.
+
+THE OPTIONAL ROOMS:
+The dead ends are the building's pockets — rooms it grew and stopped using and kept anyway, the
+way a body keeps an appendix. They hold no objective because they hold the time the building
+borrows from the clock: every minute the player spends wandering is a minute the building need not
+account for at close of business. The second break room, Wellness Room A, the atrium marked PHASE
+I — not traps, not threats. They are where the building puts the player when it wants the player
+kept, gently, in motion and out of the way. A curious employee is a manageable employee.
+
+THE TERMINALS:
+Every terminal in the building is the same terminal, the way every VANE door is the corner office.
+The chat window that reads "almost done", sent by the player four minutes ago, is the player, from
+a previous day, still in progress. The forty thousand untitled documents in the print queue are
+the days. The terminal is not haunted. The terminal is current.
+
+THE TEMP:
+The figure at the edge of the floor in the too-small polo, holding a crumpled page, is the player
+— yesterday's provisioning, or tomorrow's, glimpsed across the seam where the day is re-issued.
+The building keeps them out of arm's reach because two of the same employee in one place would be
+a completion of sorts, and completion is the one thing. Never let the player catch the Temp. If
+they corner it, it is a coat, a reflection, a draught.
+
+WELLNESS ROOMS A AND B:
+Wellness Room A is for resting, and the rest never resolves, because rest that resolved would be
+completion. Wellness Room B is where the player is filed when the day ends and they are still
+inside: not a punishment, a placement. The sign on B reads ORIENTATION BEGINS TOMORROW, 4:47,
+because for the building there is only the one day, re-issued, and to be filed is simply to be
+ready for it again.
+
 HOW TO USE THIS:
 - Nothing in this note is ever stated. It sets the temperature of scenes.
 - The building should feel staffed, not haunted. Everyone is pleasant. The pleasantness
@@ -1320,6 +1710,8 @@ HOW TO USE THIS:
 - If the player asks a colleague what year it is: the colleague suggests setting up a
   short meeting to align on that.
 - If the player asks Pat what is going on, Pat says: "The usual." Pat means it.
+- If the player goes looking for the Pre-Alignment Sync, the room is never where they look. Let
+  them spend the time. The looking is the meeting.
 - At the moment of victory, as the door turns: the building is not angry. Something in the
   HVAC pitches down, like a held breath released into a spreadsheet. Let the player feel —
   briefly, and never confirmed — that the building is, in its way, proud.</textarea>
@@ -1459,15 +1851,20 @@ Your two weeks' notice, you decide, will be effective immediately, and retroacti
     <em>"You need to record the outcomes before calling pick_random — check the rules note."</em>
   </div>
 
+  <div class="callout">
+    <strong>Wandering has a price.</strong> The building has fourteen optional dead ends — a mail room, a server room, a second break room with no coffee, an atrium marked PHASE I. None of them advance the report, and entering one costs thirteen minutes off a clock you cannot spare. Curiosity is how the building keeps you.
+  </div>
+
   <h3>Adjusting difficulty</h3>
   <p>Turn off read-only, edit, then re-enable read-only.</p>
   <ul class="plain">
-    <li><strong>Easier:</strong> In <code>g.cyo.discombobulation</code>, change <code>mental_bandwidth = "4"</code> to <code>"6"</code>.</li>
+    <li><strong>Easier:</strong> In <code>g.cyo.discombobulation</code>, change <code>mental_bandwidth = "3"</code> to <code>"5"</code>.</li>
     <li><strong>Easier:</strong> Change <code>office_clock = "4:47 PM"</code> to <code>"4:21 PM"</code> — two extra transitions before lockdown.</li>
     <li><strong>Easier:</strong> In <code>g.cyo.discombobulation.rules</code>, allow the coffee twice. The vending machine misreads the fiscal quarter.</li>
-    <li><strong>Harder:</strong> Starting bandwidth <code>"3"</code>, or start the clock at <code>"5:00 PM"</code>.</li>
+    <li><strong>Harder:</strong> Starting bandwidth <code>"2"</code>, or start the clock at <code>"5:00 PM"</code>.</li>
     <li><strong>Harder:</strong> Set <code>hr_engagement_level = "1"</code> in WORLD STATE INIT — one associate is already circling back.</li>
     <li><strong>Much harder:</strong> Remove the COFFEE RECESSION paragraph from the rules note. The clock only moves forward, the way clocks are believed to.</li>
+    <li><strong>Harder:</strong> Lean into the dead ends — every optional room the player visits costs a transition, and there are fourteen of them.</li>
   </ul>
 </section>
 
