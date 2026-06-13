@@ -33,25 +33,39 @@ func StartTitleWorker(st *store.Store, cfg *config.Config, onConvTitled func(int
 	}()
 }
 
+// resolveTitleModel resolves the chat endpoint and credentials for the
+// title-generation model (the configured default model). ok is false when
+// generation can't proceed. skipDesc, if non-empty, is named in the log line
+// emitted when no default model is configured; pass "" to skip silently.
+func resolveTitleModel(cfg *config.Config, skipDesc string) (chatURL, modelName, apiKey string, responseTimeout time.Duration, ok bool) {
+	modelName = cfg.Server.DefaultModel
+	if modelName == "" {
+		if skipDesc != "" {
+			log.Printf("title worker: no default_model configured, skipping %s", skipDesc)
+		}
+		return "", "", "", 0, false
+	}
+	srv, err := cfg.ServerForModel(modelName)
+	if err != nil {
+		log.Printf("title worker: %v", err)
+		return "", "", "", 0, false
+	}
+	chatURL = srv.APIBase + "/chat/completions"
+	responseTimeout = time.Duration(cfg.Server.ResponseTimeoutSeconds) * time.Second
+	return chatURL, modelName, srv.APIKey, responseTimeout, true
+}
+
 // GenerateTitleForConversation generates a title for convID and persists it.
 // It runs the generation in a goroutine and calls onTitled on success.
 func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID int64, onTitled func(int64, string)) {
 	debug.Log("title: GenerateTitleForConversation triggered for conversation %d", convID)
 	go func() {
-		modelName := cfg.Server.DefaultModel
-		if modelName == "" {
-			log.Printf("title worker: no default_model configured, skipping conversation %d", convID)
+		chatURL, modelName, apiKey, responseTimeout, ok := resolveTitleModel(cfg, fmt.Sprintf("conversation %d", convID))
+		if !ok {
 			return
 		}
-		srv, err := cfg.ServerForModel(modelName)
-		if err != nil {
-			log.Printf("title worker: %v", err)
-			return
-		}
-		chatURL := srv.APIBase + "/chat/completions"
 		debug.Log("title: generating title for conversation %d using model %q at %s", convID, modelName, chatURL)
-		responseTimeout := time.Duration(cfg.Server.ResponseTimeoutSeconds) * time.Second
-		title, err := generateTitle(st, chatURL, modelName, srv.APIKey, convID, responseTimeout)
+		title, err := generateTitle(st, chatURL, modelName, apiKey, convID, responseTimeout)
 		if err != nil {
 			log.Printf("title worker: conversation %d: %v", convID, err)
 			return
@@ -73,18 +87,10 @@ func GenerateTitleForConversation(st *store.Store, cfg *config.Config, convID in
 func GenerateTitleForCompletion(st *store.Store, cfg *config.Config, compID int64, onTitled func(int64, string)) {
 	debug.Log("title: GenerateTitleForCompletion triggered for completion %d", compID)
 	go func() {
-		modelName := cfg.Server.DefaultModel
-		if modelName == "" {
-			log.Printf("title worker: no default_model configured, skipping completion %d", compID)
+		chatURL, modelName, apiKey, responseTimeout, ok := resolveTitleModel(cfg, fmt.Sprintf("completion %d", compID))
+		if !ok {
 			return
 		}
-		srv, err := cfg.ServerForModel(modelName)
-		if err != nil {
-			log.Printf("title worker: %v", err)
-			return
-		}
-		chatURL := srv.APIBase + "/chat/completions"
-		responseTimeout := time.Duration(cfg.Server.ResponseTimeoutSeconds) * time.Second
 
 		userID, content, err := st.GetCompletionForTitle(compID)
 		if err != nil {
@@ -95,7 +101,7 @@ func GenerateTitleForCompletion(st *store.Store, cfg *config.Config, compID int6
 			log.Printf("title worker: completion %d has no content", compID)
 			return
 		}
-		title, err := generateCompletionTitle(*content, chatURL, modelName, srv.APIKey, responseTimeout)
+		title, err := generateCompletionTitle(*content, chatURL, modelName, apiKey, responseTimeout)
 		if err != nil {
 			log.Printf("title worker: completion %d: %v", compID, err)
 			return
@@ -113,17 +119,10 @@ func GenerateTitleForCompletion(st *store.Store, cfg *config.Config, compID int6
 
 func generateCompletionTitles(st *store.Store, cfg *config.Config, onTitled func(int64, string)) {
 	debug.Log("title: running completion title job")
-	modelName := cfg.Server.DefaultModel
-	if modelName == "" {
+	chatURL, modelName, apiKey, responseTimeout, ok := resolveTitleModel(cfg, "")
+	if !ok {
 		return
 	}
-	srv, err := cfg.ServerForModel(modelName)
-	if err != nil {
-		log.Printf("title worker: %v", err)
-		return
-	}
-	chatURL := srv.APIBase + "/chat/completions"
-	responseTimeout := time.Duration(cfg.Server.ResponseTimeoutSeconds) * time.Second
 
 	ids, err := st.ListUntitledEligibleCompletions(CompletionAutoTitleMinTokens)
 	if err != nil {
@@ -141,7 +140,7 @@ func generateCompletionTitles(st *store.Store, cfg *config.Config, onTitled func
 		if err != nil || content == nil || *content == "" {
 			continue
 		}
-		title, err := generateCompletionTitle(*content, chatURL, modelName, srv.APIKey, responseTimeout)
+		title, err := generateCompletionTitle(*content, chatURL, modelName, apiKey, responseTimeout)
 		if err != nil {
 			log.Printf("title worker: completion %d: %v", id, err)
 			continue
@@ -162,41 +161,16 @@ func generateCompletionTitle(content, chatURL, modelName, apiKey string, respons
 		content = content[:titleTranscriptLimit]
 	}
 
-	msgs := []llm.Message{
-		{Role: "system", Content: "Generate a short title (at most 6 words) for the following text. Respond with only the title — no quotes, no trailing punctuation, no explanation."},
-		{Role: "user", Content: content},
-	}
-
 	debug.Log("title: POST %s (model=%s, completion title)", chatURL, modelName)
-	ctx, cancel := context.WithTimeout(context.Background(), responseTimeout)
-	defer cancel()
-	raw, err := llm.ChatComplete(ctx, http.DefaultClient, chatURL, apiKey, modelName, msgs, map[string]any{"max_tokens": 20})
-	if err != nil {
-		return "", err
-	}
-
-	title := strings.TrimSpace(raw)
-	title = strings.Trim(title, `"'`)
-	title = strings.TrimSpace(title)
-	if title == "" {
-		return "", fmt.Errorf("empty title from model")
-	}
-	return title, nil
+	return requestTitle(completionTitlePrompt, content, chatURL, modelName, apiKey, responseTimeout)
 }
 
 func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, string)) {
 	debug.Log("title: running conversation title job")
-	modelName := cfg.Server.DefaultModel
-	if modelName == "" {
+	chatURL, modelName, apiKey, responseTimeout, ok := resolveTitleModel(cfg, "")
+	if !ok {
 		return
 	}
-	srv, err := cfg.ServerForModel(modelName)
-	if err != nil {
-		log.Printf("title worker: %v", err)
-		return
-	}
-	chatURL := srv.APIBase + "/chat/completions"
-	responseTimeout := time.Duration(cfg.Server.ResponseTimeoutSeconds) * time.Second
 
 	ids, err := st.ListUntitledEligible()
 	if err != nil {
@@ -210,7 +184,7 @@ func generateTitles(st *store.Store, cfg *config.Config, onTitled func(int64, st
 	}
 
 	for _, id := range ids {
-		title, err := generateTitle(st, chatURL, modelName, srv.APIKey, id, responseTimeout)
+		title, err := generateTitle(st, chatURL, modelName, apiKey, id, responseTimeout)
 		if err != nil {
 			log.Printf("title worker: conversation %d: %v", id, err)
 			continue
@@ -254,6 +228,8 @@ func buildTranscript(msgs []store.Message) string {
 
 const defaultTitlePrompt = "Generate a short title (at most 6 words) for the following conversation. Respond with only the title — no quotes, no trailing punctuation, no explanation."
 
+const completionTitlePrompt = "Generate a short title (at most 6 words) for the following text. Respond with only the title — no quotes, no trailing punctuation, no explanation."
+
 func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID int64, responseTimeout time.Duration) (string, error) {
 	msgs, err := st.ListMessages(convID)
 	if err != nil {
@@ -270,15 +246,22 @@ func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID in
 		systemPrompt = custom
 	}
 
-	out := []llm.Message{
+	debug.Log("title: POST %s (model=%s, conv=%d)", chatURL, modelName, convID)
+	return requestTitle(systemPrompt, transcript, chatURL, modelName, apiKey, responseTimeout)
+}
+
+// requestTitle asks the model for a short title given a system prompt and the
+// text to title, then normalises the response (trims surrounding whitespace
+// and quotes). Returns an error if the model returns an empty title.
+func requestTitle(systemPrompt, content, chatURL, modelName, apiKey string, responseTimeout time.Duration) (string, error) {
+	msgs := []llm.Message{
 		{Role: "system", Content: systemPrompt},
-		{Role: "user", Content: transcript},
+		{Role: "user", Content: content},
 	}
 
-	debug.Log("title: POST %s (model=%s, conv=%d)", chatURL, modelName, convID)
 	ctx, cancel := context.WithTimeout(context.Background(), responseTimeout)
 	defer cancel()
-	raw, err := llm.ChatComplete(ctx, http.DefaultClient, chatURL, apiKey, modelName, out, map[string]any{"max_tokens": 20})
+	raw, err := llm.ChatComplete(ctx, http.DefaultClient, chatURL, apiKey, modelName, msgs, map[string]any{"max_tokens": 20})
 	if err != nil {
 		return "", err
 	}
