@@ -14,13 +14,6 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 - [x] **Rename `sdxl_file`/`flux_file` config keys to `sdxl_workflow`/`flux_workflow`** (`internal/config/config.go:28`)
 
-- [ ] **Image generation `background` parameter** (`internal/server/tools.go:210,251`)
-  Add an optional `background` boolean parameter (default false) to both image generation tools. When true and the image loads, set it as the chat background (`static/js/thread.js:186`). Apply a legibility treatment (e.g. semi-transparent overlay on the message column) so text remains readable over the image.
-
-- [ ] **Async image generation** (`internal/server/tools.go:1400`)
-  `makeImageExecutor` blocks the SSE stream for up to 120s while ComfyUI polls. Per `docs/feature-async-image-generation.md`: return a pending attachment immediately after the ComfyUI submit, poll/download in a background goroutine, and push `attachment_ready`/`attachment_error` to the frontend via WebSocket when done.
-  The current names suggest a generic file path; `_workflow` better conveys that these are ComfyUI workflow JSON files. Update the struct tags, references in `tools.go`, hint strings, and `lemon.toml.example`.
-
 ## Research
 
 - [x] Long prompts mess up the layout.  Separate into title and prompt (both optional - one must be specified)
@@ -49,10 +42,8 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
   `handleGetAttachment` serves any attachment by id. Join through `conversation` and require `conversation.user_id == currentUser.ID` (or admin) in the query.
 
 
-- [ ] **SSRF hardening for `fetch_url` and research fetch** (`internal/server/tools.go:802`, `internal/research/web.go:81`)
-  Server-side GETs to arbitrary model/user-supplied URLs with no host filtering. Block loopback / RFC-1918 / link-local targets (e.g. cloud metadata).
 
-- [ ] **Escape filename in Content-Disposition** (`internal/server/attachments.go:29`)
+- [x] **Escape filename in Content-Disposition** (`internal/server/attachments.go:29`)
   `att.Filename` is interpolated into the header inside quotes without escaping; `filepath.Base` doesn't strip `"`/newlines. Use `mime.FormatMediaType`.
 
 - [ ] **Add WebSocket Origin check** (`internal/server/ws.go:80`)
@@ -126,5 +117,11 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 
 - [ ] **Resolve static asset paths absolutely** (`internal/server/server.go:149,169`)
   `serveFile` and the `FileServer` use relative `static/` paths that depend on the process CWD; resolve against an absolute asset dir. Also disable directory listings on the catch-all `FileServer`.
+
+- [ ] **Image generation `background` parameter** (`internal/server/tools.go:210,251`)
+  Add an optional `background` boolean parameter (default false) to both image generation tools. When true and the image loads, set it as the chat background (`static/js/thread.js:186`). Apply a legibility treatment (e.g. semi-transparent overlay on the message column) so text remains readable over the image.
+
+- [ ] **Async image generation** (`internal/server/tools.go:1400`)
+  `makeImageExecutor` blocks the SSE stream for up to 120s while ComfyUI polls. Per `docs/feature-async-image-generation.md`: return a pending attachment immediately after the ComfyUI submit, poll/download in a background goroutine, and push `attachment_ready`/`attachment_error` to the frontend via WebSocket when done.
 
 - [ ] Look into ways to follow Reddit and facebook links, if possible

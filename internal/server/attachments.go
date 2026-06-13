@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"errors"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -33,11 +34,11 @@ func (s *Server) handleGetAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	download := r.URL.Query().Get("download") == "1"
+	disposition := "inline"
 	if download {
-		w.Header().Set("Content-Disposition", `attachment; filename="`+att.Filename+`"`)
-	} else {
-		w.Header().Set("Content-Disposition", `inline; filename="`+att.Filename+`"`)
+		disposition = "attachment"
 	}
+	w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": att.Filename}))
 	w.Header().Set("Content-Type", att.MimeType)
 	http.ServeFile(w, r, filepath.Join(s.cfg.Server.DataDir, att.DiskPath))
 }
