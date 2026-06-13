@@ -71,6 +71,31 @@ function buildImagePlaceholder() {
   return div;
 }
 
+function buildAttachmentError() {
+  const div = document.createElement('div');
+  div.className = 'image-placeholder image-placeholder--error';
+  const label = document.createElement('span');
+  label.className = 'image-placeholder-label';
+  label.textContent = 'Image generation failed';
+  div.appendChild(label);
+  return div;
+}
+
+export function resolveAttachment(id, att) {
+  const placeholder = document.querySelector(`[data-attachment-id="${id}"]`);
+  if (!placeholder) return;
+  if (att) {
+    const imgWrap = buildInlineImage(att);
+    const imgTag = imgWrap.querySelector('img');
+    if (imgTag && att.background) {
+      imgTag.addEventListener('load', () => setBackground(att.id), { once: true });
+    }
+    placeholder.replaceWith(imgWrap);
+  } else {
+    placeholder.replaceWith(buildAttachmentError());
+  }
+}
+
 let lightbox = null;
 let lightboxClosing = false;
 let lightboxImages = [];
@@ -530,6 +555,15 @@ export function startStreaming() {
     },
     addAttachment(att) {
       if (att.mime_type?.startsWith('image/') && att.tool_call_id) {
+        if (att.status === 'pending') {
+          // Tag the existing placeholder so the WS handler can find and replace it.
+          const placeholder = pendingImages.get(att.tool_call_id);
+          if (placeholder) {
+            placeholder.dataset.attachmentId = att.id;
+            pendingImages.delete(att.tool_call_id);
+          }
+          return;
+        }
         const imgWrap = buildInlineImage(att);
         const imgTag = imgWrap.querySelector('img');
         if (imgTag) {
@@ -792,7 +826,11 @@ function buildMessage(msg, hideAvatar = false) {
     for (const ti of msg.tool_interactions) {
       if (!ti.attachment) continue;
       if (ti.attachment.mime_type?.startsWith('image/')) {
-        colEl.appendChild(buildInlineImage(ti.attachment));
+        if (ti.attachment.status === 'error') {
+          colEl.appendChild(buildAttachmentError());
+        } else {
+          colEl.appendChild(buildInlineImage(ti.attachment));
+        }
       } else {
         colEl.appendChild(buildAttachmentCard(ti.attachment));
       }

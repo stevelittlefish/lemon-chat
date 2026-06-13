@@ -119,7 +119,10 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Image generation `background` parameter** (`internal/server/tools.go:210,251`)
   Add an optional `background` boolean parameter (default false) to both image generation tools. When true and the image loads, set it as the chat background (`static/js/thread.js:186`). Apply a legibility treatment (e.g. semi-transparent overlay on the message column) so text remains readable over the image.
 
-- [ ] **Async image generation** (`internal/server/tools.go:1400`)
+- [x] **Async image generation** (`internal/server/tools.go:1400`)
   `makeImageExecutor` blocks the SSE stream for up to 120s while ComfyUI polls. Per `docs/feature-async-image-generation.md`: return a pending attachment immediately after the ComfyUI submit, poll/download in a background goroutine, and push `attachment_ready`/`attachment_error` to the frontend via WebSocket when done.
 
 - [ ] Look into ways to follow Reddit and facebook links, if possible
+
+- [ ] **Add "set as background" button to inline images** (`static/js/thread.js:187`)
+  `buildInlineImage` shows only a download button on hover. Add a second hover button (image/wallpaper icon) that calls `setBackground(att.id)` so users can set any generated image as the conversation background without asking the model to use `background: true`.

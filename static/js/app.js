@@ -1,7 +1,7 @@
 import { auth, conversations as convApi, messages as msgApi, models as modelApi, characters as characterApi } from './api.js';
 import * as sidebar from './sidebar.js';
 import * as thread from './thread.js';
-import { setBackground } from './thread.js';
+import { setBackground, resolveAttachment } from './thread.js';
 import * as composer from './composer.js';
 import * as header from './header.js';
 import * as ws from './ws.js';
@@ -43,6 +43,15 @@ function showApp() {
   });
   ws.on('conversations_changed', () => {
     sidebar.load();
+  });
+  ws.on('attachment_ready', (msg) => {
+    resolveAttachment(msg.id, msg);
+    if (msg.background && msg.conversation_id === activeConversationId) {
+      setBackground(msg.id);
+    }
+  });
+  ws.on('attachment_error', (msg) => {
+    resolveAttachment(msg.id, null);
   });
   ws.connect();
   window.addEventListener('popstate', (e) => {

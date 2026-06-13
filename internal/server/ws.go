@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
 const wsGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -77,6 +79,29 @@ func (h *Hub) BroadcastCompletionTitleUpdate(compID int64, title string) {
 
 func (h *Hub) BroadcastConversationListChanged() {
 	data, _ := json.Marshal(map[string]any{"type": "conversations_changed"})
+	h.broadcast(data)
+}
+
+func (h *Hub) BroadcastAttachmentReady(att *store.Attachment, background bool) {
+	data, _ := json.Marshal(map[string]any{
+		"type":            "attachment_ready",
+		"id":              att.ID,
+		"conversation_id": att.ConversationID,
+		"title":           att.Title,
+		"filename":        att.Filename,
+		"mime_type":       att.MimeType,
+		"background":      background,
+	})
+	h.broadcast(data)
+}
+
+func (h *Hub) BroadcastAttachmentError(convID, attID int64, errMsg string) {
+	data, _ := json.Marshal(map[string]any{
+		"type":            "attachment_error",
+		"id":              attID,
+		"conversation_id": convID,
+		"error":           errMsg,
+	})
 	h.broadcast(data)
 }
 

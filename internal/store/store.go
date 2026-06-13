@@ -613,6 +613,21 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v27 → v28 complete")
 	}
 
+	if version < 29 {
+		log.Println("store: migrating v28 → v29 (add status and error to attachment)")
+		if _, err := s.db.Exec(`ALTER TABLE attachment ADD COLUMN status TEXT NOT NULL DEFAULT 'ready'`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`ALTER TABLE attachment ADD COLUMN error TEXT`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (29, ?)`, now()); err != nil {
+			return err
+		}
+		version = 29
+		log.Println("store: migration v28 → v29 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

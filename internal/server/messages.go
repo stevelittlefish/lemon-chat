@@ -118,6 +118,8 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 		Title    string `json:"title"`
 		Filename string `json:"filename"`
 		MimeType string `json:"mime_type"`
+		Status   string `json:"status,omitempty"`
+		Error    string `json:"error,omitempty"`
 	}
 	type toolInteraction struct {
 		ID         string          `json:"id,omitempty"`
@@ -142,6 +144,8 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 				Title:    a.Title,
 				Filename: a.Filename,
 				MimeType: a.MimeType,
+				Status:   a.Status,
+				Error:    a.Error,
 			}
 		}
 	}
@@ -492,6 +496,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 					ConversationID:  convID,
 					Store:           s.store,
 					DataDir:         s.cfg.Server.DataDir,
+					Hub:             s.hub,
 				}
 				result, execErr := ExecuteTool(tc.name, tc.argsJSON.String(), tctx)
 				if execErr != nil {
@@ -520,6 +525,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 						"filename":     attResult.Filename,
 						"mime_type":    attResult.MimeType,
 						"background":   attResult.Background,
+						"status":       attResult.Status,
 					}})
 					fmt.Fprintf(w, "data: %s\n\n", attEvt)
 					flusher.Flush()

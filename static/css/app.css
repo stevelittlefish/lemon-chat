@@ -1510,6 +1510,16 @@ html, body {
   font-style: italic;
 }
 
+.image-placeholder--error {
+  animation: none;
+  background: var(--danger-tint);
+  border-color: var(--brick-100);
+}
+
+.image-placeholder--error .image-placeholder-label {
+  color: var(--danger);
+}
+
 .inline-image-wrap {
   position: relative;
   display: inline-block;

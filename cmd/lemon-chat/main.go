@@ -47,6 +47,12 @@ func main() {
 	}
 	defer st.Close()
 
+	if n, err := st.ClearPendingAttachments(); err != nil {
+		log.Printf("Warning: could not clear pending attachments: %v", err)
+	} else if n > 0 {
+		log.Printf("Cleared %d pending attachment(s) left over from previous run", n)
+	}
+
 	if err := bootstrap(st, cfg); err != nil {
 		log.Fatalf("bootstrap: %v", err)
 	}
