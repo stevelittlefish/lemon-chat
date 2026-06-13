@@ -19,6 +19,7 @@ const (
 type ResearchJob struct {
 	ID          int64   `json:"id"`
 	UserID      int64   `json:"user_id"`
+	Title       *string `json:"title"`
 	Query       string  `json:"query"`
 	Model       string  `json:"model"`
 	Status      string  `json:"status"`
@@ -40,12 +41,12 @@ type ResearchJob struct {
 	UpdatedAt    string  `json:"updated_at"`
 }
 
-const researchJobCols = `id, user_id, query, model, status, phase, round, empty_rounds, elapsed_ms,
+const researchJobCols = `id, user_id, title, query, model, status, phase, round, empty_rounds, elapsed_ms,
 	category, plan, report, final_report, findings, queries_used, analyzed_urls, error, created_at, updated_at`
 
 func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) {
 	var j ResearchJob
-	err := row.Scan(&j.ID, &j.UserID, &j.Query, &j.Model, &j.Status, &j.Phase, &j.Round, &j.EmptyRounds, &j.ElapsedMS,
+	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Status, &j.Phase, &j.Round, &j.EmptyRounds, &j.ElapsedMS,
 		&j.Category, &j.Plan, &j.Report, &j.FinalReport, &j.Findings, &j.QueriesUsed, &j.AnalyzedURLs, &j.Error, &j.CreatedAt, &j.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -56,17 +57,21 @@ func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) 
 	return &j, nil
 }
 
-func (s *Store) CreateResearchJob(userID int64, query, model string) (*ResearchJob, error) {
+func (s *Store) CreateResearchJob(userID int64, title, query, model string) (*ResearchJob, error) {
 	t := now()
+	var titlePtr *string
+	if title != "" {
+		titlePtr = &title
+	}
 	res, err := s.db.Exec(
-		`INSERT INTO research_job (user_id, query, model, status, created_at, updated_at) VALUES (?, ?, ?, 'pending', ?, ?)`,
-		userID, query, model, t, t,
+		`INSERT INTO research_job (user_id, title, query, model, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'pending', ?, ?)`,
+		userID, titlePtr, query, model, t, t,
 	)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	return &ResearchJob{ID: id, UserID: userID, Query: query, Model: model, Status: ResearchStatusPending, CreatedAt: t, UpdatedAt: t}, nil
+	return &ResearchJob{ID: id, UserID: userID, Title: titlePtr, Query: query, Model: model, Status: ResearchStatusPending, CreatedAt: t, UpdatedAt: t}, nil
 }
 
 func (s *Store) GetResearchJob(id, userID int64) (*ResearchJob, error) {

@@ -49,7 +49,7 @@ async function showList() {
 
   const items = jobs.map((j) => `
     <div class="card card-interactive research-item" data-id="${j.id}">
-      <span class="research-item-query">${escapeHtml(j.query)}</span>
+      <span class="research-item-query">${escapeHtml(j.title || j.query)}</span>
       <span class="research-item-meta">${formatDate(j.created_at)}</span>
       ${statusBadge(j.status)}
     </div>`).join('');
@@ -57,8 +57,9 @@ async function showList() {
   main.innerHTML = `
     <div class="card research-form">
       <h2 class="research-form-title">new research</h2>
+      <input id="research-title" class="input" type="text" placeholder="title (optional)">
       <textarea id="research-query" class="input textarea" rows="3"
-        placeholder="what do you want to know? the more specific the question, the better the report"></textarea>
+        placeholder="research question or prompt (required if no title)"></textarea>
       <div class="research-form-row">
         <select id="research-model" class="input">${options}</select>
         <button id="research-start" class="btn btn-primary">start research</button>
@@ -73,19 +74,23 @@ async function showList() {
   document.getElementById('research-query').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) startResearch();
   });
+  document.getElementById('research-title').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('research-query').focus();
+  });
   main.querySelectorAll('.research-item').forEach((el) => {
     el.addEventListener('click', () => { location.hash = el.dataset.id; });
   });
 }
 
 async function startResearch() {
+  const title = document.getElementById('research-title').value.trim();
   const query = document.getElementById('research-query').value.trim();
-  if (!query) return;
+  if (!title && !query) return;
   const model = document.getElementById('research-model').value;
   const btn = document.getElementById('research-start');
   btn.disabled = true;
   try {
-    const job = await research.start(query, model);
+    const job = await research.start(title, query, model);
     location.hash = job.id;
   } catch (err) {
     btn.disabled = false;
@@ -199,9 +204,14 @@ async function showDetail(id) {
   }
 
   const running = job.status === 'running' || job.status === 'pending';
+  const displayTitle = job.title || job.query;
+  const promptHtml = job.title && job.query
+    ? `<p class="research-detail-prompt">${escapeHtml(job.query)}</p>`
+    : '';
 
   main.innerHTML = `
-    <h1 class="research-detail-query">${escapeHtml(job.query)}</h1>
+    <h1 class="research-detail-query">${escapeHtml(displayTitle)}</h1>
+    ${promptHtml}
     <div class="research-detail-meta">
       ${statusBadge(job.status)}
       <span>${escapeHtml(job.model)}</span>
@@ -229,12 +239,17 @@ async function showDetail(id) {
     location.hash = '';
   });
   document.getElementById('research-dl-md')?.addEventListener('click', () => {
-    downloadFile(`${slugify(job.query)}.md`, 'text/markdown',
-      `# ${job.query}\n\n${job.final_report}`);
+    const heading = job.title || job.query;
+    const preamble = job.title && job.query ? `# ${job.title}\n\n${job.query}\n\n` : `# ${heading}\n\n`;
+    downloadFile(`${slugify(heading)}.md`, 'text/markdown', preamble + job.final_report);
   });
   document.getElementById('research-dl-html')?.addEventListener('click', () => {
-    downloadFile(`${slugify(job.query)}.html`, 'text/html',
-      htmlDocument(job.query, `<h1>${escapeHtml(job.query)}</h1>\n` + render(job.final_report)));
+    const heading = job.title || job.query;
+    const headingHtml = job.title && job.query
+      ? `<h1>${escapeHtml(job.title)}</h1>\n<p>${escapeHtml(job.query)}</p>\n`
+      : `<h1>${escapeHtml(heading)}</h1>\n`;
+    downloadFile(`${slugify(heading)}.html`, 'text/html',
+      htmlDocument(heading, headingHtml + render(job.final_report)));
   });
 
   if (job.status === 'error' && job.error) {

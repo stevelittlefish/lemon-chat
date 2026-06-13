@@ -56,6 +56,8 @@ html, body {
   margin: 0 0 var(--space-3);
 }
 
+.research-form .input + .input { margin-top: var(--space-3); }
+
 .research-form-row {
   display: flex;
   gap: var(--space-3);
@@ -121,6 +123,14 @@ html, body {
   font-weight: 600;
   line-height: 1.26;
   margin: 0 0 var(--space-2);
+}
+
+.research-detail-prompt {
+  font-size: var(--fs-14);
+  color: var(--fg-muted);
+  line-height: 1.5;
+  margin: 0 0 var(--space-4);
+  white-space: pre-wrap;
 }
 
 .research-detail-meta {

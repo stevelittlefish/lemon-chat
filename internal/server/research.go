@@ -135,7 +135,11 @@ func (s *Server) ResumeResearchJobs() {
 	}
 	for i := range jobs {
 		job := jobs[i]
-		log.Printf("Resuming research job id=%d user_id=%d round=%d query=%q", job.ID, job.UserID, job.Round, job.Query)
+		title := ""
+		if job.Title != nil {
+			title = *job.Title
+		}
+		log.Printf("Resuming research job id=%d user_id=%d round=%d title=%q query=%q", job.ID, job.UserID, job.Round, title, job.Query)
 		go s.runResearch(&job)
 	}
 }
@@ -163,9 +167,19 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		}
 	}
 
+	// Build the LLM-facing prompt from whichever fields are set.
+	llmQuery := job.Query
+	if job.Title != nil && *job.Title != "" {
+		if job.Query != "" {
+			llmQuery = *job.Title + "\n\n" + job.Query
+		} else {
+			llmQuery = *job.Title
+		}
+	}
+
 	rc := s.cfg.Research
 	cfg := research.Config{
-		Query:                 job.Query,
+		Query:                 llmQuery,
 		Model:                 job.Model,
 		APIBase:               modelServer.APIBase,
 		APIKey:                modelServer.APIKey,
@@ -288,6 +302,7 @@ func (s *Server) finishResearch(jobID int64, run *researchRun, status string, fi
 // researchJobView is the listing shape — heavy state columns omitted.
 type researchJobView struct {
 	ID        int64   `json:"id"`
+	Title     *string `json:"title"`
 	Query     string  `json:"query"`
 	Model     string  `json:"model"`
 	Status    string  `json:"status"`
@@ -301,7 +316,7 @@ type researchJobView struct {
 
 func researchView(j *store.ResearchJob) researchJobView {
 	return researchJobView{
-		ID: j.ID, Query: j.Query, Model: j.Model, Status: j.Status, Phase: j.Phase,
+		ID: j.ID, Title: j.Title, Query: j.Query, Model: j.Model, Status: j.Status, Phase: j.Phase,
 		Round: j.Round, ElapsedMS: j.ElapsedMS, Error: j.Error, CreatedAt: j.CreatedAt, UpdatedAt: j.UpdatedAt,
 	}
 }
@@ -309,6 +324,7 @@ func researchView(j *store.ResearchJob) researchJobView {
 func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	var req struct {
+		Title string `json:"title"`
 		Query string `json:"query"`
 		Model string `json:"model"`
 	}
@@ -316,8 +332,8 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	if req.Query == "" {
-		writeError(w, http.StatusBadRequest, "query required")
+	if req.Title == "" && req.Query == "" {
+		writeError(w, http.StatusBadRequest, "title or query required")
 		return
 	}
 	if s.cfg.SearXNG.URL == "" {
@@ -334,12 +350,12 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	job, err := s.store.CreateResearchJob(user.ID, req.Query, model)
+	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	log.Printf("Starting research job id=%d user_id=%d model=%q query=%q", job.ID, user.ID, model, req.Query)
+	log.Printf("Starting research job id=%d user_id=%d model=%q title=%q query=%q", job.ID, user.ID, model, req.Title, req.Query)
 	go s.runResearch(job)
 	writeJSON(w, http.StatusCreated, researchView(job))
 }
