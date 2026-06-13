@@ -88,7 +88,7 @@ type Config struct {
 // are live generation updates (throttled to ~4/sec) carrying the tail of the
 // text being generated.
 type Progress struct {
-	Phase         string   `json:"phase"` // planning | searching | reading | analyzing | deciding | writing | warning
+	Phase         string   `json:"phase"` // planning | searching | reading | analyzing | deciding | writing | note | warning
 	Round         int      `json:"round,omitempty"`
 	Message       string   `json:"message,omitempty"`
 	URL           string   `json:"url,omitempty"`
@@ -197,6 +197,13 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 		}
 	}
 
+	// If the main loop ran to its hard cap (rather than the model deciding the
+	// report was complete or the run aborting), say so.
+	if r.state.Round >= r.cfg.MaxRounds {
+		r.progress(Progress{Phase: "note", Round: r.state.Round,
+			Message: fmt.Sprintf("reached the maximum number of rounds (%d)", r.cfg.MaxRounds)})
+	}
+
 	// Bonus creative rounds (effort 4 → 1, effort 5 → 2). These run past the
 	// normal stopping point, pushing the model to search from fresh angles —
 	// only worth doing when we already have a report to extend.
@@ -211,8 +218,12 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 				break
 			}
 			round := r.state.Round + 1
-			r.progress(Progress{Phase: "searching", Round: round,
-				Message: fmt.Sprintf("bonus round %d of %d — searching more creatively", creativity, r.cfg.ExtraRounds)})
+			how := "more creatively"
+			if creativity >= 2 {
+				how = "even more creatively"
+			}
+			r.progress(Progress{Phase: "note", Round: round,
+				Message: fmt.Sprintf("bonus round %d of %d — searching %s", creativity, r.cfg.ExtraRounds, how)})
 			keepGoing, err := r.runRound(ctx, round, creativity)
 			if err != nil {
 				return "", err

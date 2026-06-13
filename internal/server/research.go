@@ -305,6 +305,12 @@ func logResearchProgress(jobID int64, p research.Progress) {
 		log.Printf("Deciding whether to stop job_id=%d round=%d — %s", jobID, p.Round, clip(p.Message))
 	case "writing":
 		log.Printf("Writing final report job_id=%d sources=%d findings=%d", jobID, p.TotalSources, p.TotalFindings)
+	case "note":
+		if p.Round > 0 {
+			log.Printf("Research note job_id=%d round=%d — %s", jobID, p.Round, clip(p.Message))
+		} else {
+			log.Printf("Research note job_id=%d — %s", jobID, clip(p.Message))
+		}
 	case "warning":
 		log.Printf("Research warning job_id=%d — %s", jobID, clip(p.Message))
 	default:

@@ -187,6 +187,7 @@ function progressLine(ev) {
     case 'analyzing': return `round ${ev.round} — synthesizing (${ev.total_findings} finding${ev.total_findings === 1 ? '' : 's'})`;
     case 'deciding': return `round ${ev.round} — stop check: ${ev.message}`;
     case 'writing': return 'writing final report';
+    case 'note': return ev.message;
     case 'warning': return ev.message;
     default: return ev.message || ev.phase;
   }
