@@ -21,7 +21,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 - [ ] The back button in the top left when viewing an individual piece of deep research should take you back to the list, not the menu
 
-- [ ] Brainstorming mode - alternate algorithm where we want the LLM to invent / design stuff and use web search when necessary, rather than basing the entire process around web search
+- [x] Brainstorming mode - alternate algorithm where we want the LLM to invent / design stuff and use web search when necessary, rather than basing the entire process around web search
 
 - [ ] Look into ways to follow Reddit and facebook links, if possible
 

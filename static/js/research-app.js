@@ -78,6 +78,12 @@ async function showList() {
         placeholder="research question or prompt (required if no title)"></textarea>
       <div class="research-form-row">
         <select id="research-model" class="input">${options}</select>
+        <label class="research-field">mode
+          <select id="research-mode" class="input">
+            <option value="research" selected>research</option>
+            <option value="brainstorm">brainstorm</option>
+          </select>
+        </label>
         <label class="research-field">effort
           <select id="research-effort" class="input">${effortOptions}</select>
         </label>
@@ -92,6 +98,17 @@ async function showList() {
     <div class="research-list">
       ${items || '<p class="research-empty">no research yet — ask a question above to get started</p>'}
     </div>`;
+
+  // Relabel the prompt and action when switching to brainstorm mode, which is
+  // about inventing/designing rather than searching the web.
+  const modeSel = document.getElementById('research-mode');
+  modeSel.addEventListener('change', () => {
+    const brainstorm = modeSel.value === 'brainstorm';
+    document.getElementById('research-query').placeholder = brainstorm
+      ? 'what to brainstorm or design (required if no title)'
+      : 'research question or prompt (required if no title)';
+    document.getElementById('research-start').textContent = brainstorm ? 'start brainstorm' : 'start research';
+  });
 
   document.getElementById('research-start').addEventListener('click', startResearch);
   document.getElementById('research-query').addEventListener('keydown', (e) => {
@@ -110,12 +127,13 @@ async function startResearch() {
   const query = document.getElementById('research-query').value.trim();
   if (!title && !query) return;
   const model = document.getElementById('research-model').value;
+  const mode = document.getElementById('research-mode').value;
   const effort = parseInt(document.getElementById('research-effort').value, 10) || formDefaults.effort;
   const maxTimeMinutes = parseInt(document.getElementById('research-time').value, 10) || formDefaults.max_time_minutes;
   const btn = document.getElementById('research-start');
   btn.disabled = true;
   try {
-    const job = await research.start(title, query, model, effort, maxTimeMinutes);
+    const job = await research.start(title, query, model, mode, effort, maxTimeMinutes);
     location.hash = job.id;
   } catch (err) {
     btn.disabled = false;
@@ -240,6 +258,7 @@ async function showDetail(id) {
     ${promptHtml}
     <div class="research-detail-meta">
       ${statusBadge(job.status)}
+      ${job.mode === 'brainstorm' ? '<span>brainstorm</span>' : ''}
       <span>${escapeHtml(job.model)}</span>
       ${job.effort ? `<span>effort: ${EFFORT_NAMES[job.effort] || job.effort}</span>` : ''}
       <span>${formatDate(job.created_at)}</span>

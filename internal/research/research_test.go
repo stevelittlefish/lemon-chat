@@ -98,6 +98,19 @@ func TestUntrustedContextMessage(t *testing.T) {
 	}
 }
 
+func TestModeDefaulting(t *testing.T) {
+	// An empty mode defaults to research.
+	r := New(Config{}, State{}, nil, nil)
+	if r.cfg.Mode != ModeResearch || r.brainstorm() {
+		t.Errorf("empty mode: got mode=%q brainstorm=%v, want research/false", r.cfg.Mode, r.brainstorm())
+	}
+	// An explicit brainstorm mode is preserved and reported.
+	rb := New(Config{Mode: ModeBrainstorm}, State{}, nil, nil)
+	if rb.cfg.Mode != ModeBrainstorm || !rb.brainstorm() {
+		t.Errorf("brainstorm mode: got mode=%q brainstorm=%v, want brainstorm/true", rb.cfg.Mode, rb.brainstorm())
+	}
+}
+
 func TestStateRoundTrip(t *testing.T) {
 	st := State{
 		Round:        3,

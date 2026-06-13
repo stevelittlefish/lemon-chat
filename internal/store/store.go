@@ -565,6 +565,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v23 → v24 complete")
 	}
 
+	if version < 25 {
+		log.Println("store: migrating v24 → v25 (add mode to research_job)")
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN mode TEXT NOT NULL DEFAULT 'research'`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (25, ?)`, now()); err != nil {
+			return err
+		}
+		version = 25
+		log.Println("store: migration v24 → v25 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

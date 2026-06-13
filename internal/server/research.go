@@ -211,6 +211,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	cfg := research.Config{
 		Query:                 llmQuery,
 		Model:                 job.Model,
+		Mode:                  job.Mode,
 		APIBase:               modelServer.APIBase,
 		APIKey:                modelServer.APIKey,
 		SearXNGURL:            s.cfg.SearXNG.URL,
@@ -342,6 +343,7 @@ type researchJobView struct {
 	Title     *string `json:"title"`
 	Query     string  `json:"query"`
 	Model     string  `json:"model"`
+	Mode      string  `json:"mode"`
 	Status         string  `json:"status"`
 	Phase          *string `json:"phase"`
 	Effort         int     `json:"effort"`
@@ -355,7 +357,7 @@ type researchJobView struct {
 
 func researchView(j *store.ResearchJob) researchJobView {
 	return researchJobView{
-		ID: j.ID, Title: j.Title, Query: j.Query, Model: j.Model, Status: j.Status, Phase: j.Phase,
+		ID: j.ID, Title: j.Title, Query: j.Query, Model: j.Model, Mode: j.Mode, Status: j.Status, Phase: j.Phase,
 		Effort: j.Effort, MaxTimeSeconds: j.MaxTimeSeconds,
 		Round: j.Round, ElapsedMS: j.ElapsedMS, Error: j.Error, CreatedAt: j.CreatedAt, UpdatedAt: j.UpdatedAt,
 	}
@@ -380,6 +382,7 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		Title          string `json:"title"`
 		Query          string `json:"query"`
 		Model          string `json:"model"`
+		Mode           string `json:"mode"`
 		Effort         int    `json:"effort"`
 		MaxTimeMinutes int    `json:"max_time_minutes"`
 	}
@@ -389,6 +392,14 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Title == "" && req.Query == "" {
 		writeError(w, http.StatusBadRequest, "title or query required")
+		return
+	}
+	mode := req.Mode
+	if mode == "" {
+		mode = research.ModeResearch
+	}
+	if mode != research.ModeResearch && mode != research.ModeBrainstorm {
+		writeError(w, http.StatusBadRequest, "invalid mode")
 		return
 	}
 	effort := req.Effort
@@ -418,12 +429,12 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, effort, maxTimeSeconds)
+	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, effort, maxTimeSeconds)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	log.Printf("Starting research job id=%d user_id=%d model=%q effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, effort, maxTimeSeconds, req.Title, req.Query)
+	log.Printf("Starting research job id=%d user_id=%d model=%q mode=%q effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, mode, effort, maxTimeSeconds, req.Title, req.Query)
 	go s.runResearch(job)
 	writeJSON(w, http.StatusCreated, researchView(job))
 }

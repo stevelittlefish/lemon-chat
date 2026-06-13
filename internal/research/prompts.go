@@ -60,6 +60,110 @@ const queryGenCreativeInstruction = "We already have substantial findings and th
 
 const queryGenVeryCreativeInstruction = "This is a final, deep bonus round — be bold and highly creative. Generate unconventional, exploratory queries that dig into surprising angles, niche or primary sources, dissenting opinions, historical context, or future implications. Deliberately seek out perspectives and information the report is still missing. Avoid anything resembling earlier searches."
 
+// ── Brainstorm mode ──────────────────────────────────────────
+//
+// Brainstorm mode flips the research pipeline around: instead of web search
+// driving the process, the model invents and develops ideas, reaching for the
+// web only when it decides it needs to look something up. These prompts replace
+// their research-mode counterparts when Config.Mode == ModeBrainstorm.
+
+const brainstormPlanPrompt = `You are a creative strategist about to brainstorm and design solutions to a problem. Before generating ideas, frame the problem.
+
+**Brief:** %s
+
+Think about:
+1. What is actually being asked for — what would a great outcome look like?
+2. What are the key dimensions, constraints, or angles worth exploring?
+3. What different directions could a strong solution take?
+
+Write a short framing (a few sentences, no headings) that captures the goal, the main constraints, and 2-4 promising directions to explore. This will guide the ideation that follows. Do not solve the problem yet — just frame it.`
+
+const brainstormQueryPrompt = `You are developing ideas for a creative/design brief. Decide whether you need to look anything up on the web this round.
+
+**Brief:** %s
+
+**Framing:**
+%s
+
+**Ideas so far:**
+%s
+
+**Round:** %d
+
+%s
+
+You can rely on your own knowledge for most of the work. Only search when external information would genuinely improve the result — e.g. to check a fact, find prior art or real-world examples, get concrete numbers, or verify something you are unsure about.
+
+If you need to search, return a JSON array of 1-3 focused search query strings.
+If you can make good progress from your own knowledge this round, return an empty array: []
+
+Return ONLY the JSON array, nothing else.
+Example (search): ["existing solutions to X", "typical cost of Y"]
+Example (no search): []`
+
+const brainstormSearchInstruction = "Keep developing the ideas. Search only if a specific fact, example, or number would meaningfully strengthen them."
+
+const brainstormCreativeInstruction = "This is a bonus round — push into fresh, less obvious directions. Search only if grounding a new angle in real-world examples or data would help."
+
+const brainstormVeryCreativeInstruction = "This is a final, bold bonus round — explore surprising, unconventional directions. Search only if a concrete external reference would sharpen a new idea."
+
+const brainstormDevelopPrompt = `You are an inventor and designer developing ideas for a brief.
+
+**Brief:** %s
+
+**Framing:**
+%s
+
+**Design notes so far:**
+%s
+
+**New research from this round:**
+%s
+
+Develop the work further this round: introduce new ideas where useful, deepen the most promising ones, address weaknesses and trade-offs, and fold in any new research. Keep the strongest material, prune dead ends, and maintain a clear, logical structure. Where a web source informed a specific point, keep its URL as an inline citation.
+
+Write only the updated design notes — no preamble or meta-commentary.`
+
+const brainstormStopPrompt = `You are deciding whether a brainstorming/design effort is well developed enough.
+
+**Brief:** %s
+
+**Design notes so far:**
+%s
+
+**Rounds completed:** %d of %d
+
+Consider:
+- Is there at least one strong, well-developed concept (or a solid set of options)?
+- Are the key design decisions and trade-offs worked out?
+- Would another round of ideation meaningfully improve the result, or is it diminishing returns?
+
+If rounds completed is well below the target, prefer continuing unless the ideas are already strong and thoroughly developed.
+
+Reply with ONLY "YES" or "NO" followed by a brief one-sentence reason.
+Example: "YES — There is a strong, fully worked-out concept with trade-offs addressed."
+Example: "NO — The ideas are still thin and the trade-offs are unexplored."`
+
+const brainstormFinalPrompt = `Write a polished **design document** for this brief, based on the ideas developed below.
+
+**Brief:** %s
+
+**Framing:**
+%s
+
+**Developed design notes:**
+%s
+
+Structure the document with clear ## headings, roughly:
+- A short **executive summary** of the proposed solution
+- **The concept** — the core idea(s), explained clearly
+- **How it works** — the key components, mechanics, or design decisions
+- **Trade-offs and alternatives** — what was chosen and why, and what was rejected
+- **Risks and open questions**
+- **Next steps** — concrete actions to move forward
+
+Be specific and decisive — recommend, don't just list options. Where a web source informed a specific fact, cite it inline [like this](url). Write in an engaging, clear style. Length should fit the idea: thorough but not padded.`
+
 // extractorSystem is the goal-based content extraction prompt
 // (credited to the Tongyi DeepResearch lineage).
 const extractorSystem = `Extract relevant information from a webpage for a given research goal.

@@ -22,6 +22,10 @@ type ResearchJob struct {
 	Title       *string `json:"title"`
 	Query       string  `json:"query"`
 	Model       string  `json:"model"`
+	// Mode is "research" (web-search-driven report) or "brainstorm"
+	// (ideation-driven design doc, search used only when the model decides it
+	// needs to look something up).
+	Mode        string  `json:"mode"`
 	Status      string  `json:"status"`
 	Phase       *string `json:"phase"`
 	// Effort is the 1–5 effort level chosen for the job; MaxTimeSeconds is the
@@ -45,12 +49,12 @@ type ResearchJob struct {
 	UpdatedAt    string  `json:"updated_at"`
 }
 
-const researchJobCols = `id, user_id, title, query, model, status, phase, effort, max_time_seconds, round, empty_rounds, elapsed_ms,
+const researchJobCols = `id, user_id, title, query, model, mode, status, phase, effort, max_time_seconds, round, empty_rounds, elapsed_ms,
 	category, plan, report, final_report, findings, queries_used, analyzed_urls, error, created_at, updated_at`
 
 func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) {
 	var j ResearchJob
-	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.Round, &j.EmptyRounds, &j.ElapsedMS,
+	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Mode, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.Round, &j.EmptyRounds, &j.ElapsedMS,
 		&j.Category, &j.Plan, &j.Report, &j.FinalReport, &j.Findings, &j.QueriesUsed, &j.AnalyzedURLs, &j.Error, &j.CreatedAt, &j.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -61,22 +65,22 @@ func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) 
 	return &j, nil
 }
 
-func (s *Store) CreateResearchJob(userID int64, title, query, model string, effort, maxTimeSeconds int) (*ResearchJob, error) {
+func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string, effort, maxTimeSeconds int) (*ResearchJob, error) {
 	t := now()
 	var titlePtr *string
 	if title != "" {
 		titlePtr = &title
 	}
 	res, err := s.db.Exec(
-		`INSERT INTO research_job (user_id, title, query, model, status, effort, max_time_seconds, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
-		userID, titlePtr, query, model, effort, maxTimeSeconds, t, t,
+		`INSERT INTO research_job (user_id, title, query, model, mode, status, effort, max_time_seconds, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+		userID, titlePtr, query, model, mode, effort, maxTimeSeconds, t, t,
 	)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	return &ResearchJob{ID: id, UserID: userID, Title: titlePtr, Query: query, Model: model, Status: ResearchStatusPending,
+	return &ResearchJob{ID: id, UserID: userID, Title: titlePtr, Query: query, Model: model, Mode: mode, Status: ResearchStatusPending,
 		Effort: effort, MaxTimeSeconds: maxTimeSeconds, CreatedAt: t, UpdatedAt: t}, nil
 }
 

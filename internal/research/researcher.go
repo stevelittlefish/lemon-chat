@@ -28,6 +28,14 @@ const (
 
 var validCategories = map[string]bool{"product": true, "comparison": true, "howto": true, "factcheck": true}
 
+// Research modes. "research" is the default web-search-driven pipeline;
+// "brainstorm" is an ideation-driven variant where each round the model
+// develops ideas and decides for itself whether it needs to search the web.
+const (
+	ModeResearch   = "research"
+	ModeBrainstorm = "brainstorm"
+)
+
 // Finding is one successfully extracted page.
 type Finding struct {
 	URL      string `json:"url"`
@@ -65,6 +73,7 @@ type State struct {
 type Config struct {
 	Query      string
 	Model      string
+	Mode       string // ModeResearch (default) or ModeBrainstorm
 	APIBase    string
 	APIKey     string
 	SearXNGURL string
@@ -120,8 +129,15 @@ func New(cfg Config, state State, onProgress func(Progress), onCheckpoint func(S
 	if cfg.Location == nil {
 		cfg.Location = time.Local
 	}
+	if cfg.Mode == "" {
+		cfg.Mode = ModeResearch
+	}
 	return &Researcher{cfg: cfg, state: state, client: http.DefaultClient, onProgress: onProgress, onCheckpoint: onCheckpoint}
 }
+
+// brainstorm reports whether this is an ideation run rather than a
+// web-search-driven research run.
+func (r *Researcher) brainstorm() bool { return r.cfg.Mode == ModeBrainstorm }
 
 func (r *Researcher) progress(p Progress) {
 	if r.onProgress != nil {
@@ -161,7 +177,9 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 			r.progress(Progress{Phase: "planning", Message: "plan ready — " + r.state.Plan})
 		}
 	}
-	if r.state.Round == 0 && r.state.Category == "" {
+	// Classification only shapes the research-report format overrides, so it is
+	// skipped entirely in brainstorm mode.
+	if !r.brainstorm() && r.state.Round == 0 && r.state.Category == "" {
 		r.state.Category = r.classify(ctx)
 		if ctx.Err() != nil {
 			return "", ctx.Err()
@@ -179,7 +197,7 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 			break
 		}
 
-		keepGoing, err := r.runRound(ctx, round, 0)
+		keepGoing, err := r.runOneRound(ctx, round, 0)
 		if err != nil {
 			return "", err
 		}
@@ -224,7 +242,7 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 			}
 			r.progress(Progress{Phase: "note", Round: round,
 				Message: fmt.Sprintf("bonus round %d of %d — searching %s", creativity, r.cfg.ExtraRounds, how)})
-			keepGoing, err := r.runRound(ctx, round, creativity)
+			keepGoing, err := r.runOneRound(ctx, round, creativity)
 			if err != nil {
 				return "", err
 			}
@@ -253,6 +271,54 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 // timeExhausted reports whether the wall-clock budget has been spent.
 func (r *Researcher) timeExhausted() bool {
 	return time.Duration(r.elapsedMS())*time.Millisecond > r.cfg.MaxTime
+}
+
+// runOneRound dispatches to the round implementation for the active mode.
+func (r *Researcher) runOneRound(ctx context.Context, round, creativity int) (keepGoing bool, err error) {
+	if r.brainstorm() {
+		return r.runBrainstormRound(ctx, round, creativity)
+	}
+	return r.runRound(ctx, round, creativity)
+}
+
+// runBrainstormRound executes one ideation round: the model develops the
+// design, deciding for itself whether it needs to search the web. When it asks
+// for queries we search and extract as usual; when it doesn't, the round is
+// pure ideation. Either way the design doc is developed before checkpointing.
+// Unlike research mode, a round that finds nothing on the web is not a failure
+// — the model can still make progress from its own knowledge — so empty rounds
+// never abort the run.
+func (r *Researcher) runBrainstormRound(ctx context.Context, round, creativity int) (keepGoing bool, err error) {
+	queries := r.generateQueries(ctx, round, creativity)
+	if ctx.Err() != nil {
+		return false, nil
+	}
+
+	var findings []Finding
+	if len(queries) > 0 {
+		r.state.QueriesUsed = append(r.state.QueriesUsed, queries...)
+		r.progress(Progress{Phase: "searching", Round: round, Queries: queries, TotalSources: len(r.state.AnalyzedURLs)})
+		newURLs := r.searchAll(ctx, queries)
+		findings = r.extractAll(ctx, round, newURLs)
+		if ctx.Err() != nil {
+			return false, nil
+		}
+		if len(findings) > 0 {
+			r.state.Findings = append(r.state.Findings, findings...)
+		}
+	} else {
+		r.progress(Progress{Phase: "note", Round: round, Message: "developing ideas without web search this round"})
+	}
+
+	r.progress(Progress{Phase: "analyzing", Round: round, TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
+	r.synthesize(ctx, round, findings)
+	if ctx.Err() != nil {
+		return false, nil
+	}
+
+	r.state.Round = round
+	r.checkpoint()
+	return true, nil
 }
 
 // runRound executes one Think → Search → Extract → Synthesise round and
@@ -307,6 +373,15 @@ func (r *Researcher) runRound(ctx context.Context, round, creativity int) (keepG
 // ── Phase 1: Plan ────────────────────────────────────────────
 
 func (r *Researcher) plan(ctx context.Context) string {
+	if r.brainstorm() {
+		prompt := currentDateContext(r.cfg.Location) + fmt.Sprintf(brainstormPlanPrompt, r.cfg.Query)
+		out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.6, 1024, planningTimeout)
+		if err != nil {
+			r.progress(Progress{Phase: "warning", Message: "planning failed: " + err.Error()})
+			return ""
+		}
+		return strings.TrimSpace(out)
+	}
 	prompt := currentDateContext(r.cfg.Location) + fmt.Sprintf(researchPlanPrompt, r.cfg.Query)
 	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, 1024, planningTimeout)
 	if err != nil {
@@ -351,22 +426,40 @@ func (r *Researcher) classify(ctx context.Context) string {
 // ── Phase 3: Think (query generation) ────────────────────────
 
 func (r *Researcher) generateQueries(ctx context.Context, round, creativity int) []string {
-	numQueries, instruction := 4, queryGenFirstRoundInstruction
-	if round > 1 {
-		numQueries, instruction = 3, queryGenFollowUpInstruction
-	}
-	switch {
-	case creativity == 1:
-		instruction = queryGenCreativeInstruction
-	case creativity >= 2:
-		instruction = queryGenVeryCreativeInstruction
-	}
 	report := r.state.Report
-	if report == "" {
-		report = "(No findings yet.)"
+
+	var prompt string
+	if r.brainstorm() {
+		instruction := brainstormSearchInstruction
+		switch {
+		case creativity == 1:
+			instruction = brainstormCreativeInstruction
+		case creativity >= 2:
+			instruction = brainstormVeryCreativeInstruction
+		}
+		if report == "" {
+			report = "(No ideas developed yet.)"
+		}
+		prompt = currentDateContext(r.cfg.Location) +
+			fmt.Sprintf(brainstormQueryPrompt, r.cfg.Query, r.state.Plan, report, round, instruction)
+	} else {
+		numQueries, instruction := 4, queryGenFirstRoundInstruction
+		if round > 1 {
+			numQueries, instruction = 3, queryGenFollowUpInstruction
+		}
+		switch {
+		case creativity == 1:
+			instruction = queryGenCreativeInstruction
+		case creativity >= 2:
+			instruction = queryGenVeryCreativeInstruction
+		}
+		if report == "" {
+			report = "(No findings yet.)"
+		}
+		prompt = currentDateContext(r.cfg.Location) +
+			fmt.Sprintf(queryGenPrompt, r.cfg.Query, r.state.Plan, report, round, numQueries, instruction)
 	}
-	prompt := currentDateContext(r.cfg.Location) +
-		fmt.Sprintf(queryGenPrompt, r.cfg.Query, r.state.Plan, report, round, numQueries, instruction)
+
 	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, 4096, queryTimeout)
 	if err != nil {
 		r.progress(Progress{Phase: "warning", Round: round, Message: "query generation failed: " + err.Error()})
@@ -476,7 +569,16 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 	if report == "" {
 		report = "(First round — no report yet.)"
 	}
-	prompt := fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, formatFindings(newFindings))
+	var prompt string
+	if r.brainstorm() {
+		findingsText := formatFindings(newFindings)
+		if findingsText == "" {
+			findingsText = "(No web research this round — develop the ideas from your own knowledge.)"
+		}
+		prompt = fmt.Sprintf(brainstormDevelopPrompt, r.cfg.Query, r.state.Plan, report, findingsText)
+	} else {
+		prompt = fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, formatFindings(newFindings))
+	}
 	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout,
 		func(generated int, tail string) {
 			r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
@@ -492,7 +594,11 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 // ── Phase 7: Decide ──────────────────────────────────────────
 
 func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
-	prompt := fmt.Sprintf(stopPrompt, r.cfg.Query, r.state.Report, round, r.cfg.MaxRounds)
+	stop := stopPrompt
+	if r.brainstorm() {
+		stop = brainstormStopPrompt
+	}
+	prompt := fmt.Sprintf(stop, r.cfg.Query, r.state.Report, round, r.cfg.MaxRounds)
 	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 128, stopTimeout)
 	if err != nil {
 		return false
@@ -505,6 +611,9 @@ func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
 // ── Phase 8: Final report ────────────────────────────────────
 
 func (r *Researcher) finalReport(ctx context.Context) string {
+	if r.brainstorm() {
+		return r.finalBrainstorm(ctx)
+	}
 	prompt := fmt.Sprintf(finalReportPrompt, r.cfg.Query, r.state.Report)
 	if override, ok := categoryPrompts[r.state.Category]; ok {
 		prompt += override
@@ -529,6 +638,22 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 		if err == nil && len(expanded) > len(report) {
 			report = expanded
 		}
+	}
+	return report
+}
+
+// finalBrainstorm writes the polished design document for a brainstorm run.
+// Unlike finalReport it imposes no report-category overrides and no minimum
+// length — the output is a structured design write-up, not a long-form article.
+func (r *Researcher) finalBrainstorm(ctx context.Context) string {
+	prompt := fmt.Sprintf(brainstormFinalPrompt, r.cfg.Query, r.state.Plan, r.state.Report)
+	onDelta := func(generated int, tail string) {
+		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
+	}
+	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	if err != nil || report == "" {
+		// Never return empty — fall back to the evolving design doc.
+		return r.state.Report
 	}
 	return report
 }
