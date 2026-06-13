@@ -270,13 +270,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	chatURL := modelServer.APIBase + "/chat/completions"
 
-	// Persist user message.
-	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil, user.DisplayName, nil, nil, ""); err != nil {
-		internalError(w, err)
-		return
-	}
-
-	// Build message history for model.
+	// Build message history for model (user message not yet persisted).
 	history, err := s.store.ListMessages(convID)
 	if err != nil {
 		internalError(w, err)
@@ -284,6 +278,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chatMsgs = buildChatMsgs(chatMsgs, history)
+	chatMsgs = append(chatMsgs, chatMsg{Role: "user", Content: req.Content})
 
 	// Determine tool definitions for this character.
 	var activeToolDefs []toolDef
@@ -338,6 +333,13 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	resp, err := doRequest()
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "model unreachable")
+		return
+	}
+
+	// Model is reachable — persist the user message now.
+	if _, err := s.store.CreateMessage(convID, "user", req.Content, nil, user.DisplayName, nil, nil, ""); err != nil {
+		resp.Body.Close()
+		internalError(w, err)
 		return
 	}
 
@@ -590,7 +592,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 		// Trigger auto-title on the first completed exchange when the character requests it.
 		if usedCharacter != nil && usedCharacter.AutoTitle && conv.Title == nil {
-			userMsgCount := 0
+			userMsgCount := 1 // +1 for the user message just persisted (history was loaded before persist)
 			for _, m := range history {
 				if m.Role == "user" {
 					userMsgCount++

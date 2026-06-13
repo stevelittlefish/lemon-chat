@@ -60,7 +60,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **WebSocket broadcast has no write deadline** (`internal/server/ws.go:43`)
   One slow/half-dead client blocks the broadcast loop, stalling notifications for everyone. Set a write deadline per `conn.Write`, or push to a per-client buffered channel with a drop policy (as the research hub does).
 
-- [ ] **User message persisted before model reachability is confirmed** (`internal/server/messages.go:274`)
+- [x] **User message persisted before model reachability is confirmed** (`internal/server/messages.go:274`)
   On model-unreachable the user turn is left stored with no assistant reply. Persist after a successful response start, or clean up on early failure.
 
 - [ ] **Streaming continues after client disconnect** (`internal/server/messages.go:195`)
