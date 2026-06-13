@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/stevelittlefish/lemon-chat/internal/htmltext"
 )
 
 type webpage struct {
@@ -18,15 +20,8 @@ type webpage struct {
 }
 
 var (
-	reWebScript  = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
-	reWebStyle   = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
-	reWebChrome  = regexp.MustCompile(`(?is)<(nav|header|footer|aside)[^>]*>.*?</(nav|header|footer|aside)>`)
-	reWebBlock   = regexp.MustCompile(`(?i)</?(p|div|section|article|h[1-6]|li|ul|ol|tr|table|blockquote|pre)[^>]*>|<br[^>]*>`)
-	reWebTag     = regexp.MustCompile(`<[^>]+>`)
 	reWebTitle   = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
 	reWebOGImage = regexp.MustCompile(`(?is)<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']|<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']`)
-	reWebBlank   = regexp.MustCompile(`\n\s*\n\s*\n+`)
-	reWebSpaces  = regexp.MustCompile(`[ \t]+`)
 )
 
 // fetchWebpage fetches a URL and returns cleaned text content, preserving
@@ -68,15 +63,7 @@ func (r *Researcher) fetchWebpage(ctx context.Context, pageURL string) (*webpage
 		}
 	}
 
-	text := reWebScript.ReplaceAllString(raw, " ")
-	text = reWebStyle.ReplaceAllString(text, " ")
-	text = reWebChrome.ReplaceAllString(text, " ")
-	text = reWebBlock.ReplaceAllString(text, "\n\n")
-	text = reWebTag.ReplaceAllString(text, " ")
-	text = html.UnescapeString(text)
-	text = reWebSpaces.ReplaceAllString(text, " ")
-	text = reWebBlank.ReplaceAllString(text, "\n\n")
-	page.Content = strings.TrimSpace(text)
+	page.Content = htmltext.StripStructured(raw)
 	return page, nil
 }
 

@@ -14,12 +14,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
+	"github.com/stevelittlefish/lemon-chat/internal/htmltext"
 	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"github.com/stevelittlefish/lemon-chat/internal/searx"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
@@ -853,7 +853,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 			return content, nil
 		}
 
-		stripped := stripHTML(content)
+		stripped := htmltext.Strip(content)
 		const maxStripped = 50_000
 		if len(stripped) > maxStripped {
 			stripped = stripped[:maxStripped] + "\n\n[truncated — page content exceeded 50,000 characters]"
@@ -983,7 +983,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 
 		var sb strings.Builder
 		for i, r := range data.Query.Search {
-			snippet := strings.TrimSpace(stripHTML(r.Snippet))
+			snippet := strings.TrimSpace(htmltext.Strip(r.Snippet))
 			fmt.Fprintf(&sb, "%d. **%s** — %s\n", i+1, r.Title, snippet)
 		}
 		return strings.TrimSpace(sb.String()), nil
@@ -1221,7 +1221,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 			if len(tocData.Parse.Sections) > 0 {
 				sb.WriteString("\n\nSections:\n")
 				for _, s := range tocData.Parse.Sections {
-					title := strings.TrimSpace(stripHTML(s.Line))
+					title := strings.TrimSpace(htmltext.Strip(s.Line))
 					fmt.Fprintf(&sb, "%s. %s\n", s.Number, title)
 				}
 			}
@@ -1232,7 +1232,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		sectionLower := strings.ToLower(args.Section)
 		sectionIndex := ""
 		for _, s := range tocData.Parse.Sections {
-			title := strings.TrimSpace(stripHTML(s.Line))
+			title := strings.TrimSpace(htmltext.Strip(s.Line))
 			if strings.ToLower(title) == sectionLower {
 				sectionIndex = s.Index
 				break
@@ -1241,7 +1241,7 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		if sectionIndex == "" {
 			var names []string
 			for _, s := range tocData.Parse.Sections {
-				names = append(names, strings.TrimSpace(stripHTML(s.Line)))
+				names = append(names, strings.TrimSpace(htmltext.Strip(s.Line)))
 			}
 			return "", fmt.Errorf("section %q not found in %q — available sections: %s", args.Section, args.Title, strings.Join(names, ", "))
 		}
@@ -1268,23 +1268,8 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		if html == "" {
 			return fmt.Sprintf("Section %q appears to be empty.", args.Section), nil
 		}
-		return strings.TrimSpace(stripHTML(html)), nil
+		return strings.TrimSpace(htmltext.Strip(html)), nil
 	},
-}
-
-var (
-	reScript = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
-	reStyle  = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
-	reTag    = regexp.MustCompile(`<[^>]+>`)
-	reSpace  = regexp.MustCompile(`\s+`)
-)
-
-func stripHTML(html string) string {
-	s := reScript.ReplaceAllString(html, " ")
-	s = reStyle.ReplaceAllString(s, " ")
-	s = reTag.ReplaceAllString(s, " ")
-	s = reSpace.ReplaceAllString(s, " ")
-	return strings.TrimSpace(s)
 }
 
 func summariseHTML(text, modelName string, srv *config.ModelServer, timeout time.Duration) (string, error) {

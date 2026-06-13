@@ -84,7 +84,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **De-duplicate SearXNG search** (`internal/server/tools.go:862`, `internal/research/web.go:23`)
   Implemented twice with separate response structs.
 
-- [ ] **De-duplicate HTML stripping** (`internal/server/tools.go:1305`, `internal/research/web.go:67`)
+- [x] **De-duplicate HTML stripping** (`internal/server/tools.go:1305`, `internal/research/web.go:67`)
   Two separate regex-based strippers.
 
 - [ ] **Unify conversation/completion title generation** (`internal/tasks/titles.go`)
