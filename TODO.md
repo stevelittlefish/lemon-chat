@@ -26,3 +26,99 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [ ] Look into ways to follow Reddit and facebook links, if possible
 
 - [ ] Question: are there any more useful parameters to expose on the research UI?
+
+## Code review (2026-06-13)
+
+Findings from `code_review_2026-06-13.md`, in suggested priority order.
+
+### Security
+
+- [ ] **Stored XSS — sanitise rendered markdown** (`static/js/markdown.js:37`)
+  `marked.parse(text)` is assigned to `innerHTML` with no sanitiser; assistant output (which includes fetched web-page content and shared character prompts) executes as live HTML. Vendor DOMPurify (no build step — drop in `static/js/vendor/`) and sanitise the output of `render()` before assigning. Highest priority.
+
+- [ ] **Notes IDOR — add ownership checks** (`internal/server/notes.go:24,82,112`)
+  `handleGetNote`, `handleDeleteNote`, and `handleSetNoteReadOnly` operate on a note id with no scope/ownership check, defeating the `g.`/`u.`/`c.` visibility model. After `GetNoteByID`, verify the note is visible to `currentUser(r)` (global, owned by the user, or in one of the user's conversations) before returning/mutating.
+
+- [ ] **Attachment IDOR — add ownership check** (`internal/server/attachments.go:11`)
+  `handleGetAttachment` serves any attachment by id. Join through `conversation` and require `conversation.user_id == currentUser.ID` (or admin) in the query.
+
+- [ ] **Guard / warn on passwordless accounts** (`internal/server/auth.go:36`)
+  `handleLogin` skips the password check when `PasswordHash` is nil, so a default `admin` with no password is a silent full login. Log a prominent startup warning when any account has no password, and/or require an explicit `allow_passwordless` config flag.
+
+- [ ] **SSRF hardening for `fetch_url` and research fetch** (`internal/server/tools.go:802`, `internal/research/web.go:81`)
+  Server-side GETs to arbitrary model/user-supplied URLs with no host filtering. Block loopback / RFC-1918 / link-local targets (e.g. cloud metadata).
+
+- [ ] **Escape filename in Content-Disposition** (`internal/server/attachments.go:29`)
+  `att.Filename` is interpolated into the header inside quotes without escaping; `filepath.Base` doesn't strip `"`/newlines. Use `mime.FormatMediaType`.
+
+- [ ] **Add WebSocket Origin check** (`internal/server/ws.go:80`)
+  `handleWS` never validates `Origin` (CSWSH). Mitigated by `SameSite=Strict` cookie, but add the check as defence in depth.
+
+### Bugs
+
+- [ ] **`title_prompt` is dead — wire it up or remove it** (`internal/tasks/titles.go:299`)
+  The column is stored, editable in the character editor, and exposed via `GetConversationTitlePrompt`, but the title worker uses a hardcoded prompt and never reads it. Either use the per-character title prompt in `generateTitle`, or remove the field, `GetConversationTitlePrompt`, and the UI control.
+
+- [ ] **Research SSE subscribe-after-finish race** (`internal/server/research.go:499`)
+  If `run.finish()` runs between `get(id)` and `subscribe()`, the new channel is never closed and the client never receives `[DONE]` (hung SSE connection). Have `subscribe()` detect the finished state and return a channel that's closed after replaying `last`.
+
+- [ ] **WebSocket broadcast has no write deadline** (`internal/server/ws.go:43`)
+  One slow/half-dead client blocks the broadcast loop, stalling notifications for everyone. Set a write deadline per `conn.Write`, or push to a per-client buffered channel with a drop policy (as the research hub does).
+
+- [ ] **User message persisted before model reachability is confirmed** (`internal/server/messages.go:274`)
+  On model-unreachable the user turn is left stored with no assistant reply. Persist after a successful response start, or clean up on early failure.
+
+- [ ] **Streaming continues after client disconnect** (`internal/server/messages.go:195`)
+  Tool executors run on `context.Background()`, not the request context, so closing the tab keeps the tool loop running and writing to a dead `ResponseWriter` (wasted work, possible duplicate image generation). Check `r.Context().Err()` between loop iterations and thread the request context into `ToolContext`.
+
+- [ ] **`note_list` prefix semantics differ between model and UI** (`internal/store/notes.go:198`)
+  Model-facing `ListNotes` treats a bare term as `g.foo%` (matches `foobar`); the settings `ListUserVisibleNotes` uses `g.foo.%` (segment boundary). Pick one rule and share it.
+
+- [ ] **Migration version-label gap** (`internal/store/store.go:228`)
+  The v8 block is followed by `if version < 10` labelled "v9 → v10" with no v8→v9 block. Works, but relabel/comment to avoid confusion.
+
+- [ ] **`parseJSONObject` shadows builtin `close`** (`internal/research/llm.go:266`)
+  Rename the local to `closeIdx`.
+
+### Duplication
+
+- [ ] **Extract a shared streaming chat-completion helper** (`internal/server/messages.go:311`, `internal/server/completions.go:246`, `internal/research/llm.go:78`)
+  The SSE scanner loop (`1<<20` buffer, `"data: "` prefix, `[DONE]`) and request plumbing are reimplemented three times.
+
+- [ ] **Extract a shared non-streaming chat-completion helper** (`internal/server/tools.go:1320`, `internal/research/llm.go:23`, `internal/tasks/titles.go:162,299`)
+  Build payload → set auth → decode `choices[0].Message.Content` is duplicated four times.
+
+- [ ] **De-duplicate SearXNG search** (`internal/server/tools.go:862`, `internal/research/web.go:23`)
+  Implemented twice with separate response structs.
+
+- [ ] **De-duplicate HTML stripping** (`internal/server/tools.go:1305`, `internal/research/web.go:67`)
+  Two separate regex-based strippers.
+
+- [ ] **Unify conversation/completion title generation** (`internal/tasks/titles.go`)
+  Near-duplicate function pairs for the two entity types.
+
+- [ ] **Add a handler helper for the parse-id → Get → 404/500 pattern** (`internal/server/`)
+  Repeated dozens of times across the conversation/character/completion/research/notes handlers.
+
+### Organisation & maintainability
+
+- [ ] **Split `tools.go` by concern** (`internal/server/tools.go`)
+  1637 lines mixing schemas, executors, three external-service clients, HTML stripping, and image generation. Split into registry / web / image / notes-state files.
+
+- [ ] **Reduce the four hand-synced tool lists** (`internal/server/tools.go:58,627,1595`, `static/js/settings-character-edit.js`)
+  `toolRegistry`, `executors`, `allTools`, and `TOOL_GROUPS` must be kept in sync manually. CLAUDE.md has already drifted (missing `note_to_self`, `state_clear`; wrong `world_state` expansion). Drive them from one declaration and fix the CLAUDE.md tool table.
+
+- [ ] **Break up `handleSendMessage`** (`internal/server/messages.go:195`)
+  ~430 lines doing model resolution, tool-loop orchestration, SSE framing, persistence, and title triggers. Extract the tool loop and title-trigger block at minimum.
+
+- [ ] **`gofmt` six files and add gofmt/vet to CI** (`internal/server/{admin,avatars,messages,notes,research}.go`, `internal/store/research.go`)
+  Flagged by `gofmt -l` (vet and build are clean). CI should fail on a gofmt diff.
+
+- [ ] **Periodic expired-session cleanup** (`internal/store/sessions.go:41`)
+  Expired sessions are only deleted lazily on access; never-revisited sessions linger forever. Add a sweeper (an index on `expires_at` already exists).
+
+- [ ] **Make tool timeouts named/configurable** (`internal/server/tools.go`, `internal/research/web.go`)
+  Magic literals (120s ComfyUI poll, 30s/15s/5s fetch timeouts) scattered inline; name them or move to config as the research engine already does.
+
+- [ ] **Resolve static asset paths absolutely** (`internal/server/server.go:149,169`)
+  `serveFile` and the `FileServer` use relative `static/` paths that depend on the process CWD; resolve against an absolute asset dir. Also disable directory listings on the catch-all `FileServer`.
