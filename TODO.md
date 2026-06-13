@@ -54,7 +54,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **`title_prompt` is dead — wire it up or remove it** (`internal/tasks/titles.go:299`)
   The column is stored, editable in the character editor, and exposed via `GetConversationTitlePrompt`, but the title worker uses a hardcoded prompt and never reads it. Either use the per-character title prompt in `generateTitle`, or remove the field, `GetConversationTitlePrompt`, and the UI control.
 
-- [ ] **Research SSE subscribe-after-finish race** (`internal/server/research.go:499`)
+- [x] **Research SSE subscribe-after-finish race** (`internal/server/research.go:499`)
   If `run.finish()` runs between `get(id)` and `subscribe()`, the new channel is never closed and the client never receives `[DONE]` (hung SSE connection). Have `subscribe()` detect the finished state and return a channel that's closed after replaying `last`.
 
 - [ ] **WebSocket broadcast has no write deadline** (`internal/server/ws.go:43`)

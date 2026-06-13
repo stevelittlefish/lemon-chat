@@ -23,6 +23,7 @@ type researchRun struct {
 
 	mu              sync.Mutex
 	cancelRequested bool
+	finished        bool
 	subs            map[chan []byte]struct{}
 	last            []byte // most recent event, replayed to new subscribers
 }
@@ -56,6 +57,7 @@ func (run *researchRun) broadcast(data []byte) {
 func (run *researchRun) finish(data []byte) {
 	run.mu.Lock()
 	defer run.mu.Unlock()
+	run.finished = true
 	run.last = data
 	for ch := range run.subs {
 		select {
@@ -71,6 +73,15 @@ func (run *researchRun) subscribe() chan []byte {
 	run.mu.Lock()
 	defer run.mu.Unlock()
 	ch := make(chan []byte, 64)
+	if run.finished {
+		// finish() already ran — return a pre-closed channel so the SSE handler
+		// drains the last event and sends [DONE] instead of blocking forever.
+		if run.last != nil {
+			ch <- run.last
+		}
+		close(ch)
+		return ch
+	}
 	if run.last != nil {
 		ch <- run.last
 	}
