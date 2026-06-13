@@ -45,6 +45,8 @@ Pick the section that matches the severity. Within a section, add the new item a
 
 Edit `TODO.md` to add the item in the chosen location. Do not reorder, reformat, or touch any other part of the file.
 
+After inserting, verify the file ends with a single trailing newline. If it does not, add one.
+
 ## Step 6 — Confirm
 
 One sentence: name the section you added it to and quote the title you used. Nothing else.

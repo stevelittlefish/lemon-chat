@@ -45,6 +45,23 @@ func (s *Store) GetAttachment(id int64) (*Attachment, error) {
 	return a, nil
 }
 
+// GetAttachmentForUser fetches an attachment only if its conversation is owned
+// by userID. Returns sql.ErrNoRows if the attachment doesn't exist or belongs
+// to a different user, so the caller cannot distinguish the two cases.
+func (s *Store) GetAttachmentForUser(id, userID int64) (*Attachment, error) {
+	a := &Attachment{}
+	err := s.db.QueryRow(`
+		SELECT a.id, a.tool_call_id, a.conversation_id, a.title, a.filename, a.mime_type, a.disk_path, a.created_at
+		FROM attachment a
+		JOIN conversation c ON c.id = a.conversation_id
+		WHERE a.id = ? AND c.user_id = ?
+	`, id, userID).Scan(&a.ID, &a.ToolCallID, &a.ConversationID, &a.Title, &a.Filename, &a.MimeType, &a.DiskPath, &a.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
 func (s *Store) ListAttachmentsByConversation(convID int64) ([]Attachment, error) {
 	rows, err := s.db.Query(
 		`SELECT id, tool_call_id, conversation_id, title, filename, mime_type, disk_path, created_at

@@ -5,6 +5,10 @@
 lemon-chat is a local, open-source AI chat UI. Think self-hosted claude.ai or ChatGPT. It talks to locally-running models via HTTP API (e.g. Ollama) and persists everything in a local SQLite database.
 
 
+## General conventions
+
+- All files must end with a single trailing newline.
+
 ## Technical constraints
 
 These apply to every change. Don't add packages, build steps, or abstractions without a clear reason.

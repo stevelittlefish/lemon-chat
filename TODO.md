@@ -13,6 +13,12 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 - [x] Research feature (port of docs/deep_research_spec.html to Go) — `/research` page linked from the main menu, iterative search/extract/synthesise engine in `internal/research/`, crash-resumable jobs via state checkpoints in the `research_job` table.
 
 - [x] **Rename `sdxl_file`/`flux_file` config keys to `sdxl_workflow`/`flux_workflow`** (`internal/config/config.go:28`)
+
+- [ ] **Image generation `background` parameter** (`internal/server/tools.go:210,251`)
+  Add an optional `background` boolean parameter (default false) to both image generation tools. When true and the image loads, set it as the chat background (`static/js/thread.js:186`). Apply a legibility treatment (e.g. semi-transparent overlay on the message column) so text remains readable over the image.
+
+- [ ] **Async image generation** (`internal/server/tools.go:1400`)
+  `makeImageExecutor` blocks the SSE stream for up to 120s while ComfyUI polls. Per `docs/feature-async-image-generation.md`: return a pending attachment immediately after the ComfyUI submit, poll/download in a background goroutine, and push `attachment_ready`/`attachment_error` to the frontend via WebSocket when done.
   The current names suggest a generic file path; `_workflow` better conveys that these are ComfyUI workflow JSON files. Update the struct tags, references in `tools.go`, hint strings, and `lemon.toml.example`.
 
 ## Research
@@ -25,8 +31,6 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 - [x] In-depth report toggle: build the final report section by section from the raw findings (outline → self-critique refine → per-section write → glue) instead of one summarising pass, to stop reports losing detail. Opt-in checkbox; applies to both modes. `deepReport` pipeline in `internal/research/researcher.go`.
 
-
-- [ ] Look into ways to follow Reddit and facebook links, if possible
 
 
 ## Code review (2026-06-13)
@@ -41,11 +45,9 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Notes IDOR — add ownership checks** (`internal/server/notes.go:24,82,112`)
   `handleGetNote`, `handleDeleteNote`, and `handleSetNoteReadOnly` operate on a note id with no scope/ownership check, defeating the `g.`/`u.`/`c.` visibility model. After `GetNoteByID`, verify the note is visible to `currentUser(r)` (global, owned by the user, or in one of the user's conversations) before returning/mutating.
 
-- [ ] **Attachment IDOR — add ownership check** (`internal/server/attachments.go:11`)
+- [x] **Attachment IDOR — add ownership check** (`internal/server/attachments.go:11`)
   `handleGetAttachment` serves any attachment by id. Join through `conversation` and require `conversation.user_id == currentUser.ID` (or admin) in the query.
 
-- [ ] **Guard / warn on passwordless accounts** (`internal/server/auth.go:36`)
-  `handleLogin` skips the password check when `PasswordHash` is nil, so a default `admin` with no password is a silent full login. Log a prominent startup warning when any account has no password, and/or require an explicit `allow_passwordless` config flag.
 
 - [ ] **SSRF hardening for `fetch_url` and research fetch** (`internal/server/tools.go:802`, `internal/research/web.go:81`)
   Server-side GETs to arbitrary model/user-supplied URLs with no host filtering. Block loopback / RFC-1918 / link-local targets (e.g. cloud metadata).
@@ -124,3 +126,5 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 
 - [ ] **Resolve static asset paths absolutely** (`internal/server/server.go:149,169`)
   `serveFile` and the `FileServer` use relative `static/` paths that depend on the process CWD; resolve against an absolute asset dir. Also disable directory listings on the catch-all `FileServer`.
+
+- [ ] Look into ways to follow Reddit and facebook links, if possible
