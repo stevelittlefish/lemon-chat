@@ -1,6 +1,7 @@
 package research
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -68,6 +69,93 @@ func (r *Researcher) llmCall(ctx context.Context, msgs []chatMsg, temperature fl
 		return "", fmt.Errorf("no choices in response")
 	}
 	return stripThinking(result.Choices[0].Message.Content), nil
+}
+
+// llmCallStream is llmCall with stream=true. onDelta is invoked at most every
+// 250ms with the number of characters generated so far and the tail of the
+// output, so long generations (synthesis, final report) can show live
+// progress instead of appearing stuck.
+func (r *Researcher) llmCallStream(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration, onDelta func(generated int, tail string)) (string, error) {
+	payload, _ := json.Marshal(map[string]any{
+		"model":       r.cfg.Model,
+		"messages":    msgs,
+		"stream":      true,
+		"temperature": temperature,
+		"max_tokens":  maxTokens,
+	})
+
+	callCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(callCtx, "POST", r.cfg.APIBase+"/chat/completions", bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if r.cfg.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+r.cfg.APIKey)
+	}
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("model request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return "", fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, body)
+	}
+
+	var full strings.Builder
+	var lastEmit time.Time
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 1<<20), 1<<20)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		data := line[6:]
+		if data == "[DONE]" {
+			break
+		}
+		var chunk struct {
+			Choices []struct {
+				Delta struct {
+					Content string `json:"content"`
+				} `json:"delta"`
+			} `json:"choices"`
+		}
+		if json.Unmarshal([]byte(data), &chunk) != nil || len(chunk.Choices) == 0 {
+			continue
+		}
+		if text := chunk.Choices[0].Delta.Content; text != "" {
+			full.WriteString(text)
+			if onDelta != nil && time.Since(lastEmit) >= 250*time.Millisecond {
+				lastEmit = time.Now()
+				onDelta(full.Len(), tailOf(full.String(), 300))
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil && full.Len() == 0 {
+		return "", fmt.Errorf("stream read failed: %w", err)
+	}
+
+	out := stripThinking(full.String())
+	if out == "" {
+		return "", fmt.Errorf("empty response from model")
+	}
+	return out, nil
+}
+
+// tailOf returns the last n runes of s on a valid UTF-8 boundary.
+func tailOf(s string, n int) string {
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	return string(runes[len(runes)-n:])
 }
 
 var (

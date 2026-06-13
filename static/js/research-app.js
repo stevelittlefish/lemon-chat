@@ -98,14 +98,41 @@ async function startResearch() {
 function progressLine(ev) {
   const host = (url) => { try { return new URL(url).hostname; } catch { return url; } };
   switch (ev.phase) {
-    case 'planning': return 'planning research approach';
+    case 'planning': return ev.message || 'planning research approach';
     case 'searching': return `round ${ev.round} — searching: ${(ev.queries || []).join(' · ')}`;
     case 'reading': return `round ${ev.round} — reading ${host(ev.url)}`;
     case 'analyzing': return `round ${ev.round} — synthesizing (${ev.total_findings} finding${ev.total_findings === 1 ? '' : 's'})`;
+    case 'deciding': return `round ${ev.round} — stop check: ${ev.message}`;
     case 'writing': return 'writing final report';
     case 'warning': return ev.message;
     default: return ev.message || ev.phase;
   }
+}
+
+// Live preview of text being generated during synthesis / report writing.
+// Created on the first streaming event, updated in place, removed when the
+// generation phase ends.
+function updateStream(ev) {
+  let box = document.getElementById('research-stream');
+  if (!box) {
+    const log = document.getElementById('research-progress');
+    if (!log) return;
+    box = document.createElement('div');
+    box.id = 'research-stream';
+    box.className = 'research-stream';
+    box.innerHTML = `
+      <div class="research-stream-label"></div>
+      <div class="research-stream-text"><span class="research-stream-tail"></span><span class="research-stream-caret"></span></div>`;
+    log.after(box);
+  }
+  const verb = ev.phase === 'writing' ? 'writing report' : 'synthesizing';
+  box.querySelector('.research-stream-label').textContent =
+    `${verb} · ${ev.generated.toLocaleString()} chars`;
+  box.querySelector('.research-stream-tail').textContent = ev.snippet || '';
+}
+
+function removeStream() {
+  document.getElementById('research-stream')?.remove();
 }
 
 async function showDetail(id) {
@@ -182,6 +209,11 @@ function watchProgress(id) {
         if (location.hash.slice(1) === String(id)) showDetail(id);
         return;
       }
+      if (ev.generated) {
+        updateStream(ev);
+        return;
+      }
+      removeStream(); // any non-streaming event means the generation finished
       append(progressLine(ev), ev.phase === 'warning' ? 'warn' : '');
     },
     onError: () => append('connection to progress stream lost — reload to reconnect', 'warn'),

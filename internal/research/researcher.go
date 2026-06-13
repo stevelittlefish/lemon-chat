@@ -81,9 +81,11 @@ type Config struct {
 	SynthesisWindow       int
 }
 
-// Progress is emitted at each phase transition.
+// Progress is emitted at each phase transition. Events with Generated > 0
+// are live generation updates (throttled to ~4/sec) carrying the tail of the
+// text being generated.
 type Progress struct {
-	Phase         string   `json:"phase"` // planning | searching | reading | analyzing | writing | warning
+	Phase         string   `json:"phase"` // planning | searching | reading | analyzing | deciding | writing | warning
 	Round         int      `json:"round,omitempty"`
 	Message       string   `json:"message,omitempty"`
 	URL           string   `json:"url,omitempty"`
@@ -91,6 +93,8 @@ type Progress struct {
 	Queries       []string `json:"queries,omitempty"`
 	TotalSources  int      `json:"total_sources,omitempty"`
 	TotalFindings int      `json:"total_findings,omitempty"`
+	Generated     int      `json:"generated,omitempty"` // chars generated so far in a streaming LLM call
+	Snippet       string   `json:"snippet,omitempty"`   // tail of the text being generated
 }
 
 type Researcher struct {
@@ -150,12 +154,16 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
+		if r.state.Plan != "" {
+			r.progress(Progress{Phase: "planning", Message: "plan ready — " + r.state.Plan})
+		}
 	}
 	if r.state.Round == 0 && r.state.Category == "" {
 		r.state.Category = r.classify(ctx)
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
+		r.progress(Progress{Phase: "planning", Message: "report category: " + r.state.Category})
 		r.checkpoint()
 	}
 
@@ -200,7 +208,7 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 			r.state.EmptyRounds = 0
 			r.state.Findings = append(r.state.Findings, findings...)
 			r.progress(Progress{Phase: "analyzing", Round: round, TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
-			r.synthesize(ctx, findings)
+			r.synthesize(ctx, round, findings)
 			if ctx.Err() != nil {
 				return "", ctx.Err()
 			}
@@ -391,7 +399,7 @@ func (r *Researcher) extractAll(ctx context.Context, round int, urls []AnalyzedU
 
 // ── Phase 6: Synthesise ──────────────────────────────────────
 
-func (r *Researcher) synthesize(ctx context.Context, newFindings []Finding) {
+func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Finding) {
 	if len(newFindings) > r.cfg.SynthesisWindow {
 		newFindings = newFindings[len(newFindings)-r.cfg.SynthesisWindow:]
 	}
@@ -400,7 +408,10 @@ func (r *Researcher) synthesize(ctx context.Context, newFindings []Finding) {
 		report = "(First round — no report yet.)"
 	}
 	prompt := fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, formatFindings(newFindings))
-	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout)
+	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout,
+		func(generated int, tail string) {
+			r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
+		})
 	if err != nil || out == "" {
 		// Keep the current report unchanged.
 		r.progress(Progress{Phase: "warning", Message: "synthesis failed — keeping previous report"})
@@ -417,8 +428,9 @@ func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
 	if err != nil {
 		return false
 	}
-	out = strings.ToUpper(strings.TrimLeft(out, "*_`\"'>#- \t\n"))
-	return strings.HasPrefix(out, "YES")
+	decision := strings.TrimLeft(out, "*_`\"'>#- \t\n")
+	r.progress(Progress{Phase: "deciding", Round: round, Message: decision})
+	return strings.HasPrefix(strings.ToUpper(decision), "YES")
 }
 
 // ── Phase 8: Final report ────────────────────────────────────
@@ -428,7 +440,10 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 	if override, ok := categoryPrompts[r.state.Category]; ok {
 		prompt += override
 	}
-	report, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout)
+	onDelta := func(generated int, tail string) {
+		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
+	}
+	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
 	if err != nil || report == "" {
 		// Never return empty — fall back to the evolving synthesis.
 		return r.state.Report
@@ -436,11 +451,12 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 
 	// Minimum-length retry: ask the model to expand reports under 400 words.
 	if len(strings.Fields(report)) < 400 {
-		expanded, err := r.llmCall(ctx, []chatMsg{
+		r.progress(Progress{Phase: "warning", Message: fmt.Sprintf("report is short (%d words) — asking the model to expand it", len(strings.Fields(report)))})
+		expanded, err := r.llmCallStream(ctx, []chatMsg{
 			{Role: "user", Content: prompt},
 			{Role: "assistant", Content: report},
 			{Role: "user", Content: expandReportPrompt},
-		}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout)
+		}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
 		if err == nil && len(expanded) > len(report) {
 			report = expanded
 		}

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -188,6 +189,12 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	onProgress := func(p research.Progress) {
 		data, _ := json.Marshal(p)
 		run.broadcast(data)
+		// Streaming generation updates (~4/sec) are broadcast to the UI but
+		// kept out of the log and the DB.
+		if p.Generated > 0 {
+			return
+		}
+		logResearchProgress(job.ID, p)
 		if p.Phase != lastPhase && p.Phase != "warning" {
 			lastPhase = p.Phase
 			if err := s.store.UpdateResearchJobPhase(job.ID, store.ResearchStatusRunning, p.Phase); err != nil {
@@ -222,6 +229,41 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	default:
 		log.Printf("Research job failed id=%d: %v", job.ID, runErr)
 		s.finishResearch(job.ID, run, store.ResearchStatusError, nil, runErr.Error(), elapsedMS)
+	}
+}
+
+// logResearchProgress writes one log line per phase event so a tailed log
+// shows what a job is doing. Streaming deltas are filtered out by the caller.
+func logResearchProgress(jobID int64, p research.Progress) {
+	const maxLogText = 300
+	clip := func(s string) string {
+		s = strings.ReplaceAll(s, "\n", " ")
+		if len(s) > maxLogText {
+			return s[:maxLogText] + "…"
+		}
+		return s
+	}
+	switch p.Phase {
+	case "planning":
+		if p.Message != "" {
+			log.Printf("Planning research job_id=%d — %s", jobID, clip(p.Message))
+		} else {
+			log.Printf("Planning research job_id=%d", jobID)
+		}
+	case "searching":
+		log.Printf("Searching web job_id=%d round=%d queries=%q", jobID, p.Round, p.Queries)
+	case "reading":
+		log.Printf("Reading page job_id=%d round=%d url=%s", jobID, p.Round, p.URL)
+	case "analyzing":
+		log.Printf("Synthesizing findings job_id=%d round=%d findings=%d", jobID, p.Round, p.TotalFindings)
+	case "deciding":
+		log.Printf("Deciding whether to stop job_id=%d round=%d — %s", jobID, p.Round, clip(p.Message))
+	case "writing":
+		log.Printf("Writing final report job_id=%d sources=%d findings=%d", jobID, p.TotalSources, p.TotalFindings)
+	case "warning":
+		log.Printf("Research warning job_id=%d — %s", jobID, clip(p.Message))
+	default:
+		log.Printf("Research progress job_id=%d phase=%s %s", jobID, p.Phase, clip(p.Message))
 	}
 }
 
