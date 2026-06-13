@@ -93,6 +93,59 @@ async function startResearch() {
   }
 }
 
+// ── Downloads ───────────────────────────────────────────────
+
+function slugify(text) {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'research';
+}
+
+function downloadFile(filename, mime, content) {
+  const url = URL.createObjectURL(new Blob([content], { type: mime }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// Wraps the rendered report in a self-contained HTML document styled to
+// match the design system (paper background, warm ink, serif headings).
+function htmlDocument(title, bodyHtml) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(title)}</title>
+<style>
+  body { background: #FBF7EC; color: #1B1814; font-family: 'Source Sans 3', ui-sans-serif, system-ui, sans-serif;
+         font-size: 16px; line-height: 1.6; max-width: 760px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1, h2, h3 { font-family: 'Source Serif 4', ui-serif, Georgia, serif; line-height: 1.25; }
+  h2 { border-bottom: 1px solid #E7DFC9; padding-bottom: 8px; margin-top: 40px; }
+  a { color: #3565A8; }
+  code, pre { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.92em; }
+  code:not(pre code) { background: #F6EFDD; border: 1px solid #E7DFC9; border-radius: 2px; padding: 1px 6px; }
+  pre { background: #F6EFDD; border: 1px solid #E7DFC9; border-radius: 6px; padding: 12px 16px; overflow-x: auto; }
+  table { border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th, td { border: 1px solid #E7DFC9; padding: 6px 12px; text-align: left; }
+  th { background: #F6EFDD; }
+  blockquote { border-left: 2px solid #D6CDB7; margin-left: 0; padding-left: 16px; color: #6B6357; }
+  details { border: 1px solid #E7DFC9; border-radius: 6px; padding: 8px 16px; margin: 16px 0; }
+  details summary { cursor: pointer; }
+  hr { border: none; border-top: 1px solid #E7DFC9; }
+</style>
+</head>
+<body>
+<article>
+${bodyHtml}
+</article>
+</body>
+</html>
+`;
+}
+
 // ── Detail view ─────────────────────────────────────────────
 
 function progressLine(ev) {
@@ -155,6 +208,9 @@ async function showDetail(id) {
       <span>${formatDate(job.created_at)}</span>
       ${job.elapsed_ms ? `<span>${formatDuration(job.elapsed_ms)}</span>` : ''}
       <span class="research-detail-actions">
+        ${job.final_report ? `
+          <button id="research-dl-md" class="btn btn-sm btn-secondary">download .md</button>
+          <button id="research-dl-html" class="btn btn-sm btn-secondary">download .html</button>` : ''}
         ${running
           ? '<button id="research-cancel" class="btn btn-sm btn-secondary">cancel</button>'
           : '<button id="research-delete" class="btn btn-sm btn-danger">delete</button>'}
@@ -171,6 +227,14 @@ async function showDetail(id) {
     if (!confirm('Delete this research?')) return;
     await research.delete(id);
     location.hash = '';
+  });
+  document.getElementById('research-dl-md')?.addEventListener('click', () => {
+    downloadFile(`${slugify(job.query)}.md`, 'text/markdown',
+      `# ${job.query}\n\n${job.final_report}`);
+  });
+  document.getElementById('research-dl-html')?.addEventListener('click', () => {
+    downloadFile(`${slugify(job.query)}.html`, 'text/html',
+      htmlDocument(job.query, `<h1>${escapeHtml(job.query)}</h1>\n` + render(job.final_report)));
   });
 
   if (job.status === 'error' && job.error) {

@@ -33,5 +33,12 @@ marked.use({
 });
 
 export function render(text) {
-  return marked.parse(text);
+  const div = document.createElement('div');
+  div.innerHTML = marked.parse(text);
+  // All links in rendered content are external — open them in a new tab.
+  div.querySelectorAll('a').forEach((a) => {
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener');
+  });
+  return div.innerHTML;
 }
