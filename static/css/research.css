@@ -66,7 +66,12 @@ html, body {
   flex-wrap: wrap;
 }
 
-.research-form-row select { max-width: 280px; }
+/* Size selects to their content with integer widths. The shared .input style
+   sets width:100%, which flex then shrinks to a fractional pixel — and a native
+   <select> re-rounds its text on every hover repaint, so a fractional width
+   makes the text jitter as the pointer moves over it. */
+.research-form-row select { width: auto; max-width: 280px; flex: none; }
+.research-form-row > select.input { min-width: 200px; }
 .research-form-row .btn { margin-left: auto; }
 
 /* Inline labelled controls (effort, time limit). */
@@ -81,6 +86,10 @@ html, body {
 }
 .research-field .input { max-width: 220px; }
 .research-time-input { width: 5ch; max-width: 5ch; }
+.research-force-search { cursor: pointer; }
+.research-force-search input { cursor: pointer; accent-color: var(--fg); }
+/* The `hidden` attribute would otherwise lose to .research-field's display:flex. */
+.research-force-search[hidden] { display: none; }
 
 /* ── Job list ───────────────────────────────────────────── */
 

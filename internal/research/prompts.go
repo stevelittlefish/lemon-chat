@@ -101,6 +101,32 @@ Return ONLY the JSON array, nothing else.
 Example (search): ["existing solutions to X", "typical cost of Y"]
 Example (no search): []`
 
+// brainstormForcedQueryPrompt is used for the first round when the user has
+// asked for at least one web search — it removes the "return []" escape hatch
+// and requires the model to commit to one or more queries.
+const brainstormForcedQueryPrompt = `You are developing ideas for a creative/design brief, and you should ground this round in some real-world research.
+
+**Brief:** %s
+
+**Framing:**
+%s
+
+**Ideas so far:**
+%s
+
+**Round:** %d
+
+%s
+
+Find external information that will sharpen the work — e.g. prior art, real-world examples, concrete numbers, or facts worth verifying.
+
+Return a JSON array of 1-3 focused search query strings. Do not return an empty array.
+
+Return ONLY the JSON array, nothing else.
+Example: ["existing solutions to X", "typical cost of Y"]`
+
+const brainstormForcedSearchInstruction = "Ground this round in real-world research: identify what is worth looking up to strengthen the ideas."
+
 const brainstormSearchInstruction = "Keep developing the ideas. Search only if a specific fact, example, or number would meaningfully strengthen them."
 
 const brainstormCreativeInstruction = "This is a bonus round — push into fresh, less obvious directions. Search only if grounding a new angle in real-world examples or data would help."

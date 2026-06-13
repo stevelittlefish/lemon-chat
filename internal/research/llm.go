@@ -142,7 +142,7 @@ func (r *Researcher) llmCallStream(ctx context.Context, msgs []chatMsg, temperat
 		return "", fmt.Errorf("stream read failed: %w", err)
 	}
 
-	out := stripThinking(full.String())
+	out := stripToolCalls(stripThinking(full.String()))
 	if out == "" {
 		return "", fmt.Errorf("empty response from model")
 	}
@@ -170,6 +170,27 @@ var (
 func stripThinking(text string) string {
 	out := reThinkBlock.ReplaceAllString(text, "")
 	out = reThinkOpen.ReplaceAllString(out, "")
+	return strings.TrimSpace(out)
+}
+
+var (
+	// Tool-call special tokens vary by model family — <|tool_call|>, <tool_call>,
+	// the asymmetric <|tool_call> … <tool_call|>, etc. This marker matches any of
+	// those open/close variants.
+	reToolCallMarker = `<\/?\|?tool[_ ]?calls?\|?>`
+	reToolCallBlock  = regexp.MustCompile(`(?is)` + reToolCallMarker + `.*?` + reToolCallMarker)
+	reToolCallOpen   = regexp.MustCompile(`(?is)` + reToolCallMarker + `.*$`)
+)
+
+// stripToolCalls removes tool-call markup from prose output. The research engine
+// does not use real tool-calling — it expects plain text or JSON — but tool-eager
+// local models sometimes emit a tool-call token block instead of following the
+// prompt. Left in place it pollutes the plan and report; this strips the whole
+// block (markers and inner payload). Do NOT apply this before query parsing:
+// parseJSONStringArray deliberately harvests the query array out of such a block.
+func stripToolCalls(text string) string {
+	out := reToolCallBlock.ReplaceAllString(text, "")
+	out = reToolCallOpen.ReplaceAllString(out, "")
 	return strings.TrimSpace(out)
 }
 

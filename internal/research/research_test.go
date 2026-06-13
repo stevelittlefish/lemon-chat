@@ -16,6 +16,9 @@ func TestParseJSONStringArray(t *testing.T) {
 		{"surrounding prose", `Here are the queries: ["one", "two"]`, []string{"one", "two"}},
 		{"truncated array", `["first query", "second query", "thi`, []string{"first query", "second query"}},
 		{"echoed example then answer", `["query one", "query two", "query three"] is the format. ["real a", "real b"]`, []string{"real a", "real b"}},
+		// A tool-eager model may wrap the queries in tool-call markup; the array
+		// must still be harvested so the round actually searches.
+		{"tool-call wrapped queries", `<|tool_call>call:google_search:search{queries: ["a", "b"]}<tool_call|>`, []string{"a", "b"}},
 		{"no array", `no json here`, nil},
 	}
 	for _, c := range cases {
@@ -57,6 +60,24 @@ func TestStripThinking(t *testing.T) {
 	}
 	if got := stripThinking("no tags at all"); got != "no tags at all" {
 		t.Errorf("no tags: got %q", got)
+	}
+}
+
+func TestStripToolCalls(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"asymmetric markers", `<|tool_call>call:search{queries: ["a"]}<tool_call|>`, ""},
+		{"angle markers", "framing text <tool_call>foo</tool_call> more", "framing text  more"},
+		{"unterminated open", "the framing <|tool_call|>call:search{...", "the framing"},
+		{"no markup", "a clean framing paragraph", "a clean framing paragraph"},
+	}
+	for _, c := range cases {
+		if got := stripToolCalls(c.in); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
 	}
 }
 

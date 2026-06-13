@@ -84,6 +84,9 @@ async function showList() {
             <option value="brainstorm">brainstorm</option>
           </select>
         </label>
+        <label class="research-field research-force-search" id="research-force-search-field" hidden>
+          <input type="checkbox" id="research-force-search"> always search the web
+        </label>
         <label class="research-field">effort
           <select id="research-effort" class="input">${effortOptions}</select>
         </label>
@@ -108,6 +111,9 @@ async function showList() {
       ? 'what to brainstorm or design (required if no title)'
       : 'research question or prompt (required if no title)';
     document.getElementById('research-start').textContent = brainstorm ? 'start brainstorm' : 'start research';
+    // The force-search toggle only changes brainstorm behaviour — research mode
+    // always searches — so it is only shown for brainstorm.
+    document.getElementById('research-force-search-field').hidden = !brainstorm;
   });
 
   document.getElementById('research-start').addEventListener('click', startResearch);
@@ -128,12 +134,13 @@ async function startResearch() {
   if (!title && !query) return;
   const model = document.getElementById('research-model').value;
   const mode = document.getElementById('research-mode').value;
+  const forceSearch = mode === 'brainstorm' && document.getElementById('research-force-search').checked;
   const effort = parseInt(document.getElementById('research-effort').value, 10) || formDefaults.effort;
   const maxTimeMinutes = parseInt(document.getElementById('research-time').value, 10) || formDefaults.max_time_minutes;
   const btn = document.getElementById('research-start');
   btn.disabled = true;
   try {
-    const job = await research.start(title, query, model, mode, effort, maxTimeMinutes);
+    const job = await research.start(title, query, model, mode, forceSearch, effort, maxTimeMinutes);
     location.hash = job.id;
   } catch (err) {
     btn.disabled = false;
@@ -202,7 +209,10 @@ function progressLine(ev) {
     case 'planning': return ev.message || 'planning research approach';
     case 'searching': return `round ${ev.round} — searching: ${(ev.queries || []).join(' · ')}`;
     case 'reading': return `round ${ev.round} — reading ${host(ev.url)}`;
-    case 'analyzing': return `round ${ev.round} — synthesizing (${ev.total_findings} finding${ev.total_findings === 1 ? '' : 's'})`;
+    case 'analyzing': {
+      const n = ev.total_findings || 0;
+      return `round ${ev.round} — synthesizing (${n} finding${n === 1 ? '' : 's'})`;
+    }
     case 'deciding': return `round ${ev.round} — stop check: ${ev.message}`;
     case 'writing': return 'writing final report';
     case 'note': return ev.message;
@@ -258,7 +268,7 @@ async function showDetail(id) {
     ${promptHtml}
     <div class="research-detail-meta">
       ${statusBadge(job.status)}
-      ${job.mode === 'brainstorm' ? '<span>brainstorm</span>' : ''}
+      ${job.mode === 'brainstorm' ? `<span>brainstorm${job.force_search ? ' · always searches' : ''}</span>` : ''}
       <span>${escapeHtml(job.model)}</span>
       ${job.effort ? `<span>effort: ${EFFORT_NAMES[job.effort] || job.effort}</span>` : ''}
       <span>${formatDate(job.created_at)}</span>

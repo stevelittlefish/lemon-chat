@@ -71,13 +71,16 @@ type State struct {
 // Config carries everything a run needs; all tuning parameters come from the
 // [research] section of lemon.toml.
 type Config struct {
-	Query      string
-	Model      string
-	Mode       string // ModeResearch (default) or ModeBrainstorm
-	APIBase    string
-	APIKey     string
-	SearXNGURL string
-	Location   *time.Location
+	Query string
+	Model string
+	Mode  string // ModeResearch (default) or ModeBrainstorm
+	// ForceSearch (brainstorm only) guarantees at least one web search: the
+	// first round must produce a query rather than leaving it to the model.
+	ForceSearch bool
+	APIBase     string
+	APIKey      string
+	SearXNGURL  string
+	Location    *time.Location
 
 	MaxRounds             int
 	MaxTime               time.Duration
@@ -380,7 +383,7 @@ func (r *Researcher) plan(ctx context.Context) string {
 			r.progress(Progress{Phase: "warning", Message: "planning failed: " + err.Error()})
 			return ""
 		}
-		return strings.TrimSpace(out)
+		return stripToolCalls(out)
 	}
 	prompt := currentDateContext(r.cfg.Location) + fmt.Sprintf(researchPlanPrompt, r.cfg.Query)
 	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, 1024, planningTimeout)
@@ -395,7 +398,7 @@ func (r *Researcher) plan(ctx context.Context) string {
 	}
 	if parseJSONObject(out, &plan) != nil {
 		// JSON parsing failed — use the raw text as the plan.
-		return out
+		return stripToolCalls(out)
 	}
 	return fmt.Sprintf("Sub-questions: %s\nKey topics: %s\nSuccess: %s",
 		strings.Join(plan.SubQuestions, "; "), strings.Join(plan.KeyTopics, ", "), plan.SuccessCriteria)
@@ -428,6 +431,11 @@ func (r *Researcher) classify(ctx context.Context) string {
 func (r *Researcher) generateQueries(ctx context.Context, round, creativity int) []string {
 	report := r.state.Report
 
+	// forceSearch makes the first brainstorm round mandatory-search so a run with
+	// the toggle on never ends up as pure ideation. Bonus creative rounds (and
+	// every round after the first) keep the model's own discretion.
+	forceSearch := r.brainstorm() && r.cfg.ForceSearch && creativity == 0 && round == 1
+
 	var prompt string
 	if r.brainstorm() {
 		instruction := brainstormSearchInstruction
@@ -440,8 +448,13 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 		if report == "" {
 			report = "(No ideas developed yet.)"
 		}
+		queryPrompt := brainstormQueryPrompt
+		if forceSearch {
+			queryPrompt = brainstormForcedQueryPrompt
+			instruction = brainstormForcedSearchInstruction
+		}
 		prompt = currentDateContext(r.cfg.Location) +
-			fmt.Sprintf(brainstormQueryPrompt, r.cfg.Query, r.state.Plan, report, round, instruction)
+			fmt.Sprintf(queryPrompt, r.cfg.Query, r.state.Plan, report, round, instruction)
 	} else {
 		numQueries, instruction := 4, queryGenFirstRoundInstruction
 		if round > 1 {
@@ -478,6 +491,13 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 		}
 		used[strings.ToLower(q)] = true
 		queries = append(queries, q)
+	}
+	// With the toggle on, the model occasionally still returns no usable query;
+	// fall back to the brief itself so the promised search always happens.
+	if forceSearch && len(queries) == 0 {
+		if q := strings.TrimSpace(r.cfg.Query); q != "" && !used[strings.ToLower(q)] {
+			queries = append(queries, q)
+		}
 	}
 	return queries
 }
@@ -603,7 +623,7 @@ func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
 	if err != nil {
 		return false
 	}
-	decision := strings.TrimLeft(out, "*_`\"'>#- \t\n")
+	decision := strings.TrimLeft(stripToolCalls(out), "*_`\"'>#- \t\n")
 	r.progress(Progress{Phase: "deciding", Round: round, Message: decision})
 	return strings.HasPrefix(strings.ToUpper(decision), "YES")
 }

@@ -17,28 +17,31 @@ const (
 )
 
 type ResearchJob struct {
-	ID          int64   `json:"id"`
-	UserID      int64   `json:"user_id"`
-	Title       *string `json:"title"`
-	Query       string  `json:"query"`
-	Model       string  `json:"model"`
+	ID     int64   `json:"id"`
+	UserID int64   `json:"user_id"`
+	Title  *string `json:"title"`
+	Query  string  `json:"query"`
+	Model  string  `json:"model"`
 	// Mode is "research" (web-search-driven report) or "brainstorm"
 	// (ideation-driven design doc, search used only when the model decides it
 	// needs to look something up).
-	Mode        string  `json:"mode"`
+	Mode string `json:"mode"`
+	// ForceSearch (brainstorm mode only) requires at least one web search on the
+	// first round instead of letting the model decide whether to search at all.
+	ForceSearch bool    `json:"force_search"`
 	Status      string  `json:"status"`
 	Phase       *string `json:"phase"`
 	// Effort is the 1–5 effort level chosen for the job; MaxTimeSeconds is the
 	// per-job wall-clock budget (0 means use the configured default).
-	Effort         int   `json:"effort"`
-	MaxTimeSeconds int   `json:"max_time_seconds"`
-	Round          int   `json:"round"`
-	EmptyRounds    int   `json:"empty_rounds"`
-	ElapsedMS      int64 `json:"elapsed_ms"`
-	Category    *string `json:"category"`
-	Plan        *string `json:"plan"`
-	Report      *string `json:"report"`
-	FinalReport *string `json:"final_report"`
+	Effort         int     `json:"effort"`
+	MaxTimeSeconds int     `json:"max_time_seconds"`
+	Round          int     `json:"round"`
+	EmptyRounds    int     `json:"empty_rounds"`
+	ElapsedMS      int64   `json:"elapsed_ms"`
+	Category       *string `json:"category"`
+	Plan           *string `json:"plan"`
+	Report         *string `json:"report"`
+	FinalReport    *string `json:"final_report"`
 	// Findings, QueriesUsed, and AnalyzedURLs are JSON-encoded arrays —
 	// checkpoint state for resuming an interrupted job.
 	Findings     *string `json:"findings"`
@@ -49,12 +52,12 @@ type ResearchJob struct {
 	UpdatedAt    string  `json:"updated_at"`
 }
 
-const researchJobCols = `id, user_id, title, query, model, mode, status, phase, effort, max_time_seconds, round, empty_rounds, elapsed_ms,
+const researchJobCols = `id, user_id, title, query, model, mode, force_search, status, phase, effort, max_time_seconds, round, empty_rounds, elapsed_ms,
 	category, plan, report, final_report, findings, queries_used, analyzed_urls, error, created_at, updated_at`
 
 func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) {
 	var j ResearchJob
-	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Mode, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.Round, &j.EmptyRounds, &j.ElapsedMS,
+	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Mode, &j.ForceSearch, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.Round, &j.EmptyRounds, &j.ElapsedMS,
 		&j.Category, &j.Plan, &j.Report, &j.FinalReport, &j.Findings, &j.QueriesUsed, &j.AnalyzedURLs, &j.Error, &j.CreatedAt, &j.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -65,22 +68,22 @@ func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) 
 	return &j, nil
 }
 
-func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string, effort, maxTimeSeconds int) (*ResearchJob, error) {
+func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string, forceSearch bool, effort, maxTimeSeconds int) (*ResearchJob, error) {
 	t := now()
 	var titlePtr *string
 	if title != "" {
 		titlePtr = &title
 	}
 	res, err := s.db.Exec(
-		`INSERT INTO research_job (user_id, title, query, model, mode, status, effort, max_time_seconds, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
-		userID, titlePtr, query, model, mode, effort, maxTimeSeconds, t, t,
+		`INSERT INTO research_job (user_id, title, query, model, mode, force_search, status, effort, max_time_seconds, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+		userID, titlePtr, query, model, mode, forceSearch, effort, maxTimeSeconds, t, t,
 	)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	return &ResearchJob{ID: id, UserID: userID, Title: titlePtr, Query: query, Model: model, Mode: mode, Status: ResearchStatusPending,
+	return &ResearchJob{ID: id, UserID: userID, Title: titlePtr, Query: query, Model: model, Mode: mode, ForceSearch: forceSearch, Status: ResearchStatusPending,
 		Effort: effort, MaxTimeSeconds: maxTimeSeconds, CreatedAt: t, UpdatedAt: t}, nil
 }
 
