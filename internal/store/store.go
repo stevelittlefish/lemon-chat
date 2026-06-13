@@ -589,6 +589,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v25 → v26 complete")
 	}
 
+	if version < 27 {
+		log.Println("store: migrating v26 → v27 (add deep_report to research_job)")
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN deep_report INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (27, ?)`, now()); err != nil {
+			return err
+		}
+		version = 27
+		log.Println("store: migration v26 → v27 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

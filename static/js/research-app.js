@@ -84,8 +84,11 @@ async function showList() {
             <option value="brainstorm">brainstorm</option>
           </select>
         </label>
-        <label class="research-field research-force-search" id="research-force-search-field" hidden>
+        <label class="research-field research-check research-force-search" id="research-force-search-field" hidden>
           <input type="checkbox" id="research-force-search"> always search the web
+        </label>
+        <label class="research-field research-check">
+          <input type="checkbox" id="research-deep-report"> in-depth report
         </label>
         <label class="research-field">effort
           <select id="research-effort" class="input">${effortOptions}</select>
@@ -135,12 +138,13 @@ async function startResearch() {
   const model = document.getElementById('research-model').value;
   const mode = document.getElementById('research-mode').value;
   const forceSearch = mode === 'brainstorm' && document.getElementById('research-force-search').checked;
+  const deepReport = document.getElementById('research-deep-report').checked;
   const effort = parseInt(document.getElementById('research-effort').value, 10) || formDefaults.effort;
   const maxTimeMinutes = parseInt(document.getElementById('research-time').value, 10) || formDefaults.max_time_minutes;
   const btn = document.getElementById('research-start');
   btn.disabled = true;
   try {
-    const job = await research.start(title, query, model, mode, forceSearch, effort, maxTimeMinutes);
+    const job = await research.start(title, query, model, mode, forceSearch, deepReport, effort, maxTimeMinutes);
     location.hash = job.id;
   } catch (err) {
     btn.disabled = false;
@@ -214,7 +218,7 @@ function progressLine(ev) {
       return `round ${ev.round} — synthesizing (${n} finding${n === 1 ? '' : 's'})`;
     }
     case 'deciding': return `round ${ev.round} — stop check: ${ev.message}`;
-    case 'writing': return 'writing final report';
+    case 'writing': return ev.message || 'writing final report';
     case 'note': return ev.message;
     case 'warning': return ev.message;
     default: return ev.message || ev.phase;
@@ -269,6 +273,7 @@ async function showDetail(id) {
     <div class="research-detail-meta">
       ${statusBadge(job.status)}
       ${job.mode === 'brainstorm' ? `<span>brainstorm${job.force_search ? ' · always searches' : ''}</span>` : ''}
+      ${job.deep_report ? '<span>in-depth</span>' : ''}
       <span>${escapeHtml(job.model)}</span>
       ${job.effort ? `<span>effort: ${EFFORT_NAMES[job.effort] || job.effort}</span>` : ''}
       <span>${formatDate(job.created_at)}</span>

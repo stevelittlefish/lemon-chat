@@ -51,6 +51,26 @@ func TestParseJSONObject(t *testing.T) {
 	}
 }
 
+func TestParseOutlineJSON(t *testing.T) {
+	// The deep-report outline is parsed as {"sections": [{title, intent}]} with
+	// the same tolerant extraction as other object parsing (fences, prose).
+	var v struct {
+		Sections []reportSection `json:"sections"`
+	}
+	in := "Here is the outline:\n```json\n{\"sections\": [{\"title\": \"Background\", \"intent\": \"set the scene\"}, {\"title\": \"Analysis\", \"intent\": \"dig in\"}]}\n```"
+	if err := parseJSONObject(in, &v); err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if len(v.Sections) != 2 || v.Sections[0].Title != "Background" || v.Sections[1].Intent != "dig in" {
+		t.Errorf("unexpected sections: %+v", v.Sections)
+	}
+
+	// Round-trips through marshalOutline cleanly.
+	if got := marshalOutline(v.Sections); !strings.Contains(got, `"title":"Background"`) {
+		t.Errorf("marshalOutline: %q", got)
+	}
+}
+
 func TestStripThinking(t *testing.T) {
 	if got := stripThinking("<think>internal monologue</think>YES — looks complete"); got != "YES — looks complete" {
 		t.Errorf("closed block: got %q", got)

@@ -77,10 +77,14 @@ type Config struct {
 	// ForceSearch (brainstorm only) guarantees at least one web search: the
 	// first round must produce a query rather than leaving it to the model.
 	ForceSearch bool
-	APIBase     string
-	APIKey      string
-	SearXNGURL  string
-	Location    *time.Location
+	// DeepReport replaces the single-shot final write with a section-based
+	// pipeline (outline → refine → per-section write from raw findings → glue),
+	// producing a longer, more detailed report. Applies to both modes.
+	DeepReport bool
+	APIBase    string
+	APIKey     string
+	SearXNGURL string
+	Location   *time.Location
 
 	MaxRounds             int
 	MaxTime               time.Duration
@@ -264,7 +268,12 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 	}
 
 	r.progress(Progress{Phase: "writing", TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
-	final := r.finalReport(ctx)
+	var final string
+	if r.cfg.DeepReport {
+		final = r.deepReport(ctx)
+	} else {
+		final = r.finalReport(ctx)
+	}
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
@@ -676,6 +685,200 @@ func (r *Researcher) finalBrainstorm(ctx context.Context) string {
 		return r.state.Report
 	}
 	return report
+}
+
+// ── Phase 8b: Section-based deep report ──────────────────────
+//
+// deepReport replaces the single-shot final write with a multi-call pipeline:
+// outline (draft → self-critique refine) → write each section in depth from the
+// raw findings → glue on an executive summary and conclusion, assembled
+// deterministically (no full-document rewrite, which would re-compress the
+// detail this mode exists to preserve). Any stage failing falls back to the
+// standard single-shot writer so the run never returns empty.
+
+// reportSection is one planned section of the report/design document.
+type reportSection struct {
+	Title  string `json:"title"`
+	Intent string `json:"intent"`
+}
+
+func (r *Researcher) deepReport(ctx context.Context) string {
+	r.progress(Progress{Phase: "writing", Message: "planning report structure"})
+	sections := r.outline(ctx)
+	if ctx.Err() != nil {
+		return r.state.Report
+	}
+	if len(sections) == 0 {
+		r.progress(Progress{Phase: "warning", Message: "outline generation failed — writing a standard report"})
+		return r.finalReport(ctx)
+	}
+
+	titles := make([]string, len(sections))
+	for i, s := range sections {
+		titles[i] = s.Title
+	}
+	outline := strings.Join(titles, "\n")
+	findings := formatFindings(r.state.Findings)
+	report := r.state.Report
+
+	var bodies []string
+	for i, sec := range sections {
+		if ctx.Err() != nil {
+			break
+		}
+		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings),
+			Message: fmt.Sprintf("writing section %d of %d — %s", i+1, len(sections), sec.Title)})
+		if body := r.writeSection(ctx, sec, outline, findings, report); body != "" {
+			bodies = append(bodies, body)
+		}
+	}
+	if len(bodies) == 0 {
+		return r.finalReport(ctx)
+	}
+
+	// Glue: a short executive summary up top and a closing section, generated
+	// from the outline + condensed overview (cheap, robust plain-text calls).
+	r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Message: "writing summary and conclusion"})
+	summary := r.gluePart(ctx, outline, report,
+		"a concise executive summary (2-4 sentences) capturing the most important takeaways.")
+	conclHeading, conclInstruction := "## Conclusion",
+		"a conclusion that ties the findings together and directly answers the question."
+	if r.brainstorm() {
+		conclHeading, conclInstruction = "## Next steps",
+			"a 'Next steps' list of concrete, actionable recommendations to move the design forward."
+	}
+	conclusion := r.gluePart(ctx, outline, report, conclInstruction)
+
+	var sb strings.Builder
+	if summary != "" {
+		sb.WriteString("## Executive summary\n\n")
+		sb.WriteString(summary)
+		sb.WriteString("\n\n")
+	}
+	sb.WriteString(strings.Join(bodies, "\n\n"))
+	if conclusion != "" {
+		sb.WriteString("\n\n")
+		sb.WriteString(conclHeading)
+		sb.WriteString("\n\n")
+		sb.WriteString(conclusion)
+	}
+	return sb.String()
+}
+
+// outline produces the section plan: a draft outline followed by a self-critique
+// refine pass that catches gaps and prunes redundancy. Returns nil on failure.
+func (r *Researcher) outline(ctx context.Context) []reportSection {
+	findings := formatFindings(r.state.Findings)
+	if findings == "" {
+		findings = "(No web findings — work from the notes and the brief.)"
+	}
+	report := r.state.Report
+	if report == "" {
+		report = "(No evolving report yet.)"
+	}
+
+	var draftPrompt string
+	if r.brainstorm() {
+		draftPrompt = fmt.Sprintf(brainstormOutlineDraftPrompt, r.cfg.Query, r.state.Plan, report, findings)
+	} else {
+		catHint := ""
+		if r.state.Category != "" && r.state.Category != "general" {
+			catHint = fmt.Sprintf(" This is a %s-type report, so shape the sections accordingly.", r.state.Category)
+		}
+		draftPrompt = fmt.Sprintf(outlineDraftPrompt, r.cfg.Query, r.state.Plan, report, findings, catHint)
+	}
+	draft := r.parseOutline(ctx, draftPrompt)
+	if ctx.Err() != nil || len(draft) == 0 {
+		return draft
+	}
+
+	var refinePrompt string
+	if r.brainstorm() {
+		refinePrompt = fmt.Sprintf(brainstormOutlineRefinePrompt, r.cfg.Query, r.state.Plan, findings, marshalOutline(draft))
+	} else {
+		refinePrompt = fmt.Sprintf(outlineRefinePrompt, r.cfg.Query, r.state.Plan, findings, marshalOutline(draft))
+	}
+	if refined := r.parseOutline(ctx, refinePrompt); len(refined) > 0 {
+		return refined
+	}
+	return draft // refine failed — the draft is still usable
+}
+
+// parseOutline runs one outline LLM call and parses {"sections": [...]}.
+func (r *Researcher) parseOutline(ctx context.Context, prompt string) []reportSection {
+	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, 1024, planningTimeout)
+	if err != nil {
+		return nil
+	}
+	var parsed struct {
+		Sections []reportSection `json:"sections"`
+	}
+	if parseJSONObject(out, &parsed) != nil {
+		return nil
+	}
+	var sections []reportSection
+	for _, s := range parsed.Sections {
+		s.Title = strings.TrimSpace(s.Title)
+		if s.Title != "" {
+			sections = append(sections, s)
+		}
+	}
+	return sections
+}
+
+// marshalOutline serialises an outline for the refine prompt.
+func marshalOutline(sections []reportSection) string {
+	b, _ := json.Marshal(struct {
+		Sections []reportSection `json:"sections"`
+	}{sections})
+	return string(b)
+}
+
+// writeSection writes one section in depth from the raw findings. Returns "" on
+// failure so the caller can skip it. A "##" heading is ensured.
+func (r *Researcher) writeSection(ctx context.Context, sec reportSection, outline, findings, report string) string {
+	if findings == "" {
+		findings = "(No web findings — develop from the notes and your own knowledge.)"
+	}
+	if report == "" {
+		report = "(No evolving report yet.)"
+	}
+	var prompt string
+	if r.brainstorm() {
+		prompt = fmt.Sprintf(brainstormSectionWritePrompt, r.cfg.Query, r.state.Plan, sec.Title, sec.Intent, outline, report, findings)
+	} else {
+		prompt = fmt.Sprintf(sectionWritePrompt, r.cfg.Query, r.state.Plan, sec.Title, sec.Intent, outline, report, findings)
+	}
+	onDelta := func(generated int, tail string) {
+		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
+	}
+	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	if err != nil || strings.TrimSpace(out) == "" {
+		return ""
+	}
+	out = strings.TrimSpace(out)
+	if !strings.HasPrefix(out, "#") {
+		out = "## " + sec.Title + "\n\n" + out
+	}
+	return out
+}
+
+// gluePart generates a short standalone piece (executive summary or conclusion)
+// from the outline and condensed overview. Plain text, no heading.
+func (r *Researcher) gluePart(ctx context.Context, outline, report, instruction string) string {
+	if report == "" {
+		report = "(No overview available.)"
+	}
+	tmpl := reportGluePartPrompt
+	if r.brainstorm() {
+		tmpl = brainstormGluePartPrompt
+	}
+	prompt := fmt.Sprintf(tmpl, r.cfg.Query, outline, report, instruction)
+	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, 1500, synthesisTimeout)
+	if err != nil {
+		return ""
+	}
+	return stripToolCalls(out)
 }
 
 // ── Report formatting ────────────────────────────────────────

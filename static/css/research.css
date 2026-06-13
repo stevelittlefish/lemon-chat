@@ -86,8 +86,8 @@ html, body {
 }
 .research-field .input { max-width: 220px; }
 .research-time-input { width: 5ch; max-width: 5ch; }
-.research-force-search { cursor: pointer; }
-.research-force-search input { cursor: pointer; accent-color: var(--fg); }
+.research-check { cursor: pointer; }
+.research-check input { cursor: pointer; accent-color: var(--fg); }
 /* The `hidden` attribute would otherwise lose to .research-field's display:flex. */
 .research-force-search[hidden] { display: none; }
 

@@ -213,6 +213,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		Model:                 job.Model,
 		Mode:                  job.Mode,
 		ForceSearch:           job.ForceSearch,
+		DeepReport:            job.DeepReport,
 		APIBase:               modelServer.APIBase,
 		APIKey:                modelServer.APIKey,
 		SearXNGURL:            s.cfg.SearXNG.URL,
@@ -346,6 +347,7 @@ type researchJobView struct {
 	Model          string  `json:"model"`
 	Mode           string  `json:"mode"`
 	ForceSearch    bool    `json:"force_search"`
+	DeepReport     bool    `json:"deep_report"`
 	Status         string  `json:"status"`
 	Phase          *string `json:"phase"`
 	Effort         int     `json:"effort"`
@@ -359,7 +361,7 @@ type researchJobView struct {
 
 func researchView(j *store.ResearchJob) researchJobView {
 	return researchJobView{
-		ID: j.ID, Title: j.Title, Query: j.Query, Model: j.Model, Mode: j.Mode, ForceSearch: j.ForceSearch, Status: j.Status, Phase: j.Phase,
+		ID: j.ID, Title: j.Title, Query: j.Query, Model: j.Model, Mode: j.Mode, ForceSearch: j.ForceSearch, DeepReport: j.DeepReport, Status: j.Status, Phase: j.Phase,
 		Effort: j.Effort, MaxTimeSeconds: j.MaxTimeSeconds,
 		Round: j.Round, ElapsedMS: j.ElapsedMS, Error: j.Error, CreatedAt: j.CreatedAt, UpdatedAt: j.UpdatedAt,
 	}
@@ -386,6 +388,7 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		Model          string `json:"model"`
 		Mode           string `json:"mode"`
 		ForceSearch    bool   `json:"force_search"`
+		DeepReport     bool   `json:"deep_report"`
 		Effort         int    `json:"effort"`
 		MaxTimeMinutes int    `json:"max_time_minutes"`
 	}
@@ -434,12 +437,12 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 
 	// ForceSearch only changes brainstorm-mode behaviour; ignore it otherwise.
 	forceSearch := req.ForceSearch && mode == research.ModeBrainstorm
-	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, effort, maxTimeSeconds)
+	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, effort, maxTimeSeconds)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	log.Printf("Starting research job id=%d user_id=%d model=%q mode=%q force_search=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, mode, forceSearch, effort, maxTimeSeconds, req.Title, req.Query)
+	log.Printf("Starting research job id=%d user_id=%d model=%q mode=%q force_search=%t deep_report=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, mode, forceSearch, req.DeepReport, effort, maxTimeSeconds, req.Title, req.Query)
 	go s.runResearch(job)
 	writeJSON(w, http.StatusCreated, researchView(job))
 }

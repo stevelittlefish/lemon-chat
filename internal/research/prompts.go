@@ -271,6 +271,162 @@ const expandReportPrompt = `This report is too brief. Please expand it significa
 - Target at least 1000 words
 Write the full expanded report now.`
 
+// ── Section-based deep report ─────────────────────────────────
+//
+// Used when DeepReport is set. The report is built section by section from the
+// raw findings instead of in one summarising pass. Research- and brainstorm-mode
+// variants mirror the single-shot final prompts above.
+
+const outlineDraftPrompt = `You are planning the structure of a detailed research report.
+
+**Question:** %s
+
+**Research plan:**
+%s
+
+**Current report draft (a condensed overview):**
+%s
+
+**Collected evidence (raw findings):**
+%s
+
+Design an outline as a set of sections that together answer the question thoroughly and without overlap. Cover every important aspect supported by the evidence. Aim for roughly 4-8 substantial sections. Do NOT include an executive summary or conclusion section — those are added separately.%s
+
+Return ONLY a JSON object of this exact shape, nothing else:
+{"sections": [{"title": "Section title", "intent": "One sentence on what this section covers and why"}]}`
+
+const outlineRefinePrompt = `You are reviewing and improving the outline for a detailed research report before it is written.
+
+**Question:** %s
+
+**Research plan:**
+%s
+
+**Collected evidence (raw findings):**
+%s
+
+**Draft outline:**
+%s
+
+Critically review the draft outline against the question, the plan, and the evidence:
+- Add sections for anything important that is missing or under-covered.
+- Remove or merge sections that are redundant or thin.
+- Order the sections so the report flows logically.
+Do not include an executive summary or conclusion section (those are added separately).
+
+Return ONLY the improved outline as a JSON object of the same shape, nothing else:
+{"sections": [{"title": "Section title", "intent": "One sentence on what this section covers and why"}]}`
+
+const sectionWritePrompt = `You are writing ONE section of a detailed, long-form research report. Other sections are written separately.
+
+**Question:** %s
+
+**Research plan:**
+%s
+
+**This section:** %s
+**What this section should cover:** %s
+
+**Full report outline (for context — avoid overlapping with the other sections):**
+%s
+
+**Condensed overview of findings so far:**
+%s
+
+**Collected evidence (raw findings — draw on the relevant ones):**
+%s
+
+Write this section in depth: multiple detailed paragraphs with specific facts, numbers, and comparisons drawn from the evidence, explaining why things matter. Include inline citations as [like this](url) using the finding URLs. Start with a "## " heading for this section's title. Write only this section's content — no preamble, no other sections.`
+
+const reportGluePartPrompt = `You are writing one part of a detailed research report.
+
+**Question:** %s
+
+**Report section outline:**
+%s
+
+**Condensed overview of the report:**
+%s
+
+Write %s
+
+Write only that text — no heading, no preamble, no meta-commentary.`
+
+const brainstormOutlineDraftPrompt = `You are planning the structure of a detailed design document.
+
+**Brief:** %s
+
+**Framing:**
+%s
+
+**Design notes so far:**
+%s
+
+**Any supporting research:**
+%s
+
+Design an outline as a set of sections that fully present and justify the proposed solution. Typical sections include the core concept, how it works, key components or mechanics, and trade-offs and alternatives — but tailor them to this brief. Aim for roughly 4-8 substantial sections. Do NOT include an executive summary or next-steps section — those are added separately.
+
+Return ONLY a JSON object of this exact shape, nothing else:
+{"sections": [{"title": "Section title", "intent": "One sentence on what this section covers and why"}]}`
+
+const brainstormOutlineRefinePrompt = `You are reviewing and improving the outline for a design document before it is written.
+
+**Brief:** %s
+
+**Framing:**
+%s
+
+**Any supporting research:**
+%s
+
+**Draft outline:**
+%s
+
+Critically review the draft outline against the brief and the design work so far:
+- Add sections for anything important that is missing or under-developed.
+- Remove or merge sections that are redundant or thin.
+- Order the sections so the document flows logically.
+Do not include an executive summary or next-steps section (those are added separately).
+
+Return ONLY the improved outline as a JSON object of the same shape, nothing else:
+{"sections": [{"title": "Section title", "intent": "One sentence on what this section covers and why"}]}`
+
+const brainstormSectionWritePrompt = `You are writing ONE section of a detailed design document. Other sections are written separately.
+
+**Brief:** %s
+
+**Framing:**
+%s
+
+**This section:** %s
+**What this section should cover:** %s
+
+**Full document outline (for context — avoid overlapping with the other sections):**
+%s
+
+**Design notes so far:**
+%s
+
+**Any supporting research (draw on the relevant items):**
+%s
+
+Develop this section in depth. Be specific and decisive — recommend, don't just list options. Where a web source informed a specific point, cite it inline as [like this](url). Start with a "## " heading for this section's title. Write only this section's content — no preamble, no other sections.`
+
+const brainstormGluePartPrompt = `You are writing one part of a design document.
+
+**Brief:** %s
+
+**Document section outline:**
+%s
+
+**Overview of the design:**
+%s
+
+Write %s
+
+Write only that text — no heading, no preamble, no meta-commentary.`
+
 // categoryPrompts are appended to the final-report prompt when a category
 // was detected or supplied.
 var categoryPrompts = map[string]string{
