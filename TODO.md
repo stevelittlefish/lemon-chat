@@ -28,7 +28,6 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 - [ ] Look into ways to follow Reddit and facebook links, if possible
 
-- [ ] Question: are there any more useful parameters to expose on the research UI?
 
 ## Code review (2026-06-13)
 
@@ -36,7 +35,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 
 ### Security
 
-- [ ] **Stored XSS — sanitise rendered markdown** (`static/js/markdown.js:37`)
+- [x] **Stored XSS — sanitise rendered markdown** (`static/js/markdown.js:37`)
   `marked.parse(text)` is assigned to `innerHTML` with no sanitiser; assistant output (which includes fetched web-page content and shared character prompts) executes as live HTML. Vendor DOMPurify (no build step — drop in `static/js/vendor/`) and sanitise the output of `render()` before assigning. Highest priority.
 
 - [ ] **Notes IDOR — add ownership checks** (`internal/server/notes.go:24,82,112`)
