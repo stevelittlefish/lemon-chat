@@ -8,6 +8,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 )
 
@@ -86,6 +88,14 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.store.SessionUserID(cookie.Value); err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
+	}
+
+	if origin := r.Header.Get("Origin"); origin != "" {
+		originURL, err := url.Parse(origin)
+		if err != nil || !strings.EqualFold(originURL.Host, r.Host) {
+			http.Error(w, "forbidden origin", http.StatusForbidden)
+			return
+		}
 	}
 
 	if r.Header.Get("Upgrade") != "websocket" {

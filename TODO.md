@@ -46,7 +46,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Escape filename in Content-Disposition** (`internal/server/attachments.go:29`)
   `att.Filename` is interpolated into the header inside quotes without escaping; `filepath.Base` doesn't strip `"`/newlines. Use `mime.FormatMediaType`.
 
-- [ ] **Add WebSocket Origin check** (`internal/server/ws.go:80`)
+- [x] **Add WebSocket Origin check** (`internal/server/ws.go:80`)
   `handleWS` never validates `Origin` (CSWSH). Mitigated by `SameSite=Strict` cookie, but add the check as defence in depth.
 
 ### Bugs
