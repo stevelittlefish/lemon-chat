@@ -1,11 +1,8 @@
 package tasks
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -13,6 +10,7 @@ import (
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/debug"
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
@@ -164,62 +162,20 @@ func generateCompletionTitle(content, chatURL, modelName, apiKey string, respons
 		content = content[:titleTranscriptLimit]
 	}
 
-	type chatMsg struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}
-	msgs := []chatMsg{
+	msgs := []llm.Message{
 		{Role: "system", Content: "Generate a short title (at most 6 words) for the following text. Respond with only the title — no quotes, no trailing punctuation, no explanation."},
 		{Role: "user", Content: content},
 	}
-	payload, _ := json.Marshal(map[string]any{
-		"model":      modelName,
-		"messages":   msgs,
-		"stream":     false,
-		"max_tokens": 20,
-	})
 
-	debug.Log("title: completion title payload: %s", payload)
 	debug.Log("title: POST %s (model=%s, completion title)", chatURL, modelName)
 	ctx, cancel := context.WithTimeout(context.Background(), responseTimeout)
 	defer cancel()
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
+	raw, err := llm.ChatComplete(ctx, http.DefaultClient, chatURL, apiKey, modelName, msgs, map[string]any{"max_tokens": 20})
 	if err != nil {
-		return "", fmt.Errorf("POST %s: %w", chatURL, err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-	resp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		return "", fmt.Errorf("POST %s: %w", chatURL, err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("read response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("model server returned %d: %s", resp.StatusCode, body)
+		return "", err
 	}
 
-	var result struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
-
-	title := strings.TrimSpace(result.Choices[0].Message.Content)
+	title := strings.TrimSpace(raw)
 	title = strings.Trim(title, `"'`)
 	title = strings.TrimSpace(title)
 	if title == "" {
@@ -314,67 +270,20 @@ func generateTitle(st *store.Store, chatURL, modelName, apiKey string, convID in
 		systemPrompt = custom
 	}
 
-	type chatMsg struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}
-
-	out := []chatMsg{
+	out := []llm.Message{
 		{Role: "system", Content: systemPrompt},
 		{Role: "user", Content: transcript},
 	}
 
-	payload, _ := json.Marshal(map[string]any{
-		"model":      modelName,
-		"messages":   out,
-		"stream":     false,
-		"max_tokens": 20,
-	})
-
-	debug.Log("title: payload for conversation %d: %s", convID, payload)
 	debug.Log("title: POST %s (model=%s, conv=%d)", chatURL, modelName, convID)
 	ctx, cancel := context.WithTimeout(context.Background(), responseTimeout)
 	defer cancel()
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
+	raw, err := llm.ChatComplete(ctx, http.DefaultClient, chatURL, apiKey, modelName, out, map[string]any{"max_tokens": 20})
 	if err != nil {
-		return "", fmt.Errorf("POST %s: %w", chatURL, err)
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-	resp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		return "", fmt.Errorf("POST %s: %w", chatURL, err)
-	}
-	defer resp.Body.Close()
-	debug.Log("title: response status %d for conversation %d", resp.StatusCode, convID)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("read response: %w", err)
-	}
-	debug.Log("title: response body for conversation %d: %s", convID, body)
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("model server returned %d: %s", resp.StatusCode, body)
+		return "", err
 	}
 
-	var result struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
-
-	title := strings.TrimSpace(result.Choices[0].Message.Content)
+	title := strings.TrimSpace(raw)
 	title = strings.Trim(title, `"'`)
 	title = strings.TrimSpace(title)
 	if title == "" {

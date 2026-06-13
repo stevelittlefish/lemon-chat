@@ -75,10 +75,10 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 
 ### Duplication
 
-- [ ] **Extract a shared streaming chat-completion helper** (`internal/server/messages.go:311`, `internal/server/completions.go:246`, `internal/research/llm.go:78`)
+- [x] **Extract a shared streaming chat-completion helper** (`internal/server/messages.go:311`, `internal/server/completions.go:246`, `internal/research/llm.go:78`)
   The SSE scanner loop (`1<<20` buffer, `"data: "` prefix, `[DONE]`) and request plumbing are reimplemented three times.
 
-- [ ] **Extract a shared non-streaming chat-completion helper** (`internal/server/tools.go:1320`, `internal/research/llm.go:23`, `internal/tasks/titles.go:162,299`)
+- [x] **Extract a shared non-streaming chat-completion helper** (`internal/server/tools.go:1320`, `internal/research/llm.go:23`, `internal/tasks/titles.go:162,299`)
   Build payload → set auth → decode `choices[0].Message.Content` is duplicated four times.
 
 - [ ] **De-duplicate SearXNG search** (`internal/server/tools.go:862`, `internal/research/web.go:23`)

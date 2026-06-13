@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/debug"
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
@@ -291,18 +291,7 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 	var generated strings.Builder
 	var chunkCount int
 	var promptTokens, completionTokens int64
-	scanner := bufio.NewScanner(resp.Body)
-	scanner.Buffer(make([]byte, 1<<20), 1<<20)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "data: ") {
-			continue
-		}
-		data := line[6:]
-		if data == "[DONE]" {
-			debug.Log("completions: received [DONE] after %d chunks, %d generated chars", chunkCount, generated.Len())
-			break
-		}
+	scanErr := llm.ScanSSE(resp.Body, func(data string) error {
 		var chunk struct {
 			Choices []struct {
 				Text         string  `json:"text"`
@@ -315,7 +304,7 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 			debug.Log("completions: failed to parse chunk: %v — raw: %q", err, data)
-			continue
+			return nil
 		}
 		if chunk.Usage != nil {
 			promptTokens = chunk.Usage.PromptTokens
@@ -323,7 +312,7 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 			debug.Log("completions: usage: prompt=%d completion=%d", promptTokens, completionTokens)
 		}
 		if len(chunk.Choices) == 0 {
-			continue
+			return nil
 		}
 		if text := chunk.Choices[0].Text; text != "" {
 			chunkCount++
@@ -332,9 +321,11 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "data: %s\n\n", delta)
 			flusher.Flush()
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		log.Printf("completions: SSE scanner error for completion %d: %v", id, err)
+		return nil
+	})
+	debug.Log("completions: stream ended after %d chunks, %d generated chars", chunkCount, generated.Len())
+	if scanErr != nil {
+		log.Printf("completions: SSE scanner error for completion %d: %v", id, scanErr)
 	}
 
 	// Save the final content (prompt + generated).

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/debug"
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
@@ -372,19 +372,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		var pendingCalls []*streamToolCall
 		var finishReason string
 
-		scanner := bufio.NewScanner(resp.Body)
-		scanner.Buffer(make([]byte, 1<<20), 1<<20)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if tokenLog != nil && strings.HasPrefix(line, "data: ") {
-				fmt.Fprintf(tokenLog, "[loop=%d] %s\n", loop, line)
-			}
-			if !strings.HasPrefix(line, "data: ") {
-				continue
-			}
-			data := line[6:]
-			if data == "[DONE]" {
-				break
+		scanErr := llm.ScanSSE(resp.Body, func(data string) error {
+			if tokenLog != nil {
+				fmt.Fprintf(tokenLog, "[loop=%d] data: %s\n", loop, data)
 			}
 			var chunk struct {
 				Choices []struct {
@@ -407,7 +397,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				} `json:"usage"`
 			}
 			if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-				continue
+				return nil
 			}
 			if chunk.Usage != nil {
 				usageStats = &store.MessageStats{
@@ -417,7 +407,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if len(chunk.Choices) == 0 {
-				continue
+				return nil
 			}
 			choice := chunk.Choices[0]
 			if choice.FinishReason != nil {
@@ -441,8 +431,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				}
 				pendingCalls[tc.Index].argsJSON.WriteString(tc.Function.Arguments)
 			}
-		}
-		if scanErr := scanner.Err(); scanErr != nil {
+			return nil
+		})
+		if scanErr != nil {
 			log.Printf("messages: SSE scanner error for conv %d: %v", convID, scanErr)
 		}
 		resp.Body.Close()

@@ -1,7 +1,6 @@
 package research
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -11,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
 )
 
 type chatMsg struct {
@@ -21,54 +22,17 @@ type chatMsg struct {
 // llmCall makes a non-streaming chat completion request and returns the
 // response content with any reasoning blocks stripped.
 func (r *Researcher) llmCall(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, error) {
-	payload, _ := json.Marshal(map[string]any{
-		"model":       r.cfg.Model,
-		"messages":    msgs,
-		"stream":      false,
-		"temperature": temperature,
-		"max_tokens":  maxTokens,
-	})
-
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(callCtx, "POST", r.cfg.APIBase+"/chat/completions", bytes.NewReader(payload))
+	content, err := llm.ChatComplete(callCtx, r.client, r.cfg.APIBase+"/chat/completions", r.cfg.APIKey, r.cfg.Model, msgs, map[string]any{
+		"temperature": temperature,
+		"max_tokens":  maxTokens,
+	})
 	if err != nil {
-		return "", fmt.Errorf("build request: %w", err)
+		return "", err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	if r.cfg.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+r.cfg.APIKey)
-	}
-
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("model request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 20*1024*1024))
-	if err != nil {
-		return "", fmt.Errorf("read response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, body)
-	}
-
-	var result struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
-	}
-	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
-	return stripThinking(result.Choices[0].Message.Content), nil
+	return stripThinking(content), nil
 }
 
 // llmCallStream is llmCall with stream=true. onDelta is invoked at most every
@@ -109,17 +73,7 @@ func (r *Researcher) llmCallStream(ctx context.Context, msgs []chatMsg, temperat
 
 	var full strings.Builder
 	var lastEmit time.Time
-	scanner := bufio.NewScanner(resp.Body)
-	scanner.Buffer(make([]byte, 1<<20), 1<<20)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "data: ") {
-			continue
-		}
-		data := line[6:]
-		if data == "[DONE]" {
-			break
-		}
+	scanErr := llm.ScanSSE(resp.Body, func(data string) error {
 		var chunk struct {
 			Choices []struct {
 				Delta struct {
@@ -128,7 +82,7 @@ func (r *Researcher) llmCallStream(ctx context.Context, msgs []chatMsg, temperat
 			} `json:"choices"`
 		}
 		if json.Unmarshal([]byte(data), &chunk) != nil || len(chunk.Choices) == 0 {
-			continue
+			return nil
 		}
 		if text := chunk.Choices[0].Delta.Content; text != "" {
 			full.WriteString(text)
@@ -137,9 +91,10 @@ func (r *Researcher) llmCallStream(ctx context.Context, msgs []chatMsg, temperat
 				onDelta(full.Len(), tailOf(full.String(), 300))
 			}
 		}
-	}
-	if err := scanner.Err(); err != nil && full.Len() == 0 {
-		return "", fmt.Errorf("stream read failed: %w", err)
+		return nil
+	})
+	if scanErr != nil && full.Len() == 0 {
+		return "", fmt.Errorf("stream read failed: %w", scanErr)
 	}
 
 	out := stripToolCalls(stripThinking(full.String()))

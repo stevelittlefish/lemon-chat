@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
@@ -1321,61 +1322,18 @@ func stripHTML(html string) string {
 }
 
 func summariseHTML(text, modelName string, srv *config.ModelServer, timeout time.Duration) (string, error) {
-	type chatMsg struct {
-		Role    string `json:"role"`
-		Content string `json:"content"`
-	}
-	msgs := []chatMsg{
+	msgs := []llm.Message{
 		{Role: "system", Content: "Convert the following web page text to clean, well-structured markdown. Preserve headings, lists, links, and code blocks. Remove navigation, footer, and boilerplate text."},
 		{Role: "user", Content: text},
 	}
-	payload, _ := json.Marshal(map[string]any{
-		"model":    modelName,
-		"messages": msgs,
-		"stream":   false,
-	})
-
-	chatURL := srv.APIBase + "/chat/completions"
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
+	content, err := llm.ChatComplete(ctx, http.DefaultClient, srv.APIBase+"/chat/completions", srv.APIKey, modelName, msgs, nil)
 	if err != nil {
-		return "", fmt.Errorf("build summarise request: %w", err)
+		return "", err
 	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	if srv.APIKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+srv.APIKey)
-	}
-
-	httpResp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		return "", fmt.Errorf("summarise request failed: %w", err)
-	}
-	defer httpResp.Body.Close()
-
-	respBody, err := io.ReadAll(httpResp.Body)
-	if err != nil {
-		return "", fmt.Errorf("read summarise response: %w", err)
-	}
-	if httpResp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("model server returned %d: %s", httpResp.StatusCode, respBody)
-	}
-
-	var result struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return "", fmt.Errorf("decode summarise response: %w", err)
-	}
-	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("no choices in summarise response")
-	}
-	return strings.TrimSpace(result.Choices[0].Message.Content), nil
+	return strings.TrimSpace(content), nil
 }
 
 // ExecuteTool runs a tool by name and returns its result string.
