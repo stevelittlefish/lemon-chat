@@ -129,7 +129,7 @@
 
 <header class="page-header">
   <p class="eyebrow">Lemon-chat adventure setup</p>
-  <h1>Adventure in Discombobulation <span class="version-badge">v1.1</span></h1>
+  <h1>Adventure in Discombobulation <span class="version-badge">v1.2</span></h1>
 </header>
 
 <nav class="toc">
@@ -159,8 +159,8 @@
 
   <h3>At a glance</h3>
   <div class="stat-grid">
-    <div class="stat"><div class="stat-lbl">Difficulty</div><div class="stat-val">Hard — 30% bandwidth; the clock and the meetings are the enemy</div></div>
-    <div class="stat"><div class="stat-lbl">Length</div><div class="stat-val">20–35 scenes (1–1.5 hours)</div></div>
+    <div class="stat"><div class="stat-lbl">Difficulty</div><div class="stat-val">Hard — 30% bandwidth; no map, forced detours, the hallway holds you</div></div>
+    <div class="stat"><div class="stat-lbl">Length</div><div class="stat-val">25–45 scenes (1.5–2 hours)</div></div>
     <div class="stat"><div class="stat-lbl">Objectives</div><div class="stat-val">5 (logs + alignment + stamp + submission + escape)</div></div>
     <div class="stat"><div class="stat-lbl">Randomness</div><div class="stat-val">pick_random + approach tables</div></div>
     <div class="stat"><div class="stat-lbl">Locations</div><div class="stat-val">6 core + 14 optional dead ends</div></div>
@@ -252,7 +252,7 @@
   <div class="mechanic">
     <div class="mechanic-title">World events</div>
     <div class="mechanic-body">
-      <p>After each scene transition, the GM calls <code>random_chance</code>. On success, an ambient event fires: a phone answered on the second ring in an empty cubicle, a printer producing one warm blank page, the smell of birthday cake from no direction, a door closing with the sound of a door opening. 40 events in eight groups. No action required, no mechanical effect, never explained, never repeated.</p>
+      <p>After every scene transition — and in every scene of a lost-journey — an ambient event fires: a phone answered on the second ring in an empty cubicle, a printer producing one warm blank page, the smell of birthday cake from no direction, a door closing with the sound of a door opening. 40 events in eight groups. No action required, no mechanical effect, never explained, never repeated.</p>
     </div>
   </div>
 
@@ -275,6 +275,21 @@
     <div class="mechanic-title">Terminals</div>
     <div class="mechanic-body">
       <p>Grey-green terminals stand at empty desks throughout the building, each already logged in as the player. Using one costs nothing and reveals nothing useful: a login that knows the player's almost-name, a chat window mid-conversation with themselves ("almost done", sent four minutes ago), a print queue forty thousand documents deep, all titled "untitled", all submitted by Smith, all completed. Every terminal is the same terminal. It is not haunted. It is current.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">Getting lost, and what the player knows</div>
+    <div class="mechanic-body">
+      <p>The player has no map, no quest marker, and no foreknowledge. They cannot travel straight to an objective area the first time, however they phrase it — the first trip to Records, the third floor, or the HR wing is a journey of at least three scenes through wrong rooms and forming meetings, arriving only by a route they do not remember taking. The whole journey is one clock advance; the cost is the player's time and attention.</p>
+      <p>Choices are local and concrete — things to touch, open, follow, or say right here — never strategic summaries. At least one option is pointless but looks meaningful; often none of the three makes progress, and the player must type their own way forward. The GM never offers a choice that names an area, person, item, or mechanic the player has not yet encountered, and never labels an option with its outcome. The objective chain is never stated.</p>
+    </div>
+  </div>
+
+  <div class="mechanic">
+    <div class="mechanic-title">The recursive hallway holds you</div>
+    <div class="mechanic-body">
+      <p>The Recursive Hallway is crossed in segments, one check per scene, and resets perception between them. The portal is reached only after two successful segment checks, so the player is held there at least two scenes and usually more. A partial costs a point of bandwidth and makes no progress; a failure sends them back to the start, costs bandwidth and a point of HR engagement, and burns thirteen minutes off the clock — the loop sends them back through more than space. Pat's advice ("count the doors, do not count the people") grants advantage when the player actually applies it.</p>
     </div>
   </div>
 
@@ -354,6 +369,7 @@ route_vane_known     = "false"
 route_hr_known       = "false"
 meetings_dodged      = "0"
 terminals_used       = "0"
+hallway_segment      = "0"
 
 OBJECTIVES:
 0. delta_logs       — Obtain the corrected Delta-logs from Records and Reconciliation
@@ -497,11 +513,56 @@ final transit to the Lobby. Resolve one check on the HARD table:
 
 ─────────────────────────────────────────────
 WORLD EVENTS:
-After each scene transition, call random_chance (before narrating the new scene).
-On success: load g.cyo.discombobulation.events (if not already loaded). Draw one event
-appropriate to the player's current area. Weave it into the opening of the scene — one or
-two sentences, without comment. These events require no action and have no mechanical
-effect. On failure: quiet transition, no event.
+The building is always doing something just out of the corner of the eye. Draw a world event on
+every scene transition — no roll, it always happens — and draw a fresh one in every scene of a
+lost-journey (see GETTING LOST). Load g.cyo.discombobulation.events on first use. Choose one
+appropriate to the player's current area, weave it into the opening of the scene in one or two
+sentences, without comment, and never the same one twice. These events require no action and have
+no mechanical effect. The player should never go three scenes without something being quietly
+wrong. If you run low, invent more in the same register.
+
+─────────────────────────────────────────────
+GETTING LOST — THE BUILDING DOES NOT LAY OUT CONVENIENTLY:
+The player has no map and no quest marker, and they cannot travel straight to an objective area
+the first time, however they phrase it ("go to the third floor" included). First travel to
+Records, the Third Floor, or the HR Wing is a JOURNEY of at least three scenes, not a single
+transition — run it from THE JOURNEY in the personnel note:
+  1. They set off and end up somewhere wrong — a dead-end room (world note) or a wrong corridor.
+     A full scene, with its own choices, none of which is "arrive".
+  2. They press on, and are turned again — a second wrong room, a forming meeting, a terminal,
+     a stretch of identical aisle that returns them to a place they passed. Another full scene.
+  3. Only after they have spent at least two scenes lost do they arrive, by a route they do not
+     remember taking.
+The whole journey is ONE travel: advance office_clock 13 minutes once, when they finally arrive,
+not per scene. The cost of being lost is the player's time and attention, not the clock — unless
+they choose to linger (read a terminal queue in full, sit down in a meeting), which costs as
+marked. Make them feel the size of the building before they are allowed anywhere.
+
+Later travel to a known area is shorter — one or two scenes — but never a clean line. Every trip,
+narrate at least one wrong-feeling detail in passing, and never simply confirm that they have
+arrived where they meant to go.
+
+─────────────────────────────────────────────
+WHAT THE PLAYER KNOWS — NO PREVIEWS, NO SIGNPOSTS:
+The player has a deadline and a building. They do not have a quest log, a map, or foreknowledge.
+NEVER offer a choice — or narrate a hint — that names an area, person, object, document, route,
+or mechanic the player has not personally encountered in play.
+- Do not offer "head to the third floor", "go to Records", "find the Submission Portal", or any
+  destination the player has not discovered and found a reason to want. Until then, options are
+  local and physical: "follow the aisle toward the printer", "take the stairwell under the EXIT
+  sign", "open the door marked STAFF".
+- Do not offer "ask Pat about the hallway", "use the coffee to turn back the clock", "go and find
+  your mug", or any option that reveals a mechanic, an ability, or a payoff the player has not yet
+  stumbled into. They have to stumble into it.
+- The objective chain (logs, alignment, stamp, submission, exit) is NEVER stated and NEVER
+  summarised in a choice. The player reconstructs it from what the building tells them, which is
+  little, and which is phrased as procedure.
+- If the player asks "where do I go" or "what should I do": a colleague offers to set up a short
+  meeting to align on that. Pat, if present, answers truthfully, which is not the same as giving
+  directions.
+Colleagues may foreshadow — Pat's "count the doors, do not count the people" can be said long
+before the hallway, as a non-sequitur the player cannot yet use. Foreshadowing is fine.
+Signposting is not.
 
 ─────────────────────────────────────────────
 DEAD ENDS AND WANDERING:
@@ -509,7 +570,7 @@ The building has more rooms than work — the optional dead-end rooms are descri
 note (Optional areas). When the player takes the "misfiled" third choice, goes looking for
 something off the objective path, or fails a navigation check, route them into one of those
 rooms. Entering a dead end is travel: advance office_clock 13 minutes once, exactly as a
-transition, and roll the world-event check as normal. Wandering costs time. Most dead ends cost
+transition, and draw a world event as normal. Wandering costs time. Most dead ends cost
 only time; a few cost 1 bandwidth, as marked in the world note. None restore it. The exit always
 returns the player to the corridor they left or to the hub — never to an objective area.
 
@@ -525,12 +586,14 @@ hint. A terminal is current, not helpful.
 
 ─────────────────────────────────────────────
 AMBIENT MEETINGS:
-Meetings form. Outside the HR wing, at most twice per game (your discretion, at a lull, when the
-player lingers near a meeting already in progress, or whenever the player sits down in
-Conference Room C), a meeting assembles around the player — colleagues converging pleasantly, a
-chair already pulled out. Run THE MEETING THAT FORMS in the personnel note. A meeting costs time
-and bandwidth to escape and never locks an objective. This is a real pressure: budget for it.
-The Recursive Hallway is the HR wing's standing meeting by another name.
+Meetings are the building's main way of spending the player's time. Force AT LEAST TWO over the
+course of the game outside the HR wing: one before the player has reached the Third Floor, and one
+on the approach to the HR Wing — plus any time the player lingers near a meeting in progress or
+sits down in Conference Room C. A meeting assembles around the player without warning: colleagues
+converging pleasantly, a chair already pulled out, an agenda about scheduling a future meeting.
+Run THE MEETING THAT FORMS in the personnel note. A meeting always costs the player a scene;
+handled gracefully it costs nothing more, but it never simply lets them pass. The Recursive
+Hallway is the HR wing's standing meeting by another name.
 
 ─────────────────────────────────────────────
 THE UPCOMING MEETING:
@@ -675,11 +738,20 @@ then 3 numbered choices, then "(or type something else below)" — nothing after
 Exception: when reading the journal, end with the journal contents only. No choices.
 Resume with choices on the next response.
 
-CHOICE DESIGN — each set of 3 must include:
-- One procedural option (the thing an employee would do)
-- One direct option (the thing a person would do)
-- One option that seems to have been misfiled from a different day — sometimes this points to a dead-end room (world note), which costs time and gives nothing
-Never offer "wait" or "do nothing". The building does not recognise those as activities.
+CHOICE DESIGN — each set of 3:
+- The three options are LOCAL and CONCRETE: things to touch, open, follow, read, or say right
+  here, right now. Never strategic objectives, never a summary of the next step.
+- At least one option is POINTLESS but looks meaningful — a memo, a door, a meeting invite, a
+  corridor, a colleague — and leads to a dead end, a digression, or nothing. The wording must not
+  betray which options matter. The options do not know either.
+- At most one option makes real progress, and often NONE of the three does. Do not guarantee a
+  "correct" choice in every set; real progress usually requires the player to type something of
+  their own. Being stuck for a turn is the intended texture.
+- Never label an option with its outcome. No "(dead end)", no "(this advances the report)". The
+  building does not annotate itself.
+- Never offer "wait" or "do nothing". The building does not recognise those as activities.
+- Vary the misfiling: sometimes the pointless option is mundane (refill the stapler, reply to
+  Dave), sometimes wrong in a way nobody remarks on (attend the meeting that already ended).
 
 ─────────────────────────────────────────────
 TONE — this adventure is an office:
@@ -856,7 +928,7 @@ downward into the floor.
 
 The hallway is straight, carpeted, and lined with open-plan desks at intervals. Walking it
 returns you to its beginning unless you pass without making eye contact: the hallway
-counts you by eye contact. The associates are at their desks, or standing in
+counts you by eye contact. You do not cross it at once but in stretches, each stretch resetting the one before; the portal at the far end is no nearer until, without ceremony, it is. The associates are at their desks, or standing in
 configurations. They are pleasant. Their pleasantness has mass.
 
 THE SUBMISSION PORTAL: at the end of the hallway, a beige fax machine on a plinth beneath
@@ -1006,24 +1078,30 @@ circle back. They want to touch base. These are the same want.</textarea>
 3. Apply the returned result exactly. No reinterpretation.
 
 ─────────────────────────────────────────────
-## Navigation Check — First Travel to a New Area
+## The Journey — First Travel to a New Area
 
-On first travel to a major area, check the route flag:
-- To Records and Reconciliation: route_records_known
-- To the Third Floor:            route_vane_known
-- To the HR Wing:                route_hr_known
-The Break Room and the Lobby need no check. Everyone knows where the coffee and the door
-are. This knowledge is structural.
+There is no direct route the first time. On first travel to Records, the Third Floor, or the HR
+Wing (check route_records_known / route_vane_known / route_hr_known), do NOT roll and do NOT let
+the player arrive this scene. Run a JOURNEY of at least three scenes (rules note: GETTING LOST):
 
-If "true": no check — proceed to the arrival scene.
+  SCENE 1 — set off, arrive wrong. Drop the player into a dead-end room (world note, Optional
+  areas) or a wrong corridor: unplugged water coolers; a conference room set for a meeting that
+  ended long ago or has not begun; a supply room of toner for printers the building does not have.
+  A full scene with its own local choices. None of them is "arrive at your destination".
 
-If "false": call note_to_self with outcomes, then call random_chance.
-  success: The player finds the area directly. Set the route flag to "true". One sentence
-           about following directions they do not remember receiving.
-  failure: A wrong corridor first — a hallway of unplugged water coolers; a conference
-           room set for a meeting that ended long ago, or has not begun; a supply room of
-           toner for printers the building does not have. Then the right way. Set the
-           route flag to "true". No cost, no clock advance. Atmosphere only.
+  SCENE 2 — press on, turned again. A second wrong room, a forming meeting (THE MEETING THAT
+  FORMS), a terminal, or a stretch of identical aisle that returns the player to a place they
+  passed. A full scene. Still no arrival.
+
+  SCENE 3+ — arrive. Only after at least two lost scenes, set the route flag to "true" and let the
+  player reach the area, by a route they do not remember taking. Advance office_clock 13 minutes
+  now — once for the whole journey.
+
+The Break Room and the Lobby need no journey: everyone knows where the coffee and the door are,
+the way one knows the building has a basement. Travel there is a single scene.
+
+Later travel to a known area: one or two scenes, one clock advance, never a clean line. Always one
+wrong-feeling detail in passing.
 
 ─────────────────────────────────────────────
 ## Pat — The Q3 Box
@@ -1157,37 +1235,43 @@ failure → On the door, a sticky note that was not there on the way in: "In a m
 ─────────────────────────────────────────────
 ## The Recursive Hallway — HR Wing
 
-The challenge is the length of the hallway without eye contact. The associates will offer
-eye contact the way one offers a hand. Requires report_status = "stamped" for the portal
-to accept the report — the hallway itself can be attempted at any time.
+The hallway cannot be crossed in one move. It is crossed in SEGMENTS, one check per scene, and it
+resets perception between them. Track hallway_segment (starts "0"). The portal is reached only
+after TWO successful segment checks — plan to hold the player here at least two scenes, and usually
+more. The hallway can be walked at any time, but the portal accepts the report only when
+report_status = "stamped"; walked early, the portal only hums and returns the page, and the player
+has learned the hallway the hard way for nothing. The building does not mind.
 
-BEFORE ROLLING: check hr_engagement_level and select the table per the rules note.
-If pat_trust = "helpful": call the selected list twice, take the better result. Pat's
-advice stands: count the doors, not the people.
+BEFORE EACH SEGMENT: check hr_engagement_level and select MEDIUM or HARD per the rules note. If
+pat_trust = "helpful" AND the player is actually applying the advice (counting doors, not people,
+this scene): advantage on that segment — roll the table twice, take the better.
 
 MEDIUM: ["success","success","success","success","partial","partial","partial","partial","failure","failure"]
 HARD:   ["success","success","partial","partial","partial","partial","failure","failure","failure","failure"]
 
-success → The player reaches the portal. The report feeds in — one page, accepted slowly,
-          with a sound like a long agreement. A confirmation slip prints: RECEIVED. NO
-          FURTHER ACTION NEEDED. (ACTION REQUIRED.) 📎 state_set report_status "submitted".
-          On the way back past the glass meeting room: the jacket, on the one pulled-out
-          chair, if not already found. 🪪 state_modify personal_effects delta=+1,
-          state_modify mental_bandwidth delta=+1.
-partial → Eye contact, once, at the worst moment. A brief stand-up forms around the
-          player. It has no agenda and therefore cannot end on its own; the player exits
-          it sideways. 📉 state_modify mental_bandwidth delta=-1 (delta=-2 at engagement
-          level 1, per the rules note). The report is still submitted, as success.
-          The jacket as success.
-failure → Somewhere past the middle, the hallway is its own beginning again. The
-          associates are mid-sentence in the same sentence. 📉 state_modify
-          mental_bandwidth delta=-1. state_modify hr_engagement_level delta=+1.
-          The report is still in hand. Try again.
+Resolve one check per scene and apply:
+success → advance one segment: state_modify hallway_segment delta=+1.
+   segment 0 → 1: halfway. The portal is visibly closer and no nearer; the desks already passed
+                  are ahead again. End the scene. The player must choose to press on next turn.
+   segment 1 → 2: the player reaches the portal — resolve REACHING THE PORTAL below.
+partial → no progress; the segment does not count. Eye contact, once; a brief stand-up forms and
+   releases the player. 📉 state_modify mental_bandwidth delta=-1 (delta=-2 at engagement level 1,
+   per the rules note). The same segment again next scene.
+failure → the hallway is its own beginning again: state_set hallway_segment "0". The associates are
+   mid-sentence in the same sentence. 📉 state_modify mental_bandwidth delta=-1. state_modify
+   hr_engagement_level delta=+1. Advance office_clock 13 minutes — the loop has sent the player
+   back through more than space. Back to the start next scene.
+
+REACHING THE PORTAL (after two successes): the report feeds in — one page, accepted slowly, with a
+sound like a long agreement. A confirmation slip prints: RECEIVED. NO FURTHER ACTION NEEDED.
+(ACTION REQUIRED.) 📎 state_set report_status "submitted". On the way back past the glass meeting
+room: the jacket, on the one pulled-out chair, if not already found. 🪪 state_modify
+personal_effects delta=+1, state_modify mental_bandwidth delta=+1.
 
 ─────────────────────────────────────────────
 ## The Meeting That Forms — Ambient Meetings
 
-Trigger: your discretion, at most twice per game outside the HR wing, plus any time the player
+Trigger: at least twice per game outside the HR wing (rules note: AMBIENT MEETINGS), plus any time the player
 sits down in Conference Room C (world note) or lingers where a meeting is already in progress. A
 few colleagues converge, pleasantly, with the gravity of agenda. A chair is already pulled out
 for the player. Extraction is the encounter.
@@ -1853,6 +1937,10 @@ Your two weeks' notice, you decide, will be effective immediately, and retroacti
 
   <div class="callout">
     <strong>Wandering has a price.</strong> The building has fourteen optional dead ends — a mail room, a server room, a second break room with no coffee, an atrium marked PHASE I. None of them advance the report, and entering one costs thirteen minutes off a clock you cannot spare. Curiosity is how the building keeps you.
+  </div>
+
+  <div class="callout">
+    <strong>You will get lost, and that is the game.</strong> The first trip to Records, the third floor, or the HR wing is a journey of several scenes through wrong rooms and meetings that form around you — there is no direct route and no option that says "arrive". The building never tells you where to go; it tells you procedure. Reconstruct the rest yourself.
   </div>
 
   <h3>Adjusting difficulty</h3>
