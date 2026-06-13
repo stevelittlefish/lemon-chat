@@ -408,6 +408,14 @@ html, body {
   max-width: 85%;
 }
 
+.main.has-bg .message.assistant .message-content {
+  background: var(--bg-lifted);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-xl);
+  border-bottom-left-radius: 4px;
+  padding: var(--space-3) var(--space-4);
+}
+
 .typing-indicator {
   display: flex;
   gap: 4px;
@@ -1690,4 +1698,18 @@ html, body {
 .main.has-bg .composer-container {
   position: relative;
   z-index: 2;
+}
+
+.main.has-bg .message-role,
+.main.has-bg .message-ts,
+.main.has-bg .date-sep,
+.main.has-bg .foot-btn,
+.main.has-bg .tool-call-toggle,
+.main.has-bg .tool-call-section-label {
+  color: var(--fg);
+}
+
+.main.has-bg .date-sep::before,
+.main.has-bg .date-sep::after {
+  background: var(--ink-400);
 }
