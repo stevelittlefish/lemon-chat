@@ -28,6 +28,10 @@ const (
 
 var validCategories = map[string]bool{"product": true, "comparison": true, "howto": true, "factcheck": true}
 
+var validBrainstormFormats = map[string]bool{
+	"design-doc": true, "options": true, "ideas": true, "analysis": true, "explainer": true,
+}
+
 // Research modes. "research" is the default web-search-driven pipeline;
 // "brainstorm" is an ideation-driven variant where each round the model
 // develops ideas and decides for itself whether it needs to search the web.
@@ -184,14 +188,17 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 			r.progress(Progress{Phase: "planning", Message: "plan ready — " + r.state.Plan})
 		}
 	}
-	// Classification only shapes the research-report format overrides, so it is
-	// skipped entirely in brainstorm mode.
-	if !r.brainstorm() && r.state.Round == 0 && r.state.Category == "" {
-		r.state.Category = r.classify(ctx)
+	if r.state.Round == 0 && r.state.Category == "" {
+		if r.brainstorm() {
+			r.state.Category = r.classifyBrainstorm(ctx)
+			r.progress(Progress{Phase: "planning", Message: "output format: " + r.state.Category})
+		} else {
+			r.state.Category = r.classify(ctx)
+			r.progress(Progress{Phase: "planning", Message: "report category: " + r.state.Category})
+		}
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
-		r.progress(Progress{Phase: "planning", Message: "report category: " + r.state.Category})
 		r.checkpoint()
 	}
 
@@ -435,6 +442,26 @@ func (r *Researcher) classify(ctx context.Context) string {
 	return "general"
 }
 
+// classifyBrainstorm returns the output format for a brainstorm run, defaulting
+// to "design-doc" when no other format fits. Mirrors classify for research mode.
+func (r *Researcher) classifyBrainstorm(ctx context.Context) string {
+	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(brainstormClassifyPrompt, r.cfg.Query)}}, 0, 20, classifyTimeout)
+	if err != nil {
+		return "design-doc"
+	}
+	first := strings.ToLower(strings.Trim(strings.Fields(out+" x")[0], ".,!:;\"'"))
+	if validBrainstormFormats[first] {
+		return first
+	}
+	for _, word := range strings.Fields(strings.ToLower(out)) {
+		w := strings.Trim(word, ".,!:;\"'")
+		if validBrainstormFormats[w] {
+			return w
+		}
+	}
+	return "design-doc"
+}
+
 // ── Phase 3: Think (query generation) ────────────────────────
 
 func (r *Researcher) generateQueries(ctx context.Context, round, creativity int) []string {
@@ -676,6 +703,9 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 // length — the output is a structured design write-up, not a long-form article.
 func (r *Researcher) finalBrainstorm(ctx context.Context) string {
 	prompt := fmt.Sprintf(brainstormFinalPrompt, r.cfg.Query, r.state.Plan, r.state.Report)
+	if override, ok := brainstormFormatOverrides[r.state.Category]; ok {
+		prompt += override
+	}
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
@@ -744,8 +774,11 @@ func (r *Researcher) deepReport(ctx context.Context) string {
 	conclHeading, conclInstruction := "## Conclusion",
 		"a conclusion that ties the findings together and directly answers the question."
 	if r.brainstorm() {
-		conclHeading, conclInstruction = "## Next steps",
-			"a 'Next steps' list of concrete, actionable recommendations to move the design forward."
+		parts := brainstormFormatConclusion[r.state.Category]
+		if parts[0] == "" {
+			parts = brainstormFormatConclusion["design-doc"]
+		}
+		conclHeading, conclInstruction = parts[0], parts[1]
 	}
 	conclusion := r.gluePart(ctx, outline, report, conclInstruction)
 
@@ -780,6 +813,9 @@ func (r *Researcher) outline(ctx context.Context) []reportSection {
 	var draftPrompt string
 	if r.brainstorm() {
 		draftPrompt = fmt.Sprintf(brainstormOutlineDraftPrompt, r.cfg.Query, r.state.Plan, report, findings)
+		if hint, ok := brainstormFormatOverrides[r.state.Category]; ok {
+			draftPrompt += hint
+		}
 	} else {
 		catHint := ""
 		if r.state.Category != "" && r.state.Category != "general" {

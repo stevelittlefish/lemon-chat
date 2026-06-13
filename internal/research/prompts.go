@@ -32,6 +32,19 @@ Question: %s
 
 Respond with ONLY the category name, nothing else.`
 
+const brainstormClassifyPrompt = `Classify this brainstorm brief into exactly ONE output format.
+
+Formats:
+- design-doc: Designing or building one specific solution, product, or system — a clear single recommendation
+- options: Exploring multiple distinct alternatives or approaches to compare — no single winner expected
+- ideas: Open-ended creative brainstorm — a variety of concepts to spark thinking, not a single solution
+- analysis: Strategic, philosophical, or conceptual investigation — exploring a question deeply for insight
+- explainer: Factual explanation — what something is, how it works, or why it matters
+
+Brief: %s
+
+Respond with ONLY the format name (e.g. design-doc), nothing else.`
+
 const queryGenPrompt = `You are a research assistant planning web searches.
 
 **Original question:** %s
@@ -465,6 +478,57 @@ IMPORTANT FORMAT OVERRIDE — this is a FACT-CHECK report:
 - Include a ## Verdict section with one of: **Supported**, **Mixed Evidence**, or **Unsupported**
 - End with ## Nuance & Caveats for important context and limitations
 - Be balanced and cite sources for every claim`,
+}
+
+// brainstormFormatOverrides are appended to brainstormFinalPrompt (and to the
+// outline draft prompt for deep-report runs) when a specific output format was
+// detected. The default format (design-doc) uses the base prompt unchanged.
+var brainstormFormatOverrides = map[string]string{
+	"options": `
+
+IMPORTANT FORMAT OVERRIDE — present as a set of OPTIONS, not a single recommended design:
+- Open with a brief ## Brief framing the question and what a good option looks like
+- Present 3–5 distinct options, each as a ## [Option Name] section
+- For each option: describe the core concept, how it works, its strengths and weaknesses, and when to choose it
+- End with a ## Which to choose section giving honest guidance on which options suit which situations
+- Do NOT pick a single winner — help the reader make the right choice for their context`,
+
+	"ideas": `
+
+IMPORTANT FORMAT OVERRIDE — present as a curated IDEAS document, not a single design:
+- Open with a brief ## Overview framing the creative space and what kinds of ideas are possible
+- Present 5–8 developed ideas, each as a ### [Idea Name] section
+- For each idea: a one-sentence hook, how it works, what makes it interesting, and any obvious challenges
+- Ideas should be meaningfully distinct — avoid overlap
+- End with a ## Directions section suggesting which ideas might combine well or are most worth pursuing first`,
+
+	"analysis": `
+
+IMPORTANT FORMAT OVERRIDE — write a strategic/philosophical ANALYSIS, not a design document:
+- Use a discursive essay structure with ## headings for the main threads of inquiry
+- Explore the question from multiple angles: context, competing perspectives, underlying tensions, implications
+- Aim for insight and clarity rather than a prescriptive plan — the goal is understanding, not a deliverable
+- Do NOT include a Next steps section or a single prescriptive recommendation unless the brief asks for one
+- Cite any web sources inline`,
+
+	"explainer": `
+
+IMPORTANT FORMAT OVERRIDE — write a clear EXPLAINER, not a design document:
+- Open with a direct, concise answer to the question (1–3 sentences)
+- Use ## sections to build out the explanation with depth and context
+- Use concrete examples, analogies, and plain language — avoid jargon
+- Only include as much depth as the question warrants — do not pad
+- Do NOT include Next steps, trade-offs, or risks sections unless directly relevant to the explanation`,
+}
+
+// brainstormFormatConclusion maps output format to the deep-report glue
+// conclusion heading and instruction.
+var brainstormFormatConclusion = map[string][2]string{
+	"design-doc": {"## Next steps", "a 'Next steps' list of concrete, actionable recommendations to move the design forward."},
+	"options":    {"## Which to choose", "a 'Which to choose' section giving honest guidance on which options suit which situations and contexts."},
+	"ideas":      {"## Directions", "a 'Directions' section suggesting which ideas might combine well or are most worth pursuing first."},
+	"analysis":   {"## Synthesis", "a 'Synthesis' section that ties the main threads of the analysis together into a clear takeaway."},
+	"explainer":  {"## Summary", "a concise 'Summary' section that recaps the key points of the explanation in plain language."},
 }
 
 // lowQualityMarkers — a finding whose summary contains any of these
