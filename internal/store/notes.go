@@ -128,8 +128,8 @@ func (s *Store) LoadNote(key string, userID, convID int64) (Note, error) {
 // ListNotes returns matching notes visible to the caller. prefix may be:
 //   - empty: all accessible notes
 //   - a scope letter alone ("g", "g.", "u", "u.", "c", "c."): all notes in that scope
-//   - a scoped path like "g.eldoria": global notes at that key or under it
-//   - a bare term like "eldoria": prefix match under each scope (g.eldoria*, u.eldoria*, c.eldoria*)
+//   - a scoped path like "g.eldoria": the exact key plus any children (g.eldoria.*)
+//   - a bare term like "eldoria": the exact key plus children under each scope (g.eldoria, g.eldoria.*, etc.)
 func (s *Store) ListNotes(prefix string, userID, convID int64) (string, error) {
 	var whereClauses []string
 	var args []any
@@ -184,7 +184,7 @@ func (s *Store) ListNotes(prefix string, userID, convID int64) (string, error) {
 			}
 		} else if hasScope {
 			exact := prefix
-			like := prefix + "%"
+			like := prefix + ".%"
 			switch prefix[0] {
 			case 'g':
 				addGlobal(exact, like)
@@ -194,10 +194,10 @@ func (s *Store) ListNotes(prefix string, userID, convID int64) (string, error) {
 				addConv(exact, like)
 			}
 		} else {
-			// Bare term: prefix match under each scope (e.g. "foo" finds g.foo*, u.foo*, c.foo*).
-			addGlobal("g."+prefix, "g."+prefix+"%")
-			addUser("u."+prefix, "u."+prefix+"%")
-			addConv("c."+prefix, "c."+prefix+"%")
+			// Bare term: exact key plus children under each scope (e.g. "foo" finds g.foo, g.foo.*, etc.).
+			addGlobal("g."+prefix, "g."+prefix+".%")
+			addUser("u."+prefix, "u."+prefix+".%")
+			addConv("c."+prefix, "c."+prefix+".%")
 		}
 	}
 

@@ -64,7 +64,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
   On model-unreachable the user turn is left stored with no assistant reply. Persist after a successful response start, or clean up on early failure.
 
 
-- [ ] **`note_list` prefix semantics differ between model and UI** (`internal/store/notes.go:198`)
+- [x] **`note_list` prefix semantics differ between model and UI** (`internal/store/notes.go:198`)
   Model-facing `ListNotes` treats a bare term as `g.foo%` (matches `foobar`); the settings `ListUserVisibleNotes` uses `g.foo.%` (segment boundary). Pick one rule and share it.
 
 - [ ] **Migration version-label gap** (`internal/store/store.go:228`)
