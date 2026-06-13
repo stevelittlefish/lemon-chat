@@ -79,6 +79,9 @@ type Config struct {
 	MinRounds             int
 	MaxEmptyRounds        int
 	SynthesisWindow       int
+	// ExtraRounds is the number of bonus "creative" rounds to run after the
+	// report would normally be considered complete (effort 4 → 1, effort 5 → 2).
+	ExtraRounds int
 }
 
 // Progress is emitted at each phase transition. Events with Generated > 0
@@ -171,57 +174,52 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
-		if time.Duration(r.elapsedMS())*time.Millisecond > r.cfg.MaxTime {
+		if r.timeExhausted() {
 			r.progress(Progress{Phase: "warning", Message: "time budget exhausted — writing report with findings so far"})
 			break
 		}
 
-		queries := r.generateQueries(ctx, round)
-		if ctx.Err() != nil {
-			return "", ctx.Err()
+		keepGoing, err := r.runRound(ctx, round, 0)
+		if err != nil {
+			return "", err
 		}
-		if len(queries) == 0 {
-			r.progress(Progress{Phase: "warning", Round: round, Message: "no new search queries generated — stopping"})
+		if !keepGoing {
 			break
 		}
-		r.state.QueriesUsed = append(r.state.QueriesUsed, queries...)
-		r.progress(Progress{Phase: "searching", Round: round, Queries: queries, TotalSources: len(r.state.AnalyzedURLs)})
 
-		newURLs := r.searchAll(ctx, queries)
-		findings := r.extractAll(ctx, round, newURLs)
+		// No point running the stop-check on the final round — the loop exits
+		// regardless. This keeps the low-effort modes (1–2 rounds) snappy.
+		if round < r.cfg.MaxRounds && round >= r.cfg.MinRounds && r.shouldStop(ctx, round) {
+			break
+		}
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
+	}
 
-		if len(findings) == 0 {
-			r.state.EmptyRounds++
-			if r.state.EmptyRounds >= r.cfg.MaxEmptyRounds {
-				if len(r.state.Findings) == 0 {
-					return "", fmt.Errorf("search returned no usable results after %d round(s) — check that SearXNG is running and reachable", round)
-				}
-				r.progress(Progress{Phase: "warning", Round: round, Message: "consecutive empty rounds — writing report with findings so far"})
-				r.state.Round = round
-				r.checkpoint()
-				break
-			}
-		} else {
-			r.state.EmptyRounds = 0
-			r.state.Findings = append(r.state.Findings, findings...)
-			r.progress(Progress{Phase: "analyzing", Round: round, TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
-			r.synthesize(ctx, round, findings)
+	// Bonus creative rounds (effort 4 → 1, effort 5 → 2). These run past the
+	// normal stopping point, pushing the model to search from fresh angles —
+	// only worth doing when we already have a report to extend.
+	if r.cfg.ExtraRounds > 0 && len(r.state.Findings) > 0 {
+		r.state.EmptyRounds = 0 // give the bonus rounds a fair chance
+		for creativity := 1; creativity <= r.cfg.ExtraRounds; creativity++ {
 			if ctx.Err() != nil {
 				return "", ctx.Err()
 			}
-		}
-
-		r.state.Round = round
-		r.checkpoint()
-
-		if round >= r.cfg.MinRounds && r.shouldStop(ctx, round) {
-			break
-		}
-		if ctx.Err() != nil {
-			return "", ctx.Err()
+			if r.timeExhausted() {
+				r.progress(Progress{Phase: "warning", Message: "time budget exhausted — writing report with findings so far"})
+				break
+			}
+			round := r.state.Round + 1
+			r.progress(Progress{Phase: "searching", Round: round,
+				Message: fmt.Sprintf("bonus round %d of %d — searching more creatively", creativity, r.cfg.ExtraRounds)})
+			keepGoing, err := r.runRound(ctx, round, creativity)
+			if err != nil {
+				return "", err
+			}
+			if !keepGoing {
+				break
+			}
 		}
 	}
 
@@ -239,6 +237,60 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 		return "", ctx.Err()
 	}
 	return r.formatCompositeReport(final), nil
+}
+
+// timeExhausted reports whether the wall-clock budget has been spent.
+func (r *Researcher) timeExhausted() bool {
+	return time.Duration(r.elapsedMS())*time.Millisecond > r.cfg.MaxTime
+}
+
+// runRound executes one Think → Search → Extract → Synthesise round and
+// checkpoints the result. creativity (0 = normal, 1 = creative, ≥2 = very
+// creative) selects the query-generation instruction. It returns keepGoing =
+// false when the loop should stop (no new queries, or too many empty rounds),
+// and a non-nil error only on a fatal condition (no usable results at all).
+func (r *Researcher) runRound(ctx context.Context, round, creativity int) (keepGoing bool, err error) {
+	queries := r.generateQueries(ctx, round, creativity)
+	if ctx.Err() != nil {
+		return false, nil
+	}
+	if len(queries) == 0 {
+		r.progress(Progress{Phase: "warning", Round: round, Message: "no new search queries generated — stopping"})
+		return false, nil
+	}
+	r.state.QueriesUsed = append(r.state.QueriesUsed, queries...)
+	r.progress(Progress{Phase: "searching", Round: round, Queries: queries, TotalSources: len(r.state.AnalyzedURLs)})
+
+	newURLs := r.searchAll(ctx, queries)
+	findings := r.extractAll(ctx, round, newURLs)
+	if ctx.Err() != nil {
+		return false, nil
+	}
+
+	if len(findings) == 0 {
+		r.state.EmptyRounds++
+		if r.state.EmptyRounds >= r.cfg.MaxEmptyRounds {
+			if len(r.state.Findings) == 0 {
+				return false, fmt.Errorf("search returned no usable results after %d round(s) — check that SearXNG is running and reachable", round)
+			}
+			r.progress(Progress{Phase: "warning", Round: round, Message: "consecutive empty rounds — writing report with findings so far"})
+			r.state.Round = round
+			r.checkpoint()
+			return false, nil
+		}
+	} else {
+		r.state.EmptyRounds = 0
+		r.state.Findings = append(r.state.Findings, findings...)
+		r.progress(Progress{Phase: "analyzing", Round: round, TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
+		r.synthesize(ctx, round, findings)
+		if ctx.Err() != nil {
+			return false, nil
+		}
+	}
+
+	r.state.Round = round
+	r.checkpoint()
+	return true, nil
 }
 
 // ── Phase 1: Plan ────────────────────────────────────────────
@@ -287,10 +339,16 @@ func (r *Researcher) classify(ctx context.Context) string {
 
 // ── Phase 3: Think (query generation) ────────────────────────
 
-func (r *Researcher) generateQueries(ctx context.Context, round int) []string {
+func (r *Researcher) generateQueries(ctx context.Context, round, creativity int) []string {
 	numQueries, instruction := 4, queryGenFirstRoundInstruction
 	if round > 1 {
 		numQueries, instruction = 3, queryGenFollowUpInstruction
+	}
+	switch {
+	case creativity == 1:
+		instruction = queryGenCreativeInstruction
+	case creativity >= 2:
+		instruction = queryGenVeryCreativeInstruction
 	}
 	report := r.state.Report
 	if report == "" {

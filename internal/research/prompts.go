@@ -54,6 +54,12 @@ const queryGenFirstRoundInstruction = "This is the first round — generate broa
 
 const queryGenFollowUpInstruction = "We already have partial findings. Generate targeted follow-up queries to fill gaps, verify claims, or explore specific aspects that the report doesn't yet cover well."
 
+// Creative instructions are used for the bonus "extra effort" rounds that run
+// after the report would normally be considered complete.
+const queryGenCreativeInstruction = "We already have substantial findings and the report looks reasonably complete. This is a bonus round — think laterally. Generate creative, non-obvious queries that approach the question from fresh angles: adjacent topics, contrarian viewpoints, recent developments, edge cases, or expert sources the report has not yet explored. Avoid repeating earlier searches."
+
+const queryGenVeryCreativeInstruction = "This is a final, deep bonus round — be bold and highly creative. Generate unconventional, exploratory queries that dig into surprising angles, niche or primary sources, dissenting opinions, historical context, or future implications. Deliberately seek out perspectives and information the report is still missing. Avoid anything resembling earlier searches."
+
 // extractorSystem is the goal-based content extraction prompt
 // (credited to the Tongyi DeepResearch lineage).
 const extractorSystem = `Extract relevant information from a webpage for a given research goal.

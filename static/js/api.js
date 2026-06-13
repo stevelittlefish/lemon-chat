@@ -199,8 +199,12 @@ export const completions = {
 // Research
 export const research = {
   list: () => request('GET', '/api/research'),
+  defaults: () => request('GET', '/api/research/defaults'),
   get: (id) => request('GET', `/api/research/${id}`),
-  start: (title, query, model) => request('POST', '/api/research', { title, query, ...(model ? { model } : {}) }),
+  start: (title, query, model, effort, maxTimeMinutes) =>
+    request('POST', '/api/research', {
+      title, query, ...(model ? { model } : {}), effort, max_time_minutes: maxTimeMinutes,
+    }),
   cancel: (id) => request('POST', `/api/research/${id}/cancel`),
   delete: (id) => request('DELETE', `/api/research/${id}`),
   // Streams progress events for a job. onEvent receives each parsed event;

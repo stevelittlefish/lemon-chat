@@ -114,6 +114,31 @@ func (m *researchManager) remove(jobID int64) {
 	m.mu.Unlock()
 }
 
+// researchEffortRounds maps a 1–5 effort level onto round limits, layered on
+// top of the configured defaults:
+//
+//	1 (half arsed) — a single round
+//	2 (low)        — two rounds
+//	3 (default)    — the configured defaults, no bonus rounds
+//	4 (extra)      — defaults plus one bonus creative round
+//	5 (too much)   — defaults plus two bonus creative rounds
+func researchEffortRounds(effort, defaultMaxRounds, defaultMinRounds int) (maxRounds, minRounds, extraRounds int) {
+	switch effort {
+	case 1:
+		maxRounds = 1
+	case 2:
+		maxRounds = 2
+	case 4:
+		maxRounds, extraRounds = defaultMaxRounds, 1
+	case 5:
+		maxRounds, extraRounds = defaultMaxRounds, 2
+	default: // 3 and any unexpected value
+		maxRounds = defaultMaxRounds
+	}
+	minRounds = min(defaultMinRounds, maxRounds)
+	return maxRounds, minRounds, extraRounds
+}
+
 // researchModel resolves the model to use for a research job.
 func (s *Server) researchModel(requested string) string {
 	if requested != "" {
@@ -178,6 +203,11 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	}
 
 	rc := s.cfg.Research
+	maxRounds, minRounds, extraRounds := researchEffortRounds(job.Effort, rc.MaxRounds, rc.MinRounds)
+	maxTimeSeconds := rc.MaxTimeSeconds
+	if job.MaxTimeSeconds > 0 {
+		maxTimeSeconds = job.MaxTimeSeconds
+	}
 	cfg := research.Config{
 		Query:                 llmQuery,
 		Model:                 job.Model,
@@ -185,15 +215,16 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		APIKey:                modelServer.APIKey,
 		SearXNGURL:            s.cfg.SearXNG.URL,
 		Location:              loc,
-		MaxRounds:             rc.MaxRounds,
-		MaxTime:               time.Duration(rc.MaxTimeSeconds) * time.Second,
+		MaxRounds:             maxRounds,
+		MaxTime:               time.Duration(maxTimeSeconds) * time.Second,
 		MaxURLsPerRound:       rc.MaxURLsPerRound,
 		MaxContentChars:       rc.MaxContentChars,
 		MaxReportTokens:       rc.MaxReportTokens,
 		ExtractionConcurrency: rc.ExtractionConcurrency,
-		MinRounds:             rc.MinRounds,
+		MinRounds:             minRounds,
 		MaxEmptyRounds:        rc.MaxEmptyRounds,
 		SynthesisWindow:       rc.SynthesisWindow,
+		ExtraRounds:           extraRounds,
 	}
 
 	state := research.UnmarshalState(job.Round, job.EmptyRounds, job.ElapsedMS,
@@ -305,28 +336,46 @@ type researchJobView struct {
 	Title     *string `json:"title"`
 	Query     string  `json:"query"`
 	Model     string  `json:"model"`
-	Status    string  `json:"status"`
-	Phase     *string `json:"phase"`
-	Round     int     `json:"round"`
-	ElapsedMS int64   `json:"elapsed_ms"`
-	Error     *string `json:"error"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	Status         string  `json:"status"`
+	Phase          *string `json:"phase"`
+	Effort         int     `json:"effort"`
+	MaxTimeSeconds int     `json:"max_time_seconds"`
+	Round          int     `json:"round"`
+	ElapsedMS      int64   `json:"elapsed_ms"`
+	Error          *string `json:"error"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
 }
 
 func researchView(j *store.ResearchJob) researchJobView {
 	return researchJobView{
 		ID: j.ID, Title: j.Title, Query: j.Query, Model: j.Model, Status: j.Status, Phase: j.Phase,
+		Effort: j.Effort, MaxTimeSeconds: j.MaxTimeSeconds,
 		Round: j.Round, ElapsedMS: j.ElapsedMS, Error: j.Error, CreatedAt: j.CreatedAt, UpdatedAt: j.UpdatedAt,
 	}
+}
+
+// handleResearchDefaults reports the default form values so the UI can
+// pre-fill the effort selector and time-limit field from server config.
+func (s *Server) handleResearchDefaults(w http.ResponseWriter, r *http.Request) {
+	maxTimeMinutes := s.cfg.Research.MaxTimeSeconds / 60
+	if maxTimeMinutes < 1 {
+		maxTimeMinutes = 10
+	}
+	writeJSON(w, http.StatusOK, map[string]int{
+		"effort":           3,
+		"max_time_minutes": maxTimeMinutes,
+	})
 }
 
 func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	var req struct {
-		Title string `json:"title"`
-		Query string `json:"query"`
-		Model string `json:"model"`
+		Title          string `json:"title"`
+		Query          string `json:"query"`
+		Model          string `json:"model"`
+		Effort         int    `json:"effort"`
+		MaxTimeMinutes int    `json:"max_time_minutes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -335,6 +384,19 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 	if req.Title == "" && req.Query == "" {
 		writeError(w, http.StatusBadRequest, "title or query required")
 		return
+	}
+	effort := req.Effort
+	if effort == 0 {
+		effort = 3 // default
+	}
+	if effort < 1 || effort > 5 {
+		writeError(w, http.StatusBadRequest, "effort must be between 1 and 5")
+		return
+	}
+	// 0 means "use the configured default", resolved when the job runs.
+	maxTimeSeconds := 0
+	if req.MaxTimeMinutes > 0 {
+		maxTimeSeconds = req.MaxTimeMinutes * 60
 	}
 	if s.cfg.SearXNG.URL == "" {
 		writeError(w, http.StatusUnprocessableEntity, "research requires SearXNG — add [searxng] url to lemon.toml")
@@ -350,12 +412,12 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model)
+	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, effort, maxTimeSeconds)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	log.Printf("Starting research job id=%d user_id=%d model=%q title=%q query=%q", job.ID, user.ID, model, req.Title, req.Query)
+	log.Printf("Starting research job id=%d user_id=%d model=%q effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, effort, maxTimeSeconds, req.Title, req.Query)
 	go s.runResearch(job)
 	writeJSON(w, http.StatusCreated, researchView(job))
 }

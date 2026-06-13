@@ -7,7 +7,19 @@ import { escapeHtml } from './utils.js';
 const main = document.getElementById('research-main');
 
 let modelList = [];
+let formDefaults = { effort: 3, max_time_minutes: 10 };
 let abortEvents = null; // aborts the active SSE subscription
+
+// Effort levels — value matches the 1–5 scale the backend expects.
+const EFFORT_LEVELS = [
+  [1, 'half arsed — one round'],
+  [2, 'low — two rounds'],
+  [3, 'default'],
+  [4, 'extra — one bonus round'],
+  [5, 'too much — two bonus rounds'],
+];
+
+const EFFORT_NAMES = { 1: 'half arsed', 2: 'low', 3: 'default', 4: 'extra', 5: 'too much' };
 
 function stopEvents() {
   if (abortEvents) { abortEvents(); abortEvents = null; }
@@ -47,6 +59,10 @@ async function showList() {
       `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`))
     .join('');
 
+  const effortOptions = EFFORT_LEVELS.map(([value, label]) =>
+    `<option value="${value}"${value === formDefaults.effort ? ' selected' : ''}>${label}</option>`)
+    .join('');
+
   const items = jobs.map((j) => `
     <div class="card card-interactive research-item" data-id="${j.id}">
       <span class="research-item-query">${escapeHtml(j.title || j.query)}</span>
@@ -62,6 +78,13 @@ async function showList() {
         placeholder="research question or prompt (required if no title)"></textarea>
       <div class="research-form-row">
         <select id="research-model" class="input">${options}</select>
+        <label class="research-field">effort
+          <select id="research-effort" class="input">${effortOptions}</select>
+        </label>
+        <label class="research-field">time limit
+          <input id="research-time" class="input research-time-input" type="number" min="1" max="240"
+            value="${formDefaults.max_time_minutes}"> min
+        </label>
         <button id="research-start" class="btn btn-primary">start research</button>
       </div>
     </div>
@@ -87,10 +110,12 @@ async function startResearch() {
   const query = document.getElementById('research-query').value.trim();
   if (!title && !query) return;
   const model = document.getElementById('research-model').value;
+  const effort = parseInt(document.getElementById('research-effort').value, 10) || formDefaults.effort;
+  const maxTimeMinutes = parseInt(document.getElementById('research-time').value, 10) || formDefaults.max_time_minutes;
   const btn = document.getElementById('research-start');
   btn.disabled = true;
   try {
-    const job = await research.start(title, query, model);
+    const job = await research.start(title, query, model, effort, maxTimeMinutes);
     location.hash = job.id;
   } catch (err) {
     btn.disabled = false;
@@ -215,6 +240,7 @@ async function showDetail(id) {
     <div class="research-detail-meta">
       ${statusBadge(job.status)}
       <span>${escapeHtml(job.model)}</span>
+      ${job.effort ? `<span>effort: ${EFFORT_NAMES[job.effort] || job.effort}</span>` : ''}
       <span>${formatDate(job.created_at)}</span>
       ${job.elapsed_ms ? `<span>${formatDuration(job.elapsed_ms)}</span>` : ''}
       <span class="research-detail-actions">
@@ -313,6 +339,11 @@ async function init() {
     modelList = await models.list();
   } catch {
     modelList = [];
+  }
+  try {
+    formDefaults = await research.defaults();
+  } catch {
+    // keep the built-in fallback defaults
   }
   window.addEventListener('hashchange', route);
   route();

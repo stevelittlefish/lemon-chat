@@ -100,6 +100,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Research
 	mux.HandleFunc("GET /api/research", s.requireAuth(s.handleListResearch))
+	mux.HandleFunc("GET /api/research/defaults", s.requireAuth(s.handleResearchDefaults))
 	mux.HandleFunc("POST /api/research", s.requireAuth(s.handleStartResearch))
 	mux.HandleFunc("GET /api/research/{id}", s.requireAuth(s.handleGetResearch))
 	mux.HandleFunc("GET /api/research/{id}/events", s.requireAuth(s.handleResearchEvents))

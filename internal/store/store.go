@@ -550,6 +550,21 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v22 → v23 complete")
 	}
 
+	if version < 24 {
+		log.Println("store: migrating v23 → v24 (add effort and max_time_seconds to research_job)")
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN effort INTEGER NOT NULL DEFAULT 3`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN max_time_seconds INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (24, ?)`, now()); err != nil {
+			return err
+		}
+		version = 24
+		log.Println("store: migration v23 → v24 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

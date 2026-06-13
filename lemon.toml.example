@@ -63,8 +63,8 @@ model_server = "local"
 # All keys are optional; the values shown are the defaults.
 # [research]
 # model = ""                  # model for research jobs (falls back to default_model)
-# max_rounds = 8              # hard upper bound on research rounds
-# max_time_seconds = 600      # wall-clock budget, checked at the start of each round
+# max_rounds = 8              # hard upper bound on research rounds (effort 3; the per-job effort/time controls in the UI layer on top of these)
+# max_time_seconds = 600      # default wall-clock budget; the UI time-limit field overrides it per job
 # max_urls_per_round = 3      # URLs fetched per query per round
 # max_content_chars = 15000   # page content truncation limit before extraction
 # max_report_tokens = 8192    # max_tokens for synthesis and final report calls
