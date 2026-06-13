@@ -1660,3 +1660,34 @@ html, body {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Conversation background image ──────────────────────────── */
+
+.main.has-bg {
+  position: relative;
+}
+
+.main.has-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--thread-bg-url);
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+
+.main.has-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(251, 247, 236, 0.80);
+  z-index: 1;
+}
+
+.main.has-bg .chat-header,
+.main.has-bg .thread-container,
+.main.has-bg .composer-container {
+  position: relative;
+  z-index: 2;
+}

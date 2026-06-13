@@ -601,6 +601,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v26 → v27 complete")
 	}
 
+	if version < 28 {
+		log.Println("store: migrating v27 → v28 (add background_attachment_id to conversation)")
+		if _, err := s.db.Exec(`ALTER TABLE conversation ADD COLUMN background_attachment_id INTEGER`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (28, ?)`, now()); err != nil {
+			return err
+		}
+		version = 28
+		log.Println("store: migration v27 → v28 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

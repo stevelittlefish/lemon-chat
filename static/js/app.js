@@ -1,6 +1,7 @@
 import { auth, conversations as convApi, messages as msgApi, models as modelApi, characters as characterApi } from './api.js';
 import * as sidebar from './sidebar.js';
 import * as thread from './thread.js';
+import { setBackground } from './thread.js';
 import * as composer from './composer.js';
 import * as header from './header.js';
 import * as ws from './ws.js';
@@ -169,6 +170,7 @@ async function loadConversation(id, { pushHistory = true } = {}) {
     activeHasMessages = false;
     header.setConversation(null, null);
     sidebar.setActive(null);
+    setBackground(null);
     showPickerScreen();
     return;
   }
@@ -183,6 +185,7 @@ async function loadConversation(id, { pushHistory = true } = {}) {
     header.setConversation(id, conv?.title ?? null);
     if (conv) header.setSelection(conv);
     applyAvatarContext(conv?.character_id ?? null);
+    setBackground(conv?.background_attachment_id ?? null);
     thread.renderMessages(msgs);
   } catch {
     activeConversationId = null;

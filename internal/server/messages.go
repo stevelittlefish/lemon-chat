@@ -519,6 +519,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 						"title":        attResult.Title,
 						"filename":     attResult.Filename,
 						"mime_type":    attResult.MimeType,
+						"background":   attResult.Background,
 					}})
 					fmt.Fprintf(w, "data: %s\n\n", attEvt)
 					flusher.Flush()

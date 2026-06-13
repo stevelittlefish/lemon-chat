@@ -116,7 +116,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [ ] **Resolve static asset paths absolutely** (`internal/server/server.go:149,169`)
   `serveFile` and the `FileServer` use relative `static/` paths that depend on the process CWD; resolve against an absolute asset dir. Also disable directory listings on the catch-all `FileServer`.
 
-- [ ] **Image generation `background` parameter** (`internal/server/tools.go:210,251`)
+- [x] **Image generation `background` parameter** (`internal/server/tools.go:210,251`)
   Add an optional `background` boolean parameter (default false) to both image generation tools. When true and the image loads, set it as the chat background (`static/js/thread.js:186`). Apply a legibility treatment (e.g. semi-transparent overlay on the message column) so text remains readable over the image.
 
 - [ ] **Async image generation** (`internal/server/tools.go:1400`)

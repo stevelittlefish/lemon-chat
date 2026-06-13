@@ -248,6 +248,10 @@ Examples:
 						"type":        "integer",
 						"description": "Number of diffusion steps. Default: 30. More steps can improve quality but take longer. Typical range: 20–50.",
 					},
+					"background": map[string]any{
+						"type":        "boolean",
+						"description": "If true, set the generated image as the chat background instead of displaying it inline.",
+					},
 				},
 				Required: []string{"prompt"},
 			},
@@ -280,6 +284,10 @@ Examples:
 					"steps": map[string]any{
 						"type":        "integer",
 						"description": "Number of diffusion steps. Default: 4. Range: 1–8. Flux Schnell is optimised for very few steps.",
+					},
+					"background": map[string]any{
+						"type":        "boolean",
+						"description": "If true, set the generated image as the chat background instead of displaying it inline.",
 					},
 				},
 				Required: []string{"prompt"},
@@ -586,6 +594,7 @@ type AttachmentResult struct {
 	Title        string `json:"title"`
 	Filename     string `json:"filename"`
 	MimeType     string `json:"mime_type"`
+	Background   bool   `json:"background,omitempty"`
 }
 
 func mimeTypeForFilename(filename string) string {
@@ -1319,6 +1328,7 @@ func makeImageExecutor(comfyURL, workflowFile string, defaultSteps int, defaultC
 			Width          int     `json:"width"`
 			Height         int     `json:"height"`
 			Steps          int     `json:"steps"`
+			Background     bool    `json:"background"`
 		}
 		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 			return "", fmt.Errorf("invalid args: %w", err)
@@ -1490,11 +1500,18 @@ func makeImageExecutor(comfyURL, workflowFile string, defaultSteps int, defaultC
 			return "", fmt.Errorf("server error: could not record image in database (%w) — tell the user the image was generated but could not be saved due to a server error", err)
 		}
 
+		if args.Background {
+			if err := tctx.Store.SetConversationBackground(tctx.ConversationID, att.ID); err != nil {
+				log.Printf("Setting conversation background conversation_id=%d attachment_id=%d: %v", tctx.ConversationID, att.ID, err)
+			}
+		}
+
 		result := AttachmentResult{
 			AttachmentID: att.ID,
 			Title:        "Generated image",
 			Filename:     "image.png",
 			MimeType:     "image/png",
+			Background:   args.Background,
 		}
 		out, _ := json.Marshal(result)
 		return string(out), nil

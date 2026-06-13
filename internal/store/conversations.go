@@ -7,18 +7,19 @@ import (
 )
 
 type Conversation struct {
-	ID          int64   `json:"id"`
-	UserID      int64   `json:"user_id"`
-	Model       *string `json:"model"`
-	CharacterID *int64  `json:"character_id"`
-	Title       *string `json:"title"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID                   int64   `json:"id"`
+	UserID               int64   `json:"user_id"`
+	Model                *string `json:"model"`
+	CharacterID          *int64  `json:"character_id"`
+	Title                *string `json:"title"`
+	BackgroundAttachmentID *int64 `json:"background_attachment_id"`
+	CreatedAt            string  `json:"created_at"`
+	UpdatedAt            string  `json:"updated_at"`
 }
 
 func (s *Store) ListConversations(userID int64, limit, offset int) ([]Conversation, error) {
 	rows, err := s.db.Query(
-		`SELECT id, user_id, model, character_id, title, created_at, updated_at
+		`SELECT id, user_id, model, character_id, title, background_attachment_id, created_at, updated_at
 		 FROM conversation WHERE user_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
 		userID, limit, offset,
 	)
@@ -29,7 +30,7 @@ func (s *Store) ListConversations(userID int64, limit, offset int) ([]Conversati
 	var convs []Conversation
 	for rows.Next() {
 		var c Conversation
-		if err := rows.Scan(&c.ID, &c.UserID, &c.Model, &c.CharacterID, &c.Title, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Model, &c.CharacterID, &c.Title, &c.BackgroundAttachmentID, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		convs = append(convs, c)
@@ -40,10 +41,10 @@ func (s *Store) ListConversations(userID int64, limit, offset int) ([]Conversati
 func (s *Store) GetConversation(id, userID int64) (*Conversation, error) {
 	c := &Conversation{}
 	err := s.db.QueryRow(
-		`SELECT id, user_id, model, character_id, title, created_at, updated_at
+		`SELECT id, user_id, model, character_id, title, background_attachment_id, created_at, updated_at
 		 FROM conversation WHERE id = ? AND user_id = ?`,
 		id, userID,
-	).Scan(&c.ID, &c.UserID, &c.Model, &c.CharacterID, &c.Title, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.UserID, &c.Model, &c.CharacterID, &c.Title, &c.BackgroundAttachmentID, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -140,6 +141,11 @@ func (s *Store) UpdateConversationAfterMessage(id int64, model *string, characte
 func (s *Store) UpdateConversationTitle(id int64, title string) error {
 	// Deliberately does not touch updated_at so sidebar sort order is unaffected.
 	_, err := s.db.Exec(`UPDATE conversation SET title = ? WHERE id = ?`, title, id)
+	return err
+}
+
+func (s *Store) SetConversationBackground(convID, attachmentID int64) error {
+	_, err := s.db.Exec(`UPDATE conversation SET background_attachment_id = ? WHERE id = ?`, attachmentID, convID)
 	return err
 }
 

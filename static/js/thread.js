@@ -13,6 +13,7 @@ const artifactPanelDownload = document.getElementById('artifact-panel-download')
 const artifactPanelClose = document.getElementById('artifact-panel-close');
 const artifactPanelBody = document.getElementById('artifact-panel-body');
 const appEl = document.getElementById('app');
+const mainEl = document.getElementById('main');
 
 artifactPanelClose.addEventListener('click', closeArtifactPanel);
 
@@ -261,6 +262,16 @@ let currentConvId = null;
 
 export function setConversationId(id) {
   currentConvId = id;
+}
+
+export function setBackground(attachmentId) {
+  if (attachmentId) {
+    mainEl.style.setProperty('--thread-bg-url', `url('/api/attachments/${attachmentId}')`);
+    mainEl.classList.add('has-bg');
+  } else {
+    mainEl.style.removeProperty('--thread-bg-url');
+    mainEl.classList.remove('has-bg');
+  }
 }
 
 export function setForkHandler(fn) {
@@ -521,7 +532,12 @@ export function startStreaming() {
       if (att.mime_type?.startsWith('image/') && att.tool_call_id) {
         const imgWrap = buildInlineImage(att);
         const imgTag = imgWrap.querySelector('img');
-        if (imgTag) imgTag.addEventListener('load', () => { if (!userScrolledDuringStream) scrollToBottom(); }, { once: true });
+        if (imgTag) {
+          imgTag.addEventListener('load', () => {
+            if (att.background) setBackground(att.id);
+            if (!userScrolledDuringStream) scrollToBottom();
+          }, { once: true });
+        }
         const placeholder = pendingImages.get(att.tool_call_id);
         if (placeholder) {
           placeholder.replaceWith(imgWrap);
