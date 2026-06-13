@@ -63,8 +63,6 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **User message persisted before model reachability is confirmed** (`internal/server/messages.go:274`)
   On model-unreachable the user turn is left stored with no assistant reply. Persist after a successful response start, or clean up on early failure.
 
-- [ ] **Streaming continues after client disconnect** (`internal/server/messages.go:195`)
-  Tool executors run on `context.Background()`, not the request context, so closing the tab keeps the tool loop running and writing to a dead `ResponseWriter` (wasted work, possible duplicate image generation). Check `r.Context().Err()` between loop iterations and thread the request context into `ToolContext`.
 
 - [ ] **`note_list` prefix semantics differ between model and UI** (`internal/store/notes.go:198`)
   Model-facing `ListNotes` treats a bare term as `g.foo%` (matches `foobar`); the settings `ListUserVisibleNotes` uses `g.foo.%` (segment boundary). Pick one rule and share it.

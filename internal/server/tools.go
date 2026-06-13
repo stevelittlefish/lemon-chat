@@ -41,6 +41,9 @@ type toolDef struct {
 }
 
 // ToolContext carries per-request context to tool executors.
+// There is deliberately no context.Context field: tool execution must complete
+// even if the client disconnects mid-stream, so that the response is persisted
+// and visible when the user returns to the conversation.
 type ToolContext struct {
 	ModelName       string
 	ModelServer     *config.ModelServer
