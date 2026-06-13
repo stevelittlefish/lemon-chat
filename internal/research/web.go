@@ -2,61 +2,14 @@ package research
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"html"
 	"io"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 	"time"
 )
-
-type searchResult struct {
-	Title   string `json:"title"`
-	URL     string `json:"url"`
-	Content string `json:"content"`
-}
-
-// search queries SearXNG and returns up to 10 results.
-func (r *Researcher) search(ctx context.Context, query string) ([]searchResult, error) {
-	searchURL := strings.TrimRight(r.cfg.SearXNGURL, "/") + "/search?q=" + url.QueryEscape(query) + "&format=json"
-
-	callCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(callCtx, "GET", searchURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("build search request: %w", err)
-	}
-	req.Header.Set("User-Agent", "lemon-chat/1.0")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("could not reach SearXNG: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1*1024*1024))
-	if err != nil {
-		return nil, fmt.Errorf("read SearXNG response: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("SearXNG returned HTTP %d", resp.StatusCode)
-	}
-
-	var data struct {
-		Results []searchResult `json:"results"`
-	}
-	if err := json.Unmarshal(body, &data); err != nil {
-		return nil, fmt.Errorf("SearXNG response was not valid JSON: %w", err)
-	}
-	if len(data.Results) > 10 {
-		data.Results = data.Results[:10]
-	}
-	return data.Results, nil
-}
 
 type webpage struct {
 	Content string

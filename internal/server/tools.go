@@ -21,6 +21,7 @@ import (
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/llm"
+	"github.com/stevelittlefish/lemon-chat/internal/searx"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
@@ -892,40 +893,15 @@ var executors = map[string]func(string, ToolContext) (string, error){
 
 		log.Printf("Searching web query=%q max_results=%d page=%d", args.Query, n, page)
 
-		searchURL := strings.TrimRight(tctx.SearXNGURL, "/") + "/search?q=" + url.QueryEscape(args.Query) + fmt.Sprintf("&format=json&pageno=%d", page)
-		fetchCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-
-		req, err := http.NewRequestWithContext(fetchCtx, "GET", searchURL, nil)
+		results, err := searx.Search(context.Background(), tctx.SearXNGURL, args.Query, page)
 		if err != nil {
-			return "", fmt.Errorf("the SearXNG URL in lemon.toml appears to be malformed: %w", err)
-		}
-		req.Header.Set("User-Agent", "lemon-chat/1.0")
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return "", fmt.Errorf("could not reach SearXNG at %q: %w — tell the user that the search service is currently unreachable and they may want to check that SearXNG is running", tctx.SearXNGURL, err)
-		}
-		defer resp.Body.Close()
-
-		body, err := io.ReadAll(io.LimitReader(resp.Body, 1*1024*1024))
-		if err != nil {
-			return "", fmt.Errorf("could not read response from SearXNG: %w", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("SearXNG returned HTTP %d — tell the user the search service returned an error", resp.StatusCode)
+			return "", fmt.Errorf("%w — tell the user the web search service is currently unavailable; they may want to check that SearXNG is running at %q and has the JSON output format enabled", err, tctx.SearXNGURL)
 		}
 
-		var data searxngResponse
-		if err := json.Unmarshal(body, &data); err != nil {
-			return "", fmt.Errorf("SearXNG response was not valid JSON (got: %.200s): %w — SearXNG may need to have the JSON format enabled", string(body), err)
-		}
-
-		if len(data.Results) == 0 {
+		if len(results) == 0 {
 			return "No results found for: " + args.Query, nil
 		}
 
-		results := data.Results
 		if len(results) > n {
 			results = results[:n]
 		}
@@ -1294,16 +1270,6 @@ var executors = map[string]func(string, ToolContext) (string, error){
 		}
 		return strings.TrimSpace(stripHTML(html)), nil
 	},
-}
-
-type searxngResponse struct {
-	Results []searxngResult `json:"results"`
-}
-
-type searxngResult struct {
-	Title   string `json:"title"`
-	URL     string `json:"url"`
-	Content string `json:"content"`
 }
 
 var (

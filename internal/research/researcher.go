@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/stevelittlefish/lemon-chat/internal/searx"
 )
 
 // Per-phase LLM timeouts (spec §5).
@@ -543,16 +545,19 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 // searchAll runs all queries in parallel and returns new (unseen) URLs,
 // capped at MaxURLsPerRound × len(queries).
 func (r *Researcher) searchAll(ctx context.Context, queries []string) []AnalyzedURL {
-	results := make([][]searchResult, len(queries))
+	results := make([][]searx.Result, len(queries))
 	var wg sync.WaitGroup
 	for i, q := range queries {
 		wg.Add(1)
 		go func(i int, q string) {
 			defer wg.Done()
-			res, err := r.search(ctx, q)
+			res, err := searx.Search(ctx, r.cfg.SearXNGURL, q, 1)
 			if err != nil {
 				r.progress(Progress{Phase: "warning", Message: fmt.Sprintf("search failed for %q: %v", q, err)})
 				return
+			}
+			if len(res) > 10 {
+				res = res[:10]
 			}
 			results[i] = res
 		}(i, q)

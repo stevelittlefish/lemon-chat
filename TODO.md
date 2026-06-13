@@ -81,7 +81,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Extract a shared non-streaming chat-completion helper** (`internal/server/tools.go:1320`, `internal/research/llm.go:23`, `internal/tasks/titles.go:162,299`)
   Build payload → set auth → decode `choices[0].Message.Content` is duplicated four times.
 
-- [ ] **De-duplicate SearXNG search** (`internal/server/tools.go:862`, `internal/research/web.go:23`)
+- [x] **De-duplicate SearXNG search** (`internal/server/tools.go:862`, `internal/research/web.go:23`)
   Implemented twice with separate response structs.
 
 - [ ] **De-duplicate HTML stripping** (`internal/server/tools.go:1305`, `internal/research/web.go:67`)
