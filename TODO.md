@@ -38,7 +38,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Stored XSS — sanitise rendered markdown** (`static/js/markdown.js:37`)
   `marked.parse(text)` is assigned to `innerHTML` with no sanitiser; assistant output (which includes fetched web-page content and shared character prompts) executes as live HTML. Vendor DOMPurify (no build step — drop in `static/js/vendor/`) and sanitise the output of `render()` before assigning. Highest priority.
 
-- [ ] **Notes IDOR — add ownership checks** (`internal/server/notes.go:24,82,112`)
+- [x] **Notes IDOR — add ownership checks** (`internal/server/notes.go:24,82,112`)
   `handleGetNote`, `handleDeleteNote`, and `handleSetNoteReadOnly` operate on a note id with no scope/ownership check, defeating the `g.`/`u.`/`c.` visibility model. After `GetNoteByID`, verify the note is visible to `currentUser(r)` (global, owned by the user, or in one of the user's conversations) before returning/mutating.
 
 - [ ] **Attachment IDOR — add ownership check** (`internal/server/attachments.go:11`)

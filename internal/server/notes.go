@@ -10,6 +10,24 @@ import (
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
+// checkNoteAccess verifies the note is visible to user. Admins bypass the
+// check. Returns false and writes the error response if access is denied.
+func (s *Server) checkNoteAccess(w http.ResponseWriter, noteID int64, user *store.User) bool {
+	if user.IsAdmin {
+		return true
+	}
+	visible, err := s.store.IsNoteVisibleToUser(noteID, user.ID)
+	if err != nil {
+		internalError(w, err)
+		return false
+	}
+	if !visible {
+		writeError(w, http.StatusNotFound, "not found")
+		return false
+	}
+	return true
+}
+
 func (s *Server) handleListNotes(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	prefix := r.URL.Query().Get("prefix")
@@ -22,6 +40,7 @@ func (s *Server) handleListNotes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetNote(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid id")
@@ -34,6 +53,9 @@ func (s *Server) handleGetNote(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		internalError(w, err)
+		return
+	}
+	if !s.checkNoteAccess(w, n.ID, user) {
 		return
 	}
 	writeJSON(w, http.StatusOK, n)
@@ -96,6 +118,9 @@ func (s *Server) handleDeleteNote(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
+	if !s.checkNoteAccess(w, n.ID, user) {
+		return
+	}
 	if n.ReadOnly {
 		writeError(w, http.StatusForbidden, "note is read-only")
 		return
@@ -132,6 +157,9 @@ func (s *Server) handleSetNoteReadOnly(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		internalError(w, err)
+		return
+	}
+	if !s.checkNoteAccess(w, n.ID, user) {
 		return
 	}
 

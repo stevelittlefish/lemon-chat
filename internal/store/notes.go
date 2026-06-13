@@ -419,6 +419,26 @@ func (s *Store) ListUserVisibleNotes(prefix string, userID int64) ([]NoteRow, er
 	return result, nil
 }
 
+// IsNoteVisibleToUser reports whether the note with the given id is accessible
+// to userID: global notes (no user_id, no conversation_id), notes owned by
+// userID, or notes in a conversation owned by userID.
+func (s *Store) IsNoteVisibleToUser(id, userID int64) (bool, error) {
+	var count int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM note
+		WHERE id = ?
+		AND (
+			(user_id IS NULL AND conversation_id IS NULL)
+			OR (user_id = ? AND conversation_id IS NULL)
+			OR (user_id IS NULL AND conversation_id IN (SELECT id FROM conversation WHERE user_id = ?))
+		)
+	`, id, userID, userID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // GetNoteByID fetches a note by its DB id (for the settings REST API).
 func (s *Store) GetNoteByID(id int64) (Note, error) {
 	var n Note
