@@ -25,7 +25,6 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 - [x] In-depth report toggle: build the final report section by section from the raw findings (outline → self-critique refine → per-section write → glue) instead of one summarising pass, to stop reports losing detail. Opt-in checkbox; applies to both modes. `deepReport` pipeline in `internal/research/researcher.go`.
 
-- [ ] Optional HTML output format for research/brainstorm reports (deferred follow-up) — let the LLM use richer layout, tables, inline SVG. Needs a `format` column, an HTML variant of `formatCompositeReport`, and a render-path/sanitisation decision in `static/js/markdown.js`.
 
 - [ ] Look into ways to follow Reddit and facebook links, if possible
 
