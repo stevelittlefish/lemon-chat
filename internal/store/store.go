@@ -226,7 +226,7 @@ func (s *Store) migrate() error {
 	}
 
 	if version < 10 {
-		log.Println("store: migrating v9 → v10 (add indexes on message, conversation, session)")
+		log.Println("store: migrating v8 → v10 (add indexes on message, conversation, session)")
 		for _, stmt := range []string{
 			`CREATE INDEX IF NOT EXISTS idx_message_conversation_id ON message(conversation_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_conversation_user_id    ON conversation(user_id)`,
@@ -241,7 +241,7 @@ func (s *Store) migrate() error {
 			return err
 		}
 		version = 10
-		log.Println("store: migration v9 → v10 complete")
+		log.Println("store: migration v8 → v10 complete")
 	}
 
 	if version < 11 {

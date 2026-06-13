@@ -284,9 +284,9 @@ func parseJSONObject(text string, v any) error {
 		return nil
 	}
 	open := strings.Index(text, "{")
-	close := strings.LastIndex(text, "}")
-	if open != -1 && close > open {
-		return json.Unmarshal([]byte(text[open:close+1]), v)
+	closeIdx := strings.LastIndex(text, "}")
+	if open != -1 && closeIdx > open {
+		return json.Unmarshal([]byte(text[open:closeIdx+1]), v)
 	}
 	return fmt.Errorf("no JSON object found")
 }

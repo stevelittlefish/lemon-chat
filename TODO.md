@@ -67,10 +67,10 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **`note_list` prefix semantics differ between model and UI** (`internal/store/notes.go:198`)
   Model-facing `ListNotes` treats a bare term as `g.foo%` (matches `foobar`); the settings `ListUserVisibleNotes` uses `g.foo.%` (segment boundary). Pick one rule and share it.
 
-- [ ] **Migration version-label gap** (`internal/store/store.go:228`)
+- [x] **Migration version-label gap** (`internal/store/store.go:228`)
   The v8 block is followed by `if version < 10` labelled "v9 → v10" with no v8→v9 block. Works, but relabel/comment to avoid confusion.
 
-- [ ] **`parseJSONObject` shadows builtin `close`** (`internal/research/llm.go:266`)
+- [x] **`parseJSONObject` shadows builtin `close`** (`internal/research/llm.go:266`)
   Rename the local to `closeIdx`.
 
 ### Duplication
