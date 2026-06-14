@@ -1535,6 +1535,8 @@ func makeImageExecutor(comfyURL, workflowFile string, defaultSteps int, defaultC
 				if bg {
 					if err := tctx.Store.SetConversationBackground(convID, attID); err != nil {
 						log.Printf("Setting conversation background conversation_id=%d attachment_id=%d: %v", convID, attID, err)
+					} else {
+						tctx.Hub.BroadcastConversationBackground(convID, attID)
 					}
 				}
 				finalAtt, err := tctx.Store.GetAttachment(attID)
@@ -1573,6 +1575,8 @@ func makeImageExecutor(comfyURL, workflowFile string, defaultSteps int, defaultC
 		if args.Background {
 			if err := tctx.Store.SetConversationBackground(tctx.ConversationID, att.ID); err != nil {
 				log.Printf("Setting conversation background conversation_id=%d attachment_id=%d: %v", tctx.ConversationID, att.ID, err)
+			} else {
+				tctx.Hub.BroadcastConversationBackground(tctx.ConversationID, att.ID)
 			}
 		}
 		result := AttachmentResult{

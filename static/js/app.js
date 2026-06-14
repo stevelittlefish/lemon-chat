@@ -47,6 +47,12 @@ function showApp() {
   ws.on('attachment_ready', (msg) => {
     resolveAttachment(msg.id, msg);
   });
+  // A background was set on a conversation. Patch the cached item so re-loading
+  // the conversation restores the background, and apply it now if it's active.
+  ws.on('conversation_background', ({ id, attachment_id }) => {
+    sidebar.updateItem(id, { background_attachment_id: attachment_id });
+    if (id === activeConversationId) setBackground(attachment_id);
+  });
   ws.on('attachment_error', (msg) => {
     resolveAttachment(msg.id, null);
   });
