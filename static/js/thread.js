@@ -96,16 +96,27 @@ function buildAttachmentError() {
 export function resolveAttachment(id, att) {
   const placeholder = document.querySelector(`[data-attachment-id="${id}"]`);
   if (!placeholder) return;
-  if (att) {
-    const imgWrap = buildInlineImage(att);
-    const imgTag = imgWrap.querySelector('img');
-    if (imgTag && att.background) {
-      imgTag.addEventListener('load', () => setBackground(att.id), { once: true });
-    }
-    placeholder.replaceWith(imgWrap);
-  } else {
+  if (!att) {
     placeholder.replaceWith(buildAttachmentError());
+    return;
   }
+  // Were we pinned to the bottom before any layout change? Capture this while the
+  // (correctly-sized) placeholder is still in place so it reflects the true position.
+  const stick = isNearBottom();
+  const imgWrap = buildInlineImage(att);
+  const imgTag = imgWrap.querySelector('img');
+  // Carry the placeholder's reserved box onto the image so the swap doesn't
+  // collapse before the bitmap decodes — the image is the same size, so this
+  // makes the swap itself shift-free regardless of network timing.
+  if (imgTag) {
+    imgTag.style.width = placeholder.style.width;
+    imgTag.style.height = placeholder.style.height;
+  }
+  placeholder.replaceWith(imgWrap);
+  // A background image adds legibility padding across the whole thread, which
+  // pushes content down. If we were at the bottom, follow the new scene.
+  if (att.background) setBackground(att.id);
+  if (stick) scrollToBottom();
 }
 
 let lightbox = null;
@@ -303,13 +314,8 @@ export function setConversationId(id) {
 
 export function setBackground(attachmentId) {
   if (attachmentId) {
-    // Turning the background on adds vertical padding across the thread for
-    // legibility, which shifts content down. When it was previously off, keep
-    // the latest scene in view by scrolling to the bottom after the reflow.
-    const wasUnset = !mainEl.classList.contains('has-bg');
     mainEl.style.setProperty('--thread-bg-url', `url('/api/attachments/${attachmentId}')`);
     mainEl.classList.add('has-bg');
-    if (wasUnset) scrollToBottom();
   } else {
     mainEl.style.removeProperty('--thread-bg-url');
     mainEl.classList.remove('has-bg');

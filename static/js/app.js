@@ -46,9 +46,6 @@ function showApp() {
   });
   ws.on('attachment_ready', (msg) => {
     resolveAttachment(msg.id, msg);
-    if (msg.background && msg.conversation_id === activeConversationId) {
-      setBackground(msg.id);
-    }
   });
   ws.on('attachment_error', (msg) => {
     resolveAttachment(msg.id, null);
