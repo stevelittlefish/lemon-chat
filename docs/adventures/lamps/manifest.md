@@ -13,6 +13,11 @@ LOAD ON DEMAND:
 - g.cyo.lamps.victory — load when reunion_done = "true"
 
 WORLD STATE INIT:
+Set each key below to exactly the string value shown. This is the ONLY thing to do here: emit
+the 13 key/value pairs as plain data. Do NOT add comments, do NOT invent extra keys, and do
+NOT fold in any victory, "load on demand", or objective rules — those are handled elsewhere,
+never at init. Every value is a string. reunion_done is initialised to "false" here like any
+other flag; its victory role is not relevant to this step.
 phase            = "1"
 player_health    = "3"
 companion_name   = "Flicker"

@@ -3,11 +3,13 @@ RANDOMNESS — HOW ENCOUNTER OUTCOMES WORK:
 Use pick_random for all 3-outcome encounter checks. Encode the outcome directly in the
 options list so the returned string IS the result — no interpretation needed.
 
-Standard difficulty tables (10 items each):
+Standard difficulty tables (10 items each). These lean toward failure on purpose — the world
+should bite. Note that "partial" still usually advances the objective but costs 1 health; only
+"failure" blocks the player AND costs health. So the partial+failure weight is real attrition.
 
-EASY:   ["success","success","success","success","success","partial","partial","partial","failure","failure"]
-MEDIUM: ["success","success","success","success","partial","partial","partial","partial","failure","failure"]
-HARD:   ["success","success","partial","partial","partial","partial","failure","failure","failure","failure"]
+EASY:   ["success","success","success","success","partial","partial","partial","failure","failure","failure"]   (40% success / 30% partial / 30% failure)
+MEDIUM: ["success","success","success","partial","partial","partial","failure","failure","failure","failure"]   (30% / 30% / 40%)
+HARD:   ["success","success","partial","partial","partial","failure","failure","failure","failure","failure"]   (20% / 30% / 50%)
 
 ADVANTAGE: when the player has an edge, call pick_random twice with the same list and take
 the better result (success beats partial beats failure). The main source of advantage is
@@ -30,6 +32,11 @@ In act 2 — and any scene where Flicker's light plainly helps (searching the da
 nerve, frightening off a shadow) — the bond grants advantage on the pick_random check:
 - flicker_bond "2" or "3": the player has ADVANTAGE (roll twice, take the better result).
 - flicker_bond "0" or "1": no bonus — Flicker's flame is willing but thin.
+
+Act-2 escape gates are HARD by design (see .phase2). Even WITH Flicker's advantage they stay a
+real fight — roughly a one-in-four chance of being driven back, and a good chance of a costly
+partial. That is intended: the dark must threaten. Do not soften it. (Advantage on a HARD table
+is far from a free pass — it is what makes a brutal gate merely hard.)
 
 Narrate the glow when it matters: at high bond Flicker flares like a held breath and the dark
 pulls back a pace. Never expose the number to the player; show it as the lamp's brightness.

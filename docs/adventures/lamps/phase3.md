@@ -49,8 +49,9 @@ The travellers must learn where in this whole bright world Flicker's family is. 
 asks the lamp-folk, follows Flicker's eager pull, reads the old brass-lamp district by its
 particular warm glow. (Lumo helps, recognising founder-make brass when he sees it.)
 
-GATE — pick_random EASY (the world is kind; the player should mostly succeed):
-["success","success","success","success","success","partial","partial","partial","failure","failure"]
+GATE — pick_random EASY (the world is kind, but bewildering; failure here only means a wrong
+turn, never a health cost):
+["success","success","success","success","partial","partial","partial","failure","failure","failure"]
 success → A kindly old Streetlamp-elder, or the pull of Flicker itself, points the way: the
           Brass Hollow, the Filament Quarter, where the brass oil-lamps have always lived.
           💎 family_clue = "known".
@@ -67,9 +68,10 @@ wait the brass oil-lamps who lost a little one to the sky long ago and never sto
 place set. The player brings Flicker to them. The final beat: Flicker lights the cold
 homecoming flame, and is known.
 
-GATE — this is the climax but it is not a fight. Use pick_random EASY, framed as whether the
-reunion lands gently or needs one more tender beat — but it CANNOT truly fail (the player came
-all this way; the brief is happily-ever-after):
+GATE — this is the climax but it is not a fight. DELIBERATE EXCEPTION to the failure-weighting
+used everywhere else: this table has NO failure outcome on purpose. The player came all this
+way; the homecoming is earned, not gambled. The roll only decides whether the reunion lands
+straight away or needs one more tender beat:
 ["success","success","success","success","success","success","partial","partial","success","partial"]
 success → Flicker leans out of the player's hands, hops to the cold hearth, and breathes its
           small flame into it — and the homecoming flame ROARS up gold and warm, and the brass

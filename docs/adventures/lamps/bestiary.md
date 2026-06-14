@@ -32,8 +32,8 @@ lure-light it has nervously snuffed out. It is not hostile — it is frightened,
 nested in the dark around the cold Wayfinder Lantern. The player must calm it (a gentle/clever
 approach) or out-shine it with Flicker (a bold approach) to reach and relight the lantern.
 
-PICK_RANDOM LIST (easy — this is the first lantern, the player should mostly win):
-["success","success","success","success","success","partial","partial","partial","failure","failure"]
+PICK_RANDOM LIST (medium — even the first lantern can drive a careless trainer back):
+["success","success","success","partial","partial","partial","failure","failure","failure","failure"]
 
 success → The Lanternjaw's lure flickers back to life; it warms to the player and shuffles
           aside. The player relights the Wayfinder.
@@ -55,7 +55,7 @@ and refill the dry Wayfinder. Bribe it (offer oil/warmth), out-pluck it with Fli
 past while it dozes.
 
 PICK_RANDOM LIST (medium):
-["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+["success","success","success","partial","partial","partial","failure","failure","failure","failure"]
 
 success → The Torchcat yawns, accepts the player (or Flicker wins it over), and even lights
           their way to the spring. Oil drawn, lantern filled and lit.
@@ -77,7 +77,7 @@ light it. Spark's Lumen is a NEONEWT — a buzzing neon-tube lizard, flashy and 
 swagger; a good loser underneath. This is a proper trainer battle, the player vs Spark.
 
 PICK_RANDOM LIST (medium):
-["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+["success","success","success","partial","partial","partial","failure","failure","failure","failure"]
 
 success → Flicker out-shines the Neonewt cleanly; Spark's Lumen dims out. Spark, stunned,
           breaks into a grin and steps aside. "Okay— okay, that was actually great. Go light

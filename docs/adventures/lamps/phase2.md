@@ -46,8 +46,9 @@ OBJECTIVES — sequenced. Do them in order; redirect naturally if the player tri
 The player needs light to navigate. They find the gym's backup lamp / oil generator and must
 get it lit in the dark (a Gloamling lurks near it, drawn to Flicker's flame).
 
-GATE — pick_random MEDIUM, with ADVANTAGE if flicker_bond is "2" or "3":
-["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+GATE — pick_random HARD, with ADVANTAGE if flicker_bond is "2" or "3" (it almost always is by
+now; even so, expect a roughly one-in-four chance of failure and a real chance of a costly partial):
+["success","success","partial","partial","partial","failure","failure","failure","failure","failure"]
 success → Flicker flares, the Gloamling shrinks back, the backup lamp catches. Emergency light
           swells through the arena — not bright, but enough. 💎 power_restored = "true".
 partial → The lamp catches but a Gloamling smothers past the player in the scramble. 💎
@@ -65,8 +66,8 @@ star-marked HIDDEN STAIR are now findable. They must reach the stair and get it 
 Gloamlings close in. (If the player makes for the main doors instead, the shadow there is
 impenetrable — redirect them to look for another way.)
 
-GATE — pick_random MEDIUM, ADVANTAGE if flicker_bond is "2" or "3":
-["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+GATE — pick_random HARD, ADVANTAGE if flicker_bond is "2" or "3":
+["success","success","partial","partial","partial","failure","failure","failure","failure","failure"]
 success → The player finds the star-marked door, breaks the old plaster, and the spiral down
           opens with a breath of cold stone air. 💎 door_unsealed = "true". They slip through
           ahead of the hounds.
@@ -82,8 +83,8 @@ cradle, lights waking as the player nears — clearly old, clearly ready. Umbra'
 down the stair behind them. The player must cross the chamber and get aboard before the dark
 catches them.
 
-GATE — pick_random MEDIUM, ADVANTAGE if flicker_bond is "2" or "3":
-["success","success","success","success","partial","partial","partial","partial","failure","failure"]
+GATE — pick_random HARD, ADVANTAGE if flicker_bond is "2" or "3":
+["success","success","partial","partial","partial","failure","failure","failure","failure","failure"]
 success → The player races across the waking chamber and through the rocket's open hatch; it
           seals behind them, shutting the cold out. 💎 at_launchpad = "true".
 partial → They make it aboard but the dark claws at their heels on the threshold. 💎

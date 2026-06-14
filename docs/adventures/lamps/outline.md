@@ -142,8 +142,11 @@ homecoming are the resolution, matching the brief.)
 
 ## Mechanics summary
 
-- **Resolution:** `pick_random` difficulty tables (EASY/MEDIUM/HARD), same model as
-  `eldoria`. `random_chance` for binary checks. Never `roll_dice`.
+- **Resolution:** `pick_random` difficulty tables (EASY/MEDIUM/HARD), failure-weighted
+  (40/30/30, 30/30/40, 20/30/50). `random_chance` for binary checks. Never `roll_dice`.
+  Act-1 lantern gates are MEDIUM; act-2 escape gates are HARD (the Flicker-bond advantage is
+  what keeps them fair at ~25% failure rather than a brutal 50%); act-3 family clue is EASY and
+  the reunion climax is a deliberate no-failure exception (happily-ever-after).
 - **Health:** start 3. Healing sources: **Lantern Rest** centers in act-1 towns (limited);
   one emergency **oil flask** in act 2; a **hearth-lamp** moment in act 3. No invented healing.
 - **Advantage:** high `flicker_bond` → roll twice, take the better result, in dark act-2
