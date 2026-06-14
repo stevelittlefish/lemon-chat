@@ -1495,6 +1495,9 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Default box for the error variant; buildImagePlaceholder() overrides
+     width/height inline to match the finished image and avoid layout shift. */
+  box-sizing: border-box;
   width: 320px;
   height: 160px;
   background: var(--bg-sunken);
@@ -1699,7 +1702,7 @@ html, body {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(251, 247, 236, 0.80);
+  background: rgba(251, 247, 236, 0.60);
   z-index: 1;
 }
 

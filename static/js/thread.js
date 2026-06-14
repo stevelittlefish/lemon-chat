@@ -61,9 +61,21 @@ function fileIconName(mimeType, filename) {
   return 'file';
 }
 
-function buildImagePlaceholder() {
+// Max display box for inline images — keep in sync with .inline-image-img in app.css.
+const IMG_MAX_W = 320;
+const IMG_MAX_H = 240;
+
+function buildImagePlaceholder(width, height) {
   const div = document.createElement('div');
   div.className = 'image-placeholder';
+  // Size the placeholder to the exact box the finished image will render in, so
+  // swapping the image in causes no layout shift (and no scroll jump). Generated
+  // images default to 1024×1024 when the model omits a size (see makeImageExecutor).
+  const w = Number(width) > 0 ? Number(width) : 1024;
+  const h = Number(height) > 0 ? Number(height) : 1024;
+  const scale = Math.min(IMG_MAX_W / w, IMG_MAX_H / h, 1);
+  div.style.width = `${Math.round(w * scale)}px`;
+  div.style.height = `${Math.round(h * scale)}px`;
   const label = document.createElement('span');
   label.className = 'image-placeholder-label';
   label.textContent = 'Generating image…';
@@ -291,8 +303,13 @@ export function setConversationId(id) {
 
 export function setBackground(attachmentId) {
   if (attachmentId) {
+    // Turning the background on adds vertical padding across the thread for
+    // legibility, which shifts content down. When it was previously off, keep
+    // the latest scene in view by scrolling to the bottom after the reflow.
+    const wasUnset = !mainEl.classList.contains('has-bg');
     mainEl.style.setProperty('--thread-bg-url', `url('/api/attachments/${attachmentId}')`);
     mainEl.classList.add('has-bg');
+    if (wasUnset) scrollToBottom();
   } else {
     mainEl.style.removeProperty('--thread-bg-url');
     mainEl.classList.remove('has-bg');
@@ -536,7 +553,7 @@ export function startStreaming() {
       if (toolCall.id) toolCallEls.set(toolCall.id, el);
       toolCallsEl.appendChild(el);
       if (toolCall.name.startsWith('generate_image') && toolCall.id) {
-        const placeholder = buildImagePlaceholder();
+        const placeholder = buildImagePlaceholder(toolCall.args?.width, toolCall.args?.height);
         if (accumulated) {
           colEl.insertBefore(placeholder, waitingEl ?? null);
         } else {
@@ -828,6 +845,12 @@ function buildMessage(msg, hideAvatar = false) {
       if (ti.attachment.mime_type?.startsWith('image/')) {
         if (ti.attachment.status === 'error') {
           colEl.appendChild(buildAttachmentError());
+        } else if (ti.attachment.status === 'pending') {
+          // Still generating — render a correctly-sized placeholder the WS
+          // attachment_ready/_error event can later resolve in place.
+          const ph = buildImagePlaceholder(ti.args?.width, ti.args?.height);
+          ph.dataset.attachmentId = ti.attachment.id;
+          colEl.appendChild(ph);
         } else {
           colEl.appendChild(buildInlineImage(ti.attachment));
         }
