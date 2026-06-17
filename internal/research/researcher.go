@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +34,8 @@ var validCategories = map[string]bool{"product": true, "comparison": true, "howt
 var validBrainstormFormats = map[string]bool{
 	"design-doc": true, "options": true, "ideas": true, "analysis": true, "explainer": true,
 }
+
+var reCombinedSourceCitation = regexp.MustCompile(`\[((?:S\d+\s*(?:[,;]|\band\b)?\s*){2,})\]`)
 
 // Research modes. "research" is the default web-search-driven pipeline;
 // "brainstorm" is an ideation-driven variant where each round the model
@@ -969,6 +972,33 @@ func (r *Researcher) formatFindings(findings []Finding) string {
 	return strings.TrimSpace(sb.String())
 }
 
+// normalizeSourceCitations converts model output like "[S1, S2]" or
+// "[S1 and S2]" into separate markdown reference links. Shortcut references
+// only work one at a time, even though models often group citations together.
+func normalizeSourceCitations(text string) string {
+	return reCombinedSourceCitation.ReplaceAllStringFunc(text, func(match string) string {
+		inner := strings.Trim(match, "[]")
+		parts := strings.FieldsFunc(inner, func(r rune) bool {
+			return r == ',' || r == ';' || r == ' ' || r == '\t' || r == '\n'
+		})
+		var ids []string
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part == "" || strings.EqualFold(part, "and") {
+				continue
+			}
+			ids = append(ids, part)
+		}
+		if len(ids) < 2 {
+			return match
+		}
+		for i, id := range ids {
+			ids[i] = "[" + id + "]"
+		}
+		return strings.Join(ids, " ")
+	})
+}
+
 // formatCompositeReport wraps the final LLM report in the composite markdown
 // document: stats header, curated sources, all analyzed URLs, and the raw
 // findings in a collapsible section.
@@ -984,7 +1014,7 @@ func (r *Researcher) formatCompositeReport(final string) string {
 	}
 	sb.WriteString("\n\n---\n\n")
 
-	sb.WriteString(final)
+	sb.WriteString(normalizeSourceCitations(final))
 
 	// Curated sources: quality-filtered findings, each URL at most once.
 	seen := map[string]bool{}

@@ -175,6 +175,60 @@ func TestCompositeReportIncludesSourceIDMap(t *testing.T) {
 	}
 }
 
+func TestNormalizeSourceCitations(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "comma list",
+			in:   "Freshness matters [S13, S18].",
+			want: "Freshness matters [S13] [S18].",
+		},
+		{
+			name: "semicolon list",
+			in:   "Freshness matters [S1; S2; S3].",
+			want: "Freshness matters [S1] [S2] [S3].",
+		},
+		{
+			name: "and list",
+			in:   "Freshness matters [S1 and S2].",
+			want: "Freshness matters [S1] [S2].",
+		},
+		{
+			name: "single citation unchanged",
+			in:   "Freshness matters [S1].",
+			want: "Freshness matters [S1].",
+		},
+		{
+			name: "ordinary bracket unchanged",
+			in:   "Freshness matters [see appendix].",
+			want: "Freshness matters [see appendix].",
+		},
+	}
+	for _, c := range cases {
+		if got := normalizeSourceCitations(c.in); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestCompositeReportNormalizesGroupedSourceIDs(t *testing.T) {
+	st := State{
+		Findings: []Finding{
+			{URL: "https://example.test/a", Title: "First source", Summary: "Alpha facts."},
+			{URL: "https://example.test/b", Title: "Second source", Summary: "Beta facts."},
+		},
+	}
+	r := New(Config{Model: "test-model"}, st, nil, nil)
+
+	got := r.formatCompositeReport("The answer cites grouped sources [S1, S2].")
+	if !strings.Contains(got, "The answer cites grouped sources [S1] [S2].") {
+		t.Errorf("grouped citations were not normalized:\n%s", got)
+	}
+}
+
 func TestUntrustedContextMessage(t *testing.T) {
 	out := untrustedContextMessage("webpage", "content with "+guardOpen+" breakout attempt")
 	if strings.Count(out, guardOpen) != 1 {
