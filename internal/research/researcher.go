@@ -273,7 +273,7 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 			return "", fmt.Errorf("research produced no findings")
 		}
 		// Synthesis never succeeded — fall back to formatted raw findings.
-		r.state.Report = "## Research Findings\n\nSynthesis was unavailable; the raw findings are listed below.\n\n" + formatFindings(r.state.Findings)
+		r.state.Report = "## Research Findings\n\nSynthesis was unavailable; the raw findings are listed below.\n\n" + r.formatFindings(r.state.Findings)
 	}
 
 	r.progress(Progress{Phase: "writing", TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
@@ -451,7 +451,7 @@ func (r *Researcher) classifyBrainstorm(ctx context.Context) string {
 	if err != nil {
 		return "design-doc"
 	}
-	first := strings.ToLower(strings.Trim(strings.Fields(out+" x")[0], ".,!:;\"'"))
+	first := strings.ToLower(strings.Trim(strings.Fields(out + " x")[0], ".,!:;\"'"))
 	if validBrainstormFormats[first] {
 		return first
 	}
@@ -632,13 +632,13 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 	}
 	var prompt string
 	if r.brainstorm() {
-		findingsText := formatFindings(newFindings)
+		findingsText := r.formatFindings(newFindings)
 		if findingsText == "" {
 			findingsText = "(No web research this round — develop the ideas from your own knowledge.)"
 		}
 		prompt = fmt.Sprintf(brainstormDevelopPrompt, r.cfg.Query, r.state.Plan, report, findingsText)
 	} else {
-		prompt = fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, formatFindings(newFindings))
+		prompt = fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, r.formatFindings(newFindings))
 	}
 	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout,
 		func(generated int, tail string) {
@@ -675,7 +675,11 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 	if r.brainstorm() {
 		return r.finalBrainstorm(ctx)
 	}
-	prompt := fmt.Sprintf(finalReportPrompt, r.cfg.Query, r.state.Report)
+	findings := r.formatFindings(r.state.Findings)
+	if findings == "" {
+		findings = "(No raw web findings were collected.)"
+	}
+	prompt := fmt.Sprintf(finalReportPrompt, r.cfg.Query, r.state.Report, findings)
 	if override, ok := categoryPrompts[r.state.Category]; ok {
 		prompt += override
 	}
@@ -707,7 +711,11 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 // Unlike finalReport it imposes no report-category overrides and no minimum
 // length — the output is a structured design write-up, not a long-form article.
 func (r *Researcher) finalBrainstorm(ctx context.Context) string {
-	prompt := fmt.Sprintf(brainstormFinalPrompt, r.cfg.Query, r.state.Plan, r.state.Report)
+	findings := r.formatFindings(r.state.Findings)
+	if findings == "" {
+		findings = "(No supporting web findings were collected.)"
+	}
+	prompt := fmt.Sprintf(brainstormFinalPrompt, r.cfg.Query, r.state.Plan, r.state.Report, findings)
 	if override, ok := brainstormFormatOverrides[r.state.Category]; ok {
 		prompt += override
 	}
@@ -753,7 +761,7 @@ func (r *Researcher) deepReport(ctx context.Context) string {
 		titles[i] = s.Title
 	}
 	outline := strings.Join(titles, "\n")
-	findings := formatFindings(r.state.Findings)
+	findings := r.formatFindings(r.state.Findings)
 	report := r.state.Report
 
 	var bodies []string
@@ -806,7 +814,7 @@ func (r *Researcher) deepReport(ctx context.Context) string {
 // outline produces the section plan: a draft outline followed by a self-critique
 // refine pass that catches gaps and prunes redundancy. Returns nil on failure.
 func (r *Researcher) outline(ctx context.Context) []reportSection {
-	findings := formatFindings(r.state.Findings)
+	findings := r.formatFindings(r.state.Findings)
 	if findings == "" {
 		findings = "(No web findings — work from the notes and the brief.)"
 	}
@@ -924,8 +932,21 @@ func (r *Researcher) gluePart(ctx context.Context, outline, report, instruction 
 
 // ── Report formatting ────────────────────────────────────────
 
-// formatFindings serialises findings for the synthesis prompt.
-func formatFindings(findings []Finding) string {
+// sourceID returns the stable citation ID for a finding within the whole run.
+// Matching by URL keeps IDs stable when a round formats only its new findings.
+func (r *Researcher) sourceID(f Finding) string {
+	for i, existing := range r.state.Findings {
+		if existing.URL == f.URL {
+			return fmt.Sprintf("S%d", i+1)
+		}
+	}
+	return "S?"
+}
+
+// formatFindings serialises findings for LLM prompts. Each source is labelled
+// with a stable ID so the model can cite [S1] instead of preserving long URLs
+// through multiple summarisation passes.
+func (r *Researcher) formatFindings(findings []Finding) string {
 	var sb strings.Builder
 	for i, f := range findings {
 		text := f.Summary
@@ -935,7 +956,15 @@ func formatFindings(findings []Finding) string {
 				text = text[:1000]
 			}
 		}
-		fmt.Fprintf(&sb, "**Finding %d** — [%s](%s)\n%s\n\n", i+1, f.Title, f.URL, text)
+		id := r.sourceID(f)
+		if id == "S?" {
+			id = fmt.Sprintf("S%d", i+1)
+		}
+		title := f.Title
+		if title == "" {
+			title = f.URL
+		}
+		fmt.Fprintf(&sb, "[%s] %s\nURL: %s\nSummary: %s\n\n", id, title, f.URL, text)
 	}
 	return strings.TrimSpace(sb.String())
 }
@@ -970,7 +999,15 @@ func (r *Researcher) formatCompositeReport(final string) string {
 	if len(sources) > 0 {
 		sb.WriteString("\n\n### Sources\n\n")
 		for _, f := range sources {
-			fmt.Fprintf(&sb, "- [%s](%s)\n", f.Title, f.URL)
+			title := f.Title
+			if title == "" {
+				title = f.URL
+			}
+			fmt.Fprintf(&sb, "- [%s] [%s](%s)\n", r.sourceID(f), title, f.URL)
+		}
+		sb.WriteString("\n")
+		for _, f := range sources {
+			fmt.Fprintf(&sb, "[%s]: %s\n", r.sourceID(f), f.URL)
 		}
 	}
 
@@ -995,7 +1032,11 @@ func (r *Researcher) formatCompositeReport(final string) string {
 	if len(r.state.Findings) > 0 {
 		fmt.Fprintf(&sb, "\n<details>\n<summary><strong>Raw collected findings (%d sources)</strong></summary>\n\n", len(r.state.Findings))
 		for i, f := range r.state.Findings {
-			fmt.Fprintf(&sb, "**%d. [%s](%s)**\n\n%s\n\n", i+1, f.Title, f.URL, f.Summary)
+			title := f.Title
+			if title == "" {
+				title = f.URL
+			}
+			fmt.Fprintf(&sb, "**%d. [%s] [%s](%s)**\n\n%s\n\n", i+1, r.sourceID(f), title, f.URL, f.Summary)
 		}
 		sb.WriteString("</details>\n")
 	}

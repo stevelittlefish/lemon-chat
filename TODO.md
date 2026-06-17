@@ -16,6 +16,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [x] Improve research citations: use stable source IDs in findings/prompts and feed raw findings into final report generation so links survive summarisation.
+
 - [x] Long prompts mess up the layout.  Separate into title and prompt (both optional - one must be specified)
 
 - [x] The back button in the top left when viewing an individual piece of deep research should take you back to the list, not the menu

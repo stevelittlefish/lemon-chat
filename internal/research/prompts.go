@@ -159,7 +159,7 @@ const brainstormDevelopPrompt = `You are an inventor and designer developing ide
 **New research from this round:**
 %s
 
-Develop the work further this round: introduce new ideas where useful, deepen the most promising ones, address weaknesses and trade-offs, and fold in any new research. Keep the strongest material, prune dead ends, and maintain a clear, logical structure. Where a web source informed a specific point, keep its URL as an inline citation.
+Develop the work further this round: introduce new ideas where useful, deepen the most promising ones, address weaknesses and trade-offs, and fold in any new research. Keep the strongest material, prune dead ends, and maintain a clear, logical structure. Where a web source informed a specific point, cite the source ID inline, e.g. [S1].
 
 Write only the updated design notes — no preamble or meta-commentary.`
 
@@ -193,6 +193,9 @@ const brainstormFinalPrompt = `Write a polished **design document** for this bri
 **Developed design notes:**
 %s
 
+**Supporting web findings:**
+%s
+
 Structure the document with clear ## headings, roughly:
 - A short **executive summary** of the proposed solution
 - **The concept** — the core idea(s), explained clearly
@@ -201,7 +204,7 @@ Structure the document with clear ## headings, roughly:
 - **Risks and open questions**
 - **Next steps** — concrete actions to move forward
 
-Be specific and decisive — recommend, don't just list options. Where a web source informed a specific fact, cite it inline [like this](url). Write in an engaging, clear style. Length should fit the idea: thorough but not padded.`
+Be specific and decisive — recommend, don't just list options. Where a web source informed a specific fact, cite the source ID inline, e.g. [S1]. Write in an engaging, clear style. Length should fit the idea: thorough but not padded.`
 
 // extractorSystem is the goal-based content extraction prompt
 // (credited to the Tongyi DeepResearch lineage).
@@ -233,7 +236,7 @@ const synthesizePrompt = `You are updating an evolving research report.
 **New findings from this round:**
 %s
 
-Integrate the new findings into the existing report. Produce an updated, well-organized report that answers the original question as completely as possible given all evidence so far. Remove redundancy, resolve contradictions, and maintain logical flow. Keep source URLs as inline citations where relevant.
+Integrate the new findings into the existing report. Produce an updated, well-organized report that answers the original question as completely as possible given all evidence so far. Remove redundancy, resolve contradictions, and maintain logical flow. Keep source IDs such as [S1] as inline citations where relevant.
 
 Write only the updated report — no preamble or meta-commentary.`
 
@@ -261,7 +264,10 @@ const finalReportPrompt = `Write a **long, detailed, comprehensive** research re
 
 **Question:** %s
 
-**All collected evidence and analysis:**
+**Current synthesized analysis:**
+%s
+
+**Raw collected findings with source IDs:**
 %s
 
 Requirements:
@@ -270,7 +276,7 @@ Requirements:
 - Each section should have multiple detailed paragraphs, not just bullet points
 - Synthesize and analyze the information — explain WHY things matter, draw comparisons, provide context
 - Include specific data points, numbers, and statistics from the evidence
-- Include source URLs as inline citations [like this](url)
+- Cite source IDs inline for specific claims, e.g. [S1]. Do not invent source IDs; use only IDs present in the raw findings.
 - Note where sources agree and where they disagree
 - Add a brief executive summary at the top
 - End with a clear conclusion that directly answers the question
@@ -281,6 +287,7 @@ const expandReportPrompt = `This report is too brief. Please expand it significa
 - Include specific data, numbers, and comparisons from the evidence
 - Explain context and significance — don't just list facts
 - Use ## headings and ### subheadings
+- Preserve and add source ID citations such as [S1] for sourced claims
 - Target at least 1000 words
 Write the full expanded report now.`
 
@@ -349,7 +356,7 @@ const sectionWritePrompt = `You are writing ONE section of a detailed, long-form
 **Collected evidence (raw findings — draw on the relevant ones):**
 %s
 
-Write this section in depth: multiple detailed paragraphs with specific facts, numbers, and comparisons drawn from the evidence, explaining why things matter. Include inline citations as [like this](url) using the finding URLs. Start with a "## " heading for this section's title. Write only this section's content — no preamble, no other sections.`
+Write this section in depth: multiple detailed paragraphs with specific facts, numbers, and comparisons drawn from the evidence, explaining why things matter. Cite source IDs inline for specific claims, e.g. [S1]. Do not invent source IDs; use only IDs present in the raw findings. Start with a "## " heading for this section's title. Write only this section's content — no preamble, no other sections.`
 
 const reportGluePartPrompt = `You are writing one part of a detailed research report.
 
@@ -424,7 +431,7 @@ const brainstormSectionWritePrompt = `You are writing ONE section of a detailed 
 **Any supporting research (draw on the relevant items):**
 %s
 
-Develop this section in depth. Be specific and decisive — recommend, don't just list options. Where a web source informed a specific point, cite it inline as [like this](url). Start with a "## " heading for this section's title. Write only this section's content — no preamble, no other sections.`
+Develop this section in depth. Be specific and decisive — recommend, don't just list options. Where a web source informed a specific point, cite the source ID inline, e.g. [S1]. Do not invent source IDs; use only IDs present in the supporting research. Start with a "## " heading for this section's title. Write only this section's content — no preamble, no other sections.`
 
 const brainstormGluePartPrompt = `You are writing one part of a design document.
 
@@ -450,7 +457,7 @@ IMPORTANT FORMAT OVERRIDE — this is a PRODUCT research report:
 - For EACH product include: name as ### heading, approximate price, 2-3 sentence summary, **Pros:** bullet list, **Cons:** bullet list, **Where to buy:** URLs as links
 - Start with a quick-compare markdown table of top picks (columns: Name, Price, Best For, Rating)
 - End with a ## Verdict section picking Best Overall and Best Value
-- Still include source citations inline`,
+- Still include source ID citations inline`,
 	"comparison": `
 
 IMPORTANT FORMAT OVERRIDE — this is a COMPARISON report:
@@ -477,7 +484,7 @@ IMPORTANT FORMAT OVERRIDE — this is a FACT-CHECK report:
 - Each piece of evidence should be a ### with source name, what it found, and how strong the evidence is
 - Include a ## Verdict section with one of: **Supported**, **Mixed Evidence**, or **Unsupported**
 - End with ## Nuance & Caveats for important context and limitations
-- Be balanced and cite sources for every claim`,
+- Be balanced and cite source IDs for every claim`,
 }
 
 // brainstormFormatOverrides are appended to brainstormFinalPrompt (and to the
@@ -509,7 +516,7 @@ IMPORTANT FORMAT OVERRIDE — write a strategic/philosophical ANALYSIS, not a de
 - Explore the question from multiple angles: context, competing perspectives, underlying tensions, implications
 - Aim for insight and clarity rather than a prescriptive plan — the goal is understanding, not a deliverable
 - Do NOT include a Next steps section or a single prescriptive recommendation unless the brief asks for one
-- Cite any web sources inline`,
+- Cite any web sources inline using source IDs such as [S1]`,
 
 	"explainer": `
 

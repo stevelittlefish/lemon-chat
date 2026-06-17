@@ -129,6 +129,52 @@ func TestIsLowQuality(t *testing.T) {
 	}
 }
 
+func TestFormatFindingsUsesStableSourceIDs(t *testing.T) {
+	st := State{Findings: []Finding{
+		{URL: "https://example.test/a", Title: "First source", Summary: "Alpha facts."},
+		{URL: "https://example.test/b", Title: "Second source", Summary: "Beta facts."},
+	}}
+	r := New(Config{}, st, nil, nil)
+
+	got := r.formatFindings([]Finding{st.Findings[1]})
+	for _, want := range []string{
+		"[S2] Second source",
+		"URL: https://example.test/b",
+		"Summary: Beta facts.",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("formatFindings missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "[S1]") {
+		t.Errorf("formatFindings renumbered subset instead of preserving stable ID:\n%s", got)
+	}
+}
+
+func TestCompositeReportIncludesSourceIDMap(t *testing.T) {
+	st := State{
+		Round:       1,
+		Findings:    []Finding{{URL: "https://example.test/a", Title: "First source", Summary: "Alpha facts."}},
+		QueriesUsed: []string{"alpha"},
+		AnalyzedURLs: []AnalyzedURL{
+			{URL: "https://example.test/a", Title: "First source"},
+		},
+	}
+	r := New(Config{Model: "test-model"}, st, nil, nil)
+
+	got := r.formatCompositeReport("The answer cites a source [S1].")
+	for _, want := range []string{
+		"The answer cites a source [S1].",
+		"- [S1] [First source](https://example.test/a)",
+		"[S1]: https://example.test/a",
+		"**1. [S1] [First source](https://example.test/a)**",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("formatCompositeReport missing %q in:\n%s", want, got)
+		}
+	}
+}
+
 func TestUntrustedContextMessage(t *testing.T) {
 	out := untrustedContextMessage("webpage", "content with "+guardOpen+" breakout attempt")
 	if strings.Count(out, guardOpen) != 1 {
