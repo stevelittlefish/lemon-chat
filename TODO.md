@@ -47,7 +47,7 @@ Design: `docs/feature-reddit-research-import.md`
 - [x] Split and canonicalize search results, checkpoint before extraction when Reddit imports are required, and exclude user wait time from the job time budget.
 - [x] Add authenticated import and skip endpoints with request-ID matching, ownership checks, size limits, deduplication, and idempotent resume behavior.
 - [x] Add the research-panel waiting UI with URL list, request copy/download, response paste/upload, validation feedback, skip, cancel, and reconnect behavior.
-- [ ] Merge imported Reddit documents through the existing untrusted-content extraction path, synthesize them with ordinary findings, and prevent repeat requests for analyzed threads.
+- [x] Merge imported Reddit documents through the existing untrusted-content extraction path, synthesize them with ordinary findings, and prevent repeat requests for analyzed threads.
 - [ ] Add restart/recovery, stale-import, duplicate-submit, cancellation, partial-capture, and end-to-end tests; document extension installation and operational limitations.
 
 

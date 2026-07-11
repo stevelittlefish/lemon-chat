@@ -209,6 +209,16 @@ func (s *Store) ClearResearchRedditState(id int64) error {
 	return err
 }
 
+// CompleteResearchRedditRound atomically checkpoints the merged round and
+// clears its handoff so it cannot be merged twice after a restart.
+func (s *Store) CompleteResearchRedditRound(id int64, round, emptyRounds int, elapsedMS int64, category, plan, report, findings, queriesUsed, analyzedURLs string) error {
+	_, err := s.db.Exec(`UPDATE research_job SET round = ?, empty_rounds = ?, elapsed_ms = ?, category = ?, plan = ?,
+		report = ?, findings = ?, queries_used = ?, analyzed_urls = ?, reddit_request_id = NULL,
+		pending_reddit_round = NULL, reddit_response = NULL, reddit_skipped = 0, updated_at = ? WHERE id = ?`,
+		round, emptyRounds, elapsedMS, category, plan, report, findings, queriesUsed, analyzedURLs, now(), id)
+	return err
+}
+
 // FinishResearchJob marks a job done, errored, or cancelled.
 func (s *Store) FinishResearchJob(id int64, status string, finalReport, errMsg *string, elapsedMS int64) error {
 	_, err := s.db.Exec(

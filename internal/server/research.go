@@ -248,6 +248,33 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		}
 		return s.store.SetResearchJobAwaitingReddit(job.ID, pending.Request.RequestID, string(body), pending.ElapsedMS)
 	}
+	cfg.OnRedditRoundComplete = func(st research.State) error {
+		findings, queries, urls := research.MarshalState(st)
+		return s.store.CompleteResearchRedditRound(job.ID, st.Round, st.EmptyRounds, st.ElapsedMS,
+			st.Category, st.Plan, st.Report, findings, queries, urls)
+	}
+	if job.PendingRedditRound != nil && (job.RedditResponse != nil || job.RedditSkipped) {
+		var pending research.PendingRedditRound
+		if err := json.Unmarshal([]byte(*job.PendingRedditRound), &pending); err != nil {
+			s.finishResearch(job.ID, run, store.ResearchStatusError, nil, "stored Reddit pending round is invalid", job.ElapsedMS)
+			return
+		}
+		resume := &research.RedditResume{Pending: pending, Skipped: job.RedditSkipped}
+		if job.RedditResponse != nil {
+			var response redditimport.Response
+			if err := json.Unmarshal([]byte(*job.RedditResponse), &response); err != nil {
+				s.finishResearch(job.ID, run, store.ResearchStatusError, nil, "stored Reddit response is invalid", job.ElapsedMS)
+				return
+			}
+			pages, err := redditimport.ValidateAndNormalize(pending.Request, response)
+			if err != nil {
+				s.finishResearch(job.ID, run, store.ResearchStatusError, nil, "stored Reddit response failed validation", job.ElapsedMS)
+				return
+			}
+			resume.Pages = pages
+		}
+		cfg.RedditResume = resume
+	}
 
 	state := research.UnmarshalState(job.Round, job.EmptyRounds, job.ElapsedMS,
 		job.Category, job.Plan, job.Report, job.Findings, job.QueriesUsed, job.AnalyzedURLs)

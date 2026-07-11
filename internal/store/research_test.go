@@ -72,6 +72,16 @@ func TestResearchRedditPauseAndResumeIsDurableAndIdempotent(t *testing.T) {
 	if resumed.Status != ResearchStatusPending || resumed.RedditResponse == nil || *resumed.RedditResponse != response {
 		t.Fatalf("resumed state was not persisted: %+v", resumed)
 	}
+	if err := s.CompleteResearchRedditRound(job.ID, 2, 0, 1500, "factcheck", "plan", "report", `[]`, `["query"]`, `[]`); err != nil {
+		t.Fatal(err)
+	}
+	completed, err := s.GetResearchJob(job.ID, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.Round != 2 || completed.Report == nil || *completed.Report != "report" || completed.RedditRequestID != nil || completed.PendingRedditRound != nil || completed.RedditResponse != nil || completed.RedditSkipped {
+		t.Fatalf("completed Reddit round was not atomically checkpointed and cleared: %+v", completed)
+	}
 }
 
 func TestMigrationV31PreservesExistingResearchData(t *testing.T) {
