@@ -41,7 +41,7 @@ Design: `docs/feature-reddit-research-import.md`
 - [x] Define and test the versioned Reddit import/request JSON contract, URL canonicalisation, validation limits, and normalized LLM-facing text.
 - [x] Add synthetic import fixtures covering nested, deleted, duplicate, oversized, partial, and prompt-injection-shaped content.
 - [x] Add a debug-only single-pass test harness: SearXNG Reddit search, request export, response validation, normalized preview, extraction, and formatted finding preview.
-- [ ] Build a Chromium Manifest V3 "Save Reddit" extension that accepts a request bundle, visits threads sequentially, expands/scrolls within limits, and exports a response bundle with completeness warnings.
+- [x] Build a Chromium Manifest V3 "Save Reddit" extension that accepts a request bundle, visits threads sequentially, expands/scrolls within limits, and exports a response bundle with completeness warnings.
 - [ ] Add the per-job "Pause to import Reddit results" option, off by default, to config persistence, API views, and the research form.
 - [ ] Add a numbered database migration and store operations for the durable `awaiting_reddit` state and pending round/request data.
 - [ ] Split and canonicalize search results, checkpoint before extraction when Reddit imports are required, and exclude user wait time from the job time budget.
