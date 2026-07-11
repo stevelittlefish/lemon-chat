@@ -275,6 +275,13 @@ html, body {
   margin-bottom: var(--space-5);
 }
 
+.reddit-waiting { margin-top: var(--space-6); display: grid; gap: var(--space-4); }
+.reddit-waiting h2, .reddit-waiting p { margin: 0; }
+.reddit-url-list { margin: 0; padding-left: var(--space-6); }
+.reddit-url-list li { margin: var(--space-2) 0; overflow-wrap: anywhere; }
+.reddit-url-list a { color: var(--link); }
+.reddit-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
 /* Rendered report */
 .research-report {
   font-size: var(--fs-15);

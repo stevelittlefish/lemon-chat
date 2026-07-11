@@ -675,13 +675,22 @@ func (s *Server) handleCancelResearch(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := s.store.GetResearchJob(id, user.ID); err != nil {
+	job, err := s.store.GetResearchJob(id, user.ID)
+	if err != nil {
 		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
 	log.Printf("Cancelling research job id=%d user_id=%d", id, user.ID)
 	run := s.research.get(id)
 	if run == nil {
+		if job.Status == store.ResearchStatusAwaitingReddit {
+			if err := s.store.FinishResearchJob(id, store.ResearchStatusCancelled, nil, nil, job.ElapsedMS); err != nil {
+				internalError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]string{"status": store.ResearchStatusCancelled})
+			return
+		}
 		writeError(w, http.StatusConflict, "job is not running")
 		return
 	}
