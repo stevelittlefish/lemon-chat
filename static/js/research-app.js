@@ -108,6 +108,9 @@ async function showList() {
         <label class="research-field research-check">
           <input type="checkbox" id="research-deep-report"> in-depth report
         </label>
+        <label class="research-field research-check">
+          <input type="checkbox" id="research-pause-reddit"> pause to import Reddit results
+        </label>
         <label class="research-field">effort
           <select id="research-effort" class="input">${effortOptions}</select>
         </label>
@@ -157,12 +160,13 @@ async function startResearch() {
   const mode = document.getElementById('research-mode').value;
   const forceSearch = mode === 'brainstorm' && document.getElementById('research-force-search').checked;
   const deepReport = document.getElementById('research-deep-report').checked;
+  const pauseRedditImport = document.getElementById('research-pause-reddit').checked;
   const effort = parseInt(document.getElementById('research-effort').value, 10) || formDefaults.effort;
   const maxTimeMinutes = parseInt(document.getElementById('research-time').value, 10) || formDefaults.max_time_minutes;
   const btn = document.getElementById('research-start');
   btn.disabled = true;
   try {
-    const job = await research.start(title, query, model, mode, forceSearch, deepReport, effort, maxTimeMinutes);
+    const job = await research.start(title, query, model, mode, forceSearch, deepReport, pauseRedditImport, effort, maxTimeMinutes);
     location.hash = job.id;
   } catch (err) {
     btn.disabled = false;
@@ -293,6 +297,7 @@ async function showDetail(id) {
       ${statusBadge(job.status)}
       ${job.mode === 'brainstorm' ? `<span>brainstorm${job.force_search ? ' · always searches' : ''}</span>` : ''}
       ${job.deep_report ? '<span>in-depth</span>' : ''}
+      ${job.pause_reddit_import ? '<span>Reddit import</span>' : ''}
       <span>${escapeHtml(job.model)}</span>
       ${job.effort ? `<span>effort: ${EFFORT_NAMES[job.effort] || job.effort}</span>` : ''}
       <span>${formatDate(job.created_at)}</span>

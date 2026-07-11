@@ -628,6 +628,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v28 → v29 complete")
 	}
 
+	if version < 30 {
+		log.Println("store: migrating v29 → v30 (add pause_reddit_import to research_job)")
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN pause_reddit_import INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (30, ?)`, now()); err != nil {
+			return err
+		}
+		version = 30
+		log.Println("store: migration v29 → v30 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

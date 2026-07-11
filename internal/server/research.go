@@ -351,27 +351,28 @@ func (s *Server) finishResearch(jobID int64, run *researchRun, status string, fi
 
 // researchJobView is the listing shape — heavy state columns omitted.
 type researchJobView struct {
-	ID             int64   `json:"id"`
-	Title          *string `json:"title"`
-	Query          string  `json:"query"`
-	Model          string  `json:"model"`
-	Mode           string  `json:"mode"`
-	ForceSearch    bool    `json:"force_search"`
-	DeepReport     bool    `json:"deep_report"`
-	Status         string  `json:"status"`
-	Phase          *string `json:"phase"`
-	Effort         int     `json:"effort"`
-	MaxTimeSeconds int     `json:"max_time_seconds"`
-	Round          int     `json:"round"`
-	ElapsedMS      int64   `json:"elapsed_ms"`
-	Error          *string `json:"error"`
-	CreatedAt      string  `json:"created_at"`
-	UpdatedAt      string  `json:"updated_at"`
+	ID                int64   `json:"id"`
+	Title             *string `json:"title"`
+	Query             string  `json:"query"`
+	Model             string  `json:"model"`
+	Mode              string  `json:"mode"`
+	ForceSearch       bool    `json:"force_search"`
+	DeepReport        bool    `json:"deep_report"`
+	PauseRedditImport bool    `json:"pause_reddit_import"`
+	Status            string  `json:"status"`
+	Phase             *string `json:"phase"`
+	Effort            int     `json:"effort"`
+	MaxTimeSeconds    int     `json:"max_time_seconds"`
+	Round             int     `json:"round"`
+	ElapsedMS         int64   `json:"elapsed_ms"`
+	Error             *string `json:"error"`
+	CreatedAt         string  `json:"created_at"`
+	UpdatedAt         string  `json:"updated_at"`
 }
 
 func researchView(j *store.ResearchJob) researchJobView {
 	return researchJobView{
-		ID: j.ID, Title: j.Title, Query: j.Query, Model: j.Model, Mode: j.Mode, ForceSearch: j.ForceSearch, DeepReport: j.DeepReport, Status: j.Status, Phase: j.Phase,
+		ID: j.ID, Title: j.Title, Query: j.Query, Model: j.Model, Mode: j.Mode, ForceSearch: j.ForceSearch, DeepReport: j.DeepReport, PauseRedditImport: j.PauseRedditImport, Status: j.Status, Phase: j.Phase,
 		Effort: j.Effort, MaxTimeSeconds: j.MaxTimeSeconds,
 		Round: j.Round, ElapsedMS: j.ElapsedMS, Error: j.Error, CreatedAt: j.CreatedAt, UpdatedAt: j.UpdatedAt,
 	}
@@ -393,14 +394,15 @@ func (s *Server) handleResearchDefaults(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	var req struct {
-		Title          string `json:"title"`
-		Query          string `json:"query"`
-		Model          string `json:"model"`
-		Mode           string `json:"mode"`
-		ForceSearch    bool   `json:"force_search"`
-		DeepReport     bool   `json:"deep_report"`
-		Effort         int    `json:"effort"`
-		MaxTimeMinutes int    `json:"max_time_minutes"`
+		Title             string `json:"title"`
+		Query             string `json:"query"`
+		Model             string `json:"model"`
+		Mode              string `json:"mode"`
+		ForceSearch       bool   `json:"force_search"`
+		DeepReport        bool   `json:"deep_report"`
+		PauseRedditImport bool   `json:"pause_reddit_import"`
+		Effort            int    `json:"effort"`
+		MaxTimeMinutes    int    `json:"max_time_minutes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -447,12 +449,12 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 
 	// ForceSearch only changes brainstorm-mode behaviour; ignore it otherwise.
 	forceSearch := req.ForceSearch && mode == research.ModeBrainstorm
-	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, effort, maxTimeSeconds)
+	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, effort, maxTimeSeconds)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	log.Printf("Starting research job id=%d user_id=%d model=%q mode=%q force_search=%t deep_report=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, mode, forceSearch, req.DeepReport, effort, maxTimeSeconds, req.Title, req.Query)
+	log.Printf("Starting research job id=%d user_id=%d model=%q mode=%q force_search=%t deep_report=%t pause_reddit_import=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, effort, maxTimeSeconds, req.Title, req.Query)
 	go s.runResearch(job)
 	writeJSON(w, http.StatusCreated, researchView(job))
 }
