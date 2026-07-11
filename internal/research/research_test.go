@@ -1,8 +1,10 @@
 package research
 
 import (
+	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseJSONStringArray(t *testing.T) {
@@ -33,6 +35,49 @@ func TestParseJSONStringArray(t *testing.T) {
 				break
 			}
 		}
+	}
+}
+
+func TestSplitRedditURLsCanonicalizesGroupsAndSkipsAnalyzedThreads(t *testing.T) {
+	ordinary, redditPages := SplitRedditURLs([]AnalyzedURL{
+		{URL: "https://example.com/article", Title: "Ordinary"},
+		{URL: "https://old.reddit.com/r/test/comments/abc123/topic/comment1/?context=3", Title: "Matched comment"},
+		{URL: "https://www.reddit.com/r/test/comments/abc123/topic/comment2/", Title: "Duplicate thread"},
+		{URL: "https://redd.it/def456", Title: "Already read"},
+	}, []AnalyzedURL{{URL: "https://www.reddit.com/comments/def456/"}})
+	if len(ordinary) != 1 || ordinary[0].URL != "https://example.com/article" {
+		t.Fatalf("ordinary URLs = %+v", ordinary)
+	}
+	if len(redditPages) != 1 || redditPages[0].URL != "https://www.reddit.com/comments/abc123/comment1/" || redditPages[0].Title != "Matched comment" {
+		t.Fatalf("Reddit pages = %+v", redditPages)
+	}
+}
+
+func TestPauseForRedditCheckpointsCompletePendingRound(t *testing.T) {
+	var checkpointed State
+	var pending PendingRedditRound
+	r := New(Config{
+		PauseRedditImport: true,
+		OnRedditPause: func(got PendingRedditRound) error {
+			pending = got
+			return nil
+		},
+	}, State{ElapsedMS: 500}, nil, func(state State) { checkpointed = state })
+	r.startTime = time.Now().Add(-250 * time.Millisecond)
+	r.baseElapsed = 500
+
+	ordinary, err := r.pauseForReddit(2, 1, []string{"query"}, []AnalyzedURL{
+		{URL: "https://example.com/page", Title: "Ordinary"},
+		{URL: "https://reddit.com/r/test/comments/abc123/topic/", Title: "Reddit"},
+	})
+	if !errors.Is(err, ErrAwaitingReddit) || ordinary != nil {
+		t.Fatalf("pause result ordinary=%+v err=%v", ordinary, err)
+	}
+	if pending.Round != 2 || pending.Creativity != 1 || len(pending.Queries) != 1 || len(pending.OrdinaryURLs) != 1 || len(pending.Request.Pages) != 1 {
+		t.Fatalf("pending round incomplete: %+v", pending)
+	}
+	if pending.Request.RequestID == "" || pending.ElapsedMS < 700 || checkpointed.ElapsedMS != pending.ElapsedMS {
+		t.Fatalf("request/checkpoint timing invalid: pending=%+v checkpoint=%+v", pending, checkpointed)
 	}
 }
 

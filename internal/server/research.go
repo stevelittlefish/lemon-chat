@@ -224,6 +224,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		Mode:                  job.Mode,
 		ForceSearch:           job.ForceSearch,
 		DeepReport:            job.DeepReport,
+		PauseRedditImport:     job.PauseRedditImport,
 		APIBase:               modelServer.APIBase,
 		APIKey:                modelServer.APIKey,
 		SearXNGURL:            s.cfg.SearXNG.URL,
@@ -238,6 +239,13 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		MaxEmptyRounds:        rc.MaxEmptyRounds,
 		SynthesisWindow:       rc.SynthesisWindow,
 		ExtraRounds:           extraRounds,
+	}
+	cfg.OnRedditPause = func(pending research.PendingRedditRound) error {
+		body, err := json.Marshal(pending)
+		if err != nil {
+			return err
+		}
+		return s.store.SetResearchJobAwaitingReddit(job.ID, pending.Request.RequestID, string(body), pending.ElapsedMS)
 	}
 
 	state := research.UnmarshalState(job.Round, job.EmptyRounds, job.ElapsedMS,
@@ -278,6 +286,10 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	elapsedMS := state.ElapsedMS + time.Since(started).Milliseconds()
 
 	switch {
+	case errors.Is(runErr, research.ErrAwaitingReddit):
+		log.Printf("Pausing research for Reddit import id=%d elapsed=%.1fs", job.ID, float64(r.State().ElapsedMS)/1000)
+		data, _ := json.Marshal(map[string]any{"status": store.ResearchStatusAwaitingReddit})
+		run.finish(data)
 	case runErr == nil:
 		log.Printf("Research job finished id=%d rounds=%d elapsed=%.1fs", job.ID, r.State().Round, float64(elapsedMS)/1000)
 		s.finishResearch(job.ID, run, store.ResearchStatusDone, &report, "", elapsedMS)

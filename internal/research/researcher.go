@@ -6,7 +6,9 @@ package research
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -14,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stevelittlefish/lemon-chat/internal/redditimport"
 	"github.com/stevelittlefish/lemon-chat/internal/searx"
 )
 
@@ -28,6 +31,8 @@ const (
 	synthesisTimeout = 180 * time.Second
 	stopTimeout      = 60 * time.Second
 )
+
+var ErrAwaitingReddit = errors.New("research is awaiting a Reddit import")
 
 var validCategories = map[string]bool{"product": true, "comparison": true, "howto": true, "factcheck": true}
 
@@ -89,11 +94,13 @@ type Config struct {
 	// DeepReport replaces the single-shot final write with a section-based
 	// pipeline (outline → refine → per-section write from raw findings → glue),
 	// producing a longer, more detailed report. Applies to both modes.
-	DeepReport bool
-	APIBase    string
-	APIKey     string
-	SearXNGURL string
-	Location   *time.Location
+	DeepReport        bool
+	PauseRedditImport bool
+	OnRedditPause     func(PendingRedditRound) error
+	APIBase           string
+	APIKey            string
+	SearXNGURL        string
+	Location          *time.Location
 
 	MaxRounds             int
 	MaxTime               time.Duration
@@ -107,6 +114,17 @@ type Config struct {
 	// ExtraRounds is the number of bonus "creative" rounds to run after the
 	// report would normally be considered complete (effort 4 → 1, effort 5 → 2).
 	ExtraRounds int
+}
+
+// PendingRedditRound is the complete durable boundary between search and
+// extraction. Resuming from it does not repeat query generation or web search.
+type PendingRedditRound struct {
+	Round        int                  `json:"round"`
+	Creativity   int                  `json:"creativity"`
+	Queries      []string             `json:"queries"`
+	OrdinaryURLs []AnalyzedURL        `json:"ordinary_urls"`
+	Request      redditimport.Request `json:"request"`
+	ElapsedMS    int64                `json:"elapsed_ms"`
 }
 
 // Progress is emitted at each phase transition. Events with Generated > 0
@@ -323,7 +341,11 @@ func (r *Researcher) runBrainstormRound(ctx context.Context, round, creativity i
 		r.state.QueriesUsed = append(r.state.QueriesUsed, queries...)
 		r.progress(Progress{Phase: "searching", Round: round, Queries: queries, TotalSources: len(r.state.AnalyzedURLs)})
 		newURLs := r.searchAll(ctx, queries)
-		findings = r.extractAll(ctx, round, newURLs)
+		ordinaryURLs, err := r.pauseForReddit(round, creativity, queries, newURLs)
+		if err != nil {
+			return false, err
+		}
+		findings = r.extractAll(ctx, round, ordinaryURLs)
 		if ctx.Err() != nil {
 			return false, nil
 		}
@@ -363,7 +385,11 @@ func (r *Researcher) runRound(ctx context.Context, round, creativity int) (keepG
 	r.progress(Progress{Phase: "searching", Round: round, Queries: queries, TotalSources: len(r.state.AnalyzedURLs)})
 
 	newURLs := r.searchAll(ctx, queries)
-	findings := r.extractAll(ctx, round, newURLs)
+	ordinaryURLs, err := r.pauseForReddit(round, creativity, queries, newURLs)
+	if err != nil {
+		return false, err
+	}
+	findings := r.extractAll(ctx, round, ordinaryURLs)
 	if ctx.Err() != nil {
 		return false, nil
 	}
@@ -586,6 +612,63 @@ func (r *Researcher) searchAll(ctx context.Context, queries []string) []Analyzed
 		}
 	}
 	return newURLs
+}
+
+func (r *Researcher) pauseForReddit(round, creativity int, queries []string, urls []AnalyzedURL) ([]AnalyzedURL, error) {
+	if !r.cfg.PauseRedditImport {
+		return urls, nil
+	}
+	ordinary, redditPages := SplitRedditURLs(urls, r.state.AnalyzedURLs)
+	if len(redditPages) == 0 {
+		return ordinary, nil
+	}
+	if r.cfg.OnRedditPause == nil {
+		return nil, errors.New("Reddit import pause callback is not configured")
+	}
+	requestIDBytes := make([]byte, 16)
+	if _, err := rand.Read(requestIDBytes); err != nil {
+		return nil, fmt.Errorf("create Reddit request ID: %w", err)
+	}
+	req, err := redditimport.NewRequest(fmt.Sprintf("%x", requestIDBytes), redditPages, redditimport.CaptureLimits{})
+	if err != nil {
+		return nil, err
+	}
+	r.checkpoint()
+	pending := PendingRedditRound{
+		Round: round, Creativity: creativity, Queries: append([]string(nil), queries...),
+		OrdinaryURLs: ordinary, Request: req, ElapsedMS: r.state.ElapsedMS,
+	}
+	if err := r.cfg.OnRedditPause(pending); err != nil {
+		return nil, fmt.Errorf("checkpoint Reddit import request: %w", err)
+	}
+	return nil, ErrAwaitingReddit
+}
+
+// SplitRedditURLs canonicalizes and groups Reddit search results while leaving
+// ordinary results in search order. Previously analyzed Reddit threads are
+// discarded so they cannot trigger another browser handoff.
+func SplitRedditURLs(urls, analyzed []AnalyzedURL) ([]AnalyzedURL, []redditimport.RequestedPage) {
+	seenThreads := make(map[string]bool)
+	for _, item := range analyzed {
+		if _, threadURL, err := redditimport.CanonicalizeURL(item.URL); err == nil {
+			seenThreads[threadURL] = true
+		}
+	}
+	ordinary := make([]AnalyzedURL, 0, len(urls))
+	redditPages := make([]redditimport.RequestedPage, 0)
+	for _, item := range urls {
+		canonical, threadURL, err := redditimport.CanonicalizeURL(item.URL)
+		if err != nil {
+			ordinary = append(ordinary, item)
+			continue
+		}
+		if seenThreads[threadURL] {
+			continue
+		}
+		seenThreads[threadURL] = true
+		redditPages = append(redditPages, redditimport.RequestedPage{URL: canonical, Title: item.Title})
+	}
+	return ordinary, redditPages
 }
 
 // ── Phase 5: Extract ─────────────────────────────────────────
