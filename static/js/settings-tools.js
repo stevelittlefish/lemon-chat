@@ -92,24 +92,12 @@ function renderPage() {
       </div>
       <div id="note-pack-result" class="tool-result hidden"></div>
     </div>
-    <div class="section">
-      <h2>Database</h2>
-      <div class="tool-row" id="tool-orphaned-messages">
-        <div class="tool-row-info">
-          <div class="tool-row-name">Delete orphaned messages</div>
-          <div class="tool-row-desc">Removes messages whose conversation has been deleted. Safe to run at any time.</div>
-        </div>
-        <button class="btn btn-secondary btn-sm" id="btn-orphaned-messages">Run</button>
-      </div>
-      <div id="orphaned-messages-result" class="tool-result hidden"></div>
-    </div>
   `;
 
   document.getElementById('btn-import-note-pack').addEventListener('click', () => {
     document.getElementById('note-pack-file').click();
   });
   document.getElementById('note-pack-file').addEventListener('change', runImportNotePack);
-  document.getElementById('btn-orphaned-messages').addEventListener('click', runDeleteOrphanedMessages);
 }
 
 async function runImportNotePack(e) {
@@ -145,32 +133,6 @@ async function runImportNotePack(e) {
   } finally {
     btn.disabled    = false;
     btn.textContent = 'Choose file';
-    result.classList.remove('hidden');
-  }
-}
-
-async function runDeleteOrphanedMessages() {
-  if (!confirm('Delete all messages whose conversation has been deleted?\n\nThis cannot be undone.')) return;
-
-  const btn    = document.getElementById('btn-orphaned-messages');
-  const result = document.getElementById('orphaned-messages-result');
-
-  btn.disabled    = true;
-  btn.textContent = 'Running…';
-  result.className = 'tool-result hidden';
-
-  try {
-    const data = await admin.tools.deleteOrphanedMessages();
-    result.className   = 'tool-result tool-result--ok';
-    result.textContent = data.deleted === 0
-      ? 'No orphaned messages found.'
-      : `Deleted ${data.deleted} orphaned message${data.deleted === 1 ? '' : 's'}.`;
-  } catch (err) {
-    result.className   = 'tool-result tool-result--error';
-    result.textContent = 'Failed: ' + (err.message || 'unknown error');
-  } finally {
-    btn.disabled    = false;
-    btn.textContent = 'Run';
     result.classList.remove('hidden');
   }
 }

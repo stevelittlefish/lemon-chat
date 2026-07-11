@@ -1,7 +1,5 @@
 package store
 
-import "log"
-
 type Message struct {
 	ID               int64   `json:"id"`
 	ConversationID   int64   `json:"conversation_id"`
@@ -23,56 +21,6 @@ type MessageStats struct {
 	PromptTokens     int64
 	CompletionTokens int64
 	TotalTimeMS      int64
-}
-
-func (s *Store) DeleteOrphanedMessages() (int64, error) {
-	log.Println("store: DeleteOrphanedMessages — scanning for orphaned messages")
-
-	rows, err := s.db.Query(
-		`SELECT id, conversation_id, role, substr(content, 1, 80)
-		 FROM message
-		 WHERE conversation_id NOT IN (SELECT id FROM conversation)
-		 ORDER BY conversation_id, id`,
-	)
-	if err != nil {
-		return 0, err
-	}
-	defer rows.Close()
-
-	type orphan struct {
-		id, convID    int64
-		role, snippet string
-	}
-	var orphans []orphan
-	for rows.Next() {
-		var o orphan
-		if err := rows.Scan(&o.id, &o.convID, &o.role, &o.snippet); err != nil {
-			return 0, err
-		}
-		orphans = append(orphans, o)
-	}
-	if err := rows.Err(); err != nil {
-		return 0, err
-	}
-
-	if len(orphans) == 0 {
-		log.Println("store: DeleteOrphanedMessages — no orphaned messages found, nothing to do")
-		return 0, nil
-	}
-
-	log.Printf("store: DeleteOrphanedMessages — found %d orphaned message(s):", len(orphans))
-	for _, o := range orphans {
-		log.Printf("store:   message id=%d conversation_id=%d role=%s content=%q", o.id, o.convID, o.role, o.snippet)
-	}
-
-	res, err := s.db.Exec(`DELETE FROM message WHERE conversation_id NOT IN (SELECT id FROM conversation)`)
-	if err != nil {
-		log.Printf("store: DeleteOrphanedMessages — delete failed: %v", err)
-		return 0, err
-	}
-	n, _ := res.RowsAffected()
-	log.Printf("store: DeleteOrphanedMessages — deleted %d message(s) successfully", n)
-	return n, nil
 }
 
 func (s *Store) ListMessages(conversationID int64) ([]Message, error) {

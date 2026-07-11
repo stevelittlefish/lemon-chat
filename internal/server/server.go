@@ -97,7 +97,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/admin/users", s.requireAdmin(s.handleAdminCreateUser))
 	mux.HandleFunc("PATCH /api/admin/users/{id}", s.requireAdmin(s.handleAdminUpdateUser))
 	mux.HandleFunc("DELETE /api/admin/users/{id}", s.requireAdmin(s.handleAdminDeleteUser))
-	mux.HandleFunc("POST /api/admin/tools/delete-orphaned-messages", s.requireAdmin(s.handleAdminDeleteOrphanedMessages))
 	mux.HandleFunc("POST /api/admin/note-packs/import", s.requireAdmin(s.handleAdminImportNotePack))
 
 	// Research

@@ -233,9 +233,6 @@ export const admin = {
     update: (id, data) => request('PATCH', `/api/admin/users/${id}`, data),
     delete: (id) => request('DELETE', `/api/admin/users/${id}`),
   },
-  tools: {
-    deleteOrphanedMessages: () => request('POST', '/api/admin/tools/delete-orphaned-messages'),
-  },
   notePacks: {
     import: (pack) => request('POST', '/api/admin/note-packs/import', pack),
   },

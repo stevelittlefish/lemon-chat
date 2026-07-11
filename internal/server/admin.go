@@ -126,19 +126,6 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) handleAdminDeleteOrphanedMessages(w http.ResponseWriter, r *http.Request) {
-	user := currentUser(r)
-	log.Printf("Running tool: delete-orphaned-messages user_id=%d username=%q", user.ID, user.Username)
-	n, err := s.store.DeleteOrphanedMessages()
-	if err != nil {
-		log.Printf("Tool delete-orphaned-messages failed: %v", err)
-		internalError(w, err)
-		return
-	}
-	log.Printf("Tool delete-orphaned-messages complete: deleted %d message(s)", n)
-	writeJSON(w, http.StatusOK, map[string]int64{"deleted": n})
-}
-
 func (s *Server) handleAdminImportNotePack(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 
@@ -182,9 +169,9 @@ func (s *Server) handleAdminImportNotePack(w http.ResponseWriter, r *http.Reques
 
 	log.Printf("Note pack import complete: %d note(s) imported/updated", imported)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"imported":   imported,
-		"pack_id":    pack.ID,
-		"pack_name":  pack.Name,
+		"imported":     imported,
+		"pack_id":      pack.ID,
+		"pack_name":    pack.Name,
 		"pack_version": pack.Version,
 	})
 }
