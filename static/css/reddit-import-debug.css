@@ -1,0 +1,26 @@
+* { box-sizing: border-box; }
+
+.harness {
+  width: min(920px, calc(100% - 32px));
+  margin: 40px auto 80px;
+}
+
+.harness h1, .harness h2, .harness p { margin-top: 0; }
+.harness > .card { margin-top: var(--space-6); }
+
+.stack { display: grid; gap: var(--space-4); }
+.stack label { display: grid; gap: var(--space-2); font-size: var(--fs-14); font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.output {
+  margin: 0;
+  padding: var(--space-4);
+  max-height: 520px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg-sunken);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  color: var(--fg);
+}

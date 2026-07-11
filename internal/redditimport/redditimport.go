@@ -91,13 +91,13 @@ type CapturedComment struct {
 // NormalizedPage is validated, deduplicated content ready to be converted to
 // the untrusted text passed through the research extractor.
 type NormalizedPage struct {
-	URL      string
-	Title    string
-	Content  string
-	Complete bool
-	Warnings []string
-	Failure  string
-	Comments int
+	URL      string   `json:"url"`
+	Title    string   `json:"title"`
+	Content  string   `json:"content"`
+	Complete bool     `json:"complete"`
+	Warnings []string `json:"warnings,omitempty"`
+	Failure  string   `json:"failure,omitempty"`
+	Comments int      `json:"comments"`
 }
 
 // CanonicalizeURL returns a stable Reddit permalink and thread identity.

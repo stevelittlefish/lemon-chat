@@ -110,6 +110,18 @@ func (r *Researcher) fetchAndExtract(ctx context.Context, pageURL, searchTitle s
 	}
 
 	content := truncateContent(page.Content, r.cfg.MaxContentChars)
+	finding := r.ExtractText(ctx, pageURL, title, content)
+	if finding != nil {
+		finding.OGImage = page.OGImage
+	}
+	return finding
+}
+
+// ExtractText runs already-fetched text through the production goal-based
+// extractor. Browser-imported content uses this entry point so it receives the
+// same prompt-injection guard and quality filtering as ordinary webpages.
+func (r *Researcher) ExtractText(ctx context.Context, pageURL, title, content string) *Finding {
+	content = truncateContent(content, r.cfg.MaxContentChars)
 
 	// Two-message structure: extraction prompt, then the page content wrapped
 	// in prompt-injection guard markers.
@@ -122,7 +134,7 @@ func (r *Researcher) fetchAndExtract(ctx context.Context, pageURL, searchTitle s
 		return nil
 	}
 
-	finding := &Finding{URL: pageURL, Title: title, OGImage: page.OGImage}
+	finding := &Finding{URL: pageURL, Title: title}
 	var extracted struct {
 		Rational string `json:"rational"`
 		Evidence string `json:"evidence"`

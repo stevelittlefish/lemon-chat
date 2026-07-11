@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reddit import harness — lemon chat</title>
+  <link rel="icon" href="/assets/favicon.ico">
+  <link rel="stylesheet" href="/css/colors_and_type.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/reddit-import-debug.css">
+</head>
+<body>
+  <main class="harness">
+    <p class="eyebrow">Debug tool</p>
+    <h1 class="h2">Reddit import harness</h1>
+    <p class="body-sm">Test the browser import boundary without starting a research job.</p>
+
+    <section class="card stack">
+      <h2 class="h4">1. Prepare request</h2>
+      <label>Optional SearXNG query<input id="query" class="input" placeholder="Local model recommendations"></label>
+      <label>Manual Reddit URLs, one per line<textarea id="urls" class="input textarea" rows="5"></textarea></label>
+      <button id="prepare" class="btn btn-primary" type="button">Prepare request</button>
+      <pre id="prepare-output" class="output" aria-live="polite"></pre>
+    </section>
+
+    <section class="card stack">
+      <h2 class="h4">2. Validate response</h2>
+      <label>Request bundle<textarea id="request" class="input textarea code" rows="10"></textarea></label>
+      <div class="actions"><button id="copy-request" class="btn btn-secondary" type="button">Copy request</button><button id="download-request" class="btn btn-secondary" type="button">Download request</button></div>
+      <label>Extension response bundle<textarea id="response" class="input textarea code" rows="12"></textarea></label>
+      <label>Or load a response file<input id="response-file" class="input" type="file" accept="application/json,.json"></label>
+      <label>Optional extraction goal<input id="goal" class="input" placeholder="What evidence is relevant?"></label>
+      <label>Optional model ID<input id="model" class="input" placeholder="Uses the configured research model"></label>
+      <div class="actions"><button id="validate" class="btn btn-primary" type="button">Validate only</button><button id="extract" class="btn btn-secondary" type="button">Validate and extract</button></div>
+    </section>
+
+    <section class="card stack">
+      <h2 class="h4">Result</h2>
+      <pre id="result" class="output" aria-live="polite">No response validated yet.</pre>
+    </section>
+  </main>
+  <script type="module" src="/js/reddit-import-debug.js"></script>
+</body>
+</html>
