@@ -16,6 +16,21 @@ Talks to locally-running models via HTTP API (tested with [Ollama](https://ollam
 
 **Multi-user** — admin users can create accounts, reset passwords, and grant or revoke admin access. Each user's conversations and completions are private to them.
 
+**Research** — iterative, crash-resumable web research and brainstorming through SearXNG. A per-job option can pause when Reddit threads are found so they can be captured with the user's normal logged-in browser session.
+
+### Save Reddit extension
+
+The optional Chromium Manifest V3 extension lives in [`extensions/save-reddit`](extensions/save-reddit). To install it for development:
+
+1. Open `chrome://extensions` (or the equivalent page in a Chromium browser).
+2. Enable developer mode and choose **Load unpacked**.
+3. Select the `extensions/save-reddit` directory.
+4. Start research with **Pause to import Reddit results** enabled. When it pauses, copy or download the request, capture it with the extension, then paste or upload the exported response.
+
+The extension requests host access only for Reddit and uses the browser's existing session. It does not read or export cookies and does not call undocumented Reddit APIs. It captures rendered pages sequentially within configured time, comment, and expansion limits. Deleted, private, quarantined, age-gated, rate-limited, or unrecognized pages can produce partial results or explicit failures. Reddit markup changes may require selector updates, and complete comment-tree capture cannot be guaranteed. Review capture warnings before importing.
+
+For boundary testing without a full research job, start lemon-chat with debug mode enabled and open `/debug/reddit-import`. The harness is unavailable when debug mode is off.
+
 ## Requirements
 
 - Go 1.26+ **or** Docker

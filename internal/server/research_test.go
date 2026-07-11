@@ -2,7 +2,10 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -66,6 +69,89 @@ func TestPendingRedditRequestMatchesDurableRequestID(t *testing.T) {
 	job.RedditRequestID = &wrong
 	if _, err := pendingRedditRequest(job); err == nil {
 		t.Fatal("mismatched durable request ID was accepted")
+	}
+}
+
+func newAwaitingRedditJob(t *testing.T) (*Server, *store.User, *store.ResearchJob) {
+	t.Helper()
+	st, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	user, err := st.CreateUser("owner", nil, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := st.CreateResearchJob(user.ID, "", "query", "model", "research", false, false, true, 3, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := redditimport.NewRequest("request-1", []redditimport.RequestedPage{{URL: "https://reddit.com/r/test/comments/abc123/topic/"}}, redditimport.CaptureLimits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending, _ := json.Marshal(research.PendingRedditRound{Round: 1, Request: request})
+	if err := st.SetResearchJobAwaitingReddit(job.ID, request.RequestID, string(pending), 500); err != nil {
+		t.Fatal(err)
+	}
+	job, err = st.GetResearchJob(job.ID, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &Server{store: st, research: newResearchManager()}, user, job
+}
+
+func requestAsUser(method, target string, user *store.User) *http.Request {
+	req := httptest.NewRequest(method, target, nil)
+	req = req.WithContext(context.WithValue(req.Context(), ctxUser, user))
+	return req
+}
+
+func TestCancelAwaitingRedditJob(t *testing.T) {
+	s, user, job := newAwaitingRedditJob(t)
+	req := requestAsUser(http.MethodPost, "/api/research/42/cancel", user)
+	req.SetPathValue("id", fmt.Sprint(job.ID))
+	recorder := httptest.NewRecorder()
+	s.handleCancelResearch(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	got, err := s.store.GetResearchJob(job.ID, user.ID)
+	if err != nil || got.Status != store.ResearchStatusCancelled {
+		t.Fatalf("cancelled job=%+v err=%v", got, err)
+	}
+}
+
+func TestRedditImportRejectsWrongOwnerAndStaleRequest(t *testing.T) {
+	s, owner, job := newAwaitingRedditJob(t)
+	other, err := s.store.CreateUser("other", nil, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := redditimport.Response{Version: 1, RequestID: "stale-request", Pages: []redditimport.CapturedPage{{
+		RequestedURL: "https://www.reddit.com/comments/abc123/", Post: redditimport.CapturedPost{Body: "synthetic"}, Complete: true,
+	}}}
+	body, _ := json.Marshal(response)
+
+	for _, tc := range []struct {
+		name string
+		user *store.User
+		want int
+	}{
+		{name: "wrong owner", user: other, want: http.StatusNotFound},
+		{name: "stale request", user: owner, want: http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := requestAsUser(http.MethodPost, "/api/research/42/reddit-import", tc.user)
+			req.Body = io.NopCloser(bytes.NewReader(body))
+			req.SetPathValue("id", fmt.Sprint(job.ID))
+			recorder := httptest.NewRecorder()
+			s.handleResearchRedditImport(recorder, req)
+			if recorder.Code != tc.want {
+				t.Fatalf("status=%d body=%s, want %d", recorder.Code, recorder.Body.String(), tc.want)
+			}
+		})
 	}
 }
 

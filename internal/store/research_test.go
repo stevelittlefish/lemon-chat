@@ -72,6 +72,13 @@ func TestResearchRedditPauseAndResumeIsDurableAndIdempotent(t *testing.T) {
 	if resumed.Status != ResearchStatusPending || resumed.RedditResponse == nil || *resumed.RedditResponse != response {
 		t.Fatalf("resumed state was not persisted: %+v", resumed)
 	}
+	recovered, err := s.ListResumableResearchJobs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recovered) != 1 || recovered[0].ID != job.ID || recovered[0].RedditResponse == nil {
+		t.Fatalf("accepted import was not restart-resumable: %+v", recovered)
+	}
 	if err := s.CompleteResearchRedditRound(job.ID, 2, 0, 1500, "factcheck", "plan", "report", `[]`, `["query"]`, `[]`); err != nil {
 		t.Fatal(err)
 	}
