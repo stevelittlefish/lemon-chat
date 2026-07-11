@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stevelittlefish/lemon-chat/internal/redditimport"
 	"github.com/stevelittlefish/lemon-chat/internal/research"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
@@ -495,7 +496,126 @@ func (s *Server) handleGetResearch(w http.ResponseWriter, r *http.Request) {
 	if notFoundOr500(w, err) {
 		return
 	}
-	writeJSON(w, http.StatusOK, job)
+	var request *redditimport.Request
+	if job.PendingRedditRound != nil {
+		var pending research.PendingRedditRound
+		if json.Unmarshal([]byte(*job.PendingRedditRound), &pending) == nil {
+			request = &pending.Request
+		}
+	}
+	writeJSON(w, http.StatusOK, struct {
+		*store.ResearchJob
+		RedditRequest *redditimport.Request `json:"reddit_request,omitempty"`
+	}{ResearchJob: job, RedditRequest: request})
+}
+
+func (s *Server) handleResearchRedditImport(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	job, err := s.store.GetResearchJob(id, user.ID)
+	if notFoundOr500(w, err) {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, redditimport.MaxTotalChars+512*1024)
+	var response redditimport.Response
+	if err := json.NewDecoder(r.Body).Decode(&response); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid or oversized Reddit response")
+		return
+	}
+	request, err := pendingRedditRequest(job)
+	if err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	if _, err := redditimport.ValidateAndNormalize(request, response); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	canonical, err := json.Marshal(response)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid Reddit response")
+		return
+	}
+	canonicalText := string(canonical)
+	transitioned, err := s.store.ResumeResearchRedditImport(id, user.ID, response.RequestID, &canonicalText, false)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	if !transitioned {
+		fresh, getErr := s.store.GetResearchJob(id, user.ID)
+		if getErr == nil && fresh.RedditRequestID != nil && *fresh.RedditRequestID == response.RequestID && fresh.RedditResponse != nil && *fresh.RedditResponse == canonicalText {
+			writeJSON(w, http.StatusOK, map[string]any{"status": fresh.Status, "resumed": false})
+			return
+		}
+		writeError(w, http.StatusConflict, "Reddit request is stale or already resolved")
+		return
+	}
+	log.Printf("Importing Reddit response research_job_id=%d user_id=%d request_id=%q pages=%d", id, user.ID, response.RequestID, len(response.Pages))
+	s.resumeResearchAfterReddit(w, id, user.ID)
+}
+
+func (s *Server) handleResearchRedditSkip(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	_, err := s.store.GetResearchJob(id, user.ID)
+	if notFoundOr500(w, err) {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	var body struct {
+		RequestID string `json:"request_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.RequestID == "" {
+		writeError(w, http.StatusBadRequest, "request_id is required")
+		return
+	}
+	transitioned, err := s.store.ResumeResearchRedditImport(id, user.ID, body.RequestID, nil, true)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	if !transitioned {
+		fresh, getErr := s.store.GetResearchJob(id, user.ID)
+		if getErr == nil && fresh.RedditRequestID != nil && *fresh.RedditRequestID == body.RequestID && fresh.RedditSkipped {
+			writeJSON(w, http.StatusOK, map[string]any{"status": fresh.Status, "resumed": false})
+			return
+		}
+		writeError(w, http.StatusConflict, "Reddit request is stale or already resolved")
+		return
+	}
+	log.Printf("Skipping Reddit import research_job_id=%d user_id=%d request_id=%q", id, user.ID, body.RequestID)
+	s.resumeResearchAfterReddit(w, id, user.ID)
+}
+
+func pendingRedditRequest(job *store.ResearchJob) (redditimport.Request, error) {
+	if job.RedditRequestID == nil || job.PendingRedditRound == nil {
+		return redditimport.Request{}, errors.New("research job has no pending Reddit request")
+	}
+	var pending research.PendingRedditRound
+	if err := json.Unmarshal([]byte(*job.PendingRedditRound), &pending); err != nil {
+		return redditimport.Request{}, errors.New("stored Reddit request is invalid")
+	}
+	if pending.Request.RequestID != *job.RedditRequestID {
+		return redditimport.Request{}, errors.New("stored Reddit request does not match")
+	}
+	return pending.Request, nil
+}
+
+func (s *Server) resumeResearchAfterReddit(w http.ResponseWriter, id, userID int64) {
+	job, err := s.store.GetResearchJob(id, userID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	go s.runResearch(job)
+	writeJSON(w, http.StatusOK, map[string]any{"status": store.ResearchStatusPending, "resumed": true})
 }
 
 // handleResearchEvents streams progress events for a job over SSE. For a

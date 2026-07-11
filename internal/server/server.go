@@ -107,6 +107,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/research/{id}", s.requireAuth(s.handleGetResearch))
 	mux.HandleFunc("GET /api/research/{id}/events", s.requireAuth(s.handleResearchEvents))
 	mux.HandleFunc("POST /api/research/{id}/cancel", s.requireAuth(s.handleCancelResearch))
+	mux.HandleFunc("POST /api/research/{id}/reddit-import", s.requireAuth(s.handleResearchRedditImport))
+	mux.HandleFunc("POST /api/research/{id}/reddit-skip", s.requireAuth(s.handleResearchRedditSkip))
 	mux.HandleFunc("DELETE /api/research/{id}", s.requireAuth(s.handleDeleteResearch))
 	mux.HandleFunc("POST /api/debug/reddit-import", s.debugOnly(s.requireAuth(s.handleRedditImportHarness)))
 

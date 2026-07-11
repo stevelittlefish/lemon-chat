@@ -57,10 +57,10 @@ type ResearchJob struct {
 	// RedditRequestID and PendingRedditRound hold the durable browser handoff
 	// and complete pending-round checkpoint. RedditResponse or RedditSkipped is
 	// set atomically before the job becomes resumable again.
-	RedditRequestID    *string `json:"reddit_request_id"`
-	PendingRedditRound *string `json:"pending_reddit_round"`
-	RedditResponse     *string `json:"reddit_response"`
-	RedditSkipped      bool    `json:"reddit_skipped"`
+	RedditRequestID    *string `json:"-"`
+	PendingRedditRound *string `json:"-"`
+	RedditResponse     *string `json:"-"`
+	RedditSkipped      bool    `json:"-"`
 	Error              *string `json:"error"`
 	CreatedAt          string  `json:"created_at"`
 	UpdatedAt          string  `json:"updated_at"`

@@ -12,6 +12,7 @@ import (
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/redditimport"
 	"github.com/stevelittlefish/lemon-chat/internal/research"
+	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
 // TestSubscribeAfterFinish verifies that subscribing after finish() has already
@@ -43,6 +44,28 @@ func TestSubscribeAfterFinish(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("subscribe after finish: channel not closed")
+	}
+}
+
+func TestPendingRedditRequestMatchesDurableRequestID(t *testing.T) {
+	pendingJSON, err := json.Marshal(research.PendingRedditRound{Request: redditimport.Request{
+		Version: redditimport.SchemaVersion, RequestID: "request-1",
+		Pages: []redditimport.RequestedPage{{URL: "https://www.reddit.com/comments/abc123/"}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestID := "request-1"
+	pendingText := string(pendingJSON)
+	job := &store.ResearchJob{RedditRequestID: &requestID, PendingRedditRound: &pendingText}
+	request, err := pendingRedditRequest(job)
+	if err != nil || request.RequestID != requestID {
+		t.Fatalf("request=%+v err=%v", request, err)
+	}
+	wrong := "request-2"
+	job.RedditRequestID = &wrong
+	if _, err := pendingRedditRequest(job); err == nil {
+		t.Fatal("mismatched durable request ID was accepted")
 	}
 }
 
