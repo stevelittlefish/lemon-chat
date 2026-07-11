@@ -9,11 +9,12 @@ import (
 // ResearchJob statuses. A job that is pending or running when the server
 // stops is resumed from its last checkpoint on the next startup.
 const (
-	ResearchStatusPending   = "pending"
-	ResearchStatusRunning   = "running"
-	ResearchStatusDone      = "done"
-	ResearchStatusError     = "error"
-	ResearchStatusCancelled = "cancelled"
+	ResearchStatusPending        = "pending"
+	ResearchStatusRunning        = "running"
+	ResearchStatusAwaitingReddit = "awaiting_reddit"
+	ResearchStatusDone           = "done"
+	ResearchStatusError          = "error"
+	ResearchStatusCancelled      = "cancelled"
 )
 
 type ResearchJob struct {
@@ -53,18 +54,25 @@ type ResearchJob struct {
 	Findings     *string `json:"findings"`
 	QueriesUsed  *string `json:"queries_used"`
 	AnalyzedURLs *string `json:"analyzed_urls"`
-	Error        *string `json:"error"`
-	CreatedAt    string  `json:"created_at"`
-	UpdatedAt    string  `json:"updated_at"`
+	// RedditRequestID and PendingRedditRound hold the durable browser handoff
+	// and complete pending-round checkpoint. RedditResponse or RedditSkipped is
+	// set atomically before the job becomes resumable again.
+	RedditRequestID    *string `json:"reddit_request_id"`
+	PendingRedditRound *string `json:"pending_reddit_round"`
+	RedditResponse     *string `json:"reddit_response"`
+	RedditSkipped      bool    `json:"reddit_skipped"`
+	Error              *string `json:"error"`
+	CreatedAt          string  `json:"created_at"`
+	UpdatedAt          string  `json:"updated_at"`
 }
 
 const researchJobCols = `id, user_id, title, query, model, mode, force_search, deep_report, pause_reddit_import, status, phase, effort, max_time_seconds, round, empty_rounds, elapsed_ms,
-	category, plan, report, final_report, findings, queries_used, analyzed_urls, error, created_at, updated_at`
+	category, plan, report, final_report, findings, queries_used, analyzed_urls, reddit_request_id, pending_reddit_round, reddit_response, reddit_skipped, error, created_at, updated_at`
 
 func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) {
 	var j ResearchJob
 	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Mode, &j.ForceSearch, &j.DeepReport, &j.PauseRedditImport, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.Round, &j.EmptyRounds, &j.ElapsedMS,
-		&j.Category, &j.Plan, &j.Report, &j.FinalReport, &j.Findings, &j.QueriesUsed, &j.AnalyzedURLs, &j.Error, &j.CreatedAt, &j.UpdatedAt)
+		&j.Category, &j.Plan, &j.Report, &j.FinalReport, &j.Findings, &j.QueriesUsed, &j.AnalyzedURLs, &j.RedditRequestID, &j.PendingRedditRound, &j.RedditResponse, &j.RedditSkipped, &j.Error, &j.CreatedAt, &j.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -159,6 +167,45 @@ func (s *Store) CheckpointResearchJob(id int64, round, emptyRounds int, elapsedM
 		`UPDATE research_job SET round = ?, empty_rounds = ?, elapsed_ms = ?, category = ?, plan = ?,
 		 report = ?, findings = ?, queries_used = ?, analyzed_urls = ?, updated_at = ? WHERE id = ?`,
 		round, emptyRounds, elapsedMS, category, plan, report, findings, queriesUsed, analyzedURLs, now(), id)
+	return err
+}
+
+// SetResearchJobAwaitingReddit durably pauses a job after its complete pending
+// round has been serialized. The request ID is stored separately for atomic
+// matching by import and skip submissions.
+func (s *Store) SetResearchJobAwaitingReddit(id int64, requestID, pendingRound string, elapsedMS int64) error {
+	res, err := s.db.Exec(`UPDATE research_job SET status = ?, phase = ?, reddit_request_id = ?, pending_reddit_round = ?,
+		reddit_response = NULL, reddit_skipped = 0, elapsed_ms = ?, updated_at = ?
+		WHERE id = ? AND status IN ('pending', 'running')`,
+		ResearchStatusAwaitingReddit, ResearchStatusAwaitingReddit, requestID, pendingRound, elapsedMS, now(), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ResumeResearchRedditImport atomically accepts an import or skip for the
+// matching owner and request. transitioned=false makes duplicate submissions
+// harmless and prevents two callers from starting runners.
+func (s *Store) ResumeResearchRedditImport(id, userID int64, requestID string, response *string, skipped bool) (transitioned bool, err error) {
+	res, err := s.db.Exec(`UPDATE research_job SET status = ?, phase = NULL, reddit_response = ?, reddit_skipped = ?, updated_at = ?
+		WHERE id = ? AND user_id = ? AND status = ? AND reddit_request_id = ?`,
+		ResearchStatusPending, response, skipped, now(), id, userID, ResearchStatusAwaitingReddit, requestID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
+// ClearResearchRedditState removes a completed handoff after its pending round
+// has been merged and checkpointed.
+func (s *Store) ClearResearchRedditState(id int64) error {
+	_, err := s.db.Exec(`UPDATE research_job SET reddit_request_id = NULL, pending_reddit_round = NULL,
+		reddit_response = NULL, reddit_skipped = 0, updated_at = ? WHERE id = ?`, now(), id)
 	return err
 }
 

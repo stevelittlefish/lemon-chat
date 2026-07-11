@@ -43,7 +43,7 @@ Design: `docs/feature-reddit-research-import.md`
 - [x] Add a debug-only single-pass test harness: SearXNG Reddit search, request export, response validation, normalized preview, extraction, and formatted finding preview.
 - [x] Build a Chromium Manifest V3 "Save Reddit" extension that accepts a request bundle, visits threads sequentially, expands/scrolls within limits, and exports a response bundle with completeness warnings.
 - [x] Add the per-job "Pause to import Reddit results" option, off by default, to config persistence, API views, and the research form.
-- [ ] Add a numbered database migration and store operations for the durable `awaiting_reddit` state and pending round/request data.
+- [x] Add a numbered database migration and store operations for the durable `awaiting_reddit` state and pending round/request data.
 - [ ] Split and canonicalize search results, checkpoint before extraction when Reddit imports are required, and exclude user wait time from the job time budget.
 - [ ] Add authenticated import and skip endpoints with request-ID matching, ownership checks, size limits, deduplication, and idempotent resume behavior.
 - [ ] Add the research-panel waiting UI with URL list, request copy/download, response paste/upload, validation feedback, skip, cancel, and reconnect behavior.

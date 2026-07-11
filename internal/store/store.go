@@ -640,6 +640,109 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v29 → v30 complete")
 	}
 
+	if version < 31 {
+		log.Println("store: migrating v30 → v31 (add durable Reddit import state)")
+		if err := s.migrateResearchRedditState(); err != nil {
+			return err
+		}
+		version = 31
+		log.Println("store: migration v30 → v31 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
+}
+
+// migrateResearchRedditState rebuilds research_job because SQLite cannot alter
+// its status CHECK constraint in place. The copy and table swap are one
+// transaction, so a failure leaves the complete v30 table untouched.
+func (s *Store) migrateResearchRedditState() (err error) {
+	if _, err = s.db.Exec(`PRAGMA foreign_keys = OFF`); err != nil {
+		return fmt.Errorf("disable foreign keys for research_job rebuild: %w", err)
+	}
+	defer func() {
+		if _, pragmaErr := s.db.Exec(`PRAGMA foreign_keys = ON`); err == nil && pragmaErr != nil {
+			err = fmt.Errorf("restore foreign keys after research_job rebuild: %w", pragmaErr)
+		}
+	}()
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err = tx.Exec(`
+		CREATE TABLE research_job_v31 (
+			id                    INTEGER PRIMARY KEY,
+			user_id               INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+			query                 TEXT    NOT NULL,
+			model                 TEXT    NOT NULL,
+			status                TEXT    NOT NULL DEFAULT 'pending'
+				CHECK (status IN ('pending', 'running', 'awaiting_reddit', 'done', 'error', 'cancelled')),
+			phase                 TEXT,
+			round                 INTEGER NOT NULL DEFAULT 0,
+			empty_rounds          INTEGER NOT NULL DEFAULT 0,
+			elapsed_ms            INTEGER NOT NULL DEFAULT 0,
+			category              TEXT,
+			plan                  TEXT,
+			report                TEXT,
+			final_report          TEXT,
+			findings              TEXT,
+			queries_used          TEXT,
+			analyzed_urls         TEXT,
+			error                 TEXT,
+			created_at            TEXT    NOT NULL,
+			updated_at            TEXT    NOT NULL,
+			title                 TEXT,
+			effort                INTEGER NOT NULL DEFAULT 3,
+			max_time_seconds      INTEGER NOT NULL DEFAULT 0,
+			mode                  TEXT    NOT NULL DEFAULT 'research',
+			force_search          INTEGER NOT NULL DEFAULT 0,
+			deep_report           INTEGER NOT NULL DEFAULT 0,
+			pause_reddit_import   INTEGER NOT NULL DEFAULT 0,
+			reddit_request_id     TEXT,
+			pending_reddit_round  TEXT,
+			reddit_response       TEXT,
+			reddit_skipped        INTEGER NOT NULL DEFAULT 0
+		);
+
+		INSERT INTO research_job_v31 (
+			id, user_id, query, model, status, phase, round, empty_rounds, elapsed_ms,
+			category, plan, report, final_report, findings, queries_used, analyzed_urls,
+			error, created_at, updated_at, title, effort, max_time_seconds, mode,
+			force_search, deep_report, pause_reddit_import
+		)
+		SELECT
+			id, user_id, query, model, status, phase, round, empty_rounds, elapsed_ms,
+			category, plan, report, final_report, findings, queries_used, analyzed_urls,
+			error, created_at, updated_at, title, effort, max_time_seconds, mode,
+			force_search, deep_report, pause_reddit_import
+		FROM research_job;
+
+		DROP TABLE research_job;
+		ALTER TABLE research_job_v31 RENAME TO research_job;
+		CREATE INDEX idx_research_job_user_id ON research_job(user_id);
+		CREATE INDEX idx_research_job_status ON research_job(status);
+	`); err != nil {
+		return fmt.Errorf("rebuild research_job: %w", err)
+	}
+	if _, err = tx.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (31, ?)`, now()); err != nil {
+		return err
+	}
+	var violations int
+	rows, err := tx.Query(`PRAGMA foreign_key_check`)
+	if err != nil {
+		return fmt.Errorf("check foreign keys after research_job rebuild: %w", err)
+	}
+	for rows.Next() {
+		violations++
+	}
+	if closeErr := rows.Close(); closeErr != nil {
+		return closeErr
+	}
+	if violations != 0 {
+		return fmt.Errorf("research_job migration produced %d foreign key violation(s)", violations)
+	}
+	return tx.Commit()
 }
