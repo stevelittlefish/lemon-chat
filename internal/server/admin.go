@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -124,6 +126,44 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleAdminListModels(w http.ResponseWriter, r *http.Request) {
+	type providerResponse struct {
+		Name    string   `json:"name"`
+		APIBase string   `json:"api_base"`
+		Models  []string `json:"models"`
+		Error   string   `json:"error,omitempty"`
+	}
+
+	user := currentUser(r)
+	log.Printf("server: handleAdminListModels — querying %d provider(s) user_id=%d username=%q", len(s.cfg.ModelServers), user.ID, user.Username)
+	providers := make([]providerResponse, len(s.cfg.ModelServers))
+	var wg sync.WaitGroup
+	for i, provider := range s.cfg.ModelServers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			log.Printf("server: handleAdminListModels — querying provider=%q api_base=%q", provider.Name, provider.APIBase)
+			models, err := llm.ListModels(r.Context(), s.modelClient, provider.APIBase, provider.APIKey)
+			result := providerResponse{
+				Name:    provider.Name,
+				APIBase: provider.APIBase,
+				Models:  models,
+			}
+			if err != nil {
+				result.Models = []string{}
+				result.Error = err.Error()
+				log.Printf("server: handleAdminListModels — provider=%q failed: %v", provider.Name, err)
+			} else {
+				log.Printf("server: handleAdminListModels — provider=%q returned %d model(s)", provider.Name, len(models))
+			}
+			providers[i] = result
+		}()
+	}
+	wg.Wait()
+	log.Printf("server: handleAdminListModels — completed %d provider(s) user_id=%d", len(providers), user.ID)
+	writeJSON(w, http.StatusOK, providers)
 }
 
 func (s *Server) handleAdminImportNotePack(w http.ResponseWriter, r *http.Request) {

@@ -1,17 +1,16 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"slices"
-	"strings"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/debug"
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"github.com/stevelittlefish/lemon-chat/internal/server"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"github.com/stevelittlefish/lemon-chat/internal/tasks"
@@ -71,47 +70,18 @@ func main() {
 }
 
 func listModels(cfg *config.Config) {
-	type modelEntry struct {
-		ID string `json:"id"`
-	}
-	type modelsResponse struct {
-		Data []modelEntry `json:"data"`
-	}
-
 	for _, srv := range cfg.ModelServers {
-		url := strings.TrimRight(srv.APIBase, "/") + "/models"
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "  error building request for %s: %v\n", srv.Name, err)
-			continue
-		}
-		if srv.APIKey != "" {
-			req.Header.Set("Authorization", "Bearer "+srv.APIKey)
-		}
-
 		fmt.Printf("Model server: %s (%s)\n", srv.Name, srv.APIBase)
-
-		resp, err := http.DefaultClient.Do(req)
+		models, err := llm.ListModels(context.Background(), http.DefaultClient, srv.APIBase, srv.APIKey)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  error: %v\n", err)
 			continue
 		}
-
-		var result modelsResponse
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			resp.Body.Close()
-			fmt.Fprintf(os.Stderr, "  error decoding response: %v\n", err)
-			continue
-		}
-		resp.Body.Close()
-
-		slices.SortFunc(result.Data, func(a, b modelEntry) int { return strings.Compare(a.ID, b.ID) })
-
-		if len(result.Data) == 0 {
+		if len(models) == 0 {
 			fmt.Println("  (no models)")
 		}
-		for _, m := range result.Data {
-			fmt.Printf("  - %s\n", m.ID)
+		for _, model := range models {
+			fmt.Printf("  - %s\n", model)
 		}
 	}
 }

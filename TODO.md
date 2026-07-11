@@ -6,6 +6,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Manually Added by User
 
+- [x] Add an admin Tools page action that lists available models from every configured provider in copy-friendly tables.
+
 - [x] Remove the admin tool for deleting orphaned messages.
 
 - [x] When multiple messages are present from the same user, only show the avatar for the first one.

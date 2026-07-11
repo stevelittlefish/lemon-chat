@@ -233,6 +233,9 @@ export const admin = {
     update: (id, data) => request('PATCH', `/api/admin/users/${id}`, data),
     delete: (id) => request('DELETE', `/api/admin/users/${id}`),
   },
+  tools: {
+    listModels: () => request('GET', '/api/admin/tools/models'),
+  },
   notePacks: {
     import: (pack) => request('POST', '/api/admin/note-packs/import', pack),
   },

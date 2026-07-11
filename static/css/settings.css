@@ -838,6 +838,130 @@ a.snav-item { text-decoration: none; }
   border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
 }
 
+.provider-models {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+.provider-models-status,
+.provider-empty,
+.provider-error {
+  padding: var(--space-3) var(--space-4);
+  color: var(--fg-muted);
+  font-size: var(--fs-13);
+}
+
+.provider-error {
+  color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.provider-models-group {
+  overflow: hidden;
+  background: var(--bg-lifted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.provider-models-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-sunken);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.provider-models-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-16);
+  color: var(--fg);
+}
+
+.provider-models-head code {
+  overflow: hidden;
+  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-model-table-wrap {
+  overflow-x: auto;
+}
+
+.provider-model-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.provider-model-table th,
+.provider-model-table td {
+  padding: 9px var(--space-4);
+  text-align: left;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.provider-model-table th {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.provider-model-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.provider-model-table th:last-child,
+.provider-model-table td:last-child {
+  width: 1%;
+  text-align: right;
+}
+
+.provider-model-id {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--fg);
+  user-select: all;
+  white-space: nowrap;
+}
+
+.provider-copy svg {
+  flex-shrink: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .provider-models-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .provider-models-head code {
+    max-width: 100%;
+  }
+}
+
 /* ── Notes page ─────────────────────────────────────────── */
 
 .note-group { margin-bottom: 8px; }

@@ -1,9 +1,10 @@
 import { admin } from './api.js';
 import { requireAuth } from './settings-auth.js';
 import { preload as preloadIcons, icon } from './icons.js';
+import { escapeHtml } from './utils.js';
 
 let user = null;
-let svgArrowLeft, svgUser, svgUsers, svgSliders;
+let svgArrowLeft, svgUser, svgUsers, svgSliders, svgCopy;
 
 async function init() {
   user = await requireAuth();
@@ -17,6 +18,7 @@ async function init() {
   svgUser      = icon('user', 16);
   svgUsers     = icon('users', 16);
   svgSliders   = icon('sliders', 16);
+  svgCopy      = icon('copy', 14);
   renderNav();
   renderPage();
 }
@@ -66,7 +68,18 @@ function renderPage() {
   document.getElementById('smain').innerHTML = `
     <div class="smain-head">
       <h1>Tools</h1>
-      <p>Database maintenance and diagnostics.</p>
+      <p>Imports, configuration helpers and diagnostics.</p>
+    </div>
+    <div class="section">
+      <h2>Models</h2>
+      <div class="tool-row">
+        <div class="tool-row-info">
+          <div class="tool-row-name">List provider models</div>
+          <div class="tool-row-desc">Query every configured provider for model IDs you can add to lemon.toml.</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btn-list-models">List models</button>
+      </div>
+      <div id="provider-models-result" class="provider-models hidden"></div>
     </div>
     <div class="section">
       <h2>Conversations</h2>
@@ -98,6 +111,84 @@ function renderPage() {
     document.getElementById('note-pack-file').click();
   });
   document.getElementById('note-pack-file').addEventListener('change', runImportNotePack);
+  document.getElementById('btn-list-models').addEventListener('click', runListModels);
+}
+
+async function runListModels() {
+  const btn = document.getElementById('btn-list-models');
+  const result = document.getElementById('provider-models-result');
+
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  result.className = 'provider-models';
+  result.innerHTML = '<div class="provider-models-status">Querying providers…</div>';
+
+  try {
+    const providers = await admin.tools.listModels();
+    result.innerHTML = providers.length === 0
+      ? '<div class="provider-models-status">No model providers are configured.</div>'
+      : providers.map(renderProviderModels).join('');
+    result.querySelectorAll('[data-copy-model]').forEach(copyBtn => {
+      copyBtn.addEventListener('click', () => copyModelID(copyBtn));
+    });
+  } catch (err) {
+    result.innerHTML = `<div class="tool-result tool-result--error">Failed: ${escapeHtml(err.message || 'unknown error')}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Refresh';
+  }
+}
+
+function renderProviderModels(provider) {
+  let body;
+  if (provider.error) {
+    body = `<div class="provider-error">Could not list models: ${escapeHtml(provider.error)}</div>`;
+  } else if (provider.models.length === 0) {
+    body = '<div class="provider-empty">This provider returned no models.</div>';
+  } else {
+    body = `
+      <div class="provider-model-table-wrap">
+        <table class="provider-model-table">
+          <thead><tr><th>Model ID</th><th><span class="sr-only">Copy</span></th></tr></thead>
+          <tbody>
+            ${provider.models.map(model => `
+              <tr>
+                <td><code class="provider-model-id">${escapeHtml(model)}</code></td>
+                <td class="provider-model-action">
+                  <button class="btn btn-ghost btn-sm provider-copy" data-copy-model="${escapeHtml(model)}" aria-label="Copy ${escapeHtml(model)}">
+                    ${svgCopy}<span>Copy</span>
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  return `
+    <section class="provider-models-group">
+      <div class="provider-models-head">
+        <h3>${escapeHtml(provider.name)}</h3>
+        <code>${escapeHtml(provider.api_base)}</code>
+      </div>
+      ${body}
+    </section>`;
+}
+
+async function copyModelID(btn) {
+  const model = btn.dataset.copyModel;
+  try {
+    await navigator.clipboard.writeText(model);
+    btn.querySelector('span').textContent = 'Copied';
+    window.setTimeout(() => { btn.querySelector('span').textContent = 'Copy'; }, 1200);
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(btn.closest('tr').querySelector('.provider-model-id'));
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
 }
 
 async function runImportNotePack(e) {
