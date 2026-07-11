@@ -81,8 +81,11 @@ async function showList() {
   const items = jobs.map((j) => `
     <div class="card card-interactive research-item" data-id="${j.id}">
       <span class="research-item-query">${escapeHtml(j.title || j.query)}</span>
-      <span class="research-item-meta">${formatDate(j.created_at)}</span>
-      ${statusBadge(j.status)}
+      <span class="research-item-details">
+        <span class="research-item-model">${escapeHtml(j.model)}</span>
+        <span class="research-item-meta">${formatDate(j.created_at)}</span>
+        ${statusBadge(j.status)}
+      </span>
     </div>`).join('');
 
   main.innerHTML = `

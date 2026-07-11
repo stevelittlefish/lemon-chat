@@ -20,6 +20,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [x] Show the model name on past research items and make the list more compact.
+
 - [x] Improve research citations: use stable source IDs in findings/prompts and feed raw findings into final report generation so links survive summarisation.
 
 - [x] Normalize combined research citations like `[S13, S18]` into separate clickable source references.
