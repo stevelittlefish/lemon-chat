@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "request_id": "fixture-request",
+  "pages": [
+    {
+      "requested_url": "https://www.reddit.com/comments/abc123/",
+      "canonical_url": "https://www.reddit.com/comments/abc123/",
+      "title": "Oversized synthetic thread",
+      "post": {
+        "author": "fixture_op",
+        "body": "{{OVERSIZED_BODY}}"
+      },
+      "complete": true
+    }
+  ]
+}
