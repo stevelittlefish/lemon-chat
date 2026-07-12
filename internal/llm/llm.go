@@ -28,6 +28,30 @@ type Message struct {
 	Content string `json:"content"`
 }
 
+// Usage is the billing metadata returned by OpenAI-compatible providers.
+// Cost is provider-reported rather than recomputed locally, so it includes
+// routing, prompt-cache reads/writes, reasoning, and other provider-specific
+// pricing rules. A nil Cost means the provider did not report a price; zero is
+// a known free call.
+type Usage struct {
+	PromptTokens     int      `json:"prompt_tokens"`
+	CompletionTokens int      `json:"completion_tokens"`
+	TotalTokens      int      `json:"total_tokens"`
+	Cost             *float64 `json:"cost"`
+}
+
+type Completion struct {
+	Content string
+	Usage   *Usage
+}
+
+func (c Completion) UsageCost() *float64 {
+	if c.Usage == nil {
+		return nil
+	}
+	return c.Usage.Cost
+}
+
 // ScanSSE reads an OpenAI-style Server-Sent Events stream from body, invoking
 // onData with the payload of each "data: " line until it reaches "[DONE]" or
 // the stream ends. Non-data lines (comments, blanks) are skipped. If onData
@@ -62,6 +86,12 @@ func ScanSSE(body io.Reader, onData func(data string) error) error {
 // "temperature" and "max_tokens"; "model", "messages", and "stream" are set by
 // this function and must not be passed in extra.
 func ChatComplete(ctx context.Context, client *http.Client, chatURL, apiKey, model string, messages any, extra map[string]any) (string, error) {
+	result, err := ChatCompleteWithUsage(ctx, client, chatURL, apiKey, model, messages, extra)
+	return result.Content, err
+}
+
+// ChatCompleteWithUsage is ChatComplete with provider-reported usage and cost.
+func ChatCompleteWithUsage(ctx context.Context, client *http.Client, chatURL, apiKey, model string, messages any, extra map[string]any) (Completion, error) {
 	body := map[string]any{
 		"model":    model,
 		"messages": messages,
@@ -74,7 +104,7 @@ func ChatComplete(ctx context.Context, client *http.Client, chatURL, apiKey, mod
 
 	req, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
 	if err != nil {
-		return "", fmt.Errorf("build request: %w", err)
+		return Completion{}, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if apiKey != "" {
@@ -83,16 +113,16 @@ func ChatComplete(ctx context.Context, client *http.Client, chatURL, apiKey, mod
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("model request failed: %w", err)
+		return Completion{}, fmt.Errorf("model request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return "", fmt.Errorf("read response: %w", err)
+		return Completion{}, fmt.Errorf("read response: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
+		return Completion{}, fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
 	}
 
 	var result struct {
@@ -101,19 +131,27 @@ func ChatComplete(ctx context.Context, client *http.Client, chatURL, apiKey, mod
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
+		Usage *Usage `json:"usage"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return "", fmt.Errorf("decode response: %w", err)
+		return Completion{}, fmt.Errorf("decode response: %w", err)
 	}
 	if len(result.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
+		return Completion{}, fmt.Errorf("no choices in response")
 	}
-	return result.Choices[0].Message.Content, nil
+	return Completion{Content: result.Choices[0].Message.Content, Usage: result.Usage}, nil
 }
 
 // ChatCompleteStream makes a streaming chat-completion request. It returns the
 // complete generated content and invokes onDelta for each non-empty text delta.
 func ChatCompleteStream(ctx context.Context, client *http.Client, chatURL, apiKey, model string, messages any, extra map[string]any, onDelta func(string)) (string, error) {
+	result, err := ChatCompleteStreamWithUsage(ctx, client, chatURL, apiKey, model, messages, extra, onDelta)
+	return result.Content, err
+}
+
+// ChatCompleteStreamWithUsage captures the usage object sent in the final SSE
+// chunk. OpenRouter sends that chunk with an empty choices array.
+func ChatCompleteStreamWithUsage(ctx context.Context, client *http.Client, chatURL, apiKey, model string, messages any, extra map[string]any, onDelta func(string)) (Completion, error) {
 	body := map[string]any{
 		"model":    model,
 		"messages": messages,
@@ -125,7 +163,7 @@ func ChatCompleteStream(ctx context.Context, client *http.Client, chatURL, apiKe
 	payload, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
 	if err != nil {
-		return "", fmt.Errorf("build request: %w", err)
+		return Completion{}, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if apiKey != "" {
@@ -133,14 +171,15 @@ func ChatCompleteStream(ctx context.Context, client *http.Client, chatURL, apiKe
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("model request failed: %w", err)
+		return Completion{}, fmt.Errorf("model request failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return "", fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
+		return Completion{}, fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
 	}
 	var full strings.Builder
+	var usage *Usage
 	err = ScanSSE(resp.Body, func(data string) error {
 		var chunk struct {
 			Choices []struct {
@@ -148,8 +187,15 @@ func ChatCompleteStream(ctx context.Context, client *http.Client, chatURL, apiKe
 					Content string `json:"content"`
 				} `json:"delta"`
 			} `json:"choices"`
+			Usage *Usage `json:"usage"`
 		}
-		if json.Unmarshal([]byte(data), &chunk) != nil || len(chunk.Choices) == 0 {
+		if json.Unmarshal([]byte(data), &chunk) != nil {
+			return nil
+		}
+		if chunk.Usage != nil {
+			usage = chunk.Usage
+		}
+		if len(chunk.Choices) == 0 {
 			return nil
 		}
 		delta := chunk.Choices[0].Delta.Content
@@ -162,7 +208,7 @@ func ChatCompleteStream(ctx context.Context, client *http.Client, chatURL, apiKe
 		return nil
 	})
 	if err != nil && full.Len() == 0 {
-		return "", fmt.Errorf("stream read failed: %w", err)
+		return Completion{}, fmt.Errorf("stream read failed: %w", err)
 	}
-	return full.String(), nil
+	return Completion{Content: full.String(), Usage: usage}, nil
 }

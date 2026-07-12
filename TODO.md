@@ -20,6 +20,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [x] Track OpenRouter response cost in the shared LLM API layer, accumulate and store research/report-remix prices, and display them in the research UI.
+
 - [x] Add an “open in new tab” action beside the HTML download on saved remix pages.
 
 - [x] Stream remix generation progress over SSE and make the remix form's submitted state visibly disabled and non-interactive.

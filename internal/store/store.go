@@ -692,6 +692,19 @@ func (s *Store) migrate() error {
 		version = 33
 		log.Println("store: migration v32 → v33 complete")
 	}
+	if version < 34 {
+		log.Println("store: migrating v33 → v34 (add research pricing)")
+		for _, stmt := range []string{`ALTER TABLE research_job ADD COLUMN price_usd REAL`, `ALTER TABLE research_remix ADD COLUMN price_usd REAL`} {
+			if _, err := s.db.Exec(stmt); err != nil {
+				return err
+			}
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (34, ?)`, now()); err != nil {
+			return err
+		}
+		version = 34
+		log.Println("store: migration v33 → v34 complete")
+	}
 
 	log.Printf("store: schema ready at version %d", version)
 	return nil

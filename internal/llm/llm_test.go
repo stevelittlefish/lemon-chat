@@ -59,7 +59,7 @@ func TestChatComplete(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
 		json.NewDecoder(r.Body).Decode(&gotPayload)
-		w.Write([]byte(`{"choices":[{"message":{"content":"hello world"}}]}`))
+		w.Write([]byte(`{"choices":[{"message":{"content":"hello world"}}],"usage":{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12,"cost":0.00125}}`))
 	}))
 	defer srv.Close()
 
@@ -86,6 +86,17 @@ func TestChatComplete(t *testing.T) {
 	}
 }
 
+func TestChatCompleteWithUsage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"choices":[{"message":{"content":"priced"}}],"usage":{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12,"cost":0.00125}}`))
+	}))
+	defer srv.Close()
+	result, err := ChatCompleteWithUsage(context.Background(), http.DefaultClient, srv.URL, "", "model", []Message{}, nil)
+	if err != nil || result.UsageCost() == nil || *result.UsageCost() != 0.00125 {
+		t.Fatalf("result = %+v, err = %v", result, err)
+	}
+}
+
 func TestChatCompleteStream(t *testing.T) {
 	var gotPayload map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -93,19 +104,24 @@ func TestChatCompleteStream(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"hello \"}}]}\n\n"))
 		w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"world\"}}]}\n\n"))
+		w.Write([]byte("data: {\"choices\":[],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":2,\"total_tokens\":6,\"cost\":0.0007}}\n\n"))
 		w.Write([]byte("data: [DONE]\n\n"))
 	}))
 	defer srv.Close()
 
 	var deltas []string
-	content, err := ChatCompleteStream(context.Background(), http.DefaultClient, srv.URL, "", "test-model",
+	result, err := ChatCompleteStreamWithUsage(context.Background(), http.DefaultClient, srv.URL, "", "test-model",
 		[]Message{{Role: "user", Content: "hi"}}, map[string]any{"max_tokens": 20},
 		func(delta string) { deltas = append(deltas, delta) })
+	content := result.Content
 	if err != nil {
 		t.Fatalf("ChatCompleteStream returned error: %v", err)
 	}
 	if content != "hello world" || strings.Join(deltas, "") != content {
 		t.Fatalf("content = %q, deltas = %v", content, deltas)
+	}
+	if result.UsageCost() == nil || *result.UsageCost() != 0.0007 {
+		t.Fatalf("usage = %+v, want cost 0.0007", result.Usage)
 	}
 	if gotPayload["stream"] != true {
 		t.Fatalf("payload stream = %v, want true", gotPayload["stream"])

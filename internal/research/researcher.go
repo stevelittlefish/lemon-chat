@@ -82,6 +82,7 @@ type State struct {
 	Findings     []Finding     `json:"findings"`
 	QueriesUsed  []string      `json:"queries_used"`
 	AnalyzedURLs []AnalyzedURL `json:"analyzed_urls"`
+	PriceUSD     *float64      `json:"price_usd,omitempty"`
 }
 
 // Config carries everything a run needs; all tuning parameters come from the
@@ -166,6 +167,7 @@ type Researcher struct {
 	// the state so the run can be resumed after a crash. Both may be nil.
 	onProgress   func(Progress)
 	onCheckpoint func(State)
+	priceMu      sync.Mutex
 }
 
 // New creates a researcher. Pass a zero State for a fresh run or a persisted
@@ -204,6 +206,19 @@ func (r *Researcher) elapsedMS() int64 {
 
 // State returns a copy of the current engine state.
 func (r *Researcher) State() State { return r.state }
+
+func (r *Researcher) addPrice(cost *float64) {
+	if cost == nil {
+		return
+	}
+	r.priceMu.Lock()
+	defer r.priceMu.Unlock()
+	if r.state.PriceUSD == nil {
+		zero := 0.0
+		r.state.PriceUSD = &zero
+	}
+	*r.state.PriceUSD += *cost
+}
 
 // Run executes the research loop and returns the formatted composite report.
 func (r *Researcher) Run(ctx context.Context) (string, error) {

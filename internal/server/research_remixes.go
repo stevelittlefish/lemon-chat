@@ -94,7 +94,7 @@ func (s *Server) handleCreateResearchRemix(w http.ResponseWriter, r *http.Reques
 
 	var generated strings.Builder
 	lastProgress := time.Time{}
-	content, err := llm.ChatCompleteStream(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
+	completion, err := llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
 		[]llm.Message{{Role: "system", Content: remixSystemPrompt}, {Role: "user", Content: userPrompt}},
 		map[string]any{"temperature": 0.7, "max_tokens": 16384}, func(delta string) {
 			generated.WriteString(delta)
@@ -115,14 +115,14 @@ func (s *Server) handleCreateResearchRemix(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeRemixEvent(w, flusher, map[string]any{"phase": "validating", "message": "checking the HTML document"})
-	html, err := normalizeRemixHTML(content)
+	html, err := normalizeRemixHTML(completion.Content)
 	if err != nil {
 		writeRemixEvent(w, flusher, map[string]any{"error": err.Error()})
 		writeRemixDone(w, flusher)
 		return
 	}
 	writeRemixEvent(w, flusher, map[string]any{"phase": "saving", "message": "saving remix"})
-	remix, err := s.store.CreateResearchRemix(job.ID, model, req.Direction, html)
+	remix, err := s.store.CreateResearchRemix(job.ID, model, req.Direction, html, completion.UsageCost())
 	if err != nil {
 		log.Printf("research remix: save failed job_id=%d user_id=%d: %v", job.ID, user.ID, err)
 		writeRemixEvent(w, flusher, map[string]any{"error": "could not save remix"})

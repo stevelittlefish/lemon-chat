@@ -12,16 +12,17 @@ func TestResearchRemixLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	created, err := s.CreateResearchRemix(job.ID, "model", "earthy colours", "<!DOCTYPE html><html></html>")
+	price := 0.0123
+	created, err := s.CreateResearchRemix(job.ID, "model", "earthy colours", "<!DOCTYPE html><html></html>", &price)
 	if err != nil {
 		t.Fatal(err)
 	}
 	items, err := s.ListResearchRemixes(job.ID)
-	if err != nil || len(items) != 1 || items[0].HTML != "" {
+	if err != nil || len(items) != 1 || items[0].HTML != "" || items[0].PriceUSD == nil || *items[0].PriceUSD != price {
 		t.Fatalf("ListResearchRemixes = %#v, %v", items, err)
 	}
 	got, err := s.GetResearchRemix(created.ID, job.ID)
-	if err != nil || got.HTML != "<!DOCTYPE html><html></html>" || got.Direction != "earthy colours" {
+	if err != nil || got.HTML != "<!DOCTYPE html><html></html>" || got.Direction != "earthy colours" || got.PriceUSD == nil || *got.PriceUSD != price {
 		t.Fatalf("GetResearchRemix = %#v, %v", got, err)
 	}
 }

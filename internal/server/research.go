@@ -192,7 +192,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 
 	modelServer, err := s.cfg.ServerForModel(job.Model)
 	if err != nil {
-		s.finishResearch(job.ID, run, store.ResearchStatusError, nil, fmt.Sprintf("unknown model %q", job.Model), 0)
+		s.finishResearch(job.ID, run, store.ResearchStatusError, nil, fmt.Sprintf("unknown model %q", job.Model), 0, job.PriceUSD)
 		return
 	}
 
@@ -260,19 +260,19 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	if job.PendingRedditRound != nil && (job.RedditResponse != nil || job.RedditSkipped) {
 		var pending research.PendingRedditRound
 		if err := json.Unmarshal([]byte(*job.PendingRedditRound), &pending); err != nil {
-			s.finishResearch(job.ID, run, store.ResearchStatusError, nil, "stored Reddit pending round is invalid", job.ElapsedMS)
+			s.finishResearch(job.ID, run, store.ResearchStatusError, nil, "stored Reddit pending round is invalid", job.ElapsedMS, job.PriceUSD)
 			return
 		}
 		resume := &research.RedditResume{Pending: pending, Skipped: job.RedditSkipped}
 		if job.RedditResponse != nil {
 			var response redditimport.Response
 			if err := json.Unmarshal([]byte(*job.RedditResponse), &response); err != nil {
-				s.finishResearch(job.ID, run, store.ResearchStatusError, nil, "stored Reddit response is invalid", job.ElapsedMS)
+				s.finishResearch(job.ID, run, store.ResearchStatusError, nil, "stored Reddit response is invalid", job.ElapsedMS, job.PriceUSD)
 				return
 			}
 			pages, err := redditimport.ValidateAndNormalize(pending.Request, response)
 			if err != nil {
-				s.finishResearch(job.ID, run, store.ResearchStatusError, nil, "stored Reddit response failed validation", job.ElapsedMS)
+				s.finishResearch(job.ID, run, store.ResearchStatusError, nil, "stored Reddit response failed validation", job.ElapsedMS, job.PriceUSD)
 				return
 			}
 			resume.Pages = pages
@@ -282,6 +282,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 
 	state := research.UnmarshalState(job.Round, job.EmptyRounds, job.ElapsedMS,
 		job.Category, job.Slug, job.Plan, job.Report, job.Findings, job.QueriesUsed, job.AnalyzedURLs)
+	state.PriceUSD = job.PriceUSD
 
 	lastPhase := ""
 	onProgress := func(p research.Progress) {
@@ -302,7 +303,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	}
 	onCheckpoint := func(st research.State) {
 		findings, queries, urls := research.MarshalState(st)
-		if err := s.store.CheckpointResearchJob(job.ID, st.Round, st.EmptyRounds, st.ElapsedMS,
+		if err := s.store.CheckpointResearchJob(job.ID, st.Round, st.EmptyRounds, st.ElapsedMS, st.PriceUSD,
 			st.Category, st.Slug, st.Plan, st.Report, findings, queries, urls); err != nil {
 			log.Printf("research: job %d: checkpoint: %v", job.ID, err)
 		}
@@ -324,13 +325,13 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		run.finish(data)
 	case runErr == nil:
 		log.Printf("Research job finished id=%d rounds=%d elapsed=%.1fs", job.ID, r.State().Round, float64(elapsedMS)/1000)
-		s.finishResearch(job.ID, run, store.ResearchStatusDone, &report, "", elapsedMS)
+		s.finishResearch(job.ID, run, store.ResearchStatusDone, &report, "", elapsedMS, r.State().PriceUSD)
 	case errors.Is(runErr, context.Canceled) && run.wasCancelRequested():
 		log.Printf("Research job cancelled id=%d", job.ID)
-		s.finishResearch(job.ID, run, store.ResearchStatusCancelled, nil, "", elapsedMS)
+		s.finishResearch(job.ID, run, store.ResearchStatusCancelled, nil, "", elapsedMS, r.State().PriceUSD)
 	default:
 		log.Printf("Research job failed id=%d: %v", job.ID, runErr)
-		s.finishResearch(job.ID, run, store.ResearchStatusError, nil, runErr.Error(), elapsedMS)
+		s.finishResearch(job.ID, run, store.ResearchStatusError, nil, runErr.Error(), elapsedMS, r.State().PriceUSD)
 	}
 }
 
@@ -375,12 +376,12 @@ func logResearchProgress(jobID int64, p research.Progress) {
 	}
 }
 
-func (s *Server) finishResearch(jobID int64, run *researchRun, status string, finalReport *string, errMsg string, elapsedMS int64) {
+func (s *Server) finishResearch(jobID int64, run *researchRun, status string, finalReport *string, errMsg string, elapsedMS int64, priceUSD *float64) {
 	var errPtr *string
 	if errMsg != "" {
 		errPtr = &errMsg
 	}
-	if err := s.store.FinishResearchJob(jobID, status, finalReport, errPtr, elapsedMS); err != nil {
+	if err := s.store.FinishResearchJob(jobID, status, finalReport, errPtr, elapsedMS, priceUSD); err != nil {
 		log.Printf("research: job %d: finish: %v", jobID, err)
 	}
 	terminal := map[string]any{"status": status}
@@ -395,30 +396,31 @@ func (s *Server) finishResearch(jobID int64, run *researchRun, status string, fi
 
 // researchJobView is the listing shape — heavy state columns omitted.
 type researchJobView struct {
-	ID                int64   `json:"id"`
-	Title             *string `json:"title"`
-	Query             string  `json:"query"`
-	Model             string  `json:"model"`
-	Mode              string  `json:"mode"`
-	ForceSearch       bool    `json:"force_search"`
-	DeepReport        bool    `json:"deep_report"`
-	PauseRedditImport bool    `json:"pause_reddit_import"`
-	Status            string  `json:"status"`
-	Phase             *string `json:"phase"`
-	Effort            int     `json:"effort"`
-	MaxTimeSeconds    int     `json:"max_time_seconds"`
-	Round             int     `json:"round"`
-	ElapsedMS         int64   `json:"elapsed_ms"`
-	Error             *string `json:"error"`
-	CreatedAt         string  `json:"created_at"`
-	UpdatedAt         string  `json:"updated_at"`
+	ID                int64    `json:"id"`
+	Title             *string  `json:"title"`
+	Query             string   `json:"query"`
+	Model             string   `json:"model"`
+	Mode              string   `json:"mode"`
+	ForceSearch       bool     `json:"force_search"`
+	DeepReport        bool     `json:"deep_report"`
+	PauseRedditImport bool     `json:"pause_reddit_import"`
+	Status            string   `json:"status"`
+	Phase             *string  `json:"phase"`
+	Effort            int      `json:"effort"`
+	MaxTimeSeconds    int      `json:"max_time_seconds"`
+	Round             int      `json:"round"`
+	ElapsedMS         int64    `json:"elapsed_ms"`
+	PriceUSD          *float64 `json:"price_usd"`
+	Error             *string  `json:"error"`
+	CreatedAt         string   `json:"created_at"`
+	UpdatedAt         string   `json:"updated_at"`
 }
 
 func researchView(j *store.ResearchJob) researchJobView {
 	return researchJobView{
 		ID: j.ID, Title: j.Title, Query: j.Query, Model: j.Model, Mode: j.Mode, ForceSearch: j.ForceSearch, DeepReport: j.DeepReport, PauseRedditImport: j.PauseRedditImport, Status: j.Status, Phase: j.Phase,
 		Effort: j.Effort, MaxTimeSeconds: j.MaxTimeSeconds,
-		Round: j.Round, ElapsedMS: j.ElapsedMS, Error: j.Error, CreatedAt: j.CreatedAt, UpdatedAt: j.UpdatedAt,
+		Round: j.Round, ElapsedMS: j.ElapsedMS, PriceUSD: j.PriceUSD, Error: j.Error, CreatedAt: j.CreatedAt, UpdatedAt: j.UpdatedAt,
 	}
 }
 
@@ -721,7 +723,7 @@ func (s *Server) handleCancelResearch(w http.ResponseWriter, r *http.Request) {
 	run := s.research.get(id)
 	if run == nil {
 		if job.Status == store.ResearchStatusAwaitingReddit {
-			if err := s.store.FinishResearchJob(id, store.ResearchStatusCancelled, nil, nil, job.ElapsedMS); err != nil {
+			if err := s.store.FinishResearchJob(id, store.ResearchStatusCancelled, nil, nil, job.ElapsedMS, job.PriceUSD); err != nil {
 				internalError(w, err)
 				return
 			}

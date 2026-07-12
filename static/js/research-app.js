@@ -45,6 +45,12 @@ function formatDuration(ms) {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
+function formatPrice(value) {
+  if (value === 0) return '$0.00';
+  const digits = value < 0.001 ? 6 : value < 0.01 ? 4 : 2;
+  return `$${Number(value).toFixed(digits)}`;
+}
+
 function formatDate(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ' ' +
@@ -322,6 +328,7 @@ async function showDetail(id) {
       ${job.effort ? `<span>effort: ${EFFORT_NAMES[job.effort] || job.effort}</span>` : ''}
       <span>${formatDate(job.created_at)}</span>
       ${job.elapsed_ms ? `<span>${formatDuration(job.elapsed_ms)}</span>` : ''}
+      ${job.price_usd != null ? `<span>${formatPrice(job.price_usd)}</span>` : ''}
     </div>
     ${running ? '<div id="research-progress" class="research-progress"></div>' : ''}
     ${awaitingReddit ? redditWaitingPanel(job) : ''}
@@ -380,7 +387,7 @@ function remixShelf(job) {
     const label = remix.direction || `Remix ${(job.remixes.length - index)}`;
     return `<button class="research-remix-item" data-remix-id="${remix.id}">
       <span>${escapeHtml(label)}</span>
-      <small>${escapeHtml(remix.model)} · ${formatDate(remix.created_at)}</small>
+      <small>${escapeHtml(remix.model)} · ${formatDate(remix.created_at)}${remix.price_usd != null ? ` · ${formatPrice(remix.price_usd)}` : ''}</small>
     </button>`;
   }).join('');
   return `<section class="research-remixes">
@@ -477,7 +484,7 @@ async function showRemix(jobID, remixID) {
   try { remix = await research.getRemix(jobID, remixID); } catch { location.hash = jobID; return; }
   const label = remix.direction || 'Designed report';
   main.innerHTML = `<div class="remix-view-header">
-    <div><p class="eyebrow">Report remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(remix.model)} · ${formatDate(remix.created_at)}</p></div>
+    <div><p class="eyebrow">Report remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(remix.model)} · ${formatDate(remix.created_at)}${remix.price_usd != null ? ` · ${formatPrice(remix.price_usd)}` : ''}</p></div>
     <div class="remix-view-actions">
       <button id="remix-download" class="btn btn-sm btn-secondary">download .html</button>
       <a class="btn btn-sm btn-secondary" href="/api/research/${jobID}/remixes/${remixID}/document" target="_blank" rel="noopener noreferrer">open in new tab</a>

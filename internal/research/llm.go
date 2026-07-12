@@ -1,12 +1,9 @@
 package research
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -25,14 +22,15 @@ func (r *Researcher) llmCall(ctx context.Context, msgs []chatMsg, temperature fl
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	content, err := llm.ChatComplete(callCtx, r.client, r.cfg.APIBase+"/chat/completions", r.cfg.APIKey, r.cfg.Model, msgs, map[string]any{
+	result, err := llm.ChatCompleteWithUsage(callCtx, r.client, r.cfg.APIBase+"/chat/completions", r.cfg.APIKey, r.cfg.Model, msgs, map[string]any{
 		"temperature": temperature,
 		"max_tokens":  maxTokens,
 	})
 	if err != nil {
 		return "", err
 	}
-	return stripThinking(content), nil
+	r.addPrice(result.UsageCost())
+	return stripThinking(result.Content), nil
 }
 
 // llmCallStream is llmCall with stream=true. onDelta is invoked at most every
@@ -40,64 +38,25 @@ func (r *Researcher) llmCall(ctx context.Context, msgs []chatMsg, temperature fl
 // output, so long generations (synthesis, final report) can show live
 // progress instead of appearing stuck.
 func (r *Researcher) llmCallStream(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration, onDelta func(generated int, tail string)) (string, error) {
-	payload, _ := json.Marshal(map[string]any{
-		"model":       r.cfg.Model,
-		"messages":    msgs,
-		"stream":      true,
-		"temperature": temperature,
-		"max_tokens":  maxTokens,
-	})
-
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(callCtx, "POST", r.cfg.APIBase+"/chat/completions", bytes.NewReader(payload))
-	if err != nil {
-		return "", fmt.Errorf("build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if r.cfg.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+r.cfg.APIKey)
-	}
-
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("model request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return "", fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, body)
-	}
-
 	var full strings.Builder
 	var lastEmit time.Time
-	scanErr := llm.ScanSSE(resp.Body, func(data string) error {
-		var chunk struct {
-			Choices []struct {
-				Delta struct {
-					Content string `json:"content"`
-				} `json:"delta"`
-			} `json:"choices"`
-		}
-		if json.Unmarshal([]byte(data), &chunk) != nil || len(chunk.Choices) == 0 {
-			return nil
-		}
-		if text := chunk.Choices[0].Delta.Content; text != "" {
+	result, err := llm.ChatCompleteStreamWithUsage(callCtx, r.client, r.cfg.APIBase+"/chat/completions", r.cfg.APIKey, r.cfg.Model, msgs,
+		map[string]any{"temperature": temperature, "max_tokens": maxTokens}, func(text string) {
 			full.WriteString(text)
 			if onDelta != nil && time.Since(lastEmit) >= 250*time.Millisecond {
 				lastEmit = time.Now()
 				onDelta(full.Len(), tailOf(full.String(), 300))
 			}
-		}
-		return nil
-	})
-	if scanErr != nil && full.Len() == 0 {
-		return "", fmt.Errorf("stream read failed: %w", scanErr)
+		})
+	if err != nil {
+		return "", err
 	}
+	r.addPrice(result.UsageCost())
 
-	out := stripToolCalls(stripThinking(full.String()))
+	out := stripToolCalls(stripThinking(result.Content))
 	if out == "" {
 		return "", fmt.Errorf("empty response from model")
 	}
