@@ -20,6 +20,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [x] Add report remixes: generate and save any number of polished standalone HTML presentations from a completed report, with model selection, optional art direction, and report-page navigation.
+
 - [x] Show the model name on past research items and make the list more compact.
 
 - [x] Improve research citations: use stable source IDs in findings/prompts and feed raw findings into final report generation so links survive summarisation.

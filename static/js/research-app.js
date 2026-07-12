@@ -311,6 +311,7 @@ async function showDetail(id) {
       ${job.elapsed_ms ? `<span>${formatDuration(job.elapsed_ms)}</span>` : ''}
       <span class="research-detail-actions">
         ${job.final_report ? `
+          <button id="research-remix" class="btn btn-sm btn-secondary">remix</button>
           <button id="research-dl-md" class="btn btn-sm btn-secondary">download .md</button>
           <button id="research-dl-html" class="btn btn-sm btn-secondary">download .html</button>` : ''}
         ${running || awaitingReddit
@@ -320,6 +321,7 @@ async function showDetail(id) {
     </div>
     ${running ? '<div id="research-progress" class="research-progress"></div>' : ''}
     ${awaitingReddit ? redditWaitingPanel(job) : ''}
+    ${job.final_report ? remixShelf(job) : ''}
     <div id="research-error"></div>
     <div id="research-report" class="research-report"></div>`;
 
@@ -335,6 +337,12 @@ async function showDetail(id) {
     const heading = job.title || job.query;
     const preamble = job.title && job.query ? `# ${job.title}\n\n${job.query}\n\n` : `# ${heading}\n\n`;
     downloadFile(`${slugify(heading)}.md`, 'text/markdown', preamble + job.final_report);
+  });
+  document.getElementById('research-remix')?.addEventListener('click', () => {
+    location.hash = `${id}/remix/new`;
+  });
+  main.querySelectorAll('.research-remix-item').forEach((el) => {
+    el.addEventListener('click', () => { location.hash = `${id}/remix/${el.dataset.remixId}`; });
   });
   document.getElementById('research-dl-html')?.addEventListener('click', () => {
     const heading = job.title || job.query;
@@ -360,6 +368,82 @@ async function showDetail(id) {
 
   if (running) watchProgress(id);
   if (awaitingReddit) wireRedditWaitingPanel(id, job);
+}
+
+function remixShelf(job) {
+  const items = (job.remixes || []).map((remix, index) => {
+    const label = remix.direction || `Remix ${(job.remixes.length - index)}`;
+    return `<button class="research-remix-item" data-remix-id="${remix.id}">
+      <span>${escapeHtml(label)}</span>
+      <small>${escapeHtml(remix.model)} · ${formatDate(remix.created_at)}</small>
+    </button>`;
+  }).join('');
+  return `<section class="research-remixes">
+    <p class="research-section-label">remixes</p>
+    <div class="research-remix-list">${items || '<p class="research-remix-empty">Turn this report into a designed, digestible HTML document.</p>'}</div>
+  </section>`;
+}
+
+function setReportBackBtn(jobID) {
+  const btn = document.getElementById('back-to-menu');
+  btn.href = `#${jobID}`;
+  btn.onclick = null;
+  document.getElementById('back-label').textContent = 'report';
+}
+
+async function showRemixForm(jobID) {
+  stopEvents();
+  setReportBackBtn(jobID);
+  let job;
+  try { job = await research.get(jobID); } catch { location.hash = ''; return; }
+  if (!job.final_report) { location.hash = jobID; return; }
+  const options = ['<option value="">default model</option>']
+    .concat(modelList.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`))
+    .join('');
+  main.innerHTML = `<section class="card remix-form">
+    <p class="eyebrow">Report remix</p>
+    <h1>Make this easier to explore</h1>
+    <p class="remix-intro">The model will redesign <strong>${escapeHtml(job.title || job.query)}</strong> as a self-contained HTML document, using diagrams and visual structure where they help.</p>
+    <label class="remix-field">Model<select id="remix-model" class="input">${options}</select></label>
+    <label class="remix-field">Optional direction<textarea id="remix-direction" class="input textarea" rows="5" maxlength="2000" placeholder="For example: use earthy greens and browns, with simple typography"></textarea></label>
+    <div id="remix-error"></div>
+    <div class="remix-form-actions">
+      <a class="btn btn-secondary" href="#${jobID}">cancel</a>
+      <button id="remix-go" class="btn btn-primary">create remix</button>
+    </div>
+  </section>`;
+  document.getElementById('remix-go').addEventListener('click', async () => {
+    const btn = document.getElementById('remix-go');
+    const error = document.getElementById('remix-error');
+    btn.disabled = true;
+    btn.textContent = 'designing document…';
+    error.innerHTML = '';
+    try {
+      const remix = await research.createRemix(jobID, document.getElementById('remix-model').value,
+        document.getElementById('remix-direction').value.trim());
+      location.hash = `${jobID}/remix/${remix.id}`;
+    } catch (err) {
+      error.innerHTML = `<div class="research-error">${escapeHtml(err.message)}</div>`;
+      btn.disabled = false;
+      btn.textContent = 'create remix';
+    }
+  });
+}
+
+async function showRemix(jobID, remixID) {
+  stopEvents();
+  setReportBackBtn(jobID);
+  let remix;
+  try { remix = await research.getRemix(jobID, remixID); } catch { location.hash = jobID; return; }
+  const label = remix.direction || 'Designed report';
+  main.innerHTML = `<div class="remix-view-header">
+    <div><p class="eyebrow">Report remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(remix.model)} · ${formatDate(remix.created_at)}</p></div>
+    <button id="remix-download" class="btn btn-sm btn-secondary">download .html</button>
+  </div>
+  <iframe class="remix-document" title="${escapeHtml(label)}" sandbox src="/api/research/${jobID}/remixes/${remixID}/document"></iframe>`;
+  document.getElementById('remix-download').addEventListener('click', () => {
+    downloadFile(`research-remix-${remix.id}.html`, 'text/html', remix.html);
+  });
 }
 
 function redditWaitingPanel(job) {
@@ -463,8 +547,11 @@ function watchProgress(id) {
 // ── Routing ─────────────────────────────────────────────────
 
 function route() {
-  const id = location.hash.slice(1);
-  if (id) showDetail(id);
+  const path = location.hash.slice(1);
+  const match = path.match(/^(\d+)\/remix\/(new|\d+)$/);
+  if (match && match[2] === 'new') showRemixForm(match[1]);
+  else if (match) showRemix(match[1], match[2]);
+  else if (path) showDetail(path);
   else showList();
 }
 

@@ -201,6 +201,8 @@ export const research = {
   list: () => request('GET', '/api/research'),
   defaults: () => request('GET', '/api/research/defaults'),
   get: (id) => request('GET', `/api/research/${id}`),
+  createRemix: (id, model, direction) => request('POST', `/api/research/${id}/remixes`, { model, direction }),
+  getRemix: (id, remixId) => request('GET', `/api/research/${id}/remixes/${remixId}`),
   start: (title, query, model, mode, forceSearch, deepReport, pauseRedditImport, effort, maxTimeMinutes) =>
     request('POST', '/api/research', {
       title, query, ...(model ? { model } : {}), mode, force_search: forceSearch, deep_report: deepReport, pause_reddit_import: pauseRedditImport, effort, max_time_minutes: maxTimeMinutes,

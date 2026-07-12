@@ -534,10 +534,16 @@ func (s *Server) handleGetResearch(w http.ResponseWriter, r *http.Request) {
 			request = &pending.Request
 		}
 	}
+	remixes, err := s.store.ListResearchRemixes(job.ID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, struct {
 		*store.ResearchJob
 		RedditRequest *redditimport.Request `json:"reddit_request,omitempty"`
-	}{ResearchJob: job, RedditRequest: request})
+		Remixes       []store.ResearchRemix `json:"remixes"`
+	}{ResearchJob: job, RedditRequest: request, Remixes: remixes})
 }
 
 func (s *Server) handleResearchRedditImport(w http.ResponseWriter, r *http.Request) {

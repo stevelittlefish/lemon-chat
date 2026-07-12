@@ -118,6 +118,16 @@ func (s *Store) migrate() error {
 				created_at      TEXT    NOT NULL
 			);
 
+			CREATE TABLE IF NOT EXISTS research_remix (
+				id              INTEGER PRIMARY KEY,
+				research_job_id INTEGER NOT NULL REFERENCES research_job(id) ON DELETE CASCADE,
+				model           TEXT    NOT NULL,
+				direction       TEXT    NOT NULL DEFAULT '',
+				html            TEXT    NOT NULL,
+				created_at      TEXT    NOT NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_research_remix_job_id ON research_remix(research_job_id);
+
 			CREATE TABLE IF NOT EXISTS schema_version (
 				version INTEGER NOT NULL
 			);
@@ -659,6 +669,28 @@ func (s *Store) migrate() error {
 		}
 		version = 32
 		log.Println("store: migration v31 → v32 complete")
+	}
+
+	if version < 33 {
+		log.Println("store: migrating v32 → v33 (create research remix table)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE IF NOT EXISTS research_remix (
+				id              INTEGER PRIMARY KEY,
+				research_job_id INTEGER NOT NULL REFERENCES research_job(id) ON DELETE CASCADE,
+				model           TEXT    NOT NULL,
+				direction       TEXT    NOT NULL DEFAULT '',
+				html            TEXT    NOT NULL,
+				created_at      TEXT    NOT NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_research_remix_job_id ON research_remix(research_job_id);
+		`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (33, ?)`, now()); err != nil {
+			return err
+		}
+		version = 33
+		log.Println("store: migration v32 → v33 complete")
 	}
 
 	log.Printf("store: schema ready at version %d", version)
