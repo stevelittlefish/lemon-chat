@@ -109,9 +109,6 @@ async function showList() {
         <label class="research-field research-check">
           <input type="checkbox" id="research-deep-report"> in-depth report
         </label>
-        <label class="research-field research-check">
-          <input type="checkbox" id="research-pause-reddit"> pause to import Reddit results
-        </label>
         <label class="research-field">effort
           <select id="research-effort" class="input">${effortOptions}</select>
         </label>
@@ -120,6 +117,11 @@ async function showList() {
             value="${formDefaults.max_time_minutes}"> min
         </label>
         <button id="research-start" class="btn btn-primary">start research</button>
+      </div>
+      <div class="research-form-options">
+        <label class="research-field research-check">
+          <input type="checkbox" id="research-pause-reddit"> pause to import Reddit results
+        </label>
       </div>
     </div>
     <p class="research-section-label">past research</p>

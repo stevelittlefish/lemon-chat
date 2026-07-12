@@ -75,6 +75,12 @@ html, body {
 .research-form-row > select.input { min-width: 200px; }
 .research-form-row .btn { margin-left: auto; }
 
+.research-form-options {
+  display: flex;
+  align-items: center;
+  margin-top: var(--space-4);
+}
+
 /* Inline labelled controls (effort, time limit). */
 .research-field {
   display: flex;
