@@ -50,6 +50,7 @@ Design: `docs/feature-reddit-research-import.md`
 - [x] Merge imported Reddit documents through the existing untrusted-content extraction path, synthesize them with ordinary findings, and prevent repeat requests for analyzed threads.
 - [x] Add restart/recovery, stale-import, duplicate-submit, cancellation, partial-capture, and end-to-end tests; document extension installation and operational limitations.
 - [x] Fix the Reddit import debug harness POST requests to satisfy the authenticated-write CSRF header requirement.
+- [x] Normalize root-relative Reddit comment permalinks in the browser extension before response export.
 
 
 

@@ -18,6 +18,12 @@ function canonicalURL() {
   return url.toString();
 }
 
+function absoluteURL(raw) {
+  if (!raw) return '';
+  try { return new URL(raw, location.origin).toString(); }
+  catch { return ''; }
+}
+
 async function expandAndScroll(limits, warnings) {
   const deadline = Date.now() + Math.min(300, limits.max_seconds_per_page || 300) * 1000;
   const maxActions = Math.min(500, limits.max_expand_actions || 500);
@@ -51,7 +57,7 @@ function captureComments(limit) {
   return nodes.slice(0, limit).map((node) => {
     const body = text(firstWithin(node, '[slot="comment"]', '[data-testid="comment"] p', '.md'));
     const author = attr(node, 'author') || text(firstWithin(node, '[slot="authorName"]', 'a[href*="/user/"]', '.author'));
-    const permalink = attr(node, 'permalink') || firstWithin(node, 'a[data-testid="comment_timestamp"]', 'a.bylink')?.href || '';
+    const permalink = absoluteURL(attr(node, 'permalink') || firstWithin(node, 'a[data-testid="comment_timestamp"]', 'a.bylink')?.href || '');
     const depthRaw = attr(node, 'depth') || node.dataset?.depth || '0';
     const score = scoreValue(attr(node, 'score') || text(firstWithin(node, '[slot="vote-button"]', '.score')));
     return { author, body, permalink, depth: Math.max(0, Number.parseInt(depthRaw, 10) || 0), ...(score === undefined ? {} : { score }) };
