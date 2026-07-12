@@ -20,6 +20,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [x] Refine the completed-report header: separate actions from metadata, reduce action-label clutter, and remove the empty remix shelf's dead space.
+
 - [x] Add report remixes: generate and save any number of polished standalone HTML presentations from a completed report, with model selection, optional art direction, and report-page navigation.
 
 - [x] Show the model name on past research items and make the list more compact.

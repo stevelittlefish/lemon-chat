@@ -298,8 +298,21 @@ async function showDetail(id) {
     : '';
 
   main.innerHTML = `
-    <h1 class="research-detail-query">${escapeHtml(displayTitle)}</h1>
-    ${promptHtml}
+    <div class="research-detail-heading">
+      <div class="research-detail-copy">
+        <h1 class="research-detail-query">${escapeHtml(displayTitle)}</h1>
+        ${promptHtml}
+      </div>
+      <div class="research-detail-actions">
+        ${job.final_report ? `
+          <button id="research-remix" class="btn btn-sm btn-secondary">remix</button>
+          <button id="research-dl-md" class="btn btn-sm btn-secondary">Markdown</button>
+          <button id="research-dl-html" class="btn btn-sm btn-secondary">HTML</button>` : ''}
+        ${running || awaitingReddit
+          ? '<button id="research-cancel" class="btn btn-sm btn-secondary">cancel</button>'
+          : '<button id="research-delete" class="btn btn-sm btn-danger">delete</button>'}
+      </div>
+    </div>
     <div class="research-detail-meta">
       ${statusBadge(job.status)}
       ${job.mode === 'brainstorm' ? `<span>brainstorm${job.force_search ? ' · always searches' : ''}</span>` : ''}
@@ -309,15 +322,6 @@ async function showDetail(id) {
       ${job.effort ? `<span>effort: ${EFFORT_NAMES[job.effort] || job.effort}</span>` : ''}
       <span>${formatDate(job.created_at)}</span>
       ${job.elapsed_ms ? `<span>${formatDuration(job.elapsed_ms)}</span>` : ''}
-      <span class="research-detail-actions">
-        ${job.final_report ? `
-          <button id="research-remix" class="btn btn-sm btn-secondary">remix</button>
-          <button id="research-dl-md" class="btn btn-sm btn-secondary">download .md</button>
-          <button id="research-dl-html" class="btn btn-sm btn-secondary">download .html</button>` : ''}
-        ${running || awaitingReddit
-          ? '<button id="research-cancel" class="btn btn-sm btn-secondary">cancel</button>'
-          : '<button id="research-delete" class="btn btn-sm btn-danger">delete</button>'}
-      </span>
     </div>
     ${running ? '<div id="research-progress" class="research-progress"></div>' : ''}
     ${awaitingReddit ? redditWaitingPanel(job) : ''}
@@ -371,6 +375,7 @@ async function showDetail(id) {
 }
 
 function remixShelf(job) {
+  if (!job.remixes?.length) return '';
   const items = (job.remixes || []).map((remix, index) => {
     const label = remix.direction || `Remix ${(job.remixes.length - index)}`;
     return `<button class="research-remix-item" data-remix-id="${remix.id}">
@@ -380,7 +385,7 @@ function remixShelf(job) {
   }).join('');
   return `<section class="research-remixes">
     <p class="research-section-label">remixes</p>
-    <div class="research-remix-list">${items || '<p class="research-remix-empty">Turn this report into a designed, digestible HTML document.</p>'}</div>
+    <div class="research-remix-list">${items}</div>
   </section>`;
 }
 
