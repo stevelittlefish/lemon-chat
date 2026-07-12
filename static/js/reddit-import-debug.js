@@ -6,7 +6,10 @@ let currentRequest = null;
 async function post(payload) {
   const response = await fetch('/api/debug/reddit-import', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
+    },
     body: JSON.stringify(payload),
   });
   const data = await response.json();
