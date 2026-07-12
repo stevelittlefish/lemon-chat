@@ -58,6 +58,7 @@ function statusBadge(status) {
     case 'done': return '<span class="badge accent"><span class="dot"></span>done</span>';
     case 'error': return '<span class="badge warn"><span class="dot"></span>error</span>';
     case 'cancelled': return '<span class="badge"><span class="dot"></span>cancelled</span>';
+    case 'awaiting_reddit': return '<span class="badge warn"><span class="dot"></span>awaiting Reddit</span>';
     default: return `<span class="badge">${escapeHtml(status)}</span>`;
   }
 }
@@ -90,7 +91,10 @@ async function showList() {
 
   main.innerHTML = `
     <div class="card research-form">
-      <h2 class="research-form-title">new research</h2>
+      <div class="research-form-heading">
+        <h2 class="research-form-title">New Research</h2>
+        <a class="research-help-link" href="/research/help" target="_blank" rel="noopener noreferrer">help</a>
+      </div>
       <input id="research-title" class="input" type="text" placeholder="title (optional)">
       <textarea id="research-query" class="input textarea" rows="3"
         placeholder="research question or prompt (required if no title)"></textarea>
@@ -116,6 +120,11 @@ async function showList() {
             value="${formDefaults.max_time_minutes}"> min
         </label>
         <button id="research-start" class="btn btn-primary">start research</button>
+      </div>
+      <div class="research-form-options">
+        <label class="research-field research-check">
+          <input type="checkbox" id="research-pause-reddit"> pause to import Reddit results
+        </label>
       </div>
     </div>
     <p class="research-section-label">past research</p>
@@ -157,12 +166,13 @@ async function startResearch() {
   const mode = document.getElementById('research-mode').value;
   const forceSearch = mode === 'brainstorm' && document.getElementById('research-force-search').checked;
   const deepReport = document.getElementById('research-deep-report').checked;
+  const pauseRedditImport = document.getElementById('research-pause-reddit').checked;
   const effort = parseInt(document.getElementById('research-effort').value, 10) || formDefaults.effort;
   const maxTimeMinutes = parseInt(document.getElementById('research-time').value, 10) || formDefaults.max_time_minutes;
   const btn = document.getElementById('research-start');
   btn.disabled = true;
   try {
-    const job = await research.start(title, query, model, mode, forceSearch, deepReport, effort, maxTimeMinutes);
+    const job = await research.start(title, query, model, mode, forceSearch, deepReport, pauseRedditImport, effort, maxTimeMinutes);
     location.hash = job.id;
   } catch (err) {
     btn.disabled = false;
@@ -280,6 +290,7 @@ async function showDetail(id) {
     return;
   }
 
+  const awaitingReddit = job.status === 'awaiting_reddit';
   const running = job.status === 'running' || job.status === 'pending';
   const displayTitle = job.title || job.query;
   const promptHtml = job.title && job.query
@@ -293,6 +304,7 @@ async function showDetail(id) {
       ${statusBadge(job.status)}
       ${job.mode === 'brainstorm' ? `<span>brainstorm${job.force_search ? ' · always searches' : ''}</span>` : ''}
       ${job.deep_report ? '<span>in-depth</span>' : ''}
+      ${job.pause_reddit_import ? '<span>Reddit import</span>' : ''}
       <span>${escapeHtml(job.model)}</span>
       ${job.effort ? `<span>effort: ${EFFORT_NAMES[job.effort] || job.effort}</span>` : ''}
       <span>${formatDate(job.created_at)}</span>
@@ -301,17 +313,18 @@ async function showDetail(id) {
         ${job.final_report ? `
           <button id="research-dl-md" class="btn btn-sm btn-secondary">download .md</button>
           <button id="research-dl-html" class="btn btn-sm btn-secondary">download .html</button>` : ''}
-        ${running
+        ${running || awaitingReddit
           ? '<button id="research-cancel" class="btn btn-sm btn-secondary">cancel</button>'
           : '<button id="research-delete" class="btn btn-sm btn-danger">delete</button>'}
       </span>
     </div>
     ${running ? '<div id="research-progress" class="research-progress"></div>' : ''}
+    ${awaitingReddit ? redditWaitingPanel(job) : ''}
     <div id="research-error"></div>
     <div id="research-report" class="research-report"></div>`;
 
   document.getElementById('research-cancel')?.addEventListener('click', async () => {
-    try { await research.cancel(id); } catch { /* already finished */ }
+    try { await research.cancel(id); showDetail(id); } catch { /* already finished */ }
   });
   document.getElementById('research-delete')?.addEventListener('click', async () => {
     if (!confirm('Delete this research?')) return;
@@ -346,6 +359,69 @@ async function showDetail(id) {
   }
 
   if (running) watchProgress(id);
+  if (awaitingReddit) wireRedditWaitingPanel(id, job);
+}
+
+function redditWaitingPanel(job) {
+  const request = job.reddit_request;
+  if (!request) return '<div class="research-error">The persisted Reddit request could not be loaded.</div>';
+  const pages = request.pages.map((page) => `<li><a href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.title || page.url)}</a></li>`).join('');
+  return `
+    <section class="card reddit-waiting">
+      <p class="eyebrow">Browser import required</p>
+      <h2 class="h4">Capture Reddit results</h2>
+      <p class="body-sm">Give this request to the Save Reddit extension, then paste or upload its response. Waiting time does not count against the research limit.</p>
+      <ol class="reddit-url-list">${pages}</ol>
+      <div class="reddit-actions">
+        <button id="reddit-copy-request" class="btn btn-secondary">copy request</button>
+        <button id="reddit-download-request" class="btn btn-secondary">download request</button>
+      </div>
+      <label class="research-field">Extension response
+        <textarea id="reddit-response" class="input textarea code" rows="10" placeholder="Paste response JSON"></textarea>
+      </label>
+      <label class="research-field">Or upload response JSON
+        <input id="reddit-response-file" class="input" type="file" accept="application/json,.json">
+      </label>
+      <div class="reddit-actions">
+        <button id="reddit-import" class="btn btn-primary">validate and continue</button>
+        <button id="reddit-skip" class="btn btn-secondary">skip Reddit sources</button>
+      </div>
+      <p id="reddit-feedback" class="body-sm" aria-live="polite"></p>
+    </section>`;
+}
+
+function wireRedditWaitingPanel(id, job) {
+  const requestText = JSON.stringify(job.reddit_request, null, 2);
+  const feedback = document.getElementById('reddit-feedback');
+  document.getElementById('reddit-copy-request').addEventListener('click', async () => {
+    await navigator.clipboard.writeText(requestText);
+    feedback.textContent = 'Request copied.';
+  });
+  document.getElementById('reddit-download-request').addEventListener('click', () => {
+    downloadFile(`reddit-request-${job.reddit_request.request_id}.json`, 'application/json', requestText);
+  });
+  document.getElementById('reddit-response-file').addEventListener('change', async (event) => {
+    const [file] = event.target.files;
+    if (file) document.getElementById('reddit-response').value = await file.text();
+  });
+  document.getElementById('reddit-import').addEventListener('click', async () => {
+    feedback.textContent = 'Validating response…';
+    try {
+      const response = JSON.parse(document.getElementById('reddit-response').value);
+      await research.importReddit(id, response);
+      await showDetail(id);
+    } catch (error) {
+      feedback.textContent = error instanceof SyntaxError ? 'Response is not valid JSON.' : error.message;
+    }
+  });
+  document.getElementById('reddit-skip').addEventListener('click', async () => {
+    if (!confirm('Continue without these Reddit sources?')) return;
+    feedback.textContent = 'Skipping Reddit sources…';
+    try {
+      await research.skipReddit(id, job.reddit_request.request_id);
+      await showDetail(id);
+    } catch (error) { feedback.textContent = error.message; }
+  });
 }
 
 function watchProgress(id) {

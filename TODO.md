@@ -34,6 +34,30 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 - [x] In-depth report toggle: build the final report section by section from the raw findings (outline → self-critique refine → per-section write → glue) instead of one summarising pass, to stop reports losing detail. Opt-in checkbox; applies to both modes. `deepReport` pipeline in `internal/research/researcher.go`.
 
+### User-assisted Reddit imports
+
+Design: `docs/feature-reddit-research-import.md`
+
+- [x] Define and test the versioned Reddit import/request JSON contract, URL canonicalisation, validation limits, and normalized LLM-facing text.
+- [x] Add synthetic import fixtures covering nested, deleted, duplicate, oversized, partial, and prompt-injection-shaped content.
+- [x] Add a debug-only single-pass test harness: SearXNG Reddit search, request export, response validation, normalized preview, extraction, and formatted finding preview.
+- [x] Build a Chromium Manifest V3 "Save Reddit" extension that accepts a request bundle, visits threads sequentially, expands/scrolls within limits, and exports a response bundle with completeness warnings.
+- [x] Add the per-job "Pause to import Reddit results" option, off by default, to config persistence, API views, and the research form.
+- [x] Add a numbered database migration and store operations for the durable `awaiting_reddit` state and pending round/request data.
+- [x] Split and canonicalize search results, checkpoint before extraction when Reddit imports are required, and exclude user wait time from the job time budget.
+- [x] Add authenticated import and skip endpoints with request-ID matching, ownership checks, size limits, deduplication, and idempotent resume behavior.
+- [x] Add the research-panel waiting UI with URL list, request copy/download, response paste/upload, validation feedback, skip, cancel, and reconnect behavior.
+- [x] Merge imported Reddit documents through the existing untrusted-content extraction path, synthesize them with ordinary findings, and prevent repeat requests for analyzed threads.
+- [x] Add restart/recovery, stale-import, duplicate-submit, cancellation, partial-capture, and end-to-end tests; document extension installation and operational limitations.
+- [x] Fix the Reddit import debug harness POST requests to satisfy the authenticated-write CSRF header requirement.
+- [x] Normalize root-relative Reddit comment permalinks in the browser extension before response export.
+- [x] Move the research Reddit-import checkbox onto its own row beneath the main form controls.
+- [x] Add a detailed research help page linked from the capitalized New Research form heading.
+- [x] Add the supplied Reddit artwork as the Save Reddit browser extension icon.
+- [x] Improve the Save Reddit extension completion state, add a load-more limit, and support exporting the active Reddit tab.
+- [x] Compact the Save Reddit popup so it fits without an internal scrollbar.
+- [x] Prevent current-page Reddit exports from closing when expansion links navigate the active tab.
+
 
 
 ## Code review (2026-06-13)
@@ -132,7 +156,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Async image generation** (`internal/server/tools.go:1400`)
   `makeImageExecutor` blocks the SSE stream for up to 120s while ComfyUI polls. Per `docs/feature-async-image-generation.md`: return a pending attachment immediately after the ComfyUI submit, poll/download in a background goroutine, and push `attachment_ready`/`attachment_error` to the frontend via WebSocket when done.
 
-- [ ] Look into ways to follow Reddit and facebook links, if possible
+- [ ] Look into ways to follow Facebook links, if possible
 
 - [ ] **Add "set as background" button to inline images** (`static/js/thread.js:187`)
   `buildInlineImage` shows only a download button on hover. Add a second hover button (image/wallpaper icon) that calls `setBackground(att.id)` so users can set any generated image as the conversation background without asking the model to use `background: true`.

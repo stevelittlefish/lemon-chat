@@ -107,7 +107,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/research/{id}", s.requireAuth(s.handleGetResearch))
 	mux.HandleFunc("GET /api/research/{id}/events", s.requireAuth(s.handleResearchEvents))
 	mux.HandleFunc("POST /api/research/{id}/cancel", s.requireAuth(s.handleCancelResearch))
+	mux.HandleFunc("POST /api/research/{id}/reddit-import", s.requireAuth(s.handleResearchRedditImport))
+	mux.HandleFunc("POST /api/research/{id}/reddit-skip", s.requireAuth(s.handleResearchRedditSkip))
 	mux.HandleFunc("DELETE /api/research/{id}", s.requireAuth(s.handleDeleteResearch))
+	mux.HandleFunc("POST /api/debug/reddit-import", s.debugOnly(s.requireAuth(s.handleRedditImportHarness)))
 
 	// WebSocket
 	mux.HandleFunc("GET /ws", s.handleWS)
@@ -130,6 +133,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /menu", serveFile("static/menu.html"))
 	mux.HandleFunc("GET /complete", serveFile("static/complete.html"))
 	mux.HandleFunc("GET /research", serveFile("static/research.html"))
+	mux.HandleFunc("GET /research/help", serveFile("static/research-help.html"))
+	mux.HandleFunc("GET /debug/reddit-import", s.debugOnly(serveFile("static/reddit-import-debug.html")))
 
 	// Settings pages
 	mux.HandleFunc("GET /settings", func(w http.ResponseWriter, r *http.Request) {
@@ -151,6 +156,16 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/", http.FileServer(http.Dir("static")))
 
 	return mux
+}
+
+func (s *Server) debugOnly(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !s.cfg.Server.Debug {
+			http.NotFound(w, r)
+			return
+		}
+		next(w, r)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

@@ -9,11 +9,12 @@ import (
 // ResearchJob statuses. A job that is pending or running when the server
 // stops is resumed from its last checkpoint on the next startup.
 const (
-	ResearchStatusPending   = "pending"
-	ResearchStatusRunning   = "running"
-	ResearchStatusDone      = "done"
-	ResearchStatusError     = "error"
-	ResearchStatusCancelled = "cancelled"
+	ResearchStatusPending        = "pending"
+	ResearchStatusRunning        = "running"
+	ResearchStatusAwaitingReddit = "awaiting_reddit"
+	ResearchStatusDone           = "done"
+	ResearchStatusError          = "error"
+	ResearchStatusCancelled      = "cancelled"
 )
 
 type ResearchJob struct {
@@ -31,9 +32,12 @@ type ResearchJob struct {
 	ForceSearch bool `json:"force_search"`
 	// DeepReport builds the final report section by section from the raw findings
 	// (outline → per-section write → glue) instead of in one summarising pass.
-	DeepReport bool    `json:"deep_report"`
-	Status     string  `json:"status"`
-	Phase      *string `json:"phase"`
+	DeepReport bool `json:"deep_report"`
+	// PauseRedditImport enables user-assisted capture when a search round finds
+	// Reddit threads. It is opt-in for each job.
+	PauseRedditImport bool    `json:"pause_reddit_import"`
+	Status            string  `json:"status"`
+	Phase             *string `json:"phase"`
 	// Effort is the 1–5 effort level chosen for the job; MaxTimeSeconds is the
 	// per-job wall-clock budget (0 means use the configured default).
 	Effort         int     `json:"effort"`
@@ -50,18 +54,25 @@ type ResearchJob struct {
 	Findings     *string `json:"findings"`
 	QueriesUsed  *string `json:"queries_used"`
 	AnalyzedURLs *string `json:"analyzed_urls"`
-	Error        *string `json:"error"`
-	CreatedAt    string  `json:"created_at"`
-	UpdatedAt    string  `json:"updated_at"`
+	// RedditRequestID and PendingRedditRound hold the durable browser handoff
+	// and complete pending-round checkpoint. RedditResponse or RedditSkipped is
+	// set atomically before the job becomes resumable again.
+	RedditRequestID    *string `json:"-"`
+	PendingRedditRound *string `json:"-"`
+	RedditResponse     *string `json:"-"`
+	RedditSkipped      bool    `json:"-"`
+	Error              *string `json:"error"`
+	CreatedAt          string  `json:"created_at"`
+	UpdatedAt          string  `json:"updated_at"`
 }
 
-const researchJobCols = `id, user_id, title, query, model, mode, force_search, deep_report, status, phase, effort, max_time_seconds, round, empty_rounds, elapsed_ms,
-	category, plan, report, final_report, findings, queries_used, analyzed_urls, error, created_at, updated_at`
+const researchJobCols = `id, user_id, title, query, model, mode, force_search, deep_report, pause_reddit_import, status, phase, effort, max_time_seconds, round, empty_rounds, elapsed_ms,
+	category, plan, report, final_report, findings, queries_used, analyzed_urls, reddit_request_id, pending_reddit_round, reddit_response, reddit_skipped, error, created_at, updated_at`
 
 func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) {
 	var j ResearchJob
-	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Mode, &j.ForceSearch, &j.DeepReport, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.Round, &j.EmptyRounds, &j.ElapsedMS,
-		&j.Category, &j.Plan, &j.Report, &j.FinalReport, &j.Findings, &j.QueriesUsed, &j.AnalyzedURLs, &j.Error, &j.CreatedAt, &j.UpdatedAt)
+	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Mode, &j.ForceSearch, &j.DeepReport, &j.PauseRedditImport, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.Round, &j.EmptyRounds, &j.ElapsedMS,
+		&j.Category, &j.Plan, &j.Report, &j.FinalReport, &j.Findings, &j.QueriesUsed, &j.AnalyzedURLs, &j.RedditRequestID, &j.PendingRedditRound, &j.RedditResponse, &j.RedditSkipped, &j.Error, &j.CreatedAt, &j.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -71,22 +82,22 @@ func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) 
 	return &j, nil
 }
 
-func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string, forceSearch, deepReport bool, effort, maxTimeSeconds int) (*ResearchJob, error) {
+func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string, forceSearch, deepReport, pauseRedditImport bool, effort, maxTimeSeconds int) (*ResearchJob, error) {
 	t := now()
 	var titlePtr *string
 	if title != "" {
 		titlePtr = &title
 	}
 	res, err := s.db.Exec(
-		`INSERT INTO research_job (user_id, title, query, model, mode, force_search, deep_report, status, effort, max_time_seconds, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
-		userID, titlePtr, query, model, mode, forceSearch, deepReport, effort, maxTimeSeconds, t, t,
+		`INSERT INTO research_job (user_id, title, query, model, mode, force_search, deep_report, pause_reddit_import, status, effort, max_time_seconds, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+		userID, titlePtr, query, model, mode, forceSearch, deepReport, pauseRedditImport, effort, maxTimeSeconds, t, t,
 	)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	return &ResearchJob{ID: id, UserID: userID, Title: titlePtr, Query: query, Model: model, Mode: mode, ForceSearch: forceSearch, DeepReport: deepReport, Status: ResearchStatusPending,
+	return &ResearchJob{ID: id, UserID: userID, Title: titlePtr, Query: query, Model: model, Mode: mode, ForceSearch: forceSearch, DeepReport: deepReport, PauseRedditImport: pauseRedditImport, Status: ResearchStatusPending,
 		Effort: effort, MaxTimeSeconds: maxTimeSeconds, CreatedAt: t, UpdatedAt: t}, nil
 }
 
@@ -155,6 +166,55 @@ func (s *Store) CheckpointResearchJob(id int64, round, emptyRounds int, elapsedM
 	_, err := s.db.Exec(
 		`UPDATE research_job SET round = ?, empty_rounds = ?, elapsed_ms = ?, category = ?, plan = ?,
 		 report = ?, findings = ?, queries_used = ?, analyzed_urls = ?, updated_at = ? WHERE id = ?`,
+		round, emptyRounds, elapsedMS, category, plan, report, findings, queriesUsed, analyzedURLs, now(), id)
+	return err
+}
+
+// SetResearchJobAwaitingReddit durably pauses a job after its complete pending
+// round has been serialized. The request ID is stored separately for atomic
+// matching by import and skip submissions.
+func (s *Store) SetResearchJobAwaitingReddit(id int64, requestID, pendingRound string, elapsedMS int64) error {
+	res, err := s.db.Exec(`UPDATE research_job SET status = ?, phase = ?, reddit_request_id = ?, pending_reddit_round = ?,
+		reddit_response = NULL, reddit_skipped = 0, elapsed_ms = ?, updated_at = ?
+		WHERE id = ? AND status IN ('pending', 'running')`,
+		ResearchStatusAwaitingReddit, ResearchStatusAwaitingReddit, requestID, pendingRound, elapsedMS, now(), id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ResumeResearchRedditImport atomically accepts an import or skip for the
+// matching owner and request. transitioned=false makes duplicate submissions
+// harmless and prevents two callers from starting runners.
+func (s *Store) ResumeResearchRedditImport(id, userID int64, requestID string, response *string, skipped bool) (transitioned bool, err error) {
+	res, err := s.db.Exec(`UPDATE research_job SET status = ?, phase = NULL, reddit_response = ?, reddit_skipped = ?, updated_at = ?
+		WHERE id = ? AND user_id = ? AND status = ? AND reddit_request_id = ?`,
+		ResearchStatusPending, response, skipped, now(), id, userID, ResearchStatusAwaitingReddit, requestID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
+// ClearResearchRedditState removes a completed handoff after its pending round
+// has been merged and checkpointed.
+func (s *Store) ClearResearchRedditState(id int64) error {
+	_, err := s.db.Exec(`UPDATE research_job SET reddit_request_id = NULL, pending_reddit_round = NULL,
+		reddit_response = NULL, reddit_skipped = 0, updated_at = ? WHERE id = ?`, now(), id)
+	return err
+}
+
+// CompleteResearchRedditRound atomically checkpoints the merged round and
+// clears its handoff so it cannot be merged twice after a restart.
+func (s *Store) CompleteResearchRedditRound(id int64, round, emptyRounds int, elapsedMS int64, category, plan, report, findings, queriesUsed, analyzedURLs string) error {
+	_, err := s.db.Exec(`UPDATE research_job SET round = ?, empty_rounds = ?, elapsed_ms = ?, category = ?, plan = ?,
+		report = ?, findings = ?, queries_used = ?, analyzed_urls = ?, reddit_request_id = NULL,
+		pending_reddit_round = NULL, reddit_response = NULL, reddit_skipped = 0, updated_at = ? WHERE id = ?`,
 		round, emptyRounds, elapsedMS, category, plan, report, findings, queriesUsed, analyzedURLs, now(), id)
 	return err
 }

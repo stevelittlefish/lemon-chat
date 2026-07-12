@@ -201,11 +201,13 @@ export const research = {
   list: () => request('GET', '/api/research'),
   defaults: () => request('GET', '/api/research/defaults'),
   get: (id) => request('GET', `/api/research/${id}`),
-  start: (title, query, model, mode, forceSearch, deepReport, effort, maxTimeMinutes) =>
+  start: (title, query, model, mode, forceSearch, deepReport, pauseRedditImport, effort, maxTimeMinutes) =>
     request('POST', '/api/research', {
-      title, query, ...(model ? { model } : {}), mode, force_search: forceSearch, deep_report: deepReport, effort, max_time_minutes: maxTimeMinutes,
+      title, query, ...(model ? { model } : {}), mode, force_search: forceSearch, deep_report: deepReport, pause_reddit_import: pauseRedditImport, effort, max_time_minutes: maxTimeMinutes,
     }),
   cancel: (id) => request('POST', `/api/research/${id}/cancel`),
+  importReddit: (id, response) => request('POST', `/api/research/${id}/reddit-import`, response),
+  skipReddit: (id, requestId) => request('POST', `/api/research/${id}/reddit-skip`, { request_id: requestId }),
   delete: (id) => request('DELETE', `/api/research/${id}`),
   // Streams progress events for a job. onEvent receives each parsed event;
   // a terminal event has a `status` field. Returns an abort() function.

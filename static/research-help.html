@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Research help — lemon chat</title>
+  <link rel="icon" href="/assets/favicon.ico">
+  <link rel="stylesheet" href="/css/colors_and_type.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/research-help.css">
+</head>
+<body>
+  <header class="help-header">
+    <a href="/research" class="help-back">← research</a>
+    <span class="eyebrow">Guide</span>
+  </header>
+
+  <main class="help-page">
+    <section class="help-hero">
+      <div>
+        <p class="eyebrow">Research in lemon chat</p>
+        <h1>From a good question to a useful report</h1>
+        <p class="help-lead">Research runs a deliberate loop of planning, searching, reading, synthesis, and review. This guide explains how to shape the work and what to expect while it runs.</p>
+      </div>
+      <aside class="help-note">
+        <span class="eyebrow">Good starting point</span>
+        <p>State the decision you need to make, the evidence that matters, and any limits on geography, date, budget, or audience.</p>
+      </aside>
+    </section>
+
+    <nav class="help-contents" aria-label="On this page">
+      <a href="#writing">Write the brief</a>
+      <a href="#modes">Choose a mode</a>
+      <a href="#controls">Set the controls</a>
+      <a href="#reddit">Import Reddit</a>
+      <a href="#running">While it runs</a>
+      <a href="#reports">Use the report</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+    </nav>
+
+    <section id="writing" class="help-section">
+      <p class="eyebrow">01 · The brief</p>
+      <h2>Write a question with edges</h2>
+      <p>The title labels the saved job. The prompt is the working brief sent to the researcher. You can provide either one, but a descriptive title plus a specific prompt usually produces the clearest result.</p>
+      <div class="example-grid">
+        <article class="example-card weak">
+          <span class="eyebrow">Too broad</span>
+          <p>Tell me about local AI.</p>
+        </article>
+        <article class="example-card strong">
+          <span class="eyebrow">More useful</span>
+          <p>Compare privacy, hardware cost, and maintenance trade-offs for running a local family chat assistant in the UK in 2026. Prefer first-hand evidence and identify unresolved risks.</p>
+        </article>
+      </div>
+      <p>Ask for comparisons, counter-evidence, implementation constraints, or a recommendation when those are important. Mention what you already know so the researcher does not spend rounds rediscovering it.</p>
+    </section>
+
+    <section id="modes" class="help-section">
+      <p class="eyebrow">02 · Mode</p>
+      <h2>Research or brainstorm</h2>
+      <div class="choice-grid">
+        <article>
+          <h3>Research</h3>
+          <p>Best for factual questions, comparisons, fact checks, product research, and how-to reports. Every round searches the web and grounds the evolving report in extracted sources.</p>
+        </article>
+        <article>
+          <h3>Brainstorm</h3>
+          <p>Best for invention, design, strategy, naming, planning, and exploring options. The model develops ideas first and searches only when evidence would improve them.</p>
+        </article>
+      </div>
+      <p><strong>Always search the web</strong> appears in brainstorm mode. Enable it when the first creative round must include external evidence rather than relying entirely on the model's knowledge.</p>
+    </section>
+
+    <section id="controls" class="help-section">
+      <p class="eyebrow">03 · Controls</p>
+      <h2>Choose depth without wasting time</h2>
+      <dl class="control-list">
+        <div><dt>Model</dt><dd>The model plans, extracts evidence, synthesizes findings, and writes the report. The default uses the research model configured by the server.</dd></div>
+        <div><dt>In-depth report</dt><dd>Builds an outline, critiques it, writes sections from raw findings, and joins them into a longer report. It takes more time but retains more source detail.</dd></div>
+        <div><dt>Effort</dt><dd>Controls the number of normal and bonus rounds. Start with default. Use extra or too much for broad questions where fresh search angles are worth the added model time.</dd></div>
+        <div><dt>Time limit</dt><dd>Caps active research time. Waiting for a Reddit import does not consume this budget. A run can finish earlier when the model decides the report is sufficient.</dd></div>
+      </dl>
+    </section>
+
+    <section id="reddit" class="help-section">
+      <p class="eyebrow">04 · Reddit import</p>
+      <h2>Bring first-hand discussions in through your browser</h2>
+      <p>Reddit often blocks reliable server-side reading. <strong>Pause to import Reddit results</strong> lets lemon chat stop after search and ask the Save Reddit extension to capture selected threads using your normal browser session.</p>
+      <ol class="steps">
+        <li><span>1</span><div><strong>Enable the option</strong><p>Start the job with the Reddit import checkbox selected.</p></div></li>
+        <li><span>2</span><div><strong>Copy the request</strong><p>When the job pauses, copy or download its versioned request bundle.</p></div></li>
+        <li><span>3</span><div><strong>Capture in the extension</strong><p>Paste the request into Save Reddit. It visits threads sequentially and reports limits, warnings, and failures honestly.</p></div></li>
+        <li><span>4</span><div><strong>Import the response</strong><p>Paste or upload the exported JSON. Lemon chat validates it, extracts relevant evidence, and resumes the exact saved round.</p></div></li>
+      </ol>
+      <p>You may skip the Reddit sources and continue with ordinary webpages. Reloading or restarting while paused is safe: the request is stored with the research job, and waiting time is excluded from the active time limit.</p>
+    </section>
+
+    <section id="running" class="help-section">
+      <p class="eyebrow">05 · Progress</p>
+      <h2>What happens while it runs</h2>
+      <div class="phase-line" aria-label="Research phases">
+        <span>Plan</span><span>Search</span><span>Read</span><span>Synthesize</span><span>Decide</span><span>Write</span>
+      </div>
+      <p>The live panel shows the current phase, round, queries, pages being read, and a tail of generated text. Closing the page does not stop the job. Pending and running jobs resume from their latest checkpoint after a server restart.</p>
+      <p>Cancel stops an active job or closes an awaiting Reddit handoff. A cancelled or failed job may retain its partial evolving report for diagnosis.</p>
+    </section>
+
+    <section id="reports" class="help-section">
+      <p class="eyebrow">06 · Results</p>
+      <h2>Read the report as an evidence map</h2>
+      <p>Reports include source references and a record of analyzed URLs. Follow citations when a claim matters, review uncertainty and capture warnings, and distinguish first-hand discussion from stronger primary evidence.</p>
+      <p>Completed reports can be downloaded as Markdown for editing or as a self-contained HTML document for reading and sharing.</p>
+    </section>
+
+    <section id="troubleshooting" class="help-section">
+      <p class="eyebrow">07 · Troubleshooting</p>
+      <h2>Common problems</h2>
+      <details><summary>No usable search results</summary><p>Confirm SearXNG is configured and reachable. Make the prompt less narrow, remove conflicting constraints, or try a different wording.</p></details>
+      <details><summary>The run stops with few findings</summary><p>Some pages may block fetching or contain too little useful text. Increase effort, broaden the brief, or explicitly request alternative source types.</p></details>
+      <details><summary>A Reddit response is rejected</summary><p>Reload the unpacked extension, recapture using the current request, and keep the request and response IDs together. Do not edit URLs or combine responses from different jobs.</p></details>
+      <details><summary>The extension reports partial capture</summary><p>Review its warnings. Comment limits, collapsed branches, access gates, deleted content, rate limits, and Reddit markup changes can prevent a complete capture. Partial results can still be useful when their limitations are understood.</p></details>
+      <details><summary>A report needs more detail</summary><p>Enable in-depth reporting, raise effort or time, and state the missing dimensions in the brief. A focused follow-up job is often better than an unbounded first request.</p></details>
+    </section>
+
+    <footer class="help-footer">
+      <p>Ready to begin with a sharper brief?</p>
+      <a href="/research">Open research</a>
+    </footer>
+  </main>
+</body>
+</html>
