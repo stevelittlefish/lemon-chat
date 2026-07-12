@@ -1,4 +1,5 @@
 import { requireAuth } from './settings-auth.js';
+import { copyToClipboard } from './utils.js';
 
 const $ = (id) => document.getElementById(id);
 let currentRequest = null;
@@ -53,7 +54,7 @@ $('response-file').addEventListener('change', async (event) => {
   const [file] = event.target.files;
   if (file) $('response').value = await file.text();
 });
-$('copy-request').addEventListener('click', async () => navigator.clipboard.writeText($('request').value));
+$('copy-request').addEventListener('click', async () => copyToClipboard($('request').value));
 $('download-request').addEventListener('click', () => {
   const blob = new Blob([$('request').value], { type: 'application/json' });
   const link = document.createElement('a');

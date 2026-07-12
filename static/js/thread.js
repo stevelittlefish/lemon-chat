@@ -1,7 +1,7 @@
 import { render as renderMarkdown } from './markdown.js';
 import { icon } from './icons.js';
 import { messages as msgApi } from './api.js';
-import { escapeHtml } from './utils.js';
+import { copyToClipboard, escapeHtml } from './utils.js';
 import { createModal } from './modal.js';
 
 // ── Artifact panel ───────────────────────────────────────────
@@ -283,21 +283,6 @@ function buildAttachmentCard(att) {
   card.appendChild(info);
   card.appendChild(openBtn);
   return card;
-}
-
-async function copyToClipboard(text) {
-  if (navigator.clipboard) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
-  document.body.appendChild(ta);
-  ta.focus();
-  ta.select();
-  document.execCommand('copy');
-  ta.remove();
 }
 
 const threadEl = document.getElementById('thread');

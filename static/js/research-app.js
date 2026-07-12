@@ -2,7 +2,7 @@
 import { requireAuth } from './settings-auth.js';
 import { research, models } from './api.js';
 import { render } from './markdown.js';
-import { escapeHtml } from './utils.js';
+import { copyToClipboard, escapeHtml } from './utils.js';
 
 const main = document.getElementById('research-main');
 
@@ -394,8 +394,12 @@ function wireRedditWaitingPanel(id, job) {
   const requestText = JSON.stringify(job.reddit_request, null, 2);
   const feedback = document.getElementById('reddit-feedback');
   document.getElementById('reddit-copy-request').addEventListener('click', async () => {
-    await navigator.clipboard.writeText(requestText);
-    feedback.textContent = 'Request copied.';
+    try {
+      await copyToClipboard(requestText);
+      feedback.textContent = 'Request copied.';
+    } catch (error) {
+      feedback.textContent = error.message;
+    }
   });
   document.getElementById('reddit-download-request').addEventListener('click', () => {
     downloadFile(`reddit-request-${job.reddit_request.request_id}.json`, 'application/json', requestText);
