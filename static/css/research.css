@@ -57,6 +57,22 @@ html, body {
   margin: 0 0 var(--space-3);
 }
 
+.research-form-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.research-help-link {
+  color: var(--link);
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  text-decoration: none;
+}
+
+.research-help-link:hover { text-decoration: underline; }
+
 .research-form .input + .input { margin-top: var(--space-3); }
 
 .research-form-row {

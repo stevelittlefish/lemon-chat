@@ -133,6 +133,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /menu", serveFile("static/menu.html"))
 	mux.HandleFunc("GET /complete", serveFile("static/complete.html"))
 	mux.HandleFunc("GET /research", serveFile("static/research.html"))
+	mux.HandleFunc("GET /research/help", serveFile("static/research-help.html"))
 	mux.HandleFunc("GET /debug/reddit-import", s.debugOnly(serveFile("static/reddit-import-debug.html")))
 
 	// Settings pages

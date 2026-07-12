@@ -52,6 +52,7 @@ Design: `docs/feature-reddit-research-import.md`
 - [x] Fix the Reddit import debug harness POST requests to satisfy the authenticated-write CSRF header requirement.
 - [x] Normalize root-relative Reddit comment permalinks in the browser extension before response export.
 - [x] Move the research Reddit-import checkbox onto its own row beneath the main form controls.
+- [x] Add a detailed research help page linked from the capitalized New Research form heading.
 
 
 

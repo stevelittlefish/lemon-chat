@@ -91,7 +91,10 @@ async function showList() {
 
   main.innerHTML = `
     <div class="card research-form">
-      <h2 class="research-form-title">new research</h2>
+      <div class="research-form-heading">
+        <h2 class="research-form-title">New Research</h2>
+        <a class="research-help-link" href="/research/help" target="_blank" rel="noopener noreferrer">help</a>
+      </div>
       <input id="research-title" class="input" type="text" placeholder="title (optional)">
       <textarea id="research-query" class="input textarea" rows="3"
         placeholder="research question or prompt (required if no title)"></textarea>
