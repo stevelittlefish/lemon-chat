@@ -4,10 +4,18 @@
 <body>
   <main>
     <h1>Save Reddit</h1>
-    <label>lemon-chat request bundle<textarea id="request" rows="9" placeholder="Paste request JSON"></textarea></label>
+    <section id="current-page" class="current-page" hidden>
+      <p>This tab is a Reddit page</p>
+      <button id="export-current">Export current page</button>
+    </section>
+    <label>lemon-chat request bundle<textarea id="request" rows="6" placeholder="Paste request JSON"></textarea></label>
     <label>Delay between pages (seconds)<input id="delay" type="number" min="0.5" max="30" step="0.5" value="1.5"></label>
+    <label>Maximum load-more actions per page<input id="max-load-more" type="number" min="0" max="500" step="1" value="5"></label>
     <button id="start" class="primary">Start capture</button>
-    <p id="status">Idle</p>
+    <section id="capture-status" class="capture-status" aria-live="polite">
+      <strong id="status-heading">Ready to capture</strong>
+      <span id="status">Idle</span>
+    </section>
     <progress id="progress" value="0" max="1"></progress>
     <div class="controls"><button id="stop">Stop</button><button id="retry">Retry last</button><button id="skip">Skip current</button></div>
     <button id="export" class="primary" disabled>Export response</button>

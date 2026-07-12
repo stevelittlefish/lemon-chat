@@ -54,6 +54,9 @@ Design: `docs/feature-reddit-research-import.md`
 - [x] Move the research Reddit-import checkbox onto its own row beneath the main form controls.
 - [x] Add a detailed research help page linked from the capitalized New Research form heading.
 - [x] Add the supplied Reddit artwork as the Save Reddit browser extension icon.
+- [x] Improve the Save Reddit extension completion state, add a load-more limit, and support exporting the active Reddit tab.
+- [x] Compact the Save Reddit popup so it fits without an internal scrollbar.
+- [x] Prevent current-page Reddit exports from closing when expansion links navigate the active tab.
 
 
 

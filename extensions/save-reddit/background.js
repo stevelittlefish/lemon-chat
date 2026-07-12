@@ -52,7 +52,9 @@ async function run() {
         tab = await chrome.tabs.create({ url: page.url, active: false });
         current.currentTabId = tab.id;
         await save(current);
-        const result = await capturePage(tab.id, page, current.request.limits);
+        const requestLimit = current.request.limits?.max_expand_actions ?? 500;
+        const limits = { ...(current.request.limits || {}), max_expand_actions: Math.min(requestLimit, current.maxLoadMore ?? 5) };
+        const result = await capturePage(tab.id, page, limits);
         current = await state();
         if (current.stopRequested) current.results.push(failedPage(page, 'Capture stopped by user'));
         else if (current.skipRequested) current.results.push(failedPage(page, 'Skipped by user'));
@@ -80,7 +82,11 @@ async function run() {
         current.index += 1;
       }
     }
-    if (current.index >= current.request.pages.length) current.status = 'complete';
+    if (!current.stopRequested && current.index >= current.request.pages.length) {
+      current.status = 'complete';
+      await chrome.action.setBadgeBackgroundColor({ color: '#5c7a3e' });
+      await chrome.action.setBadgeText({ text: 'Done' });
+    }
   } finally {
     current.running = false;
     await save(current);
@@ -99,10 +105,12 @@ function failedPage(page, failure) {
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   (async () => {
     if (message.type === 'start') {
+      await chrome.action.setBadgeText({ text: '' });
       await save({
         status: 'queued', running: false, stopRequested: false, skipRequested: false,
         request: message.request, results: [], index: 0,
         delayMs: Math.max(500, Math.min(30000, message.delayMs || 1500)),
+        maxLoadMore: Math.max(0, Math.min(500, message.maxLoadMore ?? 5)),
       });
       run();
     } else if (message.type === 'stop') {

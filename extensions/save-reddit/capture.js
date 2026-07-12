@@ -26,12 +26,14 @@ function absoluteURL(raw) {
 
 async function expandAndScroll(limits, warnings) {
   const deadline = Date.now() + Math.min(300, limits.max_seconds_per_page || 300) * 1000;
-  const maxActions = Math.min(500, limits.max_expand_actions || 500);
+  const maxActions = Math.max(0, Math.min(500, limits.max_expand_actions ?? 500));
   let actions = 0;
   while (actions < maxActions && Date.now() < deadline) {
     const buttons = all('button', 'a').filter((el) => {
       const label = `${text(el)} ${attr(el, 'aria-label')}`.toLowerCase();
-      return /more replies|continue this thread|view more comments|load more comments/.test(label) && el.offsetParent !== null;
+      const href = attr(el, 'href');
+      const navigates = el.tagName === 'A' && href && !href.startsWith('#') && !href.toLowerCase().startsWith('javascript:');
+      return /more replies|continue this thread|view more comments|load more comments/.test(label) && !navigates && el.offsetParent !== null;
     });
     if (!buttons.length) break;
     for (const button of buttons.slice(0, maxActions - actions)) {

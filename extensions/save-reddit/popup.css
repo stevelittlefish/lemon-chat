@@ -1,14 +1,21 @@
 :root { color-scheme: light; font-family: system-ui, sans-serif; color: #1b1814; background: #fbf7ec; }
 body { margin: 0; width: 380px; }
-main { display: grid; gap: 12px; padding: 16px; }
+[hidden] { display: none !important; }
+main { display: grid; gap: 10px; padding: 14px 16px; }
 h1 { margin: 0; font-family: Georgia, serif; font-size: 24px; }
+section p { margin: 0; }
 label { display: grid; gap: 5px; font-size: 13px; font-weight: 600; }
-textarea, input { box-sizing: border-box; width: 100%; padding: 8px; border: 1px solid #d6cdb7; border-radius: 5px; background: #fffcf4; color: #1b1814; }
+textarea, input { box-sizing: border-box; width: 100%; padding: 7px 8px; border: 1px solid #d6cdb7; border-radius: 5px; background: #fffcf4; color: #1b1814; }
 textarea { resize: vertical; font-family: ui-monospace, monospace; font-size: 11px; }
-button { padding: 8px 11px; border: 1px solid #b5ab97; border-radius: 4px; background: #fffcf4; color: #1b1814; cursor: pointer; }
+button { padding: 7px 11px; border: 1px solid #b5ab97; border-radius: 4px; background: #fffcf4; color: #1b1814; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }
-.primary { background: #f7d84a; border-color: #f5c518; }
+.primary, #export-current { background: #f7d84a; border-color: #f5c518; }
+.current-page { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 10px; border: 1px solid #d6cdb7; border-radius: 5px; background: #fffcf4; font-size: 12px; }
+.capture-status { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid #d6cdb7; border-radius: 5px; background: #fffcf4; }
+.capture-status strong { font-size: 15px; }
+.capture-status.complete { border-color: #5c7a3e; background: #edf3e5; }
+.capture-status.complete strong { color: #385120; }
 .controls { display: flex; gap: 8px; }
-#status, #error { margin: 0; font-size: 12px; }
+#status, #error { margin: 0; font-size: 12px; white-space: pre-wrap; }
 #error { color: #7e2310; white-space: pre-wrap; }
 progress { width: 100%; accent-color: #5c7a3e; }

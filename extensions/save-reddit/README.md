@@ -5,6 +5,12 @@ for the user-assisted research import flow. It uses the browser's existing
 Reddit session, processes pages sequentially, and exports JSON only when the
 user explicitly clicks **Export response**.
 
+The popup's load-more limit controls how many visible comment expansion links
+are clicked on each page and defaults to 5. When the active tab is a supported
+Reddit page, **Export current page** captures it without requiring a request
+bundle. Batch completion is shown in the popup and with a green **Done** badge
+on the extension icon.
+
 ## Install for development
 
 1. Open `chrome://extensions` (or the equivalent Chromium extensions page).
