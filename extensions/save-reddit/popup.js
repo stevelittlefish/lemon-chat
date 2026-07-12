@@ -14,9 +14,15 @@ function loadMoreLimit() {
   return value;
 }
 
-async function downloadResponse(response) {
+function safeFilenameStem(name, fallback) {
+  const stem = String(name || '').toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+  return stem || fallback;
+}
+
+async function downloadResponse(response, name = '') {
   const url = URL.createObjectURL(new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' }));
-  await chrome.downloads.download({ url, filename: `reddit-import-${response.request_id}.json`, saveAs: true });
+  const stem = safeFilenameStem(name, `reddit-import-${response.request_id}`);
+  await chrome.downloads.download({ url, filename: `${stem}.json`, saveAs: true });
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
@@ -69,7 +75,7 @@ $('export').addEventListener('click', async () => {
     captured_at: new Date().toISOString(),
     pages: current.results,
   };
-  await downloadResponse(response);
+  await downloadResponse(response, current.request.name);
 });
 
 $('export-current').addEventListener('click', async () => {

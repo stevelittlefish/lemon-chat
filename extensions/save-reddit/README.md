@@ -9,7 +9,8 @@ The popup's load-more limit controls how many visible comment expansion links
 are clicked on each page and defaults to 5. When the active tab is a supported
 Reddit page, **Export current page** captures it without requiring a request
 bundle. Batch completion is shown in the popup and with a green **Done** badge
-on the extension icon.
+on the extension icon. For research bundles that contain a `name`, the exported
+response defaults to `<name>.json`, matching the research slug and round.
 
 ## Install for development
 

@@ -3,6 +3,18 @@ package research
 // Prompts ported verbatim from the deep research spec (docs/deep_research_spec.html).
 // The algorithm is modelled on Alibaba's IterResearch / Tongyi DeepResearch approach.
 
+const slugPrompt = `Create a short filename slug for this research job.
+
+**Research title or question:** %s
+
+Return ONLY a descriptive slug with these constraints:
+- 2-4 meaningful words
+- lowercase ASCII letters, digits, and underscores only
+- 32 characters maximum
+- no generic words such as research, report, investigate, or analysis
+
+Example: house_building_limited_res`
+
 const researchPlanPrompt = `You are a research strategist. Before searching, analyze this question and create a research plan.
 
 **Question:** %s

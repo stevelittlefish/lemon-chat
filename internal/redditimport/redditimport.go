@@ -17,6 +17,7 @@ import (
 const SchemaVersion = 1
 
 const (
+	MaxRequestName   = 40
 	MaxPages         = 25
 	MaxComments      = 2000
 	MaxBodyChars     = 100_000
@@ -38,6 +39,7 @@ var (
 type Request struct {
 	Version   int             `json:"version"`
 	RequestID string          `json:"request_id"`
+	Name      string          `json:"name,omitempty"`
 	Pages     []RequestedPage `json:"pages"`
 	Limits    CaptureLimits   `json:"limits"`
 }
@@ -172,6 +174,25 @@ func NewRequest(requestID string, pages []RequestedPage, limits CaptureLimits) (
 		limits.MaxExpandActions = MaxExpandActions
 	}
 	return Request{Version: SchemaVersion, RequestID: requestID, Pages: out, Limits: limits}, nil
+}
+
+// SetRequestName adds the human-readable filename stem used by the browser
+// extension. RequestID remains the opaque value used for response matching.
+func SetRequestName(req *Request, name string) {
+	name = strings.Trim(strings.ToLower(strings.TrimSpace(name)), "_")
+	if len(name) > MaxRequestName {
+		name = strings.TrimRight(name[:MaxRequestName], "_")
+	}
+	valid := name != ""
+	for _, r := range name {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
+			valid = false
+			break
+		}
+	}
+	if valid {
+		req.Name = name
+	}
 }
 
 // ValidateAndNormalize validates a response against its request and returns

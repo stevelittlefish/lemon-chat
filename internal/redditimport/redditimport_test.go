@@ -68,6 +68,18 @@ func TestNewRequestGroupsThreads(t *testing.T) {
 	}
 }
 
+func TestSetRequestName(t *testing.T) {
+	req := Request{}
+	SetRequestName(&req, "House_Building_2")
+	if req.Name != "house_building_2" {
+		t.Fatalf("request name = %q", req.Name)
+	}
+	SetRequestName(&req, "../../unsafe name")
+	if req.Name != "house_building_2" {
+		t.Fatalf("invalid name replaced valid request name: %q", req.Name)
+	}
+}
+
 func TestValidateAndNormalize(t *testing.T) {
 	req, err := NewRequest("request-1", []RequestedPage{{URL: "https://reddit.com/r/test/comments/abc123/topic/", Title: "Search title"}}, CaptureLimits{MaxComments: 100})
 	if err != nil {

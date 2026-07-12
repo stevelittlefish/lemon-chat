@@ -402,7 +402,8 @@ function wireRedditWaitingPanel(id, job) {
     }
   });
   document.getElementById('reddit-download-request').addEventListener('click', () => {
-    downloadFile(`reddit-request-${job.reddit_request.request_id}.json`, 'application/json', requestText);
+    const name = job.reddit_request.name || `reddit-request-${job.reddit_request.request_id}`;
+    downloadFile(`${name}.json`, 'application/json', requestText);
   });
   document.getElementById('reddit-response-file').addEventListener('change', async (event) => {
     const [file] = event.target.files;

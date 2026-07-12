@@ -221,6 +221,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	}
 	cfg := research.Config{
 		Query:                 llmQuery,
+		SlugSource:            llmQuery,
 		Model:                 job.Model,
 		Mode:                  job.Mode,
 		ForceSearch:           job.ForceSearch,
@@ -241,6 +242,9 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		SynthesisWindow:       rc.SynthesisWindow,
 		ExtraRounds:           extraRounds,
 	}
+	if job.Title != nil && *job.Title != "" {
+		cfg.SlugSource = *job.Title
+	}
 	cfg.OnRedditPause = func(pending research.PendingRedditRound) error {
 		body, err := json.Marshal(pending)
 		if err != nil {
@@ -251,7 +255,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	cfg.OnRedditRoundComplete = func(st research.State) error {
 		findings, queries, urls := research.MarshalState(st)
 		return s.store.CompleteResearchRedditRound(job.ID, st.Round, st.EmptyRounds, st.ElapsedMS,
-			st.Category, st.Plan, st.Report, findings, queries, urls)
+			st.Category, st.Slug, st.Plan, st.Report, findings, queries, urls)
 	}
 	if job.PendingRedditRound != nil && (job.RedditResponse != nil || job.RedditSkipped) {
 		var pending research.PendingRedditRound
@@ -277,7 +281,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	}
 
 	state := research.UnmarshalState(job.Round, job.EmptyRounds, job.ElapsedMS,
-		job.Category, job.Plan, job.Report, job.Findings, job.QueriesUsed, job.AnalyzedURLs)
+		job.Category, job.Slug, job.Plan, job.Report, job.Findings, job.QueriesUsed, job.AnalyzedURLs)
 
 	lastPhase := ""
 	onProgress := func(p research.Progress) {
@@ -299,7 +303,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	onCheckpoint := func(st research.State) {
 		findings, queries, urls := research.MarshalState(st)
 		if err := s.store.CheckpointResearchJob(job.ID, st.Round, st.EmptyRounds, st.ElapsedMS,
-			st.Category, st.Plan, st.Report, findings, queries, urls); err != nil {
+			st.Category, st.Slug, st.Plan, st.Report, findings, queries, urls); err != nil {
 			log.Printf("research: job %d: checkpoint: %v", job.ID, err)
 		}
 	}

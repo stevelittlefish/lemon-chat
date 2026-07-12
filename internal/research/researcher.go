@@ -23,6 +23,7 @@ import (
 // Per-phase LLM timeouts (spec §5).
 const (
 	planningTimeout   = 90 * time.Second
+	maxSlugLength     = 32
 	classifyTimeout   = 15 * time.Second
 	queryTimeout      = 120 * time.Second
 	extractionTimeout = 90 * time.Second
@@ -75,6 +76,7 @@ type State struct {
 	EmptyRounds  int           `json:"empty_rounds"`
 	ElapsedMS    int64         `json:"elapsed_ms"`
 	Category     string        `json:"category"`
+	Slug         string        `json:"slug"`
 	Plan         string        `json:"plan"`
 	Report       string        `json:"report"`
 	Findings     []Finding     `json:"findings"`
@@ -85,9 +87,10 @@ type State struct {
 // Config carries everything a run needs; all tuning parameters come from the
 // [research] section of lemon.toml.
 type Config struct {
-	Query string
-	Model string
-	Mode  string // ModeResearch (default) or ModeBrainstorm
+	Query      string
+	SlugSource string
+	Model      string
+	Mode       string // ModeResearch (default) or ModeBrainstorm
 	// ForceSearch (brainstorm only) guarantees at least one web search: the
 	// first round must produce a query rather than leaving it to the model.
 	ForceSearch bool
@@ -209,6 +212,12 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 
 	// Phases 1–2 only run before the first round (fresh job, or a job that
 	// crashed before completing round 1 with no plan persisted).
+	if r.state.Round == 0 && r.state.Slug == "" {
+		r.state.Slug = r.generateSlug(ctx)
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+	}
 	if r.state.Round == 0 && r.state.Plan == "" {
 		r.progress(Progress{Phase: "planning"})
 		r.state.Plan = r.plan(ctx)
@@ -504,6 +513,49 @@ func (r *Researcher) runRound(ctx context.Context, round, creativity int) (keepG
 
 // ── Phase 1: Plan ────────────────────────────────────────────
 
+func (r *Researcher) generateSlug(ctx context.Context) string {
+	source := strings.TrimSpace(r.cfg.SlugSource)
+	if source == "" {
+		source = r.cfg.Query
+	}
+	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(slugPrompt, source)}}, 0.2, 64, planningTimeout)
+	if err == nil {
+		if slug := normalizeSlug(out); slug != "" {
+			return slug
+		}
+	}
+	if err != nil {
+		r.progress(Progress{Phase: "warning", Message: "research name generation failed: " + err.Error()})
+	}
+	if slug := normalizeSlug(source); slug != "" {
+		return slug
+	}
+	return "research_job"
+}
+
+func normalizeSlug(value string) string {
+	value = strings.ToLower(stripToolCalls(value))
+	var b strings.Builder
+	underscore := false
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			if underscore && b.Len() > 0 {
+				b.WriteByte('_')
+			}
+			underscore = false
+			if b.Len() < maxSlugLength {
+				b.WriteRune(r)
+			}
+		} else {
+			underscore = true
+		}
+		if b.Len() >= maxSlugLength {
+			break
+		}
+	}
+	return strings.TrimRight(b.String(), "_")
+}
+
 func (r *Researcher) plan(ctx context.Context) string {
 	if r.brainstorm() {
 		prompt := currentDateContext(r.cfg.Location) + fmt.Sprintf(brainstormPlanPrompt, r.cfg.Query)
@@ -715,6 +767,7 @@ func (r *Researcher) pauseForReddit(round, creativity int, queries []string, url
 	if err != nil {
 		return nil, err
 	}
+	redditimport.SetRequestName(&req, fmt.Sprintf("%s_%d", r.state.Slug, round))
 	r.checkpoint()
 	pending := PendingRedditRound{
 		Round: round, Creativity: creativity, Queries: append([]string(nil), queries...),
@@ -1250,10 +1303,13 @@ func MarshalState(st State) (findings, queries, urls string) {
 // UnmarshalState rebuilds a State from persisted job columns. Nil pointers
 // and invalid JSON yield empty slices, so a partially persisted job still
 // resumes cleanly.
-func UnmarshalState(round, emptyRounds int, elapsedMS int64, category, plan, report, findings, queries, urls *string) State {
+func UnmarshalState(round, emptyRounds int, elapsedMS int64, category, slug, plan, report, findings, queries, urls *string) State {
 	st := State{Round: round, EmptyRounds: emptyRounds, ElapsedMS: elapsedMS}
 	if category != nil {
 		st.Category = *category
+	}
+	if slug != nil {
+		st.Slug = *slug
 	}
 	if plan != nil {
 		st.Plan = *plan

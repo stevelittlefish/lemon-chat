@@ -394,6 +394,7 @@ func TestStateRoundTrip(t *testing.T) {
 		EmptyRounds:  1,
 		ElapsedMS:    1234,
 		Category:     "howto",
+		Slug:         "house_building",
 		Plan:         "the plan",
 		Report:       "the report",
 		Findings:     []Finding{{URL: "https://a", Title: "A", Summary: "s"}},
@@ -401,14 +402,29 @@ func TestStateRoundTrip(t *testing.T) {
 		AnalyzedURLs: []AnalyzedURL{{URL: "https://a", Title: "A"}},
 	}
 	findings, queries, urls := MarshalState(st)
-	got := UnmarshalState(st.Round, st.EmptyRounds, st.ElapsedMS, &st.Category, &st.Plan, &st.Report, &findings, &queries, &urls)
-	if got.Round != 3 || got.Category != "howto" || len(got.Findings) != 1 || len(got.QueriesUsed) != 2 || got.Findings[0].URL != "https://a" {
+	got := UnmarshalState(st.Round, st.EmptyRounds, st.ElapsedMS, &st.Category, &st.Slug, &st.Plan, &st.Report, &findings, &queries, &urls)
+	if got.Round != 3 || got.Category != "howto" || got.Slug != "house_building" || len(got.Findings) != 1 || len(got.QueriesUsed) != 2 || got.Findings[0].URL != "https://a" {
 		t.Errorf("round trip mismatch: %+v", got)
 	}
 
 	// Nil pointers (fresh job) must yield a clean zero state.
-	zero := UnmarshalState(0, 0, 0, nil, nil, nil, nil, nil, nil)
+	zero := UnmarshalState(0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
 	if zero.Round != 0 || zero.Findings != nil || zero.Plan != "" {
 		t.Errorf("zero state mismatch: %+v", zero)
+	}
+}
+
+func TestNormalizeSlug(t *testing.T) {
+	for _, tt := range []struct {
+		input string
+		want  string
+	}{
+		{"House Building: Limited Resources", "house_building_limited_resources"},
+		{"  UK energy / costs 2026  ", "uk_energy_costs_2026"},
+		{"abcdefghijklmnopqrstuvwxyz 123456789", "abcdefghijklmnopqrstuvwxyz_12345"},
+	} {
+		if got := normalizeSlug(tt.input); got != tt.want {
+			t.Errorf("normalizeSlug(%q) = %q, want %q", tt.input, got, tt.want)
+		}
 	}
 }

@@ -46,6 +46,7 @@ type ResearchJob struct {
 	EmptyRounds    int     `json:"empty_rounds"`
 	ElapsedMS      int64   `json:"elapsed_ms"`
 	Category       *string `json:"category"`
+	Slug           *string `json:"slug"`
 	Plan           *string `json:"plan"`
 	Report         *string `json:"report"`
 	FinalReport    *string `json:"final_report"`
@@ -67,12 +68,12 @@ type ResearchJob struct {
 }
 
 const researchJobCols = `id, user_id, title, query, model, mode, force_search, deep_report, pause_reddit_import, status, phase, effort, max_time_seconds, round, empty_rounds, elapsed_ms,
-	category, plan, report, final_report, findings, queries_used, analyzed_urls, reddit_request_id, pending_reddit_round, reddit_response, reddit_skipped, error, created_at, updated_at`
+	category, slug, plan, report, final_report, findings, queries_used, analyzed_urls, reddit_request_id, pending_reddit_round, reddit_response, reddit_skipped, error, created_at, updated_at`
 
 func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) {
 	var j ResearchJob
 	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Mode, &j.ForceSearch, &j.DeepReport, &j.PauseRedditImport, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.Round, &j.EmptyRounds, &j.ElapsedMS,
-		&j.Category, &j.Plan, &j.Report, &j.FinalReport, &j.Findings, &j.QueriesUsed, &j.AnalyzedURLs, &j.RedditRequestID, &j.PendingRedditRound, &j.RedditResponse, &j.RedditSkipped, &j.Error, &j.CreatedAt, &j.UpdatedAt)
+		&j.Category, &j.Slug, &j.Plan, &j.Report, &j.FinalReport, &j.Findings, &j.QueriesUsed, &j.AnalyzedURLs, &j.RedditRequestID, &j.PendingRedditRound, &j.RedditResponse, &j.RedditSkipped, &j.Error, &j.CreatedAt, &j.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -162,11 +163,11 @@ func (s *Store) UpdateResearchJobPhase(id int64, status, phase string) error {
 // CheckpointResearchJob persists the full engine state so the job can be
 // resumed from this point if the server stops. Called after planning,
 // classification, and at the end of every round.
-func (s *Store) CheckpointResearchJob(id int64, round, emptyRounds int, elapsedMS int64, category, plan, report, findings, queriesUsed, analyzedURLs string) error {
+func (s *Store) CheckpointResearchJob(id int64, round, emptyRounds int, elapsedMS int64, category, slug, plan, report, findings, queriesUsed, analyzedURLs string) error {
 	_, err := s.db.Exec(
-		`UPDATE research_job SET round = ?, empty_rounds = ?, elapsed_ms = ?, category = ?, plan = ?,
+		`UPDATE research_job SET round = ?, empty_rounds = ?, elapsed_ms = ?, category = ?, slug = ?, plan = ?,
 		 report = ?, findings = ?, queries_used = ?, analyzed_urls = ?, updated_at = ? WHERE id = ?`,
-		round, emptyRounds, elapsedMS, category, plan, report, findings, queriesUsed, analyzedURLs, now(), id)
+		round, emptyRounds, elapsedMS, category, slug, plan, report, findings, queriesUsed, analyzedURLs, now(), id)
 	return err
 }
 
@@ -211,11 +212,11 @@ func (s *Store) ClearResearchRedditState(id int64) error {
 
 // CompleteResearchRedditRound atomically checkpoints the merged round and
 // clears its handoff so it cannot be merged twice after a restart.
-func (s *Store) CompleteResearchRedditRound(id int64, round, emptyRounds int, elapsedMS int64, category, plan, report, findings, queriesUsed, analyzedURLs string) error {
-	_, err := s.db.Exec(`UPDATE research_job SET round = ?, empty_rounds = ?, elapsed_ms = ?, category = ?, plan = ?,
+func (s *Store) CompleteResearchRedditRound(id int64, round, emptyRounds int, elapsedMS int64, category, slug, plan, report, findings, queriesUsed, analyzedURLs string) error {
+	_, err := s.db.Exec(`UPDATE research_job SET round = ?, empty_rounds = ?, elapsed_ms = ?, category = ?, slug = ?, plan = ?,
 		report = ?, findings = ?, queries_used = ?, analyzed_urls = ?, reddit_request_id = NULL,
 		pending_reddit_round = NULL, reddit_response = NULL, reddit_skipped = 0, updated_at = ? WHERE id = ?`,
-		round, emptyRounds, elapsedMS, category, plan, report, findings, queriesUsed, analyzedURLs, now(), id)
+		round, emptyRounds, elapsedMS, category, slug, plan, report, findings, queriesUsed, analyzedURLs, now(), id)
 	return err
 }
 

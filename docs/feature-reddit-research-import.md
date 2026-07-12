@@ -22,7 +22,9 @@ to lemon-chat.
    goroutine remains blocked, and waiting time does not consume the job's time
    budget.
 4. The research panel presents a versioned request bundle containing a stable
-   request ID and the canonical Reddit URLs.
+   request ID, a human-readable `<research_slug>_<round>` name, and the
+   canonical Reddit URLs. The opaque ID remains the value used for response
+   matching; the name becomes the default request and response filename.
 5. The user gives the bundle to the Save Reddit browser extension. The
    extension visits the URLs sequentially using the user's normal browser
    session, extracts rendered posts and comments, and produces a response

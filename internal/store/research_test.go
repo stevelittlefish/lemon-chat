@@ -79,19 +79,19 @@ func TestResearchRedditPauseAndResumeIsDurableAndIdempotent(t *testing.T) {
 	if len(recovered) != 1 || recovered[0].ID != job.ID || recovered[0].RedditResponse == nil {
 		t.Fatalf("accepted import was not restart-resumable: %+v", recovered)
 	}
-	if err := s.CompleteResearchRedditRound(job.ID, 2, 0, 1500, "factcheck", "plan", "report", `[]`, `["query"]`, `[]`); err != nil {
+	if err := s.CompleteResearchRedditRound(job.ID, 2, 0, 1500, "factcheck", "short_name", "plan", "report", `[]`, `["query"]`, `[]`); err != nil {
 		t.Fatal(err)
 	}
 	completed, err := s.GetResearchJob(job.ID, user.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if completed.Round != 2 || completed.Report == nil || *completed.Report != "report" || completed.RedditRequestID != nil || completed.PendingRedditRound != nil || completed.RedditResponse != nil || completed.RedditSkipped {
+	if completed.Round != 2 || completed.Slug == nil || *completed.Slug != "short_name" || completed.Report == nil || *completed.Report != "report" || completed.RedditRequestID != nil || completed.PendingRedditRound != nil || completed.RedditResponse != nil || completed.RedditSkipped {
 		t.Fatalf("completed Reddit round was not atomically checkpointed and cleared: %+v", completed)
 	}
 }
 
-func TestMigrationV31PreservesExistingResearchData(t *testing.T) {
+func TestMigrationsV31AndV32PreserveExistingResearchData(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "v30.db")
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -152,8 +152,8 @@ func TestMigrationV31PreservesExistingResearchData(t *testing.T) {
 		t.Fatalf("new Reddit state was not safely defaulted: %+v", job)
 	}
 	var version int
-	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 31 {
-		t.Fatalf("schema version = %d, err=%v; want 31", version, err)
+	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 32 {
+		t.Fatalf("schema version = %d, err=%v; want 32", version, err)
 	}
 	var violations int
 	rows, err := s.db.Query(`PRAGMA foreign_key_check`)

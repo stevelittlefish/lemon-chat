@@ -59,7 +59,7 @@ $('download-request').addEventListener('click', () => {
   const blob = new Blob([$('request').value], { type: 'application/json' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `reddit-import-${currentRequest?.request_id || 'request'}.json`;
+  link.download = `${currentRequest?.name || `reddit-import-${currentRequest?.request_id || 'request'}`}.json`;
   link.click();
   URL.revokeObjectURL(link.href);
 });
