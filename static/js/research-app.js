@@ -478,7 +478,10 @@ async function showRemix(jobID, remixID) {
   const label = remix.direction || 'Designed report';
   main.innerHTML = `<div class="remix-view-header">
     <div><p class="eyebrow">Report remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(remix.model)} · ${formatDate(remix.created_at)}</p></div>
-    <button id="remix-download" class="btn btn-sm btn-secondary">download .html</button>
+    <div class="remix-view-actions">
+      <button id="remix-download" class="btn btn-sm btn-secondary">download .html</button>
+      <a class="btn btn-sm btn-secondary" href="/api/research/${jobID}/remixes/${remixID}/document" target="_blank" rel="noopener noreferrer">open in new tab</a>
+    </div>
   </div>
   <iframe class="remix-document" title="${escapeHtml(label)}" sandbox src="/api/research/${jobID}/remixes/${remixID}/document"></iframe>`;
   document.getElementById('remix-download').addEventListener('click', () => {
