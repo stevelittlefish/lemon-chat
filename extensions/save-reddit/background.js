@@ -1,4 +1,5 @@
 const STATE_KEY = 'captureState';
+const CLEAR_DONE_BADGE_ALARM = 'clearDoneBadge';
 
 async function state() {
   return (await chrome.storage.local.get(STATE_KEY))[STATE_KEY] || { status: 'idle' };
@@ -86,6 +87,7 @@ async function run() {
       current.status = 'complete';
       await chrome.action.setBadgeBackgroundColor({ color: '#5c7a3e' });
       await chrome.action.setBadgeText({ text: 'Done' });
+      await chrome.alarms.create(CLEAR_DONE_BADGE_ALARM, { delayInMinutes: 1 });
     }
   } finally {
     current.running = false;
@@ -105,6 +107,7 @@ function failedPage(page, failure) {
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   (async () => {
     if (message.type === 'start') {
+      await chrome.alarms.clear(CLEAR_DONE_BADGE_ALARM);
       await chrome.action.setBadgeText({ text: '' });
       await save({
         status: 'queued', running: false, stopRequested: false, skipRequested: false,
@@ -133,4 +136,8 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     respond({ ok: true });
   })();
   return true;
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === CLEAR_DONE_BADGE_ALARM) chrome.action.setBadgeText({ text: '' });
 });

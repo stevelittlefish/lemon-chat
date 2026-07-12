@@ -21,8 +21,8 @@ function safeFilenameStem(name, fallback) {
 
 async function downloadResponse(response, name = '') {
   const url = URL.createObjectURL(new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' }));
-  const stem = safeFilenameStem(name, `reddit-import-${response.request_id}`);
-  await chrome.downloads.download({ url, filename: `${stem}.json`, saveAs: true });
+  const stem = safeFilenameStem(name, `import-${response.request_id}`);
+  await chrome.downloads.download({ url, filename: `reddit_${stem}.json`, saveAs: true });
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
