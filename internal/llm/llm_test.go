@@ -86,6 +86,32 @@ func TestChatComplete(t *testing.T) {
 	}
 }
 
+func TestChatCompleteStream(t *testing.T) {
+	var gotPayload map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&gotPayload)
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"hello \"}}]}\n\n"))
+		w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"world\"}}]}\n\n"))
+		w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer srv.Close()
+
+	var deltas []string
+	content, err := ChatCompleteStream(context.Background(), http.DefaultClient, srv.URL, "", "test-model",
+		[]Message{{Role: "user", Content: "hi"}}, map[string]any{"max_tokens": 20},
+		func(delta string) { deltas = append(deltas, delta) })
+	if err != nil {
+		t.Fatalf("ChatCompleteStream returned error: %v", err)
+	}
+	if content != "hello world" || strings.Join(deltas, "") != content {
+		t.Fatalf("content = %q, deltas = %v", content, deltas)
+	}
+	if gotPayload["stream"] != true {
+		t.Fatalf("payload stream = %v, want true", gotPayload["stream"])
+	}
+}
+
 func TestChatCompleteNoAuthWhenKeyEmpty(t *testing.T) {
 	var gotAuth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

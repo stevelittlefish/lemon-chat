@@ -20,6 +20,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [x] Stream remix generation progress over SSE and make the remix form's submitted state visibly disabled and non-interactive.
+
 - [x] Refine the completed-report header: separate actions from metadata, reduce action-label clutter, and remove the empty remix shelf's dead space.
 
 - [x] Add report remixes: generate and save any number of polished standalone HTML presentations from a completed report, with model selection, optional art direction, and report-page navigation.

@@ -110,3 +110,59 @@ func ChatComplete(ctx context.Context, client *http.Client, chatURL, apiKey, mod
 	}
 	return result.Choices[0].Message.Content, nil
 }
+
+// ChatCompleteStream makes a streaming chat-completion request. It returns the
+// complete generated content and invokes onDelta for each non-empty text delta.
+func ChatCompleteStream(ctx context.Context, client *http.Client, chatURL, apiKey, model string, messages any, extra map[string]any, onDelta func(string)) (string, error) {
+	body := map[string]any{
+		"model":    model,
+		"messages": messages,
+		"stream":   true,
+	}
+	for k, v := range extra {
+		body[k] = v
+	}
+	payload, _ := json.Marshal(body)
+	req, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("model request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return "", fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
+	}
+	var full strings.Builder
+	err = ScanSSE(resp.Body, func(data string) error {
+		var chunk struct {
+			Choices []struct {
+				Delta struct {
+					Content string `json:"content"`
+				} `json:"delta"`
+			} `json:"choices"`
+		}
+		if json.Unmarshal([]byte(data), &chunk) != nil || len(chunk.Choices) == 0 {
+			return nil
+		}
+		delta := chunk.Choices[0].Delta.Content
+		if delta != "" {
+			full.WriteString(delta)
+			if onDelta != nil {
+				onDelta(delta)
+			}
+		}
+		return nil
+	})
+	if err != nil && full.Len() == 0 {
+		return "", fmt.Errorf("stream read failed: %w", err)
+	}
+	return full.String(), nil
+}

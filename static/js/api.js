@@ -201,7 +201,25 @@ export const research = {
   list: () => request('GET', '/api/research'),
   defaults: () => request('GET', '/api/research/defaults'),
   get: (id) => request('GET', `/api/research/${id}`),
-  createRemix: (id, model, direction) => request('POST', `/api/research/${id}/remixes`, { model, direction }),
+  createRemix: (id, model, direction, { onEvent, onDone, onError }) => {
+    const ctrl = new AbortController();
+    fetch(`/api/research/${id}/remixes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ model, direction }),
+      signal: ctrl.signal,
+    }).then(async (res) => {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        onError?.(new Error(data.error || res.statusText));
+        return;
+      }
+      await consumeSSE(res, (ev) => { onEvent?.(ev); }, onDone);
+    }).catch((err) => {
+      if (err.name !== 'AbortError') onError?.(err);
+    });
+    return () => ctrl.abort();
+  },
   getRemix: (id, remixId) => request('GET', `/api/research/${id}/remixes/${remixId}`),
   start: (title, query, model, mode, forceSearch, deepReport, pauseRedditImport, effort, maxTimeMinutes) =>
     request('POST', '/api/research', {

@@ -411,27 +411,62 @@ async function showRemixForm(jobID) {
     <p class="remix-intro">The model will redesign <strong>${escapeHtml(job.title || job.query)}</strong> as a self-contained HTML document, using diagrams and visual structure where they help.</p>
     <label class="remix-field">Model<select id="remix-model" class="input">${options}</select></label>
     <label class="remix-field">Optional direction<textarea id="remix-direction" class="input textarea" rows="5" maxlength="2000" placeholder="For example: use earthy greens and browns, with simple typography"></textarea></label>
+    <div id="remix-progress" class="remix-progress" hidden aria-live="polite">
+      <div class="remix-progress-heading"><span id="remix-progress-label">Preparing document</span><span id="remix-progress-count"></span></div>
+      <div id="remix-progress-preview" class="remix-progress-preview"></div>
+    </div>
     <div id="remix-error"></div>
     <div class="remix-form-actions">
       <a class="btn btn-secondary" href="#${jobID}">cancel</a>
       <button id="remix-go" class="btn btn-primary">create remix</button>
     </div>
   </section>`;
-  document.getElementById('remix-go').addEventListener('click', async () => {
+  document.getElementById('remix-go').addEventListener('click', () => {
     const btn = document.getElementById('remix-go');
     const error = document.getElementById('remix-error');
-    btn.disabled = true;
+    const model = document.getElementById('remix-model');
+    const direction = document.getElementById('remix-direction');
+    const progress = document.getElementById('remix-progress');
+    const progressLabel = document.getElementById('remix-progress-label');
+    const progressCount = document.getElementById('remix-progress-count');
+    const progressPreview = document.getElementById('remix-progress-preview');
+    btn.setAttribute('disabled', '');
+    btn.setAttribute('aria-busy', 'true');
+    model.disabled = true;
+    direction.disabled = true;
     btn.textContent = 'designing document…';
     error.innerHTML = '';
-    try {
-      const remix = await research.createRemix(jobID, document.getElementById('remix-model').value,
-        document.getElementById('remix-direction').value.trim());
-      location.hash = `${jobID}/remix/${remix.id}`;
-    } catch (err) {
+    progress.hidden = false;
+    let completed = false;
+    const reset = (err) => {
       error.innerHTML = `<div class="research-error">${escapeHtml(err.message)}</div>`;
-      btn.disabled = false;
+      btn.removeAttribute('disabled');
+      btn.removeAttribute('aria-busy');
+      model.disabled = false;
+      direction.disabled = false;
       btn.textContent = 'create remix';
-    }
+    };
+    research.createRemix(jobID, model.value, direction.value.trim(), {
+      onEvent: (ev) => {
+        if (ev.error) { reset(new Error(ev.error)); return; }
+        if (ev.phase === 'connecting') progressLabel.textContent = 'Connecting to model';
+        if (ev.phase === 'generating') {
+          progressLabel.textContent = 'Designing document';
+          progressCount.textContent = `${ev.generated.toLocaleString()} characters`;
+          progressPreview.textContent = ev.snippet || '';
+        }
+        if (ev.phase === 'validating') progressLabel.textContent = 'Checking document';
+        if (ev.phase === 'saving') progressLabel.textContent = 'Saving remix';
+        if (ev.phase === 'complete' && ev.remix) {
+          completed = true;
+          location.hash = `${jobID}/remix/${ev.remix.id}`;
+        }
+      },
+      onDone: () => {
+        if (!completed && btn.disabled && !error.textContent) reset(new Error('The remix stream ended before the document was saved.'));
+      },
+      onError: reset,
+    });
   });
 }
 

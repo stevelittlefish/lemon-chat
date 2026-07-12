@@ -271,6 +271,32 @@ html, body {
 .remix-field { display: grid; gap: var(--space-2); font-family: var(--font-mono); font-size: var(--fs-12); color: var(--fg-muted); }
 .remix-form-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
 
+.remix-progress {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+.remix-progress-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--fg-muted);
+}
+.remix-progress-preview {
+  max-height: 96px;
+  margin-top: var(--space-2);
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  line-height: 1.5;
+  color: var(--fg-faint);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .remix-view-header { display: flex; align-items: end; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); }
 .remix-view-header h1 { font-family: var(--font-display); font-size: var(--fs-24); margin: var(--space-1) 0; }
 .remix-view-header p { color: var(--fg-muted); font-size: var(--fs-12); margin: 0; }

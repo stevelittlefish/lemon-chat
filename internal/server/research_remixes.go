@@ -82,25 +82,67 @@ func (s *Server) handleCreateResearchRemix(w http.ResponseWriter, r *http.Reques
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
-	content, err := llm.ChatComplete(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
-		[]llm.Message{{Role: "system", Content: remixSystemPrompt}, {Role: "user", Content: userPrompt}},
-		map[string]any{"temperature": 0.7, "max_tokens": 16384})
-	if err != nil {
-		internalError(w, fmt.Errorf("generate research remix: %w", err))
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming unsupported")
 		return
 	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	writeRemixEvent(w, flusher, map[string]any{"phase": "connecting", "message": "connecting to model"})
+
+	var generated strings.Builder
+	lastProgress := time.Time{}
+	content, err := llm.ChatCompleteStream(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
+		[]llm.Message{{Role: "system", Content: remixSystemPrompt}, {Role: "user", Content: userPrompt}},
+		map[string]any{"temperature": 0.7, "max_tokens": 16384}, func(delta string) {
+			generated.WriteString(delta)
+			if time.Since(lastProgress) < 250*time.Millisecond {
+				return
+			}
+			lastProgress = time.Now()
+			tail := generated.String()
+			if len(tail) > 320 {
+				tail = tail[len(tail)-320:]
+			}
+			writeRemixEvent(w, flusher, map[string]any{"phase": "generating", "generated": generated.Len(), "snippet": tail})
+		})
+	if err != nil {
+		log.Printf("research remix: generation failed job_id=%d user_id=%d: %v", job.ID, user.ID, err)
+		writeRemixEvent(w, flusher, map[string]any{"error": "remix generation failed: " + err.Error()})
+		writeRemixDone(w, flusher)
+		return
+	}
+	writeRemixEvent(w, flusher, map[string]any{"phase": "validating", "message": "checking the HTML document"})
 	html, err := normalizeRemixHTML(content)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
+		writeRemixEvent(w, flusher, map[string]any{"error": err.Error()})
+		writeRemixDone(w, flusher)
 		return
 	}
+	writeRemixEvent(w, flusher, map[string]any{"phase": "saving", "message": "saving remix"})
 	remix, err := s.store.CreateResearchRemix(job.ID, model, req.Direction, html)
 	if err != nil {
-		internalError(w, err)
+		log.Printf("research remix: save failed job_id=%d user_id=%d: %v", job.ID, user.ID, err)
+		writeRemixEvent(w, flusher, map[string]any{"error": "could not save remix"})
+		writeRemixDone(w, flusher)
 		return
 	}
 	logResearchRemix(remix, user.ID)
-	writeJSON(w, http.StatusCreated, remix)
+	writeRemixEvent(w, flusher, map[string]any{"phase": "complete", "remix": remix})
+	writeRemixDone(w, flusher)
+}
+
+func writeRemixEvent(w http.ResponseWriter, flusher http.Flusher, event any) {
+	data, _ := json.Marshal(event)
+	fmt.Fprintf(w, "data: %s\n\n", data)
+	flusher.Flush()
+}
+
+func writeRemixDone(w http.ResponseWriter, flusher http.Flusher) {
+	fmt.Fprint(w, "data: [DONE]\n\n")
+	flusher.Flush()
 }
 
 func normalizeRemixHTML(content string) (string, error) {

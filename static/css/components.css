@@ -63,6 +63,13 @@
   padding: 0; justify-content: center;
 }
 
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  pointer-events: none;
+}
+
 /* -------- Inputs -------- */
 .input {
   font-family: var(--font-sans);
