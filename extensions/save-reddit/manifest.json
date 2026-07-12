@@ -3,6 +3,7 @@
   "name": "Save Reddit for lemon-chat",
   "version": "0.1.0",
   "description": "Captures selected Reddit threads for explicit import into lemon-chat research.",
+  "icons": { "16": "assets/icon-16.png" },
   "permissions": ["downloads", "storage", "tabs"],
   "host_permissions": [
     "https://reddit.com/*",
@@ -12,7 +13,11 @@
     "https://redd.it/*"
   ],
   "background": { "service_worker": "background.js", "type": "module" },
-  "action": { "default_popup": "popup.html", "default_title": "Save Reddit" },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Save Reddit",
+    "default_icon": { "16": "assets/icon-16.png" }
+  },
   "content_scripts": [{
     "matches": [
       "https://reddit.com/*",
