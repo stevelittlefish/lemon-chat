@@ -95,8 +95,9 @@ Fleshing out research so a finished job is an inspectable, reusable artifact —
 - [x] **4. Optional separate model for the HTML report step** (`internal/server/research.go:441`, `internal/config/config.go:23`)
   Default to using the job's model for the whole process, but allow overriding just the HTML-generation model in the start form (and via config default). Thread it through to the auto-remix step from #3.
 
-- [ ] **5. SPIKE: per-phase model configuration** (`internal/research/researcher.go`, `internal/research/llm.go:21`, `internal/config/config.go:23`)
+- [x] **5. SPIKE: per-phase model configuration** (`internal/research/researcher.go`, `internal/research/llm.go:21`, `internal/config/config.go:23`)
   Investigate whether letting a job use different models for different phases is worth it — e.g. a cheap local model for search/extract, a strong model for the final report, another for the HTML. Every phase already routes through `llmCall`/`llmCallStream`, so plumbing a per-phase model is tractable; the question is the config/UI complexity vs. benefit. Write up a recommendation before committing to an implementation.
+  **Recommendation:** `docs/spike-per-phase-model-config.md` — do a two-tier worker/writer split (one optional `worker_model` for the high-volume extraction + mechanical phases, job model for synthesis/report), not a full per-phase matrix.
 
 - [ ] **6. Revamp remix into report regeneration** (`internal/server/research_remixes.go:29`)
   Today remix only reskins the existing `final_report` into HTML and can't recover detail the writer dropped. Extend it to also (a) regenerate a fresh markdown report from the raw `findings`/`report`/`plan` (reusing `finalReport`/`deepReport`), or (b) do both, saving results as new reports on the job. Model is configurable per #4. Depends on the reports refactor (#2).
