@@ -2,6 +2,19 @@ export function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Formats a model's per-token prices as a compact "in / out" rate per 1M
+// tokens, e.g. "$3.00 / $15.00 per 1M". Pass { unit: false } to omit the
+// "per 1M" suffix. Returns '' when the model has no known price.
+export function formatModelRate(model, { unit = true } = {}) {
+  if (model?.prompt_usd == null || model?.completion_usd == null) return '';
+  const per1M = (v) => {
+    const n = v * 1e6;
+    return n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`;
+  };
+  const rate = `${per1M(model.prompt_usd)} / ${per1M(model.completion_usd)}`;
+  return unit ? `${rate} per 1M` : rate;
+}
+
 export async function copyToClipboard(text) {
   if (navigator.clipboard?.writeText) {
     try {

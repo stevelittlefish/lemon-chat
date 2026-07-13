@@ -110,9 +110,11 @@ internal/
     completions.go     # completion queries
     research.go        # research job queries (incl. resume checkpoints)
     attachments.go     # attachment queries
+    prices.go          # cached model per-token price queries
   tasks/
     titles.go          # background title-generation worker
     cleanup.go         # background stale-conversation cleanup worker
+    prices.go          # background daily OpenRouter model-price fetch worker
 static/
   index.html           # main chat app shell
   complete.html        # completions app shell

@@ -1,7 +1,7 @@
 import { render as renderMarkdown } from './markdown.js';
 import { icon } from './icons.js';
 import { messages as msgApi } from './api.js';
-import { copyToClipboard, escapeHtml } from './utils.js';
+import { copyToClipboard, escapeHtml, formatModelRate } from './utils.js';
 import { createModal } from './modal.js';
 
 // ── Artifact panel ───────────────────────────────────────────
@@ -366,12 +366,16 @@ export function showPicker(models, characters, onSelect) {
       </button>`;
   }
 
-  const modelCards = models.map(m => `
+  const modelCards = models.map(m => {
+    const rate = formatModelRate(m, { unit: false });
+    return `
     <button class="picker-card" data-type="model" data-name="${escapeHtml(m.name)}">
       <span class="picker-card-icon">${icon('cpu', 22)}</span>
       <span class="picker-card-name">${escapeHtml(m.display_name)}</span>
+      ${rate ? `<span class="picker-card-price" title="per 1M tokens (input / output)">${rate}</span>` : ''}
     </button>
-  `).join('');
+  `;
+  }).join('');
 
   threadEl.innerHTML = `
     <div class="picker">

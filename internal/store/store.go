@@ -794,6 +794,25 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v37 → v38 complete")
 	}
 
+	if version < 39 {
+		log.Println("store: migrating v38 → v39 (create model_price table)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE model_price (
+				model_id       TEXT PRIMARY KEY,
+				prompt_usd     REAL NOT NULL,
+				completion_usd REAL NOT NULL,
+				updated_at     TEXT NOT NULL
+			);
+		`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (39, ?)`, now()); err != nil {
+			return err
+		}
+		version = 39
+		log.Println("store: migration v38 → v39 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

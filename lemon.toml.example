@@ -42,6 +42,14 @@ api_base = "http://localhost:8000/v1"
 # api_base = "http://remote-host:8000/v1"
 # api_key  = "sk-..."
 
+# Servers whose api_base is on openrouter.ai are detected automatically: a
+# background worker fetches per-token pricing for their models once a day and
+# the UI shows it in the model pickers. No extra config is required.
+# [[model_server]]
+# name     = "openrouter"
+# api_base = "https://openrouter.ai/api/v1"
+# api_key  = "sk-or-..."
+
 [[model]]
 name         = "meta-llama/Llama-3.2-8B-Instruct"
 display_name = "Llama 3.2 8B"

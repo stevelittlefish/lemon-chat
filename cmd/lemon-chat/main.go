@@ -59,6 +59,7 @@ func main() {
 	hub := server.NewHub()
 	tasks.StartTitleWorker(st, cfg, hub.BroadcastTitleUpdate, hub.BroadcastCompletionTitleUpdate)
 	tasks.StartCleanupWorker(st, hub.BroadcastConversationListChanged)
+	tasks.StartPriceWorker(st, cfg)
 
 	srv := server.New(cfg, st, hub)
 	srv.ResumeResearchJobs()
