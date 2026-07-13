@@ -20,7 +20,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
-- [ ] Stream live generation progress for the auto HTML report's "designing the HTML report" phase (`internal/server/research.go:375`, `internal/server/research.go:384`). `autoGenerateHTMLReport` broadcasts a single static "designing" progress event and passes `nil` as the `onProgress` callback to `generateReportHTML`, so the UI shows no movement while the HTML is generated. Pass a callback that broadcasts `research.Progress` with `Generated`/`Snippet` (as the remix path does at `research_remixes.go:90`) so the phase streams over SSE like the other long generation steps.
+- [x] Stream live generation progress for the auto HTML report's "designing the HTML report" phase. `autoGenerateHTMLReport` now passes an `onProgress` callback to `generateReportHTML` that broadcasts `research.Progress{Phase: "designing", Generated, Snippet}` over SSE, and `updateStream` labels the phase "designing HTML report", so the phase streams like the other long generation steps.
 
 - [x] Remove the report-remix output-token cap so providers can generate up to their supported limit.
 

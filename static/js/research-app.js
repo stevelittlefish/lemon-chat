@@ -352,7 +352,9 @@ function updateStream(ev) {
       <div class="research-stream-text"><span class="research-stream-tail"></span><span class="research-stream-caret"></span></div>`;
     log.after(box);
   }
-  const verb = ev.phase === 'writing' ? 'writing report' : 'synthesizing';
+  const verb = ev.phase === 'writing' ? 'writing report'
+    : ev.phase === 'designing' ? 'designing HTML report'
+    : 'synthesizing';
   box.querySelector('.research-stream-label').textContent =
     `${verb} · ${ev.generated.toLocaleString()} chars`;
   box.querySelector('.research-stream-tail').textContent = ev.snippet || '';

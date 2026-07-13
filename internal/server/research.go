@@ -418,7 +418,10 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 	}
 	genCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	html, cost, err := s.generateReportHTML(genCtx, htmlModel, title, markdown, direction, nil)
+	html, cost, err := s.generateReportHTML(genCtx, htmlModel, title, markdown, direction, func(generated int, tail string) {
+		data, _ := json.Marshal(research.Progress{Phase: "designing", Generated: generated, Snippet: tail})
+		run.broadcast(data)
+	})
 	if err != nil {
 		log.Printf("research: job %d: auto HTML report: %v", job.ID, err)
 		return price
