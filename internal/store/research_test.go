@@ -152,8 +152,8 @@ func TestMigrationsV31AndV32PreserveExistingResearchData(t *testing.T) {
 		t.Fatalf("new Reddit state was not safely defaulted: %+v", job)
 	}
 	var version int
-	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 34 {
-		t.Fatalf("schema version = %d, err=%v; want 34", version, err)
+	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 35 {
+		t.Fatalf("schema version = %d, err=%v; want 35", version, err)
 	}
 	var violations int
 	rows, err := s.db.Query(`PRAGMA foreign_key_check`)
@@ -170,5 +170,10 @@ func TestMigrationsV31AndV32PreserveExistingResearchData(t *testing.T) {
 	var foreignKeysEnabled int
 	if err := s.db.QueryRow(`PRAGMA foreign_keys`).Scan(&foreignKeysEnabled); err != nil || foreignKeysEnabled != 1 {
 		t.Fatalf("foreign_keys = %d, err=%v; want enabled", foreignKeysEnabled, err)
+	}
+	// The completed job's final_report was back-filled as its default report.
+	def, err := s.GetDefaultResearchReport(42)
+	if err != nil || def.Markdown == nil || *def.Markdown != "saved final" || !def.IsDefault {
+		t.Fatalf("default report not back-filled: %+v, err=%v", def, err)
 	}
 }

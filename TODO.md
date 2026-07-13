@@ -86,7 +86,7 @@ Fleshing out research so a finished job is an inspectable, reusable artifact —
 - [x] **1. Add an "explore" view for all saved job data** (`internal/server/research.go:530`, `static/js/research-app.js`)
   A completed job already persists every input to the final report — `findings` (with `rational`/`evidence`/`summary`), `analyzed_urls`, `queries_used`, the evolving `report`, `plan`, and `category` — but the UI only surfaces the final report. Add an explore panel that lets you browse all of it (findings grouped by source with full evidence, the query history per round, every URL attempted, the intermediate synthesis). `GetResearchJob` already returns these columns, so this is mostly a frontend build plus possibly a lighter-weight endpoint that omits nothing.
 
-- [ ] **2. Refactor: multiple reports per job** (`internal/store/research.go`, `internal/store/store.go`, `internal/store/research_remixes.go:8`)
+- [x] **2. Refactor: multiple reports per job** (`internal/store/research.go`, `internal/store/store.go`, `internal/store/research_remixes.go:8`)
   Introduce a `research_report` concept: each job has any number of reports, one by default. A report is a master markdown document (today's `final_report`) plus an optional HTML version (today's remix output). Add a numbered migration that creates the table and back-fills existing `final_report` values and `research_remix` rows into it, then repoint the report/remix read paths. This is the structural change the toggle and revamped remix build on — do it before #3–#6.
 
 - [ ] **3. Start-form option to auto-generate the HTML report** (`internal/server/research.go:441`, `internal/server/research.go:318`, `static/js/research-app.js:100`)

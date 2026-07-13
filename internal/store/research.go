@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"strings"
 )
 
 // ResearchJob statuses. A job that is pending or running when the server
@@ -221,12 +222,22 @@ func (s *Store) CompleteResearchRedditRound(id int64, round, emptyRounds int, el
 	return err
 }
 
-// FinishResearchJob marks a job done, errored, or cancelled.
+// FinishResearchJob marks a job done, errored, or cancelled. When it completes
+// with a report, that markdown is also recorded as the job's default report.
 func (s *Store) FinishResearchJob(id int64, status string, finalReport, errMsg *string, elapsedMS int64, priceUSD *float64) error {
-	_, err := s.db.Exec(
+	if _, err := s.db.Exec(
 		`UPDATE research_job SET status = ?, phase = NULL, final_report = ?, error = ?, elapsed_ms = ?, price_usd = ?, updated_at = ? WHERE id = ?`,
-		status, finalReport, errMsg, elapsedMS, priceUSD, now(), id)
-	return err
+		status, finalReport, errMsg, elapsedMS, priceUSD, now(), id); err != nil {
+		return err
+	}
+	if finalReport != nil && strings.TrimSpace(*finalReport) != "" {
+		var model string
+		if err := s.db.QueryRow(`SELECT model FROM research_job WHERE id = ?`, id).Scan(&model); err != nil {
+			return err
+		}
+		return s.UpsertDefaultResearchReport(id, *finalReport, model)
+	}
+	return nil
 }
 
 func (s *Store) DeleteResearchJob(id, userID int64) error {
