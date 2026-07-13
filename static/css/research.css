@@ -345,12 +345,11 @@ select.input option { background: var(--paper-100); color: var(--fg); }
 
 .research-detail-heading {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-6);
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
-.research-detail-copy { min-width: 0; flex: 1; }
+.research-detail-copy { min-width: 0; }
 
 .research-detail-prompt {
   font-size: var(--fs-14);
@@ -380,20 +379,10 @@ select.input option { background: var(--paper-100); color: var(--fg); }
 }
 
 .research-detail-actions {
-  flex: none;
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  justify-content: flex-start;
   gap: var(--space-2);
-  padding-top: 1px;
-}
-
-@media (max-width: 680px) {
-  .research-detail-heading { display: block; }
-  .research-detail-actions {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-    margin: var(--space-4) 0;
-  }
 }
 
 .research-remixes { margin: 0 0 var(--space-6); }

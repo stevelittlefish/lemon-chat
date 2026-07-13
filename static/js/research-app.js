@@ -3,6 +3,7 @@ import { requireAuth } from './settings-auth.js';
 import { research, models } from './api.js';
 import { render } from './markdown.js';
 import { copyToClipboard, escapeHtml } from './utils.js';
+import { preload as preloadIcons, icon } from './icons.js';
 
 const main = document.getElementById('research-main');
 
@@ -367,19 +368,19 @@ async function showDetail(id) {
 
   main.innerHTML = `
     <div class="research-detail-heading">
+      <div class="research-detail-actions">
+        ${!running && hasExploreData(job) ? `<button id="research-explore" class="btn btn-sm btn-secondary">${icon('list', 14)} Explore Data</button>` : ''}
+        ${job.final_report ? `
+          <button id="research-remix" class="btn btn-sm btn-secondary">${icon('refresh-cw', 14)} Remix</button>
+          <button id="research-dl-md" class="btn btn-sm btn-secondary">${icon('download', 14)} Markdown</button>
+          <button id="research-dl-html" class="btn btn-sm btn-secondary">${icon('download', 14)} HTML</button>` : ''}
+        ${running || awaitingReddit
+          ? `<button id="research-cancel" class="btn btn-sm btn-secondary">${icon('x', 14)} Cancel</button>`
+          : `<button id="research-delete" class="btn btn-sm btn-danger">${icon('trash', 14)} Delete</button>`}
+      </div>
       <div class="research-detail-copy">
         <h1 class="research-detail-query">${escapeHtml(displayTitle)}</h1>
         ${promptHtml}
-      </div>
-      <div class="research-detail-actions">
-        ${!running && hasExploreData(job) ? '<button id="research-explore" class="btn btn-sm btn-secondary">explore data</button>' : ''}
-        ${job.final_report ? `
-          <button id="research-remix" class="btn btn-sm btn-secondary">remix</button>
-          <button id="research-dl-md" class="btn btn-sm btn-secondary">Markdown</button>
-          <button id="research-dl-html" class="btn btn-sm btn-secondary">HTML</button>` : ''}
-        ${running || awaitingReddit
-          ? '<button id="research-cancel" class="btn btn-sm btn-secondary">cancel</button>'
-          : '<button id="research-delete" class="btn btn-sm btn-danger">delete</button>'}
       </div>
     </div>
     <div class="research-detail-meta">
@@ -903,6 +904,7 @@ function route() {
 
 async function init() {
   if (!await requireAuth()) return;
+  await preloadIcons();
   try {
     modelList = await models.list();
   } catch {
