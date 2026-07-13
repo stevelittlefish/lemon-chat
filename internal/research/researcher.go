@@ -98,15 +98,26 @@ type Config struct {
 	// DeepReport replaces the single-shot final write with a section-based
 	// pipeline (outline → refine → per-section write from raw findings → glue),
 	// producing a longer, more detailed report. Applies to both modes.
-	DeepReport            bool
+	DeepReport bool
+	// ReportInstruction is an optional extra instruction from the user, appended
+	// to the report-writing prompts (single-pass final report and the deep-report
+	// outline/section writers). Empty means no extra instruction.
+	ReportInstruction     string
 	PauseRedditImport     bool
 	OnRedditPause         func(PendingRedditRound) error
 	RedditResume          *RedditResume
 	OnRedditRoundComplete func(State) error
 	APIBase               string
 	APIKey                string
-	SearXNGURL            string
-	Location              *time.Location
+	// WorkerModel, WorkerAPIBase, and WorkerAPIKey optionally point the worker
+	// tier (extraction + the mechanical slug/classify/query-gen/decide calls) at
+	// a separate, cheaper model. When WorkerModel is empty the worker tier reuses
+	// the job model (Model/APIBase/APIKey).
+	WorkerModel   string
+	WorkerAPIBase string
+	WorkerAPIKey  string
+	SearXNGURL    string
+	Location      *time.Location
 
 	MaxRounds             int
 	MaxTime               time.Duration
@@ -160,6 +171,12 @@ type Researcher struct {
 	state  State
 	client *http.Client
 
+	// writer is the strong job model (plan, synthesis, final/deep report);
+	// worker is the cheap/fast model for extraction and the mechanical calls.
+	// worker defaults to writer when no separate worker model is configured.
+	writer modelEndpoint
+	worker modelEndpoint
+
 	startTime   time.Time
 	baseElapsed int64 // ms accumulated by previous runs of a resumed job
 
@@ -179,7 +196,12 @@ func New(cfg Config, state State, onProgress func(Progress), onCheckpoint func(S
 	if cfg.Mode == "" {
 		cfg.Mode = ModeResearch
 	}
-	return &Researcher{cfg: cfg, state: state, client: http.DefaultClient, onProgress: onProgress, onCheckpoint: onCheckpoint}
+	writer := modelEndpoint{Model: cfg.Model, APIBase: cfg.APIBase, APIKey: cfg.APIKey}
+	worker := writer
+	if cfg.WorkerModel != "" {
+		worker = modelEndpoint{Model: cfg.WorkerModel, APIBase: cfg.WorkerAPIBase, APIKey: cfg.WorkerAPIKey}
+	}
+	return &Researcher{cfg: cfg, state: state, client: http.DefaultClient, writer: writer, worker: worker, onProgress: onProgress, onCheckpoint: onCheckpoint}
 }
 
 // brainstorm reports whether this is an ideation run rather than a
@@ -351,6 +373,40 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 		return "", ctx.Err()
 	}
 	return r.formatCompositeReport(final), nil
+}
+
+// RegenerateReport re-runs only the final-report phase over the researcher's
+// already-loaded state (findings, plan, evolving report, category), honouring
+// cfg.DeepReport. It re-uses the same writer path as a normal run's final step,
+// so it can recover detail a previous single pass dropped — without searching
+// the web again. The returned price covers only the calls this regeneration
+// made; any price already on the loaded state is ignored.
+func (r *Researcher) RegenerateReport(ctx context.Context) (string, *float64, error) {
+	r.startTime = time.Now()
+	r.baseElapsed = r.state.ElapsedMS
+	r.state.PriceUSD = nil // report only the cost of this regeneration
+
+	if r.state.Report == "" && len(r.state.Findings) == 0 {
+		return "", nil, fmt.Errorf("job has no findings to regenerate a report from")
+	}
+	if r.state.Report == "" {
+		r.state.Report = "## Research Findings\n\nSynthesis was unavailable; the raw findings are listed below.\n\n" + r.formatFindings(r.state.Findings)
+	}
+
+	r.progress(Progress{Phase: "writing", TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
+	var final string
+	if r.cfg.DeepReport {
+		final = r.deepReport(ctx)
+	} else {
+		final = r.finalReport(ctx)
+	}
+	if ctx.Err() != nil {
+		return "", nil, ctx.Err()
+	}
+	if strings.TrimSpace(final) == "" {
+		return "", nil, fmt.Errorf("report regeneration produced no content")
+	}
+	return r.formatCompositeReport(final), r.state.PriceUSD, nil
 }
 
 func (r *Researcher) resumeRedditRound(ctx context.Context, resume RedditResume) (bool, error) {
@@ -533,7 +589,7 @@ func (r *Researcher) generateSlug(ctx context.Context) string {
 	if source == "" {
 		source = r.cfg.Query
 	}
-	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(slugPrompt, source)}}, 0.2, 64, planningTimeout)
+	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(slugPrompt, source)}}, 0.2, 64, planningTimeout)
 	if err == nil {
 		if slug := normalizeSlug(out); slug != "" {
 			return slug
@@ -606,7 +662,7 @@ func (r *Researcher) plan(ctx context.Context) string {
 // "general" value also marks the job as classified so a resumed run does not
 // repeat this phase.
 func (r *Researcher) classify(ctx context.Context) string {
-	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(classifyPrompt, r.cfg.Query)}}, 0, 20, classifyTimeout)
+	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(classifyPrompt, r.cfg.Query)}}, 0, 20, classifyTimeout)
 	if err != nil {
 		return "general"
 	}
@@ -625,7 +681,7 @@ func (r *Researcher) classify(ctx context.Context) string {
 // classifyBrainstorm returns the output format for a brainstorm run, defaulting
 // to "design-doc" when no other format fits. Mirrors classify for research mode.
 func (r *Researcher) classifyBrainstorm(ctx context.Context) string {
-	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(brainstormClassifyPrompt, r.cfg.Query)}}, 0, 20, classifyTimeout)
+	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(brainstormClassifyPrompt, r.cfg.Query)}}, 0, 20, classifyTimeout)
 	if err != nil {
 		return "design-doc"
 	}
@@ -689,7 +745,7 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 			fmt.Sprintf(queryGenPrompt, r.cfg.Query, r.state.Plan, report, round, numQueries, instruction)
 	}
 
-	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, 4096, queryTimeout)
+	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, 4096, queryTimeout)
 	if err != nil {
 		r.progress(Progress{Phase: "warning", Round: round, Message: "query generation failed: " + err.Error()})
 		return nil
@@ -896,7 +952,7 @@ func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
 		stop = brainstormStopPrompt
 	}
 	prompt := fmt.Sprintf(stop, r.cfg.Query, r.state.Report, round, r.cfg.MaxRounds)
-	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 128, stopTimeout)
+	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 128, stopTimeout)
 	if err != nil {
 		return false
 	}
@@ -906,6 +962,16 @@ func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
 }
 
 // ── Phase 8: Final report ────────────────────────────────────
+
+// reportInstructionSuffix returns the user's optional extra report instruction
+// formatted for appending to a writing prompt, or "" when none was given.
+func (r *Researcher) reportInstructionSuffix() string {
+	instruction := strings.TrimSpace(r.cfg.ReportInstruction)
+	if instruction == "" {
+		return ""
+	}
+	return "\n\nAdditional instruction from the user — follow it while writing this report:\n" + instruction
+}
 
 func (r *Researcher) finalReport(ctx context.Context) string {
 	if r.brainstorm() {
@@ -919,6 +985,7 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 	if override, ok := categoryPrompts[r.state.Category]; ok {
 		prompt += override
 	}
+	prompt += r.reportInstructionSuffix()
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
@@ -955,6 +1022,7 @@ func (r *Researcher) finalBrainstorm(ctx context.Context) string {
 	if override, ok := brainstormFormatOverrides[r.state.Category]; ok {
 		prompt += override
 	}
+	prompt += r.reportInstructionSuffix()
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
@@ -1072,6 +1140,7 @@ func (r *Researcher) outline(ctx context.Context) []reportSection {
 		}
 		draftPrompt = fmt.Sprintf(outlineDraftPrompt, r.cfg.Query, r.state.Plan, report, findings, catHint)
 	}
+	draftPrompt += r.reportInstructionSuffix()
 	draft := r.parseOutline(ctx, draftPrompt)
 	if ctx.Err() != nil || len(draft) == 0 {
 		return draft
@@ -1134,6 +1203,7 @@ func (r *Researcher) writeSection(ctx context.Context, sec reportSection, outlin
 	} else {
 		prompt = fmt.Sprintf(sectionWritePrompt, r.cfg.Query, r.state.Plan, sec.Title, sec.Intent, outline, report, findings)
 	}
+	prompt += r.reportInstructionSuffix()
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}

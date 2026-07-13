@@ -129,7 +129,7 @@ func (r *Researcher) ExtractText(ctx context.Context, pageURL, title, content st
 		{Role: "user", Content: fmt.Sprintf(extractorSystem, r.cfg.Query)},
 		{Role: "user", Content: untrustedContextMessage("webpage", content)},
 	}
-	out, err := r.llmCall(ctx, msgs, 0.2, 2048, extractionTimeout)
+	out, err := r.llmCallWorker(ctx, msgs, 0.2, 2048, extractionTimeout)
 	if err != nil {
 		return nil
 	}

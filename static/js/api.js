@@ -201,12 +201,12 @@ export const research = {
   list: () => request('GET', '/api/research'),
   defaults: () => request('GET', '/api/research/defaults'),
   get: (id) => request('GET', `/api/research/${id}`),
-  createRemix: (id, model, direction, { onEvent, onDone, onError }) => {
+  regenerateReport: (id, { markdownModel, htmlModel, markdownDirection, direction, markdown, html, deepReport }, { onEvent, onDone, onError }) => {
     const ctrl = new AbortController();
-    fetch(`/api/research/${id}/remixes`, {
+    fetch(`/api/research/${id}/reports`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-      body: JSON.stringify({ model, direction }),
+      body: JSON.stringify({ markdown_model: markdownModel, html_model: htmlModel, markdown_direction: markdownDirection, direction, markdown, html, deep_report: deepReport }),
       signal: ctrl.signal,
     }).then(async (res) => {
       if (!res.ok) {
@@ -220,11 +220,13 @@ export const research = {
     });
     return () => ctrl.abort();
   },
-  getRemix: (id, remixId) => request('GET', `/api/research/${id}/remixes/${remixId}`),
-  start: (title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, effort, maxTimeMinutes) =>
+  getReport: (id, reportId) => request('GET', `/api/research/${id}/reports/${reportId}`),
+  start: (title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, htmlReportModel, workerModel, effort, maxTimeMinutes) =>
     request('POST', '/api/research', {
       title, query, ...(model ? { model } : {}), mode, force_search: forceSearch, deep_report: deepReport,
       auto_html_report: autoHtmlReport, html_report_direction: htmlReportDirection,
+      ...(htmlReportModel ? { html_report_model: htmlReportModel } : {}),
+      ...(workerModel ? { worker_model: workerModel } : {}),
       pause_reddit_import: pauseRedditImport, effort, max_time_minutes: maxTimeMinutes,
     }),
   cancel: (id) => request('POST', `/api/research/${id}/cancel`),

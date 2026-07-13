@@ -161,6 +161,50 @@ func (s *Server) researchModel(requested string) string {
 	return s.cfg.Server.DefaultModel
 }
 
+// htmlReportModel resolves which model to use for the HTML report step. An
+// explicit request wins, then the configured default, and finally the job's own
+// model. An empty return means "reuse the job model".
+func (s *Server) htmlReportModel(requested string) string {
+	if requested != "" {
+		return requested
+	}
+	return s.cfg.Research.HTMLReportModel
+}
+
+// researchLocation resolves the configured timezone, falling back to the
+// server's local time when unset or invalid.
+func (s *Server) researchLocation() *time.Location {
+	if s.cfg.Server.Timezone != "" {
+		if l, err := time.LoadLocation(s.cfg.Server.Timezone); err == nil {
+			return l
+		}
+	}
+	return time.Local
+}
+
+// researchLLMQuery builds the LLM-facing prompt for a job from whichever of its
+// title and query fields are set.
+func researchLLMQuery(job *store.ResearchJob) string {
+	if job.Title != nil && *job.Title != "" {
+		if job.Query != "" {
+			return *job.Title + "\n\n" + job.Query
+		}
+		return *job.Title
+	}
+	return job.Query
+}
+
+// workerModel resolves which model to use for the worker tier (extraction plus
+// the mechanical slug/classify/query-gen/decide calls). An explicit request
+// wins, then the configured default, and finally the job's own model. An empty
+// return means "reuse the job model".
+func (s *Server) workerModel(requested string) string {
+	if requested != "" {
+		return requested
+	}
+	return s.cfg.Research.WorkerModel
+}
+
 // ResumeResearchJobs restarts jobs that were in flight when the server last
 // stopped. Each resumes from its last checkpoint. Call once at startup.
 func (s *Server) ResumeResearchJobs() {
@@ -196,22 +240,22 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		return
 	}
 
-	loc := time.Local
-	if s.cfg.Server.Timezone != "" {
-		if l, tzErr := time.LoadLocation(s.cfg.Server.Timezone); tzErr == nil {
-			loc = l
+	// Resolve the optional worker-tier endpoint; a different model may live on a
+	// different server, so we resolve the whole (model, base, key) triple. On any
+	// error we fall back to the job model rather than failing the run.
+	workerModel, workerAPIBase, workerAPIKey := "", "", ""
+	if job.WorkerModel != nil && *job.WorkerModel != "" && *job.WorkerModel != job.Model {
+		if ws, wErr := s.cfg.ServerForModel(*job.WorkerModel); wErr == nil {
+			workerModel, workerAPIBase, workerAPIKey = *job.WorkerModel, ws.APIBase, ws.APIKey
+		} else {
+			log.Printf("research: job %d: worker model %q unresolved, using job model: %v", job.ID, *job.WorkerModel, wErr)
 		}
 	}
 
+	loc := s.researchLocation()
+
 	// Build the LLM-facing prompt from whichever fields are set.
-	llmQuery := job.Query
-	if job.Title != nil && *job.Title != "" {
-		if job.Query != "" {
-			llmQuery = *job.Title + "\n\n" + job.Query
-		} else {
-			llmQuery = *job.Title
-		}
-	}
+	llmQuery := researchLLMQuery(job)
 
 	rc := s.cfg.Research
 	maxRounds, minRounds, extraRounds := researchEffortRounds(job.Effort, rc.MaxRounds, rc.MinRounds)
@@ -229,6 +273,9 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		PauseRedditImport:     job.PauseRedditImport,
 		APIBase:               modelServer.APIBase,
 		APIKey:                modelServer.APIKey,
+		WorkerModel:           workerModel,
+		WorkerAPIBase:         workerAPIBase,
+		WorkerAPIKey:          workerAPIKey,
 		SearXNGURL:            s.cfg.SearXNG.URL,
 		Location:              loc,
 		MaxRounds:             maxRounds,
@@ -349,6 +396,11 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 		log.Printf("research: job %d: prepare default report for HTML: %v", job.ID, err)
 		return price
 	}
+	// The HTML step may use a dedicated model; fall back to the job's own model.
+	htmlModel := job.Model
+	if job.HTMLReportModel != nil && *job.HTMLReportModel != "" {
+		htmlModel = *job.HTMLReportModel
+	}
 	direction := ""
 	if job.HTMLReportDirection != nil {
 		direction = *job.HTMLReportDirection
@@ -366,7 +418,7 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 	}
 	genCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	html, cost, err := s.generateReportHTML(genCtx, job.Model, title, markdown, direction, nil)
+	html, cost, err := s.generateReportHTML(genCtx, htmlModel, title, markdown, direction, nil)
 	if err != nil {
 		log.Printf("research: job %d: auto HTML report: %v", job.ID, err)
 		return price
@@ -375,7 +427,7 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 		log.Printf("research: job %d: save auto HTML report: %v", job.ID, err)
 		return price
 	}
-	log.Printf("Generated HTML report id=%d model=%q chars=%d", job.ID, job.Model, len(html))
+	log.Printf("Generated HTML report id=%d model=%q chars=%d", job.ID, htmlModel, len(html))
 	return addResearchPrice(price, cost)
 }
 
@@ -467,7 +519,7 @@ type researchJobView struct {
 	Round             int      `json:"round"`
 	ElapsedMS         int64    `json:"elapsed_ms"`
 	PriceUSD          *float64 `json:"price_usd"`
-	RemixCount        int      `json:"remix_count"`
+	ReportCount       int      `json:"report_count"`
 	Error             *string  `json:"error"`
 	CreatedAt         string   `json:"created_at"`
 	UpdatedAt         string   `json:"updated_at"`
@@ -505,6 +557,8 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		DeepReport          bool   `json:"deep_report"`
 		AutoHTMLReport      bool   `json:"auto_html_report"`
 		HTMLReportDirection string `json:"html_report_direction"`
+		HTMLReportModel     string `json:"html_report_model"`
+		WorkerModel         string `json:"worker_model"`
 		PauseRedditImport   bool   `json:"pause_reddit_import"`
 		Effort              int    `json:"effort"`
 		MaxTimeMinutes      int    `json:"max_time_minutes"`
@@ -522,10 +576,14 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "html report direction must be 2000 characters or fewer")
 		return
 	}
-	// The style direction is only meaningful when the HTML report is requested.
+	// The style direction and model override are only meaningful when the HTML
+	// report is requested.
 	if !req.AutoHTMLReport {
 		req.HTMLReportDirection = ""
+		req.HTMLReportModel = ""
 	}
+	req.HTMLReportModel = strings.TrimSpace(req.HTMLReportModel)
+	req.WorkerModel = strings.TrimSpace(req.WorkerModel)
 	mode := req.Mode
 	if mode == "" {
 		mode = research.ModeResearch
@@ -560,15 +618,41 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "unknown model")
 		return
 	}
+	// The HTML report step may use a separate model; an empty result means "reuse
+	// the job model", resolved when the report is generated.
+	htmlReportModel := ""
+	if req.AutoHTMLReport {
+		htmlReportModel = s.htmlReportModel(req.HTMLReportModel)
+		if htmlReportModel != "" {
+			if _, err := s.cfg.ServerForModel(htmlReportModel); err != nil {
+				writeError(w, http.StatusBadRequest, "unknown HTML report model")
+				return
+			}
+		}
+	}
+
+	// The worker tier may use a separate model; an empty result means "reuse the
+	// job model", resolved when the job runs. A worker model equal to the job
+	// model is stored as empty (no override).
+	workerModel := s.workerModel(req.WorkerModel)
+	if workerModel == model {
+		workerModel = ""
+	}
+	if workerModel != "" {
+		if _, err := s.cfg.ServerForModel(workerModel); err != nil {
+			writeError(w, http.StatusBadRequest, "unknown worker model")
+			return
+		}
+	}
 
 	// ForceSearch only changes brainstorm-mode behaviour; ignore it otherwise.
 	forceSearch := req.ForceSearch && mode == research.ModeBrainstorm
-	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, req.AutoHTMLReport, req.HTMLReportDirection, effort, maxTimeSeconds)
+	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, req.AutoHTMLReport, req.HTMLReportDirection, htmlReportModel, workerModel, effort, maxTimeSeconds)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	log.Printf("Starting research job id=%d user_id=%d model=%q mode=%q force_search=%t deep_report=%t auto_html_report=%t pause_reddit_import=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, mode, forceSearch, req.DeepReport, req.AutoHTMLReport, req.PauseRedditImport, effort, maxTimeSeconds, req.Title, req.Query)
+	log.Printf("Starting research job id=%d user_id=%d model=%q worker_model=%q mode=%q force_search=%t deep_report=%t auto_html_report=%t html_report_model=%q pause_reddit_import=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, workerModel, mode, forceSearch, req.DeepReport, req.AutoHTMLReport, htmlReportModel, req.PauseRedditImport, effort, maxTimeSeconds, req.Title, req.Query)
 	go s.runResearch(job)
 	writeJSON(w, http.StatusCreated, researchView(job))
 }
@@ -580,7 +664,7 @@ func (s *Server) handleListResearch(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	remixCounts, err := s.store.ListResearchRemixCounts(user.ID)
+	reportCounts, err := s.store.ListNonDefaultResearchReportCounts(user.ID)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -588,7 +672,7 @@ func (s *Server) handleListResearch(w http.ResponseWriter, r *http.Request) {
 	views := make([]researchJobView, 0, len(jobs))
 	for i := range jobs {
 		view := researchView(&jobs[i])
-		view.RemixCount = remixCounts[jobs[i].ID]
+		view.ReportCount = reportCounts[jobs[i].ID]
 		views = append(views, view)
 	}
 	writeJSON(w, http.StatusOK, views)
@@ -611,7 +695,7 @@ func (s *Server) handleGetResearch(w http.ResponseWriter, r *http.Request) {
 			request = &pending.Request
 		}
 	}
-	remixes, err := s.store.ListResearchRemixes(job.ID)
+	reports, err := s.store.ListNonDefaultResearchReports(job.ID)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -627,10 +711,10 @@ func (s *Server) handleGetResearch(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, struct {
 		*store.ResearchJob
-		RedditRequest *redditimport.Request `json:"reddit_request,omitempty"`
-		Remixes       []store.ResearchRemix `json:"remixes"`
-		ReportHTML    bool                  `json:"report_html"`
-	}{ResearchJob: job, RedditRequest: request, Remixes: remixes, ReportHTML: reportHTML})
+		RedditRequest *redditimport.Request         `json:"reddit_request,omitempty"`
+		Reports       []store.ResearchReportSummary `json:"reports"`
+		ReportHTML    bool                          `json:"report_html"`
+	}{ResearchJob: job, RedditRequest: request, Reports: reports, ReportHTML: reportHTML})
 }
 
 // handleGetResearchReportDocument serves the default report's designed HTML

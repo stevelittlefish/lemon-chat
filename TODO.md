@@ -20,6 +20,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [ ] Stream live generation progress for the auto HTML report's "designing the HTML report" phase (`internal/server/research.go:375`, `internal/server/research.go:384`). `autoGenerateHTMLReport` broadcasts a single static "designing" progress event and passes `nil` as the `onProgress` callback to `generateReportHTML`, so the UI shows no movement while the HTML is generated. Pass a callback that broadcasts `research.Progress` with `Generated`/`Snippet` (as the remix path does at `research_remixes.go:90`) so the phase streams over SSE like the other long generation steps.
+
 - [x] Remove the report-remix output-token cap so providers can generate up to their supported limit.
 
 - [x] Indicate which past research results have saved remixes in the research list.
@@ -92,19 +94,23 @@ Fleshing out research so a finished job is an inspectable, reusable artifact —
 - [x] **3. Start-form option to auto-generate the HTML report** (`internal/server/research.go:441`, `internal/server/research.go:318`, `static/js/research-app.js:100`)
   Add a form section with a tick box (on by default) to also produce the HTML report, plus a text box for stylistic requirements. When set, after the markdown report finishes the job automatically runs what remix does today and stores the HTML on the default report. Persist the toggle and style prompt on the job so a resumed/queued job still honours them.
 
-- [ ] **4. Optional separate model for the HTML report step** (`internal/server/research.go:441`, `internal/config/config.go:23`)
+- [x] **4. Optional separate model for the HTML report step** (`internal/server/research.go:441`, `internal/config/config.go:23`)
   Default to using the job's model for the whole process, but allow overriding just the HTML-generation model in the start form (and via config default). Thread it through to the auto-remix step from #3.
 
-- [ ] **5. SPIKE: per-phase model configuration** (`internal/research/researcher.go`, `internal/research/llm.go:21`, `internal/config/config.go:23`)
+- [x] **5. SPIKE: per-phase model configuration** (`internal/research/researcher.go`, `internal/research/llm.go:21`, `internal/config/config.go:23`)
   Investigate whether letting a job use different models for different phases is worth it — e.g. a cheap local model for search/extract, a strong model for the final report, another for the HTML. Every phase already routes through `llmCall`/`llmCallStream`, so plumbing a per-phase model is tractable; the question is the config/UI complexity vs. benefit. Write up a recommendation before committing to an implementation.
+  **Recommendation:** `docs/spike-per-phase-model-config.md` — do a two-tier worker/writer split (one optional `worker_model` for the high-volume extraction + mechanical phases, job model for synthesis/report), not a full per-phase matrix.
 
-- [ ] **6. Revamp remix into report regeneration** (`internal/server/research_remixes.go:29`)
+- [x] **6. Implement the two-tier worker/writer model split** (`internal/research/llm.go:21`, `internal/research/researcher.go:90`, `internal/server/research.go:222`, `internal/config/config.go:23`)
+  Act on the #5 spike (`docs/spike-per-phase-model-config.md`). Add one optional `worker_model` that handles the high-volume extraction phase plus the mechanical calls (slug, classify, query generation, decide), keeping the job model for synthesis and the final/deep report. Steps: (1) introduce a `modelEndpoint{Model, APIBase, APIKey}` and give the `Researcher` `writer`/`worker` endpoints (worker defaults to writer), parameterising `llmCall`/`llmCallStream` by endpoint and updating the worker-tier call sites; (2) add `[research] worker_model` config + a `research_job.worker_model` column via numbered migration + persistence, mirroring #4; (3) resolve and validate both endpoints via `ServerForModel` at launch; (4) add the optional "worker model" control to the start form and surface it in the job detail/explore view. Do not build the full per-phase matrix — the spike rejected it.
+
+- [x] **7. Revamp remix into report regeneration** (`internal/server/research_reports.go`)
   Today remix only reskins the existing `final_report` into HTML and can't recover detail the writer dropped. Extend it to also (a) regenerate a fresh markdown report from the raw `findings`/`report`/`plan` (reusing `finalReport`/`deepReport`), or (b) do both, saving results as new reports on the job. Model is configurable per #4. Depends on the reports refactor (#2).
 
-- [ ] **7. Holistic progressive-disclosure UI revamp** (`static/js/research-app.js:100`, `static/research.html`)
-  Redesign the whole research UI around progressive disclosure: launching a job with sensible defaults should be one obvious action, with effort, mode, models, deep-report, HTML-report, Reddit-import, and time-limit controls revealed in layers as the user opts into more customisation. Applies to the start form, the job list, and the completed-report/reports view. Best done last, once #1–#6 have settled what controls exist.
+- [ ] **8. Holistic progressive-disclosure UI revamp** (`static/js/research-app.js:100`, `static/research.html`)
+  Redesign the whole research UI around progressive disclosure: launching a job with sensible defaults should be one obvious action, with effort, mode, models, deep-report, HTML-report, Reddit-import, and time-limit controls revealed in layers as the user opts into more customisation. Applies to the start form, the job list, and the completed-report/reports view. Best done last, once #1–#7 have settled what controls exist.
 
-- [ ] **8. Preserve all sources and citations in the HTML report** (`internal/server/research_remixes.go:17`, `internal/server/research_remixes.go:116`)
+- [ ] **9. Preserve all sources and citations in the HTML report** (`internal/server/research_remixes.go:17`, `internal/server/research_remixes.go:116`)
   The HTML generation step (`remixSystemPrompt`, run via `generateReportHTML`) loses reference detail: it strips every external source URL (inline citations link only to internal `#S` anchors and the source list is terse plain text with no links), lists only the ~half of sources cited inline, and drops some inline citations along with their counter-argument nuance. Verified by diffing the markdown and HTML of job #9. Fix by strengthening the prompt to require every source (with its URL) and every inline citation be carried over verbatim, and/or feed the raw `findings`/sources into the HTML step the way the deep-report pipeline does instead of summarising the already-written markdown.
 
 ## Code review (2026-06-13)
