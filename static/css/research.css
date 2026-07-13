@@ -418,6 +418,26 @@ select.input option { background: var(--paper-100); color: var(--fg); }
   gap: var(--space-2);
 }
 
+/* Download popover: anchored below its trigger button. */
+.research-download { position: relative; display: inline-flex; }
+.research-download-panel {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  z-index: 50;
+  min-width: 160px;
+}
+.research-download-panel[hidden] { display: none; }
+/* The items are <button>s — strip the native chrome so they read as menu rows. */
+.research-download-panel .menu-item {
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+}
+
 .research-remixes { margin: 0 0 var(--space-6); }
 .research-remix-list { display: flex; gap: var(--space-2); overflow-x: auto; padding-bottom: var(--space-2); }
 .research-remix-item {

@@ -386,8 +386,13 @@ async function showDetail(id) {
         ${!running && hasExploreData(job) ? `<button id="research-explore" class="btn btn-sm btn-secondary">${icon('list', 14)} Explore Data</button>` : ''}
         ${job.final_report ? `
           <button id="research-remix" class="btn btn-sm btn-secondary">${icon('refresh-cw', 14)} Remix</button>
-          <button id="research-dl-md" class="btn btn-sm btn-secondary">${icon('download', 14)} Markdown</button>
-          <button id="research-dl-html" class="btn btn-sm btn-secondary">${icon('download', 14)} HTML</button>` : ''}
+          <div class="research-download">
+            <button type="button" id="research-download-toggle" class="btn btn-sm btn-secondary" aria-haspopup="true" aria-expanded="false">${icon('download', 14)} Download ${icon('chevron-down', 14)}</button>
+            <div class="menu research-download-panel" hidden>
+              <button id="research-dl-md" class="menu-item">${icon('download', 14)} Markdown</button>
+              <button id="research-dl-html" class="menu-item">${icon('download', 14)} HTML</button>
+            </div>
+          </div>` : ''}
         ${running || awaitingReddit
           ? `<button id="research-cancel" class="btn btn-sm btn-secondary">${icon('x', 14)} Cancel</button>`
           : `<button id="research-delete" class="btn btn-sm btn-danger">${icon('trash', 14)} Delete</button>`}
@@ -404,6 +409,7 @@ async function showDetail(id) {
       ${job.pause_reddit_import ? '<span>Reddit import</span>' : ''}
       <span>${escapeHtml(job.model)}</span>
       ${job.worker_model ? `<span>worker: ${escapeHtml(job.worker_model)}</span>` : ''}
+      ${job.html_report_model && job.html_report_model !== job.model ? `<span>HTML: ${escapeHtml(job.html_report_model)}</span>` : ''}
       ${job.effort ? `<span>effort: ${EFFORT_NAMES[job.effort] || job.effort}</span>` : ''}
       <span>${formatDate(job.created_at)}</span>
       ${job.elapsed_ms ? `<span>${formatDuration(job.elapsed_ms)}</span>` : ''}
@@ -445,6 +451,7 @@ async function showDetail(id) {
     downloadFile(`${slugify(heading)}.html`, 'text/html',
       htmlDocument(heading, headingHtml + render(job.final_report)));
   });
+  wireDownloadMenu();
 
   // When a designed HTML version exists, the content area is tabbed. The HTML
   // tab is shown by default.
@@ -473,6 +480,34 @@ async function showDetail(id) {
 
   if (running) watchProgress(id);
   if (awaitingReddit) wireRedditWaitingPanel(id, job);
+}
+
+// wireDownloadMenu toggles the detail view's "Download" popover and closes it
+// on an outside click, on selection, or on Escape. No-op when the report has no
+// download menu (an unfinished job).
+function wireDownloadMenu() {
+  const toggle = document.getElementById('research-download-toggle');
+  const panel = document.querySelector('.research-download-panel');
+  if (!toggle || !panel) return;
+  const close = () => {
+    panel.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', onOutside, true);
+    document.removeEventListener('keydown', onKey);
+  };
+  const onOutside = (e) => { if (!e.target.closest('.research-download')) close(); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  toggle.addEventListener('click', () => {
+    if (panel.hidden) {
+      panel.hidden = false;
+      toggle.setAttribute('aria-expanded', 'true');
+      document.addEventListener('click', onOutside, true);
+      document.addEventListener('keydown', onKey);
+    } else {
+      close();
+    }
+  });
+  panel.querySelectorAll('.menu-item').forEach((el) => el.addEventListener('click', close));
 }
 
 // reportContent renders the main report area. With a designed HTML version it
