@@ -124,64 +124,68 @@ async function showList() {
       </span>
     </div>`).join('');
 
+  const modelOptions = (placeholder) => `<option value="">${placeholder}</option>` +
+    modelList.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`).join('');
+
   main.innerHTML = `
     <div class="card research-form">
       <div class="research-form-heading">
-        <h2 class="research-form-title">New Research</h2>
+        <h2 class="research-form-title">New research</h2>
         <a class="research-help-link" href="/research/help" target="_blank" rel="noopener noreferrer">help</a>
       </div>
       <input id="research-title" class="input" type="text" placeholder="title (optional)">
       <textarea id="research-query" class="input textarea" rows="3"
         placeholder="research question or prompt (required if no title)"></textarea>
       <div class="research-form-row">
-        <select id="research-model" class="input">${options}</select>
+        <label class="research-field">model
+          <select id="research-model" class="input">${options}</select>
+        </label>
         <label class="research-field">mode
           <select id="research-mode" class="input">
             <option value="research" selected>research</option>
             <option value="brainstorm">brainstorm</option>
           </select>
         </label>
-        <label class="research-field research-check research-force-search" id="research-force-search-field" hidden>
-          <input type="checkbox" id="research-force-search"> always search the web
-        </label>
-        <label class="research-field research-check">
-          <input type="checkbox" id="research-deep-report"> in-depth report
-        </label>
         <label class="research-field">effort
           <select id="research-effort" class="input">${effortOptions}</select>
         </label>
-        <label class="research-field">time limit
-          <input id="research-time" class="input research-time-input" type="number" min="1" max="240"
-            value="${formDefaults.max_time_minutes}"> min
-        </label>
         <button id="research-start" class="btn btn-primary">start research</button>
       </div>
-      <div class="research-form-options">
-        <label class="research-field research-check">
-          <input type="checkbox" id="research-html-report" checked> also design an HTML report
-        </label>
-        <label class="research-field research-check">
-          <input type="checkbox" id="research-pause-reddit"> pause to import Reddit results
-        </label>
-      </div>
-      <div class="research-form-options" id="research-html-style-row">
-        <label class="research-field">HTML report model
-          <select id="research-html-model" class="input">
-            <option value="">same as research model</option>
-            ${modelList.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`).join('')}
-          </select>
-        </label>
-        <textarea id="research-html-style" class="input textarea" rows="2" maxlength="2000"
-          placeholder="optional style for the HTML report (e.g. earthy greens, simple typography)"></textarea>
-      </div>
-      <div class="research-form-options">
-        <label class="research-field">worker model
-          <select id="research-worker-model" class="input">
-            <option value="">same as research model</option>
-            ${modelList.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`).join('')}
-          </select>
-        </label>
-        <span class="research-field-hint">handles page reading and the mechanical steps; a small local model here can cut cost and time</span>
+      <button type="button" id="research-more-toggle" class="research-disclosure" aria-expanded="false" aria-controls="research-advanced">
+        ${icon('chevron-right', 14)}<span>More options</span>
+      </button>
+      <div id="research-advanced" class="research-advanced" hidden>
+        <div class="research-form-options">
+          <label class="research-field">worker model
+            <select id="research-worker-model" class="input">${modelOptions('same as research model')}</select>
+          </label>
+          <label class="research-field">time limit
+            <input id="research-time" class="input research-time-input" type="number" min="1" max="240"
+              value="${formDefaults.max_time_minutes}"> min
+          </label>
+        </div>
+        <p class="research-field-hint">worker model handles page reading and the mechanical steps; a small local model here can cut cost and time</p>
+        <div class="research-form-options">
+          <label class="research-field research-check research-force-search" id="research-force-search-field" hidden>
+            <input type="checkbox" id="research-force-search"> always search the web
+          </label>
+          <label class="research-field research-check">
+            <input type="checkbox" id="research-deep-report"> in-depth report
+          </label>
+          <label class="research-field research-check">
+            <input type="checkbox" id="research-html-report" checked> also design an HTML report
+          </label>
+          <label class="research-field research-check">
+            <input type="checkbox" id="research-pause-reddit"> pause to import Reddit results
+          </label>
+        </div>
+        <div class="research-form-options research-suboptions" id="research-html-style-row">
+          <label class="research-field">HTML report model
+            <select id="research-html-model" class="input">${modelOptions('same as research model')}</select>
+          </label>
+          <textarea id="research-html-style" class="input textarea" rows="2" maxlength="2000"
+            placeholder="optional style for the HTML report (e.g. earthy greens, simple typography)"></textarea>
+        </div>
       </div>
     </div>
     <p class="research-section-label">past research</p>
@@ -209,6 +213,16 @@ async function showList() {
   const syncHtmlStyle = () => { htmlStyleRow.hidden = !htmlReportCheck.checked; };
   htmlReportCheck.addEventListener('change', syncHtmlStyle);
   syncHtmlStyle();
+
+  // "More options" reveals the advanced controls in a second tier.
+  const moreToggle = document.getElementById('research-more-toggle');
+  const advanced = document.getElementById('research-advanced');
+  moreToggle.addEventListener('click', () => {
+    const open = advanced.hidden;
+    advanced.hidden = !open;
+    moreToggle.setAttribute('aria-expanded', String(open));
+    moreToggle.classList.toggle('open', open);
+  });
 
   document.getElementById('research-start').addEventListener('click', startResearch);
   document.getElementById('research-query').addEventListener('keydown', (e) => {
@@ -372,8 +386,13 @@ async function showDetail(id) {
         ${!running && hasExploreData(job) ? `<button id="research-explore" class="btn btn-sm btn-secondary">${icon('list', 14)} Explore Data</button>` : ''}
         ${job.final_report ? `
           <button id="research-remix" class="btn btn-sm btn-secondary">${icon('refresh-cw', 14)} Remix</button>
-          <button id="research-dl-md" class="btn btn-sm btn-secondary">${icon('download', 14)} Markdown</button>
-          <button id="research-dl-html" class="btn btn-sm btn-secondary">${icon('download', 14)} HTML</button>` : ''}
+          <div class="research-download">
+            <button type="button" id="research-download-toggle" class="btn btn-sm btn-secondary" aria-haspopup="true" aria-expanded="false">${icon('download', 14)} Download ${icon('chevron-down', 14)}</button>
+            <div class="menu research-download-panel" hidden>
+              <button id="research-dl-md" class="menu-item">${icon('download', 14)} Markdown</button>
+              <button id="research-dl-html" class="menu-item">${icon('download', 14)} HTML</button>
+            </div>
+          </div>` : ''}
         ${running || awaitingReddit
           ? `<button id="research-cancel" class="btn btn-sm btn-secondary">${icon('x', 14)} Cancel</button>`
           : `<button id="research-delete" class="btn btn-sm btn-danger">${icon('trash', 14)} Delete</button>`}
@@ -390,6 +409,7 @@ async function showDetail(id) {
       ${job.pause_reddit_import ? '<span>Reddit import</span>' : ''}
       <span>${escapeHtml(job.model)}</span>
       ${job.worker_model ? `<span>worker: ${escapeHtml(job.worker_model)}</span>` : ''}
+      ${job.html_report_model && job.html_report_model !== job.model ? `<span>HTML: ${escapeHtml(job.html_report_model)}</span>` : ''}
       ${job.effort ? `<span>effort: ${EFFORT_NAMES[job.effort] || job.effort}</span>` : ''}
       <span>${formatDate(job.created_at)}</span>
       ${job.elapsed_ms ? `<span>${formatDuration(job.elapsed_ms)}</span>` : ''}
@@ -431,6 +451,7 @@ async function showDetail(id) {
     downloadFile(`${slugify(heading)}.html`, 'text/html',
       htmlDocument(heading, headingHtml + render(job.final_report)));
   });
+  wireDownloadMenu();
 
   // When a designed HTML version exists, the content area is tabbed. The HTML
   // tab is shown by default.
@@ -459,6 +480,34 @@ async function showDetail(id) {
 
   if (running) watchProgress(id);
   if (awaitingReddit) wireRedditWaitingPanel(id, job);
+}
+
+// wireDownloadMenu toggles the detail view's "Download" popover and closes it
+// on an outside click, on selection, or on Escape. No-op when the report has no
+// download menu (an unfinished job).
+function wireDownloadMenu() {
+  const toggle = document.getElementById('research-download-toggle');
+  const panel = document.querySelector('.research-download-panel');
+  if (!toggle || !panel) return;
+  const close = () => {
+    panel.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', onOutside, true);
+    document.removeEventListener('keydown', onKey);
+  };
+  const onOutside = (e) => { if (!e.target.closest('.research-download')) close(); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  toggle.addEventListener('click', () => {
+    if (panel.hidden) {
+      panel.hidden = false;
+      toggle.setAttribute('aria-expanded', 'true');
+      document.addEventListener('click', onOutside, true);
+      document.addEventListener('keydown', onKey);
+    } else {
+      close();
+    }
+  });
+  panel.querySelectorAll('.menu-item').forEach((el) => el.addEventListener('click', close));
 }
 
 // reportContent renders the main report area. With a designed HTML version it

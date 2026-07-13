@@ -243,6 +243,39 @@ select.input option { background: var(--paper-100); color: var(--fg); }
 .research-check input { cursor: pointer; accent-color: var(--hm-cyan); }
 .research-force-search[hidden] { display: none; }
 
+/* ── Progressive disclosure ─────────────────────────────── */
+
+.research-disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  padding: var(--space-1) 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--fg-muted);
+  transition: color var(--dur-fast) var(--ease);
+}
+.research-disclosure:hover { color: var(--fg); }
+.research-disclosure svg { transition: transform var(--dur-fast) var(--ease); }
+.research-disclosure.open svg { transform: rotate(90deg); }
+
+.research-advanced[hidden] { display: none; }
+.research-advanced {
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.research-advanced .research-form-options { margin-top: var(--space-3); }
+.research-advanced .research-field-hint { margin: var(--space-1) 0 0; }
+
+/* HTML-report style/model sub-controls, indented under their checkbox. */
+.research-suboptions { padding-left: var(--space-4); }
+.research-suboptions[hidden] { display: none; }
+
 /* ── Job list ───────────────────────────────────────────── */
 
 .research-section-label {
@@ -383,6 +416,26 @@ select.input option { background: var(--paper-100); color: var(--fg); }
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: var(--space-2);
+}
+
+/* Download popover: anchored below its trigger button. */
+.research-download { position: relative; display: inline-flex; }
+.research-download-panel {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  z-index: 50;
+  min-width: 160px;
+}
+.research-download-panel[hidden] { display: none; }
+/* The items are <button>s — strip the native chrome so they read as menu rows. */
+.research-download-panel .menu-item {
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
 }
 
 .research-remixes { margin: 0 0 var(--space-6); }
