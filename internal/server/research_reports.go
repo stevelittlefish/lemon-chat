@@ -20,7 +20,8 @@ const reportHTMLSystemPrompt = `You are an exceptional editorial designer and in
 Requirements:
 - Return only one complete HTML document, beginning with <!DOCTYPE html>. Do not use Markdown fences or add commentary.
 - Make the hierarchy immediately scannable. Prefer concise sections, summaries, key-stat blocks, cards, timelines, comparison tables, callouts, and lists over walls of text.
-- Preserve the report's meaning, important detail, nuance, and citations. Do not invent facts or sources.
+- Preserve the report's meaning, important detail, nuance, and every citation. Do not invent facts or sources.
+- Make every inline citation a direct hyperlink to its source's real URL. The report lists each source's URL (a "Sources" section and reference definitions like "[S1]: https://example.com"); resolve each [S1] marker to that URL and render it as an anchor: <a href="https://example.com" target="_blank" rel="noopener noreferrer">. Clicking a citation must open the actual source in a new tab — never point a citation at an in-page references list or a "#fragment" anchor. You may still include a sources list, but every entry there must link to its real external URL the same way.
 - Add useful diagrams or data visualisations where the material benefits from them. Draw these with semantic HTML, CSS, or inline SVG.
 - Use excellent responsive typography, spacing, colour, and print styles. The result must work on mobile and desktop.
 - Make it fully self-contained: inline all CSS and SVG. Do not use scripts, external assets, external stylesheets, web fonts, images, or network requests.
@@ -368,7 +369,7 @@ func (s *Server) handleGetResearchReportVariantDocument(w http.ResponseWriter, r
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:")
+	w.Header().Set("Content-Security-Policy", "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(report.HTML))

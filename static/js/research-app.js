@@ -476,7 +476,7 @@ function reportContent(job, id) {
       <a class="research-open-html" href="/api/research/${id}/report/document" target="_blank" rel="noopener noreferrer">open in new tab</a>
     </div>
     <div class="research-html-frame" data-panel="html">
-      <iframe class="research-html-doc" title="designed report" sandbox src="/api/research/${id}/report/document"></iframe>
+      <iframe class="research-html-doc" title="designed report" sandbox="allow-popups allow-popups-to-escape-sandbox" src="/api/research/${id}/report/document"></iframe>
     </div>
     <div id="research-report" class="research-report" data-panel="markdown"></div>`;
 }
@@ -644,7 +644,7 @@ async function showReport(jobID, reportID) {
       <button class="research-tab" role="tab" data-tab="markdown">markdown</button>
     </div>` : '';
   const htmlPanel = hasHTML
-    ? `<div class="research-html-frame" data-panel="html"><iframe class="research-html-doc" title="${escapeHtml(label)}" sandbox src="/api/research/${jobID}/reports/${reportID}/document"></iframe></div>`
+    ? `<div class="research-html-frame" data-panel="html"><iframe class="research-html-doc" title="${escapeHtml(label)}" sandbox="allow-popups allow-popups-to-escape-sandbox" src="/api/research/${jobID}/reports/${reportID}/document"></iframe></div>`
     : '';
   const mdPanel = hasMarkdown
     ? `<div class="research-report" data-panel="markdown">${render(report.markdown)}</div>`
