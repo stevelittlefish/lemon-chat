@@ -164,6 +164,12 @@ async function showList() {
         </label>
       </div>
       <div class="research-form-options" id="research-html-style-row">
+        <label class="research-field">HTML report model
+          <select id="research-html-model" class="input">
+            <option value="">same as research model</option>
+            ${modelList.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`).join('')}
+          </select>
+        </label>
         <textarea id="research-html-style" class="input textarea" rows="2" maxlength="2000"
           placeholder="optional style for the HTML report (e.g. earthy greens, simple typography)"></textarea>
       </div>
@@ -216,13 +222,14 @@ async function startResearch() {
   const deepReport = document.getElementById('research-deep-report').checked;
   const autoHtmlReport = document.getElementById('research-html-report').checked;
   const htmlReportDirection = autoHtmlReport ? document.getElementById('research-html-style').value.trim() : '';
+  const htmlReportModel = autoHtmlReport ? document.getElementById('research-html-model').value : '';
   const pauseRedditImport = document.getElementById('research-pause-reddit').checked;
   const effort = parseInt(document.getElementById('research-effort').value, 10) || formDefaults.effort;
   const maxTimeMinutes = parseInt(document.getElementById('research-time').value, 10) || formDefaults.max_time_minutes;
   const btn = document.getElementById('research-start');
   btn.disabled = true;
   try {
-    const job = await research.start(title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, effort, maxTimeMinutes);
+    const job = await research.start(title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, htmlReportModel, effort, maxTimeMinutes);
     location.hash = job.id;
   } catch (err) {
     btn.disabled = false;

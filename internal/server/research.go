@@ -161,6 +161,16 @@ func (s *Server) researchModel(requested string) string {
 	return s.cfg.Server.DefaultModel
 }
 
+// htmlReportModel resolves which model to use for the HTML report step. An
+// explicit request wins, then the configured default, and finally the job's own
+// model. An empty return means "reuse the job model".
+func (s *Server) htmlReportModel(requested string) string {
+	if requested != "" {
+		return requested
+	}
+	return s.cfg.Research.HTMLReportModel
+}
+
 // ResumeResearchJobs restarts jobs that were in flight when the server last
 // stopped. Each resumes from its last checkpoint. Call once at startup.
 func (s *Server) ResumeResearchJobs() {
@@ -349,6 +359,11 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 		log.Printf("research: job %d: prepare default report for HTML: %v", job.ID, err)
 		return price
 	}
+	// The HTML step may use a dedicated model; fall back to the job's own model.
+	htmlModel := job.Model
+	if job.HTMLReportModel != nil && *job.HTMLReportModel != "" {
+		htmlModel = *job.HTMLReportModel
+	}
 	direction := ""
 	if job.HTMLReportDirection != nil {
 		direction = *job.HTMLReportDirection
@@ -366,7 +381,7 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 	}
 	genCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	html, cost, err := s.generateReportHTML(genCtx, job.Model, title, markdown, direction, nil)
+	html, cost, err := s.generateReportHTML(genCtx, htmlModel, title, markdown, direction, nil)
 	if err != nil {
 		log.Printf("research: job %d: auto HTML report: %v", job.ID, err)
 		return price
@@ -375,7 +390,7 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 		log.Printf("research: job %d: save auto HTML report: %v", job.ID, err)
 		return price
 	}
-	log.Printf("Generated HTML report id=%d model=%q chars=%d", job.ID, job.Model, len(html))
+	log.Printf("Generated HTML report id=%d model=%q chars=%d", job.ID, htmlModel, len(html))
 	return addResearchPrice(price, cost)
 }
 
@@ -505,6 +520,7 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		DeepReport          bool   `json:"deep_report"`
 		AutoHTMLReport      bool   `json:"auto_html_report"`
 		HTMLReportDirection string `json:"html_report_direction"`
+		HTMLReportModel     string `json:"html_report_model"`
 		PauseRedditImport   bool   `json:"pause_reddit_import"`
 		Effort              int    `json:"effort"`
 		MaxTimeMinutes      int    `json:"max_time_minutes"`
@@ -522,10 +538,13 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "html report direction must be 2000 characters or fewer")
 		return
 	}
-	// The style direction is only meaningful when the HTML report is requested.
+	// The style direction and model override are only meaningful when the HTML
+	// report is requested.
 	if !req.AutoHTMLReport {
 		req.HTMLReportDirection = ""
+		req.HTMLReportModel = ""
 	}
+	req.HTMLReportModel = strings.TrimSpace(req.HTMLReportModel)
 	mode := req.Mode
 	if mode == "" {
 		mode = research.ModeResearch
@@ -560,15 +579,27 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "unknown model")
 		return
 	}
+	// The HTML report step may use a separate model; an empty result means "reuse
+	// the job model", resolved when the report is generated.
+	htmlReportModel := ""
+	if req.AutoHTMLReport {
+		htmlReportModel = s.htmlReportModel(req.HTMLReportModel)
+		if htmlReportModel != "" {
+			if _, err := s.cfg.ServerForModel(htmlReportModel); err != nil {
+				writeError(w, http.StatusBadRequest, "unknown HTML report model")
+				return
+			}
+		}
+	}
 
 	// ForceSearch only changes brainstorm-mode behaviour; ignore it otherwise.
 	forceSearch := req.ForceSearch && mode == research.ModeBrainstorm
-	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, req.AutoHTMLReport, req.HTMLReportDirection, effort, maxTimeSeconds)
+	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, req.AutoHTMLReport, req.HTMLReportDirection, htmlReportModel, effort, maxTimeSeconds)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	log.Printf("Starting research job id=%d user_id=%d model=%q mode=%q force_search=%t deep_report=%t auto_html_report=%t pause_reddit_import=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, mode, forceSearch, req.DeepReport, req.AutoHTMLReport, req.PauseRedditImport, effort, maxTimeSeconds, req.Title, req.Query)
+	log.Printf("Starting research job id=%d user_id=%d model=%q mode=%q force_search=%t deep_report=%t auto_html_report=%t html_report_model=%q pause_reddit_import=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, mode, forceSearch, req.DeepReport, req.AutoHTMLReport, htmlReportModel, req.PauseRedditImport, effort, maxTimeSeconds, req.Title, req.Query)
 	go s.runResearch(job)
 	writeJSON(w, http.StatusCreated, researchView(job))
 }

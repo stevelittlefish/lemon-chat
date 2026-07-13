@@ -22,6 +22,7 @@ type Config struct {
 
 type Research struct {
 	Model                 string `toml:"model"`                  // default model for research jobs (falls back to server.default_model)
+	HTMLReportModel       string `toml:"html_report_model"`      // default model for the HTML report step (falls back to the job's model)
 	MaxRounds             int    `toml:"max_rounds"`             // hard upper bound on research rounds
 	MaxTimeSeconds        int    `toml:"max_time_seconds"`       // wall-clock budget, checked at the start of each round
 	MaxURLsPerRound       int    `toml:"max_urls_per_round"`     // URLs fetched per query per round

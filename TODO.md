@@ -92,7 +92,7 @@ Fleshing out research so a finished job is an inspectable, reusable artifact —
 - [x] **3. Start-form option to auto-generate the HTML report** (`internal/server/research.go:441`, `internal/server/research.go:318`, `static/js/research-app.js:100`)
   Add a form section with a tick box (on by default) to also produce the HTML report, plus a text box for stylistic requirements. When set, after the markdown report finishes the job automatically runs what remix does today and stores the HTML on the default report. Persist the toggle and style prompt on the job so a resumed/queued job still honours them.
 
-- [ ] **4. Optional separate model for the HTML report step** (`internal/server/research.go:441`, `internal/config/config.go:23`)
+- [x] **4. Optional separate model for the HTML report step** (`internal/server/research.go:441`, `internal/config/config.go:23`)
   Default to using the job's model for the whole process, but allow overriding just the HTML-generation model in the start form (and via config default). Thread it through to the auto-remix step from #3.
 
 - [ ] **5. SPIKE: per-phase model configuration** (`internal/research/researcher.go`, `internal/research/llm.go:21`, `internal/config/config.go:23`)
