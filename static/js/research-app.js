@@ -90,6 +90,7 @@ async function showList() {
       <span class="research-item-query">${escapeHtml(j.title || j.query)}</span>
       <span class="research-item-details">
         <span class="research-item-model">${escapeHtml(j.model)}</span>
+        ${j.remix_count ? `<span class="research-item-remixes">${j.remix_count} ${j.remix_count === 1 ? 'remix' : 'remixes'}</span>` : ''}
         <span class="research-item-meta">${formatDate(j.created_at)}</span>
         ${statusBadge(j.status)}
       </span>

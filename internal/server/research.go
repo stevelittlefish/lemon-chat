@@ -411,6 +411,7 @@ type researchJobView struct {
 	Round             int      `json:"round"`
 	ElapsedMS         int64    `json:"elapsed_ms"`
 	PriceUSD          *float64 `json:"price_usd"`
+	RemixCount        int      `json:"remix_count"`
 	Error             *string  `json:"error"`
 	CreatedAt         string   `json:"created_at"`
 	UpdatedAt         string   `json:"updated_at"`
@@ -512,9 +513,16 @@ func (s *Server) handleListResearch(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
+	remixCounts, err := s.store.ListResearchRemixCounts(user.ID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
 	views := make([]researchJobView, 0, len(jobs))
 	for i := range jobs {
-		views = append(views, researchView(&jobs[i]))
+		view := researchView(&jobs[i])
+		view.RemixCount = remixCounts[jobs[i].ID]
+		views = append(views, view)
 	}
 	writeJSON(w, http.StatusOK, views)
 }

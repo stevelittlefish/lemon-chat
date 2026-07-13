@@ -43,6 +43,32 @@ func (s *Store) ListResearchRemixes(jobID int64) ([]ResearchRemix, error) {
 	return remixes, rows.Err()
 }
 
+// ListResearchRemixCounts returns the number of saved remixes for each of a
+// user's research jobs. Jobs without remixes are omitted from the result.
+func (s *Store) ListResearchRemixCounts(userID int64) (map[int64]int, error) {
+	rows, err := s.db.Query(`
+		SELECT remix.research_job_id, COUNT(*)
+		FROM research_remix AS remix
+		JOIN research_job AS job ON job.id = remix.research_job_id
+		WHERE job.user_id = ?
+		GROUP BY remix.research_job_id`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	counts := make(map[int64]int)
+	for rows.Next() {
+		var jobID int64
+		var count int
+		if err := rows.Scan(&jobID, &count); err != nil {
+			return nil, err
+		}
+		counts[jobID] = count
+	}
+	return counts, rows.Err()
+}
+
 func (s *Store) GetResearchRemix(id, jobID int64) (*ResearchRemix, error) {
 	var remix ResearchRemix
 	err := s.db.QueryRow(`SELECT id, research_job_id, model, direction, html, price_usd, created_at FROM research_remix WHERE id = ? AND research_job_id = ?`, id, jobID).

@@ -25,4 +25,8 @@ func TestResearchRemixLifecycle(t *testing.T) {
 	if err != nil || got.HTML != "<!DOCTYPE html><html></html>" || got.Direction != "earthy colours" || got.PriceUSD == nil || *got.PriceUSD != price {
 		t.Fatalf("GetResearchRemix = %#v, %v", got, err)
 	}
+	counts, err := s.ListResearchRemixCounts(user.ID)
+	if err != nil || counts[job.ID] != 1 {
+		t.Fatalf("ListResearchRemixCounts = %#v, %v", counts, err)
+	}
 }

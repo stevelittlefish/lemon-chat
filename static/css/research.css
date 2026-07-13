@@ -171,6 +171,13 @@ html, body {
   white-space: nowrap;
 }
 
+.research-item-remixes {
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
 @media (max-width: 560px) {
   .research-item {
     align-items: flex-start;
