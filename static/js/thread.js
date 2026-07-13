@@ -367,12 +367,12 @@ export function showPicker(models, characters, onSelect) {
   }
 
   const modelCards = models.map(m => {
-    const rate = formatModelRate(m);
+    const rate = formatModelRate(m, { unit: false });
     return `
     <button class="picker-card" data-type="model" data-name="${escapeHtml(m.name)}">
       <span class="picker-card-icon">${icon('cpu', 22)}</span>
       <span class="picker-card-name">${escapeHtml(m.display_name)}</span>
-      ${rate ? `<span class="picker-card-price">${rate}</span>` : ''}
+      ${rate ? `<span class="picker-card-price" title="per 1M tokens (input / output)">${rate}</span>` : ''}
     </button>
   `;
   }).join('');
