@@ -98,6 +98,71 @@ func (s *Store) GetResearchReport(id, jobID int64) (*ResearchReport, error) {
 		`SELECT `+researchReportCols+` FROM research_report WHERE id = ? AND research_job_id = ?`, id, jobID))
 }
 
+// ResearchReportSummary is the lightweight list view of a report variant: its
+// metadata plus which renderings it carries, without the (potentially large)
+// markdown and HTML blobs.
+type ResearchReportSummary struct {
+	ID            int64    `json:"id"`
+	ResearchJobID int64    `json:"research_job_id"`
+	Model         string   `json:"model"`
+	Direction     string   `json:"direction"`
+	HasMarkdown   bool     `json:"has_markdown"`
+	HasHTML       bool     `json:"has_html"`
+	PriceUSD      *float64 `json:"price_usd"`
+	CreatedAt     string   `json:"created_at"`
+}
+
+// ListNonDefaultResearchReports returns the job's additional (non-default)
+// reports — the ones produced by the regenerate flow — newest first.
+func (s *Store) ListNonDefaultResearchReports(jobID int64) ([]ResearchReportSummary, error) {
+	rows, err := s.db.Query(`
+		SELECT id, research_job_id, model, direction,
+		       markdown IS NOT NULL AND markdown <> '',
+		       html IS NOT NULL AND html <> '',
+		       price_usd, created_at
+		FROM research_report
+		WHERE research_job_id = ? AND is_default = 0
+		ORDER BY created_at DESC, id DESC`, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var reports []ResearchReportSummary
+	for rows.Next() {
+		var rep ResearchReportSummary
+		if err := rows.Scan(&rep.ID, &rep.ResearchJobID, &rep.Model, &rep.Direction,
+			&rep.HasMarkdown, &rep.HasHTML, &rep.PriceUSD, &rep.CreatedAt); err != nil {
+			return nil, err
+		}
+		reports = append(reports, rep)
+	}
+	return reports, rows.Err()
+}
+
+// ListNonDefaultResearchReportCounts returns the number of additional
+// (non-default) reports for each of a user's jobs. Jobs without any are omitted.
+func (s *Store) ListNonDefaultResearchReportCounts(userID int64) (map[int64]int, error) {
+	rows, err := s.db.Query(`
+		SELECT rep.research_job_id, COUNT(*)
+		FROM research_report AS rep
+		JOIN research_job AS job ON job.id = rep.research_job_id
+		WHERE job.user_id = ? AND rep.is_default = 0
+		GROUP BY rep.research_job_id`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	counts := make(map[int64]int)
+	for rows.Next() {
+		var jobID, count int64
+		if err := rows.Scan(&jobID, &count); err != nil {
+			return nil, err
+		}
+		counts[jobID] = int(count)
+	}
+	return counts, rows.Err()
+}
+
 func (s *Store) GetDefaultResearchReport(jobID int64) (*ResearchReport, error) {
 	return scanResearchReport(s.db.QueryRow(
 		`SELECT `+researchReportCols+` FROM research_report WHERE research_job_id = ? AND is_default = 1`, jobID))

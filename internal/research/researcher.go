@@ -371,6 +371,40 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 	return r.formatCompositeReport(final), nil
 }
 
+// RegenerateReport re-runs only the final-report phase over the researcher's
+// already-loaded state (findings, plan, evolving report, category), honouring
+// cfg.DeepReport. It re-uses the same writer path as a normal run's final step,
+// so it can recover detail a previous single pass dropped — without searching
+// the web again. The returned price covers only the calls this regeneration
+// made; any price already on the loaded state is ignored.
+func (r *Researcher) RegenerateReport(ctx context.Context) (string, *float64, error) {
+	r.startTime = time.Now()
+	r.baseElapsed = r.state.ElapsedMS
+	r.state.PriceUSD = nil // report only the cost of this regeneration
+
+	if r.state.Report == "" && len(r.state.Findings) == 0 {
+		return "", nil, fmt.Errorf("job has no findings to regenerate a report from")
+	}
+	if r.state.Report == "" {
+		r.state.Report = "## Research Findings\n\nSynthesis was unavailable; the raw findings are listed below.\n\n" + r.formatFindings(r.state.Findings)
+	}
+
+	r.progress(Progress{Phase: "writing", TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
+	var final string
+	if r.cfg.DeepReport {
+		final = r.deepReport(ctx)
+	} else {
+		final = r.finalReport(ctx)
+	}
+	if ctx.Err() != nil {
+		return "", nil, ctx.Err()
+	}
+	if strings.TrimSpace(final) == "" {
+		return "", nil, fmt.Errorf("report regeneration produced no content")
+	}
+	return r.formatCompositeReport(final), r.state.PriceUSD, nil
+}
+
 func (r *Researcher) resumeRedditRound(ctx context.Context, resume RedditResume) (bool, error) {
 	pending := resume.Pending
 	findings := r.extractAll(ctx, pending.Round, pending.OrdinaryURLs)

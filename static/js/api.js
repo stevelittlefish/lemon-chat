@@ -201,12 +201,12 @@ export const research = {
   list: () => request('GET', '/api/research'),
   defaults: () => request('GET', '/api/research/defaults'),
   get: (id) => request('GET', `/api/research/${id}`),
-  createRemix: (id, model, direction, { onEvent, onDone, onError }) => {
+  regenerateReport: (id, { model, direction, markdown, html, deepReport }, { onEvent, onDone, onError }) => {
     const ctrl = new AbortController();
-    fetch(`/api/research/${id}/remixes`, {
+    fetch(`/api/research/${id}/reports`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-      body: JSON.stringify({ model, direction }),
+      body: JSON.stringify({ model, direction, markdown, html, deep_report: deepReport }),
       signal: ctrl.signal,
     }).then(async (res) => {
       if (!res.ok) {
@@ -220,7 +220,7 @@ export const research = {
     });
     return () => ctrl.abort();
   },
-  getRemix: (id, remixId) => request('GET', `/api/research/${id}/remixes/${remixId}`),
+  getReport: (id, reportId) => request('GET', `/api/research/${id}/reports/${reportId}`),
   start: (title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, htmlReportModel, workerModel, effort, maxTimeMinutes) =>
     request('POST', '/api/research', {
       title, query, ...(model ? { model } : {}), mode, force_search: forceSearch, deep_report: deepReport,

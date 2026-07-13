@@ -117,7 +117,7 @@ async function showList() {
       <span class="research-item-query">${escapeHtml(j.title || j.query)}</span>
       <span class="research-item-details">
         <span class="research-item-model">${escapeHtml(j.model)}</span>
-        ${j.remix_count ? `<span class="research-item-remixes">${j.remix_count} ${j.remix_count === 1 ? 'remix' : 'remixes'}</span>` : ''}
+        ${j.report_count ? `<span class="research-item-remixes">${j.report_count} ${j.report_count === 1 ? 'report' : 'reports'}</span>` : ''}
         <span class="research-item-meta">${formatDate(j.created_at)}</span>
         ${statusBadge(j.status)}
       </span>
@@ -374,7 +374,7 @@ async function showDetail(id) {
       <div class="research-detail-actions">
         ${!running && hasExploreData(job) ? '<button id="research-explore" class="btn btn-sm btn-secondary">explore data</button>' : ''}
         ${job.final_report ? `
-          <button id="research-remix" class="btn btn-sm btn-secondary">remix</button>
+          <button id="research-remix" class="btn btn-sm btn-secondary">regenerate report</button>
           <button id="research-dl-md" class="btn btn-sm btn-secondary">Markdown</button>
           <button id="research-dl-html" class="btn btn-sm btn-secondary">HTML</button>` : ''}
         ${running || awaitingReddit
@@ -396,7 +396,7 @@ async function showDetail(id) {
     </div>
     ${running ? '<div id="research-progress" class="research-progress"></div>' : ''}
     ${awaitingReddit ? redditWaitingPanel(job) : ''}
-    ${job.final_report ? remixShelf(job) : ''}
+    ${job.final_report ? reportShelf(job) : ''}
     <div id="research-error"></div>
     ${reportContent(job, id)}`;
 
@@ -417,10 +417,10 @@ async function showDetail(id) {
     location.hash = `${id}/explore`;
   });
   document.getElementById('research-remix')?.addEventListener('click', () => {
-    location.hash = `${id}/remix/new`;
+    location.hash = `${id}/report/new`;
   });
   main.querySelectorAll('.research-remix-item').forEach((el) => {
-    el.addEventListener('click', () => { location.hash = `${id}/remix/${el.dataset.remixId}`; });
+    el.addEventListener('click', () => { location.hash = `${id}/report/${el.dataset.reportId}`; });
   });
   document.getElementById('research-dl-html')?.addEventListener('click', () => {
     const heading = job.title || job.query;
@@ -480,17 +480,18 @@ function reportContent(job, id) {
     <div id="research-report" class="research-report" data-panel="markdown"></div>`;
 }
 
-function remixShelf(job) {
-  if (!job.remixes?.length) return '';
-  const items = (job.remixes || []).map((remix, index) => {
-    const label = remix.direction || `Remix ${(job.remixes.length - index)}`;
-    return `<button class="research-remix-item" data-remix-id="${remix.id}">
-      <span>${escapeHtml(label)}</span>
-      <small>${escapeHtml(remix.model)} · ${formatDate(remix.created_at)}${remix.price_usd != null ? ` · ${formatPrice(remix.price_usd)}` : ''}</small>
+function reportShelf(job) {
+  if (!job.reports?.length) return '';
+  const items = (job.reports || []).map((report, index) => {
+    const kinds = [report.has_markdown ? 'markdown' : '', report.has_html ? 'designed' : ''].filter(Boolean).join(' + ');
+    const label = report.direction || `Report ${(job.reports.length - index)}`;
+    return `<button class="research-remix-item" data-report-id="${report.id}">
+      <span>${escapeHtml(label)}${kinds ? ` <span class="research-report-kinds">${kinds}</span>` : ''}</span>
+      <small>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</small>
     </button>`;
   }).join('');
   return `<section class="research-remixes">
-    <p class="research-section-label">remixes</p>
+    <p class="research-section-label">regenerated reports</p>
     <div class="research-remix-list">${items}</div>
   </section>`;
 }
@@ -502,7 +503,7 @@ function setReportBackBtn(jobID) {
   document.getElementById('back-label').textContent = 'report';
 }
 
-async function showRemixForm(jobID) {
+async function showReportForm(jobID) {
   stopEvents();
   setReportBackBtn(jobID);
   let job;
@@ -512,35 +513,62 @@ async function showRemixForm(jobID) {
     .concat(modelList.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`))
     .join('');
   main.innerHTML = `<section class="card remix-form">
-    <p class="eyebrow">Report remix</p>
-    <h1>Make this easier to explore</h1>
-    <p class="remix-intro">The model will redesign <strong>${escapeHtml(job.title || job.query)}</strong> as a self-contained HTML document, using diagrams and visual structure where they help.</p>
+    <p class="eyebrow">Regenerate report</p>
+    <h1>Build a fresh report</h1>
+    <p class="remix-intro">Create a new report for <strong>${escapeHtml(job.title || job.query)}</strong>. Regenerating the markdown rewrites it from the raw findings, which can recover detail an earlier pass dropped. Designing an HTML version renders it as a self-contained, visual document.</p>
+    <fieldset class="remix-outputs">
+      <label class="research-field research-check"><input type="checkbox" id="remix-markdown" checked> regenerate markdown from findings</label>
+      <label class="research-field research-check" id="remix-deep-field"><input type="checkbox" id="remix-deep"> in-depth (section-by-section) report</label>
+      <label class="research-field research-check"><input type="checkbox" id="remix-html"> also design an HTML version</label>
+    </fieldset>
     <label class="remix-field">Model<select id="remix-model" class="input">${options}</select></label>
-    <label class="remix-field">Optional direction<textarea id="remix-direction" class="input textarea" rows="5" maxlength="2000" placeholder="For example: use earthy greens and browns, with simple typography"></textarea></label>
+    <label class="remix-field" id="remix-direction-field" hidden>Optional HTML direction<textarea id="remix-direction" class="input textarea" rows="5" maxlength="2000" placeholder="For example: use earthy greens and browns, with simple typography"></textarea></label>
     <div id="remix-progress" class="remix-progress" hidden aria-live="polite">
-      <div class="remix-progress-heading"><span id="remix-progress-label">Preparing document</span><span id="remix-progress-count"></span></div>
+      <div class="remix-progress-heading"><span id="remix-progress-label">Preparing</span><span id="remix-progress-count"></span></div>
       <div id="remix-progress-preview" class="remix-progress-preview"></div>
     </div>
     <div id="remix-error"></div>
     <div class="remix-form-actions">
       <a class="btn btn-secondary" href="#${jobID}">cancel</a>
-      <button id="remix-go" class="btn btn-primary">create remix</button>
+      <button id="remix-go" class="btn btn-primary">regenerate report</button>
     </div>
   </section>`;
+
+  const markdownCheck = document.getElementById('remix-markdown');
+  const htmlCheck = document.getElementById('remix-html');
+  const deepField = document.getElementById('remix-deep-field');
+  const directionField = document.getElementById('remix-direction-field');
+  // The deep-report toggle only affects markdown regeneration; the direction
+  // box only affects the designed HTML version.
+  const syncOptions = () => {
+    deepField.hidden = !markdownCheck.checked;
+    directionField.hidden = !htmlCheck.checked;
+  };
+  markdownCheck.addEventListener('change', syncOptions);
+  htmlCheck.addEventListener('change', syncOptions);
+  syncOptions();
+
   document.getElementById('remix-go').addEventListener('click', () => {
     const btn = document.getElementById('remix-go');
     const error = document.getElementById('remix-error');
     const model = document.getElementById('remix-model');
     const direction = document.getElementById('remix-direction');
+    const deep = document.getElementById('remix-deep');
     const progress = document.getElementById('remix-progress');
     const progressLabel = document.getElementById('remix-progress-label');
     const progressCount = document.getElementById('remix-progress-count');
     const progressPreview = document.getElementById('remix-progress-preview');
+    const wantMarkdown = markdownCheck.checked;
+    const wantHTML = htmlCheck.checked;
+    if (!wantMarkdown && !wantHTML) {
+      error.innerHTML = '<div class="research-error">Select at least one output: markdown, HTML, or both.</div>';
+      return;
+    }
+    const controls = [model, direction, deep, markdownCheck, htmlCheck];
     btn.setAttribute('disabled', '');
     btn.setAttribute('aria-busy', 'true');
-    model.disabled = true;
-    direction.disabled = true;
-    btn.textContent = 'designing document…';
+    controls.forEach((c) => { c.disabled = true; });
+    btn.textContent = 'regenerating…';
     error.innerHTML = '';
     progress.hidden = false;
     let completed = false;
@@ -548,50 +576,84 @@ async function showRemixForm(jobID) {
       error.innerHTML = `<div class="research-error">${escapeHtml(err.message)}</div>`;
       btn.removeAttribute('disabled');
       btn.removeAttribute('aria-busy');
-      model.disabled = false;
-      direction.disabled = false;
-      btn.textContent = 'create remix';
+      controls.forEach((c) => { c.disabled = false; });
+      btn.textContent = 'regenerate report';
     };
-    research.createRemix(jobID, model.value, direction.value.trim(), {
+    research.regenerateReport(jobID, {
+      model: model.value, direction: direction.value.trim(), markdown: wantMarkdown, html: wantHTML, deepReport: deep.checked,
+    }, {
       onEvent: (ev) => {
         if (ev.error) { reset(new Error(ev.error)); return; }
         if (ev.phase === 'connecting') progressLabel.textContent = 'Connecting to model';
-        if (ev.phase === 'generating') {
-          progressLabel.textContent = 'Designing document';
-          progressCount.textContent = `${ev.generated.toLocaleString()} characters`;
-          progressPreview.textContent = ev.snippet || '';
+        if (ev.phase === 'generating-markdown') {
+          progressLabel.textContent = 'Regenerating the report';
+          progressCount.textContent = ev.generated ? `${ev.generated.toLocaleString()} characters` : '';
+          if (ev.snippet) progressPreview.textContent = ev.snippet;
         }
-        if (ev.phase === 'validating') progressLabel.textContent = 'Checking document';
-        if (ev.phase === 'saving') progressLabel.textContent = 'Saving remix';
-        if (ev.phase === 'complete' && ev.remix) {
+        if (ev.phase === 'generating-html') {
+          progressLabel.textContent = 'Designing document';
+          progressCount.textContent = ev.generated ? `${ev.generated.toLocaleString()} characters` : '';
+          if (ev.snippet) progressPreview.textContent = ev.snippet;
+        }
+        if (ev.phase === 'saving') progressLabel.textContent = 'Saving report';
+        if (ev.phase === 'complete' && ev.report) {
           completed = true;
-          location.hash = `${jobID}/remix/${ev.remix.id}`;
+          location.hash = `${jobID}/report/${ev.report.id}`;
         }
       },
       onDone: () => {
-        if (!completed && btn.disabled && !error.textContent) reset(new Error('The remix stream ended before the document was saved.'));
+        if (!completed && btn.disabled && !error.textContent) reset(new Error('The stream ended before the report was saved.'));
       },
       onError: reset,
     });
   });
 }
 
-async function showRemix(jobID, remixID) {
+async function showReport(jobID, reportID) {
   stopEvents();
   setReportBackBtn(jobID);
-  let remix;
-  try { remix = await research.getRemix(jobID, remixID); } catch { location.hash = jobID; return; }
-  const label = remix.direction || 'Designed report';
+  let report;
+  try { report = await research.getReport(jobID, reportID); } catch { location.hash = jobID; return; }
+  const hasMarkdown = !!(report.markdown && report.markdown.trim());
+  const hasHTML = !!report.html;
+  const label = report.direction || 'Regenerated report';
+  const openBtn = hasHTML
+    ? `<a class="btn btn-sm btn-secondary" href="/api/research/${jobID}/reports/${reportID}/document" target="_blank" rel="noopener noreferrer">open HTML in new tab</a>`
+    : '';
+  const dlHtmlBtn = hasHTML ? '<button id="report-dl-html" class="btn btn-sm btn-secondary">download .html</button>' : '';
+  const dlMdBtn = hasMarkdown ? '<button id="report-dl-md" class="btn btn-sm btn-secondary">download .md</button>' : '';
+  // Tabs only when both renderings exist; otherwise show whichever one we have.
+  const tabs = (hasMarkdown && hasHTML) ? `
+    <div class="research-report-tabs" role="tablist">
+      <button class="research-tab" role="tab" data-tab="html">designed</button>
+      <button class="research-tab" role="tab" data-tab="markdown">markdown</button>
+    </div>` : '';
+  const htmlPanel = hasHTML
+    ? `<div class="research-html-frame" data-panel="html"><iframe class="research-html-doc" title="${escapeHtml(label)}" sandbox src="/api/research/${jobID}/reports/${reportID}/document"></iframe></div>`
+    : '';
+  const mdPanel = hasMarkdown
+    ? `<div class="research-report" data-panel="markdown">${render(report.markdown)}</div>`
+    : '';
   main.innerHTML = `<div class="remix-view-header">
-    <div><p class="eyebrow">Report remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(remix.model)} · ${formatDate(remix.created_at)}${remix.price_usd != null ? ` · ${formatPrice(remix.price_usd)}` : ''}</p></div>
-    <div class="remix-view-actions">
-      <button id="remix-download" class="btn btn-sm btn-secondary">download .html</button>
-      <a class="btn btn-sm btn-secondary" href="/api/research/${jobID}/remixes/${remixID}/document" target="_blank" rel="noopener noreferrer">open in new tab</a>
-    </div>
+    <div><p class="eyebrow">Regenerated report</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</p></div>
+    <div class="remix-view-actions">${dlMdBtn}${dlHtmlBtn}${openBtn}</div>
   </div>
-  <iframe class="remix-document" title="${escapeHtml(label)}" sandbox src="/api/research/${jobID}/remixes/${remixID}/document"></iframe>`;
-  document.getElementById('remix-download').addEventListener('click', () => {
-    downloadFile(`research-remix-${remix.id}.html`, 'text/html', remix.html);
+  ${tabs}${htmlPanel}${mdPanel}`;
+
+  if (hasMarkdown && hasHTML) {
+    const tabEls = main.querySelectorAll('.research-tab');
+    const setTab = (name) => {
+      tabEls.forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+      main.querySelectorAll('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== name; });
+    };
+    tabEls.forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
+    setTab('html');
+  }
+  document.getElementById('report-dl-md')?.addEventListener('click', () => {
+    downloadFile(`research-report-${report.id}.md`, 'text/markdown', report.markdown);
+  });
+  document.getElementById('report-dl-html')?.addEventListener('click', () => {
+    downloadFile(`research-report-${report.id}.html`, 'text/html', report.html);
   });
 }
 
@@ -830,10 +892,10 @@ function watchProgress(id) {
 
 function route() {
   const path = location.hash.slice(1);
-  const remixMatch = path.match(/^(\d+)\/remix\/(new|\d+)$/);
+  const reportMatch = path.match(/^(\d+)\/report\/(new|\d+)$/);
   const exploreMatch = path.match(/^(\d+)\/explore$/);
-  if (remixMatch && remixMatch[2] === 'new') showRemixForm(remixMatch[1]);
-  else if (remixMatch) showRemix(remixMatch[1], remixMatch[2]);
+  if (reportMatch && reportMatch[2] === 'new') showReportForm(reportMatch[1]);
+  else if (reportMatch) showReport(reportMatch[1], reportMatch[2]);
   else if (exploreMatch) showExplore(exploreMatch[1]);
   else if (path) showDetail(path);
   else showList();

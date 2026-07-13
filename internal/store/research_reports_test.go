@@ -33,19 +33,21 @@ func TestResearchReportDefaultUpsert(t *testing.T) {
 		t.Fatalf("ListResearchReports after re-finish = %#v, %v", reports, err)
 	}
 
-	// A remix becomes a non-default report carrying the master markdown + HTML.
-	if _, err := s.CreateResearchRemix(job.ID, "model-b", "bold", "<!DOCTYPE html><html></html>", nil); err != nil {
+	// An HTML report variant becomes a non-default report carrying its own
+	// markdown copy (the regenerate handler copies the master markdown when only
+	// an HTML rendering is requested).
+	if _, err := s.CreateResearchReport(job.ID, &report2, "<!DOCTYPE html><html></html>", "model-b", "bold", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	reports, err = s.ListResearchReports(job.ID)
 	if err != nil || len(reports) != 2 {
-		t.Fatalf("ListResearchReports after remix = %#v, %v", reports, err)
+		t.Fatalf("ListResearchReports after variant = %#v, %v", reports, err)
 	}
-	// Default sorts first; the remix copied the current master markdown.
+	// Default sorts first; the variant copied the current master markdown.
 	if !reports[0].IsDefault || reports[1].IsDefault {
 		t.Fatalf("expected default first: %#v", reports)
 	}
 	if reports[1].Markdown == nil || *reports[1].Markdown != report2 {
-		t.Fatalf("remix report did not copy master markdown: %+v", reports[1])
+		t.Fatalf("variant report did not copy master markdown: %+v", reports[1])
 	}
 }

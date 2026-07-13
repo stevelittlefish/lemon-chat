@@ -171,6 +171,29 @@ func (s *Server) htmlReportModel(requested string) string {
 	return s.cfg.Research.HTMLReportModel
 }
 
+// researchLocation resolves the configured timezone, falling back to the
+// server's local time when unset or invalid.
+func (s *Server) researchLocation() *time.Location {
+	if s.cfg.Server.Timezone != "" {
+		if l, err := time.LoadLocation(s.cfg.Server.Timezone); err == nil {
+			return l
+		}
+	}
+	return time.Local
+}
+
+// researchLLMQuery builds the LLM-facing prompt for a job from whichever of its
+// title and query fields are set.
+func researchLLMQuery(job *store.ResearchJob) string {
+	if job.Title != nil && *job.Title != "" {
+		if job.Query != "" {
+			return *job.Title + "\n\n" + job.Query
+		}
+		return *job.Title
+	}
+	return job.Query
+}
+
 // workerModel resolves which model to use for the worker tier (extraction plus
 // the mechanical slug/classify/query-gen/decide calls). An explicit request
 // wins, then the configured default, and finally the job's own model. An empty
@@ -229,22 +252,10 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		}
 	}
 
-	loc := time.Local
-	if s.cfg.Server.Timezone != "" {
-		if l, tzErr := time.LoadLocation(s.cfg.Server.Timezone); tzErr == nil {
-			loc = l
-		}
-	}
+	loc := s.researchLocation()
 
 	// Build the LLM-facing prompt from whichever fields are set.
-	llmQuery := job.Query
-	if job.Title != nil && *job.Title != "" {
-		if job.Query != "" {
-			llmQuery = *job.Title + "\n\n" + job.Query
-		} else {
-			llmQuery = *job.Title
-		}
-	}
+	llmQuery := researchLLMQuery(job)
 
 	rc := s.cfg.Research
 	maxRounds, minRounds, extraRounds := researchEffortRounds(job.Effort, rc.MaxRounds, rc.MinRounds)
@@ -508,7 +519,7 @@ type researchJobView struct {
 	Round             int      `json:"round"`
 	ElapsedMS         int64    `json:"elapsed_ms"`
 	PriceUSD          *float64 `json:"price_usd"`
-	RemixCount        int      `json:"remix_count"`
+	ReportCount       int      `json:"report_count"`
 	Error             *string  `json:"error"`
 	CreatedAt         string   `json:"created_at"`
 	UpdatedAt         string   `json:"updated_at"`
@@ -653,7 +664,7 @@ func (s *Server) handleListResearch(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	remixCounts, err := s.store.ListResearchRemixCounts(user.ID)
+	reportCounts, err := s.store.ListNonDefaultResearchReportCounts(user.ID)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -661,7 +672,7 @@ func (s *Server) handleListResearch(w http.ResponseWriter, r *http.Request) {
 	views := make([]researchJobView, 0, len(jobs))
 	for i := range jobs {
 		view := researchView(&jobs[i])
-		view.RemixCount = remixCounts[jobs[i].ID]
+		view.ReportCount = reportCounts[jobs[i].ID]
 		views = append(views, view)
 	}
 	writeJSON(w, http.StatusOK, views)
@@ -684,7 +695,7 @@ func (s *Server) handleGetResearch(w http.ResponseWriter, r *http.Request) {
 			request = &pending.Request
 		}
 	}
-	remixes, err := s.store.ListResearchRemixes(job.ID)
+	reports, err := s.store.ListNonDefaultResearchReports(job.ID)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -700,10 +711,10 @@ func (s *Server) handleGetResearch(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, struct {
 		*store.ResearchJob
-		RedditRequest *redditimport.Request `json:"reddit_request,omitempty"`
-		Remixes       []store.ResearchRemix `json:"remixes"`
-		ReportHTML    bool                  `json:"report_html"`
-	}{ResearchJob: job, RedditRequest: request, Remixes: remixes, ReportHTML: reportHTML})
+		RedditRequest *redditimport.Request         `json:"reddit_request,omitempty"`
+		Reports       []store.ResearchReportSummary `json:"reports"`
+		ReportHTML    bool                          `json:"report_html"`
+	}{ResearchJob: job, RedditRequest: request, Reports: reports, ReportHTML: reportHTML})
 }
 
 // handleGetResearchReportDocument serves the default report's designed HTML
