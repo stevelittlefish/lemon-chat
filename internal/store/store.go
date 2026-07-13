@@ -755,6 +755,21 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v34 → v35 complete")
 	}
 
+	if version < 36 {
+		log.Println("store: migrating v35 → v36 (add auto HTML report options to research_job)")
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN auto_html_report INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN html_report_direction TEXT`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (36, ?)`, now()); err != nil {
+			return err
+		}
+		version = 36
+		log.Println("store: migration v35 → v36 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

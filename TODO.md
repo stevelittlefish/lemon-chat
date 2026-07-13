@@ -89,7 +89,7 @@ Fleshing out research so a finished job is an inspectable, reusable artifact —
 - [x] **2. Refactor: multiple reports per job** (`internal/store/research.go`, `internal/store/store.go`, `internal/store/research_remixes.go:8`)
   Introduce a `research_report` concept: each job has any number of reports, one by default. A report is a master markdown document (today's `final_report`) plus an optional HTML version (today's remix output). Add a numbered migration that creates the table and back-fills existing `final_report` values and `research_remix` rows into it, then repoint the report/remix read paths. This is the structural change the toggle and revamped remix build on — do it before #3–#6.
 
-- [ ] **3. Start-form option to auto-generate the HTML report** (`internal/server/research.go:441`, `internal/server/research.go:318`, `static/js/research-app.js:100`)
+- [x] **3. Start-form option to auto-generate the HTML report** (`internal/server/research.go:441`, `internal/server/research.go:318`, `static/js/research-app.js:100`)
   Add a form section with a tick box (on by default) to also produce the HTML report, plus a text box for stylistic requirements. When set, after the markdown report finishes the job automatically runs what remix does today and stores the HTML on the default report. Persist the toggle and style prompt on the job so a resumed/queued job still honours them.
 
 - [ ] **4. Optional separate model for the HTML report step** (`internal/server/research.go:441`, `internal/config/config.go:23`)

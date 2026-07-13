@@ -12,7 +12,7 @@ func TestCreateResearchJobPersistsRedditImportOption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := s.CreateResearchJob(user.ID, "Title", "Query", "model", "research", false, false, true, 3, 600)
+	job, err := s.CreateResearchJob(user.ID, "Title", "Query", "model", "research", false, false, true, false, "", 3, 600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,13 +28,32 @@ func TestCreateResearchJobPersistsRedditImportOption(t *testing.T) {
 	}
 }
 
+func TestCreateResearchJobPersistsAutoHTMLReport(t *testing.T) {
+	s := newTestStore(t)
+	user, err := s.CreateUser("html-researcher", nil, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := s.CreateResearchJob(user.ID, "Title", "Query", "model", "research", false, false, false, true, "earthy greens", 3, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := s.GetResearchJob(job.ID, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !loaded.AutoHTMLReport || loaded.HTMLReportDirection == nil || *loaded.HTMLReportDirection != "earthy greens" {
+		t.Fatalf("auto HTML report options not persisted: %+v", loaded)
+	}
+}
+
 func TestResearchRedditPauseAndResumeIsDurableAndIdempotent(t *testing.T) {
 	s := newTestStore(t)
 	user, err := s.CreateUser("reddit-researcher", nil, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := s.CreateResearchJob(user.ID, "", "Query", "model", "research", false, false, true, 3, 600)
+	job, err := s.CreateResearchJob(user.ID, "", "Query", "model", "research", false, false, true, false, "", 3, 600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,8 +171,8 @@ func TestMigrationsV31AndV32PreserveExistingResearchData(t *testing.T) {
 		t.Fatalf("new Reddit state was not safely defaulted: %+v", job)
 	}
 	var version int
-	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 35 {
-		t.Fatalf("schema version = %d, err=%v; want 35", version, err)
+	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 36 {
+		t.Fatalf("schema version = %d, err=%v; want 36", version, err)
 	}
 	var violations int
 	rows, err := s.db.Query(`PRAGMA foreign_key_check`)

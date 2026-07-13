@@ -212,8 +212,14 @@ select.input option { background: var(--paper-100); color: var(--fg); }
 .research-form-options {
   display: flex;
   align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
   margin-top: var(--space-4);
 }
+
+#research-html-style-row { margin-top: var(--space-3); }
+#research-html-style-row[hidden] { display: none; }
+#research-html-style { width: 100%; max-width: none; }
 
 .research-field {
   display: flex;

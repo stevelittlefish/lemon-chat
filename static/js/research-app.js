@@ -157,8 +157,15 @@ async function showList() {
       </div>
       <div class="research-form-options">
         <label class="research-field research-check">
+          <input type="checkbox" id="research-html-report" checked> also design an HTML report
+        </label>
+        <label class="research-field research-check">
           <input type="checkbox" id="research-pause-reddit"> pause to import Reddit results
         </label>
+      </div>
+      <div class="research-form-options" id="research-html-style-row">
+        <textarea id="research-html-style" class="input textarea" rows="2" maxlength="2000"
+          placeholder="optional style for the HTML report (e.g. earthy greens, simple typography)"></textarea>
       </div>
     </div>
     <p class="research-section-label">past research</p>
@@ -180,6 +187,13 @@ async function showList() {
     document.getElementById('research-force-search-field').hidden = !brainstorm;
   });
 
+  // The style box only applies when the HTML report is requested.
+  const htmlReportCheck = document.getElementById('research-html-report');
+  const htmlStyleRow = document.getElementById('research-html-style-row');
+  const syncHtmlStyle = () => { htmlStyleRow.hidden = !htmlReportCheck.checked; };
+  htmlReportCheck.addEventListener('change', syncHtmlStyle);
+  syncHtmlStyle();
+
   document.getElementById('research-start').addEventListener('click', startResearch);
   document.getElementById('research-query').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) startResearch();
@@ -200,13 +214,15 @@ async function startResearch() {
   const mode = document.getElementById('research-mode').value;
   const forceSearch = mode === 'brainstorm' && document.getElementById('research-force-search').checked;
   const deepReport = document.getElementById('research-deep-report').checked;
+  const autoHtmlReport = document.getElementById('research-html-report').checked;
+  const htmlReportDirection = autoHtmlReport ? document.getElementById('research-html-style').value.trim() : '';
   const pauseRedditImport = document.getElementById('research-pause-reddit').checked;
   const effort = parseInt(document.getElementById('research-effort').value, 10) || formDefaults.effort;
   const maxTimeMinutes = parseInt(document.getElementById('research-time').value, 10) || formDefaults.max_time_minutes;
   const btn = document.getElementById('research-start');
   btn.disabled = true;
   try {
-    const job = await research.start(title, query, model, mode, forceSearch, deepReport, pauseRedditImport, effort, maxTimeMinutes);
+    const job = await research.start(title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, effort, maxTimeMinutes);
     location.hash = job.id;
   } catch (err) {
     btn.disabled = false;
@@ -281,6 +297,7 @@ function progressLine(ev) {
     }
     case 'deciding': return `round ${ev.round} — stop check: ${ev.message}`;
     case 'writing': return ev.message || 'writing final report';
+    case 'designing': return ev.message || 'designing the HTML report';
     case 'note': return ev.message;
     case 'warning': return ev.message;
     default: return ev.message || ev.phase;
@@ -340,6 +357,7 @@ async function showDetail(id) {
       <div class="research-detail-actions">
         ${!running && hasExploreData(job) ? '<button id="research-explore" class="btn btn-sm btn-secondary">explore data</button>' : ''}
         ${job.final_report ? `
+          ${job.report_html ? `<a class="btn btn-sm btn-secondary" href="/api/research/${id}/report/document" target="_blank" rel="noopener noreferrer">designed report</a>` : ''}
           <button id="research-remix" class="btn btn-sm btn-secondary">remix</button>
           <button id="research-dl-md" class="btn btn-sm btn-secondary">Markdown</button>
           <button id="research-dl-html" class="btn btn-sm btn-secondary">HTML</button>` : ''}

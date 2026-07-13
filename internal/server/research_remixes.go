@@ -62,8 +62,7 @@ func (s *Server) handleCreateResearchRemix(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusUnprocessableEntity, "no default model configured")
 		return
 	}
-	modelServer, err := s.cfg.ServerForModel(model)
-	if err != nil {
+	if _, err := s.cfg.ServerForModel(model); err != nil {
 		writeError(w, http.StatusBadRequest, "unknown model")
 		return
 	}
@@ -71,10 +70,6 @@ func (s *Server) handleCreateResearchRemix(w http.ResponseWriter, r *http.Reques
 	title := job.Query
 	if job.Title != nil && *job.Title != "" {
 		title = *job.Title
-	}
-	userPrompt := fmt.Sprintf("Document title: %s\n\nResearch report:\n%s", title, *job.FinalReport)
-	if req.Direction != "" {
-		userPrompt += "\n\nAdditional art direction from the user:\n" + req.Direction
 	}
 	timeout := time.Duration(s.cfg.Server.ResponseTimeoutSeconds) * time.Second
 	if timeout <= 0 {
@@ -92,37 +87,17 @@ func (s *Server) handleCreateResearchRemix(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("X-Accel-Buffering", "no")
 	writeRemixEvent(w, flusher, map[string]any{"phase": "connecting", "message": "connecting to model"})
 
-	var generated strings.Builder
-	lastProgress := time.Time{}
-	completion, err := llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
-		[]llm.Message{{Role: "system", Content: remixSystemPrompt}, {Role: "user", Content: userPrompt}},
-		map[string]any{"temperature": 0.7}, func(delta string) {
-			generated.WriteString(delta)
-			if time.Since(lastProgress) < 250*time.Millisecond {
-				return
-			}
-			lastProgress = time.Now()
-			tail := generated.String()
-			if len(tail) > 320 {
-				tail = tail[len(tail)-320:]
-			}
-			writeRemixEvent(w, flusher, map[string]any{"phase": "generating", "generated": generated.Len(), "snippet": tail})
-		})
+	html, cost, err := s.generateReportHTML(ctx, model, title, *job.FinalReport, req.Direction, func(generated int, tail string) {
+		writeRemixEvent(w, flusher, map[string]any{"phase": "generating", "generated": generated, "snippet": tail})
+	})
 	if err != nil {
 		log.Printf("research remix: generation failed job_id=%d user_id=%d: %v", job.ID, user.ID, err)
-		writeRemixEvent(w, flusher, map[string]any{"error": "remix generation failed: " + err.Error()})
-		writeRemixDone(w, flusher)
-		return
-	}
-	writeRemixEvent(w, flusher, map[string]any{"phase": "validating", "message": "checking the HTML document"})
-	html, err := normalizeRemixHTML(completion.Content)
-	if err != nil {
 		writeRemixEvent(w, flusher, map[string]any{"error": err.Error()})
 		writeRemixDone(w, flusher)
 		return
 	}
 	writeRemixEvent(w, flusher, map[string]any{"phase": "saving", "message": "saving remix"})
-	remix, err := s.store.CreateResearchRemix(job.ID, model, req.Direction, html, completion.UsageCost())
+	remix, err := s.store.CreateResearchRemix(job.ID, model, req.Direction, html, cost)
 	if err != nil {
 		log.Printf("research remix: save failed job_id=%d user_id=%d: %v", job.ID, user.ID, err)
 		writeRemixEvent(w, flusher, map[string]any{"error": "could not save remix"})
@@ -132,6 +107,45 @@ func (s *Server) handleCreateResearchRemix(w http.ResponseWriter, r *http.Reques
 	logResearchRemix(remix, user.ID)
 	writeRemixEvent(w, flusher, map[string]any{"phase": "complete", "remix": remix})
 	writeRemixDone(w, flusher)
+}
+
+// generateReportHTML renders report markdown as a self-contained HTML document
+// using the editorial-design prompt shared by the interactive remix flow and
+// the auto-generated report step. onProgress, if non-nil, receives throttled
+// updates carrying the characters generated so far and the tail of the output.
+func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown, direction string, onProgress func(generated int, tail string)) (string, *float64, error) {
+	modelServer, err := s.cfg.ServerForModel(model)
+	if err != nil {
+		return "", nil, fmt.Errorf("unknown model %q", model)
+	}
+	userPrompt := fmt.Sprintf("Document title: %s\n\nResearch report:\n%s", title, markdown)
+	if direction != "" {
+		userPrompt += "\n\nAdditional art direction from the user:\n" + direction
+	}
+	var generated strings.Builder
+	lastProgress := time.Time{}
+	completion, err := llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
+		[]llm.Message{{Role: "system", Content: remixSystemPrompt}, {Role: "user", Content: userPrompt}},
+		map[string]any{"temperature": 0.7}, func(delta string) {
+			generated.WriteString(delta)
+			if onProgress == nil || time.Since(lastProgress) < 250*time.Millisecond {
+				return
+			}
+			lastProgress = time.Now()
+			tail := generated.String()
+			if len(tail) > 320 {
+				tail = tail[len(tail)-320:]
+			}
+			onProgress(generated.Len(), tail)
+		})
+	if err != nil {
+		return "", nil, fmt.Errorf("HTML generation failed: %w", err)
+	}
+	html, err := normalizeRemixHTML(completion.Content)
+	if err != nil {
+		return "", nil, err
+	}
+	return html, completion.UsageCost(), nil
 }
 
 func writeRemixEvent(w http.ResponseWriter, flusher http.Flusher, event any) {

@@ -78,6 +78,21 @@ func (s *Store) UpsertDefaultResearchReport(jobID int64, markdown, model string)
 	return err
 }
 
+// SetDefaultResearchReportHTML attaches a designed HTML rendering (and the
+// style direction and cost that produced it) to the job's default report.
+func (s *Store) SetDefaultResearchReportHTML(jobID int64, html, direction string, priceUSD *float64) error {
+	res, err := s.db.Exec(
+		`UPDATE research_report SET html = ?, direction = ?, price_usd = ?, updated_at = ? WHERE research_job_id = ? AND is_default = 1`,
+		html, direction, priceUSD, now(), jobID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) GetResearchReport(id, jobID int64) (*ResearchReport, error) {
 	return scanResearchReport(s.db.QueryRow(
 		`SELECT `+researchReportCols+` FROM research_report WHERE id = ? AND research_job_id = ?`, id, jobID))
