@@ -243,6 +243,39 @@ select.input option { background: var(--paper-100); color: var(--fg); }
 .research-check input { cursor: pointer; accent-color: var(--hm-cyan); }
 .research-force-search[hidden] { display: none; }
 
+/* ── Progressive disclosure ─────────────────────────────── */
+
+.research-disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  padding: var(--space-1) 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--fg-muted);
+  transition: color var(--dur-fast) var(--ease);
+}
+.research-disclosure:hover { color: var(--fg); }
+.research-disclosure svg { transition: transform var(--dur-fast) var(--ease); }
+.research-disclosure.open svg { transform: rotate(90deg); }
+
+.research-advanced[hidden] { display: none; }
+.research-advanced {
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.research-advanced .research-form-options { margin-top: var(--space-3); }
+.research-advanced .research-field-hint { margin: var(--space-1) 0 0; }
+
+/* HTML-report style/model sub-controls, indented under their checkbox. */
+.research-suboptions { padding-left: var(--space-4); }
+.research-suboptions[hidden] { display: none; }
+
 /* ── Job list ───────────────────────────────────────────── */
 
 .research-section-label {

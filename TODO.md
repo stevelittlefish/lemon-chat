@@ -107,7 +107,7 @@ Fleshing out research so a finished job is an inspectable, reusable artifact —
 - [x] **7. Revamp remix into report regeneration** (`internal/server/research_reports.go`)
   Today remix only reskins the existing `final_report` into HTML and can't recover detail the writer dropped. Extend it to also (a) regenerate a fresh markdown report from the raw `findings`/`report`/`plan` (reusing `finalReport`/`deepReport`), or (b) do both, saving results as new reports on the job. Model is configurable per #4. Depends on the reports refactor (#2).
 
-- [ ] **8. Holistic progressive-disclosure UI revamp** (`static/js/research-app.js:100`, `static/research.html`)
+- [~] **8. Holistic progressive-disclosure UI revamp** (`static/js/research-app.js:100`, `static/research.html`)
   Redesign the whole research UI around progressive disclosure: launching a job with sensible defaults should be one obvious action, with effort, mode, models, deep-report, HTML-report, Reddit-import, and time-limit controls revealed in layers as the user opts into more customisation. Applies to the start form, the job list, and the completed-report/reports view. Best done last, once #1–#7 have settled what controls exist.
 
 - [x] **9. Preserve all sources and citations in the HTML report** (`internal/server/research_reports.go`, `internal/server/research.go`, `static/js/research-app.js`)
