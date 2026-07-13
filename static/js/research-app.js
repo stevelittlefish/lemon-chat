@@ -357,7 +357,6 @@ async function showDetail(id) {
       <div class="research-detail-actions">
         ${!running && hasExploreData(job) ? '<button id="research-explore" class="btn btn-sm btn-secondary">explore data</button>' : ''}
         ${job.final_report ? `
-          ${job.report_html ? `<a class="btn btn-sm btn-secondary" href="/api/research/${id}/report/document" target="_blank" rel="noopener noreferrer">designed report</a>` : ''}
           <button id="research-remix" class="btn btn-sm btn-secondary">remix</button>
           <button id="research-dl-md" class="btn btn-sm btn-secondary">Markdown</button>
           <button id="research-dl-html" class="btn btn-sm btn-secondary">HTML</button>` : ''}
@@ -381,7 +380,7 @@ async function showDetail(id) {
     ${awaitingReddit ? redditWaitingPanel(job) : ''}
     ${job.final_report ? remixShelf(job) : ''}
     <div id="research-error"></div>
-    <div id="research-report" class="research-report"></div>`;
+    ${reportContent(job, id)}`;
 
   document.getElementById('research-cancel')?.addEventListener('click', async () => {
     try { await research.cancel(id); showDetail(id); } catch { /* already finished */ }
@@ -414,6 +413,18 @@ async function showDetail(id) {
       htmlDocument(heading, headingHtml + render(job.final_report)));
   });
 
+  // When a designed HTML version exists, the content area is tabbed. The HTML
+  // tab is shown by default.
+  if (job.report_html) {
+    const tabs = main.querySelectorAll('.research-tab');
+    const setTab = (name) => {
+      tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+      main.querySelectorAll('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== name; });
+    };
+    tabs.forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
+    setTab('html');
+  }
+
   if (job.status === 'error' && job.error) {
     document.getElementById('research-error').innerHTML =
       `<div class="research-error">${escapeHtml(job.error)}</div>`;
@@ -429,6 +440,25 @@ async function showDetail(id) {
 
   if (running) watchProgress(id);
   if (awaitingReddit) wireRedditWaitingPanel(id, job);
+}
+
+// reportContent renders the main report area. With a designed HTML version it
+// is tabbed (designed HTML in a full-width iframe, markdown in the usual
+// column); otherwise it is just the markdown column. The markdown container is
+// always present so callers can populate it with the rendered report.
+function reportContent(job, id) {
+  if (!job.report_html) {
+    return '<div id="research-report" class="research-report"></div>';
+  }
+  return `
+    <div class="research-report-tabs" role="tablist">
+      <button class="research-tab" role="tab" data-tab="html">designed</button>
+      <button class="research-tab" role="tab" data-tab="markdown">markdown</button>
+    </div>
+    <div class="research-html-frame" data-panel="html">
+      <iframe class="research-html-doc" title="designed report" sandbox src="/api/research/${id}/report/document"></iframe>
+    </div>
+    <div id="research-report" class="research-report" data-panel="markdown"></div>`;
 }
 
 function remixShelf(job) {
