@@ -472,6 +472,7 @@ function reportContent(job, id) {
     <div class="research-report-tabs" role="tablist">
       <button class="research-tab" role="tab" data-tab="html">designed</button>
       <button class="research-tab" role="tab" data-tab="markdown">markdown</button>
+      <a class="research-open-html" href="/api/research/${id}/report/document" target="_blank" rel="noopener noreferrer">open in new tab</a>
     </div>
     <div class="research-html-frame" data-panel="html">
       <iframe class="research-html-doc" title="designed report" sandbox src="/api/research/${id}/report/document"></iframe>

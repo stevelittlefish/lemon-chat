@@ -565,6 +565,17 @@ select.input option { background: var(--paper-100); color: var(--fg); }
 }
 .research-tab:hover { color: var(--fg); }
 .research-tab.active { color: var(--hm-cyan); border-bottom-color: var(--hm-cyan); }
+/* Pushed to the trailing edge of the tab bar; only meaningful for the designed
+   HTML report, which the iframe can otherwise feel cramped in. */
+.research-open-html {
+  margin-left: auto;
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--fg-muted);
+  text-decoration: none;
+}
+.research-open-html:hover { color: var(--fg); text-decoration: underline; }
 
 /* The designed HTML report breaks out of the centred column to span the full
    viewport width. */
