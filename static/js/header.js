@@ -1,5 +1,5 @@
 import { icon } from './icons.js';
-import { escapeHtml } from './utils.js';
+import { escapeHtml, formatModelRate } from './utils.js';
 
 const headerEl = document.getElementById('chat-header');
 
@@ -151,10 +151,14 @@ function toggleDropdown() {
   html += `<div class="model-picker-dropdown-label">model</div>`;
   html += state.models.map(m => {
     const sel = isMSel && m.name === state.selection.name;
+    const rate = formatModelRate(m);
     return `
       <div class="model-picker-option${sel ? ' selected' : ''}" data-type="model" data-name="${escapeHtml(m.name)}">
         <span class="model-picker-option-icon">${icon(sel ? 'check' : 'cpu', 13)}</span>
-        <span class="model-picker-option-name">${escapeHtml(m.display_name)}</span>
+        <span class="model-picker-option-text">
+          <span class="model-picker-option-name">${escapeHtml(m.display_name)}</span>
+          ${rate ? `<span class="model-picker-option-price">${rate}</span>` : ''}
+        </span>
       </div>`;
   }).join('');
 

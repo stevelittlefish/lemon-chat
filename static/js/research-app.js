@@ -2,7 +2,7 @@
 import { requireAuth } from './settings-auth.js';
 import { research, models } from './api.js';
 import { render } from './markdown.js';
-import { copyToClipboard, escapeHtml } from './utils.js';
+import { copyToClipboard, escapeHtml, formatModelRate } from './utils.js';
 import { preload as preloadIcons, icon } from './icons.js';
 
 const main = document.getElementById('research-main');
@@ -50,6 +50,13 @@ function formatPrice(value) {
   if (value === 0) return '$0.00';
   const digits = value < 0.001 ? 6 : value < 0.01 ? 4 : 2;
   return `$${Number(value).toFixed(digits)}`;
+}
+
+// Model dropdown label: display name, with its per-token rate appended when known.
+function modelOptionLabel(m) {
+  const name = escapeHtml(m.display_name || m.name);
+  const rate = formatModelRate(m);
+  return rate ? `${name} — ${rate}` : name;
 }
 
 function formatDate(iso) {
@@ -106,7 +113,7 @@ async function showList() {
 
   const options = ['<option value="">default model</option>']
     .concat(modelList.map((m) =>
-      `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`))
+      `<option value="${escapeHtml(m.name)}">${modelOptionLabel(m)}</option>`))
     .join('');
 
   const effortOptions = EFFORT_LEVELS.map(([value, label]) =>
@@ -125,7 +132,7 @@ async function showList() {
     </div>`).join('');
 
   const modelOptions = (placeholder) => `<option value="">${placeholder}</option>` +
-    modelList.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`).join('');
+    modelList.map((m) => `<option value="${escapeHtml(m.name)}">${modelOptionLabel(m)}</option>`).join('');
 
   main.innerHTML = `
     <div class="card research-form">
@@ -562,7 +569,7 @@ async function showReportForm(jobID) {
   try { job = await research.get(jobID); } catch { location.hash = ''; return; }
   if (!job.final_report) { location.hash = jobID; return; }
   const options = ['<option value="">default model</option>']
-    .concat(modelList.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`))
+    .concat(modelList.map((m) => `<option value="${escapeHtml(m.name)}">${modelOptionLabel(m)}</option>`))
     .join('');
   main.innerHTML = `<section class="card remix-form">
     <p class="eyebrow">Remix</p>

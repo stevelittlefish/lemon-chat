@@ -69,6 +69,13 @@ type ModelServer struct {
 	APIKey  string `toml:"api_key"`
 }
 
+// IsOpenRouter reports whether this server is OpenRouter, which publishes a
+// public model catalogue with per-token pricing. Detected from the API base
+// host so no extra config is required.
+func (s *ModelServer) IsOpenRouter() bool {
+	return strings.Contains(s.APIBase, "openrouter.ai")
+}
+
 type Model struct {
 	Name        string   `toml:"name"`
 	DisplayName string   `toml:"display_name"`
