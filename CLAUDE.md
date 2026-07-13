@@ -59,7 +59,7 @@ model_server = "local"
 modes        = ["chat"]     # only appears in chat, not completions
 ```
 
-Valid values are `"chat"` and `"complete"`. Omit `modes` entirely to allow the model in both. The frontend fetches `GET /api/models?mode=chat` or `?mode=complete` and only shows the filtered list. When adding a new interface or model picker, pass the correct `mode` parameter.
+Valid values are `"chat"` and `"complete"`. Omit `modes` entirely to allow the model in both. Set `modes = []` (an explicitly empty list) to hide the model from both the chat and completions pickers — it remains selectable for research, which lists all configured models regardless of mode. This omitted-vs-empty distinction is why `Model.Modes` is a `*[]string` rather than a plain slice. The frontend fetches `GET /api/models?mode=chat` or `?mode=complete` and only shows the filtered list. When adding a new interface or model picker, pass the correct `mode` parameter.
 
 ## Character variable substitution
 

@@ -80,16 +80,19 @@ type Model struct {
 	Name        string   `toml:"name"`
 	DisplayName string   `toml:"display_name"`
 	ModelServer string   `toml:"model_server"`
-	Modes       []string `toml:"modes"`
+	Modes       *[]string `toml:"modes"`
 }
 
 // AvailableIn reports whether the model is available in the given mode.
-// An empty Modes list means available in all modes.
+// An omitted Modes key (nil) means available in all modes. An explicitly
+// empty list (modes = []) means available in none of the picker-filtered
+// modes — useful for a model reserved for research, which lists all models
+// regardless of mode.
 func (m *Model) AvailableIn(mode string) bool {
-	if len(m.Modes) == 0 {
+	if m.Modes == nil {
 		return true
 	}
-	for _, v := range m.Modes {
+	for _, v := range *m.Modes {
 		if v == mode {
 			return true
 		}
