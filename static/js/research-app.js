@@ -57,6 +57,33 @@ function formatDate(iso) {
     d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
+function hostOf(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
+}
+
+// The heavy state columns arrive from the API as JSON-encoded strings.
+function parseJSONArray(value) {
+  if (!value) return [];
+  try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed : []; }
+  catch { return []; }
+}
+
+// Mirrors the backend sourceID(): a finding's stable citation number is the
+// 1-based position of the first finding sharing its URL.
+function sourceIDs(findings) {
+  const map = new Map();
+  findings.forEach((f, i) => { if (!map.has(f.url)) map.set(f.url, i + 1); });
+  return map;
+}
+
+// A job is worth exploring once it has collected any queries, URLs, or sources
+// — even if it errored or was cancelled before a final report was written.
+function hasExploreData(job) {
+  return parseJSONArray(job.findings).length > 0
+    || parseJSONArray(job.analyzed_urls).length > 0
+    || parseJSONArray(job.queries_used).length > 0;
+}
+
 function statusBadge(status) {
   switch (status) {
     case 'running':
@@ -311,6 +338,7 @@ async function showDetail(id) {
         ${promptHtml}
       </div>
       <div class="research-detail-actions">
+        ${!running && hasExploreData(job) ? '<button id="research-explore" class="btn btn-sm btn-secondary">explore data</button>' : ''}
         ${job.final_report ? `
           <button id="research-remix" class="btn btn-sm btn-secondary">remix</button>
           <button id="research-dl-md" class="btn btn-sm btn-secondary">Markdown</button>
@@ -349,6 +377,9 @@ async function showDetail(id) {
     const heading = job.title || job.query;
     const preamble = job.title && job.query ? `# ${job.title}\n\n${job.query}\n\n` : `# ${heading}\n\n`;
     downloadFile(`${slugify(heading)}.md`, 'text/markdown', preamble + job.final_report);
+  });
+  document.getElementById('research-explore')?.addEventListener('click', () => {
+    location.hash = `${id}/explore`;
   });
   document.getElementById('research-remix')?.addEventListener('click', () => {
     location.hash = `${id}/remix/new`;
@@ -497,6 +528,139 @@ async function showRemix(jobID, remixID) {
   });
 }
 
+// ── Explore view ────────────────────────────────────────────
+//
+// Surfaces every input that fed the final report: the plan, the full query
+// history, every source that was kept (with its extracted evidence), every URL
+// the engine attempted, and the intermediate synthesis. All of this is already
+// carried on the job object — no extra request needed.
+
+function setExploreBackBtn(jobID) {
+  const btn = document.getElementById('back-to-menu');
+  btn.href = `#${jobID}`;
+  btn.onclick = null;
+  document.getElementById('back-label').textContent = 'report';
+}
+
+async function showExplore(id) {
+  stopEvents();
+  setExploreBackBtn(id);
+  let job;
+  try { job = await research.get(id); } catch { location.hash = ''; return; }
+
+  const findings = parseJSONArray(job.findings);
+  const analyzed = parseJSONArray(job.analyzed_urls);
+  const queries = parseJSONArray(job.queries_used);
+  const ids = sourceIDs(findings);
+  const findingURLs = new Set(findings.map((f) => f.url));
+  const displayTitle = job.title || job.query;
+
+  const stats = [
+    ['rounds', job.round || 0],
+    ['queries', queries.length],
+    ['URLs analyzed', analyzed.length],
+    ['sources kept', findings.length],
+    job.elapsed_ms ? ['duration', formatDuration(job.elapsed_ms)] : null,
+    job.price_usd != null ? ['cost', formatPrice(job.price_usd)] : null,
+  ].filter(Boolean).map(([label, value]) =>
+    `<div class="explore-stat"><span class="explore-stat-value">${escapeHtml(String(value))}</span><span class="explore-stat-label">${escapeHtml(label)}</span></div>`).join('');
+
+  const planHtml = job.plan
+    ? render(job.plan)
+    : '<p class="research-empty">no plan was recorded</p>';
+
+  const queriesHtml = queries.length
+    ? `<ol class="explore-queries">${queries.map((q) => `<li>${escapeHtml(q)}</li>`).join('')}</ol>`
+    : '<p class="research-empty">no searches were run</p>';
+
+  const findingsHtml = findings.length
+    ? findings.map((f) => {
+        const sid = ids.get(f.url);
+        const title = f.title || f.url;
+        const details = (f.evidence || f.rational)
+          ? `<details class="explore-evidence">
+               <summary>evidence &amp; reasoning</summary>
+               ${f.rational ? `<p class="explore-rational"><strong>Why it's relevant:</strong> ${escapeHtml(f.rational)}</p>` : ''}
+               ${f.evidence ? `<pre class="explore-evidence-text">${escapeHtml(f.evidence)}</pre>` : ''}
+             </details>`
+          : '';
+        return `<article class="card explore-finding">
+          <div class="explore-finding-head">
+            <span class="explore-sid">S${sid}</span>
+            <a class="explore-finding-title" href="${escapeHtml(f.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>
+            <span class="explore-finding-host">${escapeHtml(hostOf(f.url))}</span>
+          </div>
+          <div class="explore-finding-summary">${render(f.summary || '')}</div>
+          ${details}
+        </article>`;
+      }).join('')
+    : '<p class="research-empty">no sources were extracted</p>';
+
+  // Every URL the engine attempted, de-duplicated in first-seen order and
+  // flagged with the source ID when it yielded a kept finding.
+  const seenURLs = new Set();
+  const urlRows = [];
+  analyzed.forEach((u) => {
+    if (seenURLs.has(u.url)) return;
+    seenURLs.add(u.url);
+    const hit = findingURLs.has(u.url);
+    const tag = hit
+      ? `<span class="explore-url-tag hit">S${ids.get(u.url)}</span>`
+      : '<span class="explore-url-tag">no finding</span>';
+    urlRows.push(`<li class="${hit ? 'is-hit' : ''}">
+      <a href="${escapeHtml(u.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(u.title || u.url)}</a>
+      ${tag}
+    </li>`);
+  });
+  const urlsHtml = urlRows.length
+    ? `<ol class="explore-urls">${urlRows.join('')}</ol>`
+    : '<p class="research-empty">no URLs were analyzed</p>';
+
+  const intermediateHtml = job.report
+    ? `<details class="explore-intermediate">
+         <summary>Intermediate synthesis (the evolving report before the final write-up)</summary>
+         <div class="research-report">${render(job.report)}</div>
+       </details>`
+    : '';
+
+  main.innerHTML = `
+    <div class="research-detail-heading">
+      <div class="research-detail-copy">
+        <p class="eyebrow">Explore research data</p>
+        <h1 class="research-detail-query">${escapeHtml(displayTitle)}</h1>
+      </div>
+      <div class="research-detail-actions">
+        <a class="btn btn-sm btn-secondary" href="#${id}">back to report</a>
+      </div>
+    </div>
+    <div class="explore-stats">${stats}</div>
+
+    <section class="explore-section">
+      <p class="research-section-label">research plan</p>
+      <div class="research-report explore-plan">${planHtml}</div>
+    </section>
+
+    <section class="explore-section">
+      <p class="research-section-label">search queries (${queries.length})</p>
+      ${queriesHtml}
+    </section>
+
+    <section class="explore-section">
+      <p class="research-section-label">sources kept (${findings.length})</p>
+      <div class="explore-findings">${findingsHtml}</div>
+    </section>
+
+    <section class="explore-section">
+      <p class="research-section-label">all URLs analyzed (${seenURLs.size})</p>
+      ${urlsHtml}
+    </section>
+
+    ${intermediateHtml ? `<section class="explore-section">
+      <p class="research-section-label">intermediate synthesis</p>
+      ${intermediateHtml}
+    </section>` : ''}`;
+}
+
 function redditWaitingPanel(job) {
   const request = job.reddit_request;
   if (!request) return '<div class="research-error">The persisted Reddit request could not be loaded.</div>';
@@ -599,9 +763,11 @@ function watchProgress(id) {
 
 function route() {
   const path = location.hash.slice(1);
-  const match = path.match(/^(\d+)\/remix\/(new|\d+)$/);
-  if (match && match[2] === 'new') showRemixForm(match[1]);
-  else if (match) showRemix(match[1], match[2]);
+  const remixMatch = path.match(/^(\d+)\/remix\/(new|\d+)$/);
+  const exploreMatch = path.match(/^(\d+)\/explore$/);
+  if (remixMatch && remixMatch[2] === 'new') showRemixForm(remixMatch[1]);
+  else if (remixMatch) showRemix(remixMatch[1], remixMatch[2]);
+  else if (exploreMatch) showExplore(exploreMatch[1]);
   else if (path) showDetail(path);
   else showList();
 }

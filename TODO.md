@@ -83,7 +83,7 @@ Fleshing out research so a finished job is an inspectable, reusable artifact —
 
 **This is an ordered work queue.** When the user says "let's do the next research improvement", pick the **lowest-numbered item still marked `[ ]`** in this list and do that one. The order encodes dependencies — the reports refactor (#2) underpins most of what follows — so don't skip ahead unless the user explicitly names a different item. Mark `[~]` when starting and `[x]` when done, so the "next" pointer stays accurate.
 
-- [ ] **1. Add an "explore" view for all saved job data** (`internal/server/research.go:530`, `static/js/research-app.js`)
+- [x] **1. Add an "explore" view for all saved job data** (`internal/server/research.go:530`, `static/js/research-app.js`)
   A completed job already persists every input to the final report — `findings` (with `rational`/`evidence`/`summary`), `analyzed_urls`, `queries_used`, the evolving `report`, `plan`, and `category` — but the UI only surfaces the final report. Add an explore panel that lets you browse all of it (findings grouped by source with full evidence, the query history per round, every URL attempted, the intermediate synthesis). `GetResearchJob` already returns these columns, so this is mostly a frontend build plus possibly a lighter-weight endpoint that omits nothing.
 
 - [ ] **2. Refactor: multiple reports per job** (`internal/store/research.go`, `internal/store/store.go`, `internal/store/research_remixes.go:8`)
