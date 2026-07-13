@@ -104,6 +104,9 @@ Fleshing out research so a finished job is an inspectable, reusable artifact —
 - [ ] **7. Holistic progressive-disclosure UI revamp** (`static/js/research-app.js:100`, `static/research.html`)
   Redesign the whole research UI around progressive disclosure: launching a job with sensible defaults should be one obvious action, with effort, mode, models, deep-report, HTML-report, Reddit-import, and time-limit controls revealed in layers as the user opts into more customisation. Applies to the start form, the job list, and the completed-report/reports view. Best done last, once #1–#6 have settled what controls exist.
 
+- [ ] **8. Preserve all sources and citations in the HTML report** (`internal/server/research_remixes.go:17`, `internal/server/research_remixes.go:116`)
+  The HTML generation step (`remixSystemPrompt`, run via `generateReportHTML`) loses reference detail: it strips every external source URL (inline citations link only to internal `#S` anchors and the source list is terse plain text with no links), lists only the ~half of sources cited inline, and drops some inline citations along with their counter-argument nuance. Verified by diffing the markdown and HTML of job #9. Fix by strengthening the prompt to require every source (with its URL) and every inline citation be carried over verbatim, and/or feed the raw `findings`/sources into the HTML step the way the deep-report pipeline does instead of summarising the already-written markdown.
+
 ## Code review (2026-06-13)
 
 Findings from `code_review_2026-06-13.md`, in suggested priority order.
