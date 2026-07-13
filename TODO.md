@@ -22,6 +22,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [x] Add a ZIP bundle download containing every research report and the job's displayed metadata and statistics.
+
 - [x] Stream live generation progress for the auto HTML report's "designing the HTML report" phase. `autoGenerateHTMLReport` now passes an `onProgress` callback to `generateReportHTML` that broadcasts `research.Progress{Phase: "designing", Generated, Snippet}` over SSE, and `updateStream` labels the phase "designing HTML report", so the phase streams like the other long generation steps.
 
 - [x] Remove the report-remix output-token cap so providers can generate up to their supported limit.

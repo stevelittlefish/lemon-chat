@@ -398,6 +398,7 @@ async function showDetail(id) {
           <div class="research-download">
             <button type="button" id="research-download-toggle" class="btn btn-sm btn-secondary" aria-haspopup="true" aria-expanded="false">${icon('download', 14)} Download ${icon('chevron-down', 14)}</button>
             <div class="menu research-download-panel" hidden>
+              <a href="/api/research/${id}/bundle" class="menu-item">${icon('download', 14)} Bundle (.zip)</a>
               <button id="research-dl-md" class="menu-item">${icon('download', 14)} Markdown</button>
               <button id="research-dl-html" class="menu-item">${icon('download', 14)} HTML</button>
             </div>
