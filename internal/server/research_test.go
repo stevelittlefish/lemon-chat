@@ -83,7 +83,7 @@ func newAwaitingRedditJob(t *testing.T) (*Server, *store.User, *store.ResearchJo
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := st.CreateResearchJob(user.ID, "", "query", "model", "research", false, false, true, false, "", "", 3, 600)
+	job, err := st.CreateResearchJob(user.ID, "", "query", "model", "research", false, false, true, false, "", "", "", 3, 600)
 	if err != nil {
 		t.Fatal(err)
 	}

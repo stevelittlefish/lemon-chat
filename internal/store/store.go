@@ -782,6 +782,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v36 → v37 complete")
 	}
 
+	if version < 38 {
+		log.Println("store: migrating v37 → v38 (add worker model override to research_job)")
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN worker_model TEXT`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (38, ?)`, now()); err != nil {
+			return err
+		}
+		version = 38
+		log.Println("store: migration v37 → v38 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

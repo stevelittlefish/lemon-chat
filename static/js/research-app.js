@@ -173,6 +173,15 @@ async function showList() {
         <textarea id="research-html-style" class="input textarea" rows="2" maxlength="2000"
           placeholder="optional style for the HTML report (e.g. earthy greens, simple typography)"></textarea>
       </div>
+      <div class="research-form-options">
+        <label class="research-field">worker model
+          <select id="research-worker-model" class="input">
+            <option value="">same as research model</option>
+            ${modelList.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`).join('')}
+          </select>
+        </label>
+        <span class="research-field-hint">handles page reading and the mechanical steps; a small local model here can cut cost and time</span>
+      </div>
     </div>
     <p class="research-section-label">past research</p>
     <div class="research-list">
@@ -223,13 +232,14 @@ async function startResearch() {
   const autoHtmlReport = document.getElementById('research-html-report').checked;
   const htmlReportDirection = autoHtmlReport ? document.getElementById('research-html-style').value.trim() : '';
   const htmlReportModel = autoHtmlReport ? document.getElementById('research-html-model').value : '';
+  const workerModel = document.getElementById('research-worker-model').value;
   const pauseRedditImport = document.getElementById('research-pause-reddit').checked;
   const effort = parseInt(document.getElementById('research-effort').value, 10) || formDefaults.effort;
   const maxTimeMinutes = parseInt(document.getElementById('research-time').value, 10) || formDefaults.max_time_minutes;
   const btn = document.getElementById('research-start');
   btn.disabled = true;
   try {
-    const job = await research.start(title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, htmlReportModel, effort, maxTimeMinutes);
+    const job = await research.start(title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, htmlReportModel, workerModel, effort, maxTimeMinutes);
     location.hash = job.id;
   } catch (err) {
     btn.disabled = false;
@@ -378,6 +388,7 @@ async function showDetail(id) {
       ${job.deep_report ? '<span>in-depth</span>' : ''}
       ${job.pause_reddit_import ? '<span>Reddit import</span>' : ''}
       <span>${escapeHtml(job.model)}</span>
+      ${job.worker_model ? `<span>worker: ${escapeHtml(job.worker_model)}</span>` : ''}
       ${job.effort ? `<span>effort: ${EFFORT_NAMES[job.effort] || job.effort}</span>` : ''}
       <span>${formatDate(job.created_at)}</span>
       ${job.elapsed_ms ? `<span>${formatDuration(job.elapsed_ms)}</span>` : ''}

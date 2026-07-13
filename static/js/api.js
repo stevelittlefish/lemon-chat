@@ -221,11 +221,12 @@ export const research = {
     return () => ctrl.abort();
   },
   getRemix: (id, remixId) => request('GET', `/api/research/${id}/remixes/${remixId}`),
-  start: (title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, htmlReportModel, effort, maxTimeMinutes) =>
+  start: (title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, htmlReportModel, workerModel, effort, maxTimeMinutes) =>
     request('POST', '/api/research', {
       title, query, ...(model ? { model } : {}), mode, force_search: forceSearch, deep_report: deepReport,
       auto_html_report: autoHtmlReport, html_report_direction: htmlReportDirection,
       ...(htmlReportModel ? { html_report_model: htmlReportModel } : {}),
+      ...(workerModel ? { worker_model: workerModel } : {}),
       pause_reddit_import: pauseRedditImport, effort, max_time_minutes: maxTimeMinutes,
     }),
   cancel: (id) => request('POST', `/api/research/${id}/cancel`),

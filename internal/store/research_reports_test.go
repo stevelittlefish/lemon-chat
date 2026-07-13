@@ -8,7 +8,7 @@ func TestResearchReportDefaultUpsert(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := s.CreateResearchJob(user.ID, "Title", "Question", "model-a", "research", false, false, false, false, "", "", 3, 600)
+	job, err := s.CreateResearchJob(user.ID, "Title", "Question", "model-a", "research", false, false, false, false, "", "", "", 3, 600)
 	if err != nil {
 		t.Fatal(err)
 	}

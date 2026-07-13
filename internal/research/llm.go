@@ -16,13 +16,35 @@ type chatMsg struct {
 	Content string `json:"content"`
 }
 
-// llmCall makes a non-streaming chat completion request and returns the
-// response content with any reasoning blocks stripped.
+// modelEndpoint is a fully-resolved model target: a model name inseparable from
+// the server base URL and key that hosts it. A research job runs a "writer"
+// endpoint (the strong job model, used for plan/synthesis/report) and a
+// "worker" endpoint (the high-volume extraction plus the mechanical calls);
+// worker defaults to writer when no separate worker model is configured.
+type modelEndpoint struct {
+	Model   string
+	APIBase string
+	APIKey  string
+}
+
+// llmCall makes a non-streaming chat completion request on the writer endpoint
+// (the strong job model) and returns the response content with any reasoning
+// blocks stripped.
 func (r *Researcher) llmCall(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, error) {
+	return r.llmCallOn(ctx, r.writer, msgs, temperature, maxTokens, timeout)
+}
+
+// llmCallWorker is llmCall on the worker endpoint — the cheap/fast model used
+// for extraction and the mechanical phases (slug, classify, query-gen, decide).
+func (r *Researcher) llmCallWorker(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, error) {
+	return r.llmCallOn(ctx, r.worker, msgs, temperature, maxTokens, timeout)
+}
+
+func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, error) {
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	result, err := llm.ChatCompleteWithUsage(callCtx, r.client, r.cfg.APIBase+"/chat/completions", r.cfg.APIKey, r.cfg.Model, msgs, map[string]any{
+	result, err := llm.ChatCompleteWithUsage(callCtx, r.client, ep.APIBase+"/chat/completions", ep.APIKey, ep.Model, msgs, map[string]any{
 		"temperature": temperature,
 		"max_tokens":  maxTokens,
 	})
@@ -43,7 +65,7 @@ func (r *Researcher) llmCallStream(ctx context.Context, msgs []chatMsg, temperat
 
 	var full strings.Builder
 	var lastEmit time.Time
-	result, err := llm.ChatCompleteStreamWithUsage(callCtx, r.client, r.cfg.APIBase+"/chat/completions", r.cfg.APIKey, r.cfg.Model, msgs,
+	result, err := llm.ChatCompleteStreamWithUsage(callCtx, r.client, r.writer.APIBase+"/chat/completions", r.writer.APIKey, r.writer.Model, msgs,
 		map[string]any{"temperature": temperature, "max_tokens": maxTokens}, func(text string) {
 			full.WriteString(text)
 			if onDelta != nil && time.Since(lastEmit) >= 250*time.Millisecond {

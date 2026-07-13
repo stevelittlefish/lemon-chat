@@ -233,6 +233,11 @@ select.input option { background: var(--paper-100); color: var(--fg); }
   white-space: nowrap;
 }
 .research-field .input { max-width: 220px; }
+.research-field-hint {
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--fg-muted);
+}
 .research-time-input { width: 7ch; max-width: 7ch; }
 .research-check { cursor: pointer; }
 .research-check input { cursor: pointer; accent-color: var(--hm-cyan); }

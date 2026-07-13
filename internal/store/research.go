@@ -42,6 +42,10 @@ type ResearchJob struct {
 	// HTMLReportModel overrides the model used for the HTML report step; nil means
 	// reuse the job's own Model.
 	HTMLReportModel *string `json:"html_report_model"`
+	// WorkerModel overrides the model used for the worker tier (extraction plus the
+	// mechanical slug/classify/query-gen/decide calls); nil means reuse the job's
+	// own Model.
+	WorkerModel *string `json:"worker_model"`
 	// PauseRedditImport enables user-assisted capture when a search round finds
 	// Reddit threads. It is opt-in for each job.
 	PauseRedditImport bool    `json:"pause_reddit_import"`
@@ -77,12 +81,12 @@ type ResearchJob struct {
 	UpdatedAt          string  `json:"updated_at"`
 }
 
-const researchJobCols = `id, user_id, title, query, model, mode, force_search, deep_report, auto_html_report, html_report_direction, html_report_model, pause_reddit_import, status, phase, effort, max_time_seconds, round, empty_rounds, elapsed_ms, price_usd,
+const researchJobCols = `id, user_id, title, query, model, mode, force_search, deep_report, auto_html_report, html_report_direction, html_report_model, worker_model, pause_reddit_import, status, phase, effort, max_time_seconds, round, empty_rounds, elapsed_ms, price_usd,
 	category, slug, plan, report, final_report, findings, queries_used, analyzed_urls, reddit_request_id, pending_reddit_round, reddit_response, reddit_skipped, error, created_at, updated_at`
 
 func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) {
 	var j ResearchJob
-	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Mode, &j.ForceSearch, &j.DeepReport, &j.AutoHTMLReport, &j.HTMLReportDirection, &j.HTMLReportModel, &j.PauseRedditImport, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.Round, &j.EmptyRounds, &j.ElapsedMS, &j.PriceUSD,
+	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Mode, &j.ForceSearch, &j.DeepReport, &j.AutoHTMLReport, &j.HTMLReportDirection, &j.HTMLReportModel, &j.WorkerModel, &j.PauseRedditImport, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.Round, &j.EmptyRounds, &j.ElapsedMS, &j.PriceUSD,
 		&j.Category, &j.Slug, &j.Plan, &j.Report, &j.FinalReport, &j.Findings, &j.QueriesUsed, &j.AnalyzedURLs, &j.RedditRequestID, &j.PendingRedditRound, &j.RedditResponse, &j.RedditSkipped, &j.Error, &j.CreatedAt, &j.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -93,7 +97,7 @@ func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) 
 	return &j, nil
 }
 
-func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string, forceSearch, deepReport, pauseRedditImport, autoHTMLReport bool, htmlReportDirection, htmlReportModel string, effort, maxTimeSeconds int) (*ResearchJob, error) {
+func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string, forceSearch, deepReport, pauseRedditImport, autoHTMLReport bool, htmlReportDirection, htmlReportModel, workerModel string, effort, maxTimeSeconds int) (*ResearchJob, error) {
 	t := now()
 	var titlePtr *string
 	if title != "" {
@@ -107,17 +111,21 @@ func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string
 	if htmlReportModel != "" {
 		htmlModelPtr = &htmlReportModel
 	}
+	var workerModelPtr *string
+	if workerModel != "" {
+		workerModelPtr = &workerModel
+	}
 	res, err := s.db.Exec(
-		`INSERT INTO research_job (user_id, title, query, model, mode, force_search, deep_report, auto_html_report, html_report_direction, html_report_model, pause_reddit_import, status, effort, max_time_seconds, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
-		userID, titlePtr, query, model, mode, forceSearch, deepReport, autoHTMLReport, directionPtr, htmlModelPtr, pauseRedditImport, effort, maxTimeSeconds, t, t,
+		`INSERT INTO research_job (user_id, title, query, model, mode, force_search, deep_report, auto_html_report, html_report_direction, html_report_model, worker_model, pause_reddit_import, status, effort, max_time_seconds, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+		userID, titlePtr, query, model, mode, forceSearch, deepReport, autoHTMLReport, directionPtr, htmlModelPtr, workerModelPtr, pauseRedditImport, effort, maxTimeSeconds, t, t,
 	)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
 	return &ResearchJob{ID: id, UserID: userID, Title: titlePtr, Query: query, Model: model, Mode: mode, ForceSearch: forceSearch, DeepReport: deepReport,
-		AutoHTMLReport: autoHTMLReport, HTMLReportDirection: directionPtr, HTMLReportModel: htmlModelPtr, PauseRedditImport: pauseRedditImport, Status: ResearchStatusPending,
+		AutoHTMLReport: autoHTMLReport, HTMLReportDirection: directionPtr, HTMLReportModel: htmlModelPtr, WorkerModel: workerModelPtr, PauseRedditImport: pauseRedditImport, Status: ResearchStatusPending,
 		Effort: effort, MaxTimeSeconds: maxTimeSeconds, CreatedAt: t, UpdatedAt: t}, nil
 }
 

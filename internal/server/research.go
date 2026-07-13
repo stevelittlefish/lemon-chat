@@ -171,6 +171,17 @@ func (s *Server) htmlReportModel(requested string) string {
 	return s.cfg.Research.HTMLReportModel
 }
 
+// workerModel resolves which model to use for the worker tier (extraction plus
+// the mechanical slug/classify/query-gen/decide calls). An explicit request
+// wins, then the configured default, and finally the job's own model. An empty
+// return means "reuse the job model".
+func (s *Server) workerModel(requested string) string {
+	if requested != "" {
+		return requested
+	}
+	return s.cfg.Research.WorkerModel
+}
+
 // ResumeResearchJobs restarts jobs that were in flight when the server last
 // stopped. Each resumes from its last checkpoint. Call once at startup.
 func (s *Server) ResumeResearchJobs() {
@@ -206,6 +217,18 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		return
 	}
 
+	// Resolve the optional worker-tier endpoint; a different model may live on a
+	// different server, so we resolve the whole (model, base, key) triple. On any
+	// error we fall back to the job model rather than failing the run.
+	workerModel, workerAPIBase, workerAPIKey := "", "", ""
+	if job.WorkerModel != nil && *job.WorkerModel != "" && *job.WorkerModel != job.Model {
+		if ws, wErr := s.cfg.ServerForModel(*job.WorkerModel); wErr == nil {
+			workerModel, workerAPIBase, workerAPIKey = *job.WorkerModel, ws.APIBase, ws.APIKey
+		} else {
+			log.Printf("research: job %d: worker model %q unresolved, using job model: %v", job.ID, *job.WorkerModel, wErr)
+		}
+	}
+
 	loc := time.Local
 	if s.cfg.Server.Timezone != "" {
 		if l, tzErr := time.LoadLocation(s.cfg.Server.Timezone); tzErr == nil {
@@ -239,6 +262,9 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		PauseRedditImport:     job.PauseRedditImport,
 		APIBase:               modelServer.APIBase,
 		APIKey:                modelServer.APIKey,
+		WorkerModel:           workerModel,
+		WorkerAPIBase:         workerAPIBase,
+		WorkerAPIKey:          workerAPIKey,
 		SearXNGURL:            s.cfg.SearXNG.URL,
 		Location:              loc,
 		MaxRounds:             maxRounds,
@@ -521,6 +547,7 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		AutoHTMLReport      bool   `json:"auto_html_report"`
 		HTMLReportDirection string `json:"html_report_direction"`
 		HTMLReportModel     string `json:"html_report_model"`
+		WorkerModel         string `json:"worker_model"`
 		PauseRedditImport   bool   `json:"pause_reddit_import"`
 		Effort              int    `json:"effort"`
 		MaxTimeMinutes      int    `json:"max_time_minutes"`
@@ -545,6 +572,7 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		req.HTMLReportModel = ""
 	}
 	req.HTMLReportModel = strings.TrimSpace(req.HTMLReportModel)
+	req.WorkerModel = strings.TrimSpace(req.WorkerModel)
 	mode := req.Mode
 	if mode == "" {
 		mode = research.ModeResearch
@@ -592,14 +620,28 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// The worker tier may use a separate model; an empty result means "reuse the
+	// job model", resolved when the job runs. A worker model equal to the job
+	// model is stored as empty (no override).
+	workerModel := s.workerModel(req.WorkerModel)
+	if workerModel == model {
+		workerModel = ""
+	}
+	if workerModel != "" {
+		if _, err := s.cfg.ServerForModel(workerModel); err != nil {
+			writeError(w, http.StatusBadRequest, "unknown worker model")
+			return
+		}
+	}
+
 	// ForceSearch only changes brainstorm-mode behaviour; ignore it otherwise.
 	forceSearch := req.ForceSearch && mode == research.ModeBrainstorm
-	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, req.AutoHTMLReport, req.HTMLReportDirection, htmlReportModel, effort, maxTimeSeconds)
+	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, req.AutoHTMLReport, req.HTMLReportDirection, htmlReportModel, workerModel, effort, maxTimeSeconds)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	log.Printf("Starting research job id=%d user_id=%d model=%q mode=%q force_search=%t deep_report=%t auto_html_report=%t html_report_model=%q pause_reddit_import=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, mode, forceSearch, req.DeepReport, req.AutoHTMLReport, htmlReportModel, req.PauseRedditImport, effort, maxTimeSeconds, req.Title, req.Query)
+	log.Printf("Starting research job id=%d user_id=%d model=%q worker_model=%q mode=%q force_search=%t deep_report=%t auto_html_report=%t html_report_model=%q pause_reddit_import=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, workerModel, mode, forceSearch, req.DeepReport, req.AutoHTMLReport, htmlReportModel, req.PauseRedditImport, effort, maxTimeSeconds, req.Title, req.Query)
 	go s.runResearch(job)
 	writeJSON(w, http.StatusCreated, researchView(job))
 }

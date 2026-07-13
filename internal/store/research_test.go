@@ -12,7 +12,7 @@ func TestCreateResearchJobPersistsRedditImportOption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := s.CreateResearchJob(user.ID, "Title", "Query", "model", "research", false, false, true, false, "", "", 3, 600)
+	job, err := s.CreateResearchJob(user.ID, "Title", "Query", "model", "research", false, false, true, false, "", "", "", 3, 600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestCreateResearchJobPersistsAutoHTMLReport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := s.CreateResearchJob(user.ID, "Title", "Query", "model", "research", false, false, false, true, "earthy greens", "html-model", 3, 600)
+	job, err := s.CreateResearchJob(user.ID, "Title", "Query", "model", "research", false, false, false, true, "earthy greens", "html-model", "", 3, 600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,13 +50,45 @@ func TestCreateResearchJobPersistsAutoHTMLReport(t *testing.T) {
 	}
 }
 
+func TestCreateResearchJobPersistsWorkerModel(t *testing.T) {
+	s := newTestStore(t)
+	user, err := s.CreateUser("worker-researcher", nil, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := s.CreateResearchJob(user.ID, "Title", "Query", "model", "research", false, false, false, false, "", "", "worker-model", 3, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := s.GetResearchJob(job.ID, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.WorkerModel == nil || *loaded.WorkerModel != "worker-model" {
+		t.Fatalf("worker model override not persisted: %+v", loaded)
+	}
+
+	// No override stores NULL, not the empty string.
+	job2, err := s.CreateResearchJob(user.ID, "Title", "Query", "model", "research", false, false, false, false, "", "", "", 3, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded2, err := s.GetResearchJob(job2.ID, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded2.WorkerModel != nil {
+		t.Fatalf("expected nil worker model, got %v", *loaded2.WorkerModel)
+	}
+}
+
 func TestResearchRedditPauseAndResumeIsDurableAndIdempotent(t *testing.T) {
 	s := newTestStore(t)
 	user, err := s.CreateUser("reddit-researcher", nil, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := s.CreateResearchJob(user.ID, "", "Query", "model", "research", false, false, true, false, "", "", 3, 600)
+	job, err := s.CreateResearchJob(user.ID, "", "Query", "model", "research", false, false, true, false, "", "", "", 3, 600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,8 +206,8 @@ func TestMigrationsV31AndV32PreserveExistingResearchData(t *testing.T) {
 		t.Fatalf("new Reddit state was not safely defaulted: %+v", job)
 	}
 	var version int
-	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 37 {
-		t.Fatalf("schema version = %d, err=%v; want 37", version, err)
+	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 38 {
+		t.Fatalf("schema version = %d, err=%v; want 38", version, err)
 	}
 	var violations int
 	rows, err := s.db.Query(`PRAGMA foreign_key_check`)

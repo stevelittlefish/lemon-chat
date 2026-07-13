@@ -64,6 +64,7 @@ model_server = "local"
 # [research]
 # model = ""                  # model for research jobs (falls back to default_model)
 # html_report_model = ""      # model for the HTML report step (falls back to the job's model); the start form can override per job
+# worker_model = ""           # model for the worker tier — page reading plus the mechanical slug/classify/query-gen/decide calls (falls back to the job's model); a cheap/local model here cuts most of the cost. The start form can override per job
 # max_rounds = 8              # hard upper bound on research rounds (effort 3; the per-job effort/time controls in the UI layer on top of these)
 # max_time_seconds = 600      # default wall-clock budget; the UI time-limit field overrides it per job
 # max_urls_per_round = 3      # URLs fetched per query per round
