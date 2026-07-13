@@ -117,7 +117,7 @@ async function showList() {
       <span class="research-item-query">${escapeHtml(j.title || j.query)}</span>
       <span class="research-item-details">
         <span class="research-item-model">${escapeHtml(j.model)}</span>
-        ${j.report_count ? `<span class="research-item-remixes">${j.report_count} ${j.report_count === 1 ? 'report' : 'reports'}</span>` : ''}
+        ${j.report_count ? `<span class="research-item-remixes">${j.report_count} ${j.report_count === 1 ? 'remix' : 'remixes'}</span>` : ''}
         <span class="research-item-meta">${formatDate(j.created_at)}</span>
         ${statusBadge(j.status)}
       </span>
@@ -374,7 +374,7 @@ async function showDetail(id) {
       <div class="research-detail-actions">
         ${!running && hasExploreData(job) ? '<button id="research-explore" class="btn btn-sm btn-secondary">explore data</button>' : ''}
         ${job.final_report ? `
-          <button id="research-remix" class="btn btn-sm btn-secondary">regenerate report</button>
+          <button id="research-remix" class="btn btn-sm btn-secondary">remix</button>
           <button id="research-dl-md" class="btn btn-sm btn-secondary">Markdown</button>
           <button id="research-dl-html" class="btn btn-sm btn-secondary">HTML</button>` : ''}
         ${running || awaitingReddit
@@ -484,14 +484,14 @@ function reportShelf(job) {
   if (!job.reports?.length) return '';
   const items = (job.reports || []).map((report, index) => {
     const kinds = [report.has_markdown ? 'markdown' : '', report.has_html ? 'designed' : ''].filter(Boolean).join(' + ');
-    const label = report.direction || `Report ${(job.reports.length - index)}`;
+    const label = report.direction || `Remix ${(job.reports.length - index)}`;
     return `<button class="research-remix-item" data-report-id="${report.id}">
       <span>${escapeHtml(label)}${kinds ? ` <span class="research-report-kinds">${kinds}</span>` : ''}</span>
       <small>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</small>
     </button>`;
   }).join('');
   return `<section class="research-remixes">
-    <p class="research-section-label">regenerated reports</p>
+    <p class="research-section-label">remixes</p>
     <div class="research-remix-list">${items}</div>
   </section>`;
 }
@@ -513,9 +513,9 @@ async function showReportForm(jobID) {
     .concat(modelList.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.display_name || m.name)}</option>`))
     .join('');
   main.innerHTML = `<section class="card remix-form">
-    <p class="eyebrow">Regenerate report</p>
-    <h1>Build a fresh report</h1>
-    <p class="remix-intro">Create a new report for <strong>${escapeHtml(job.title || job.query)}</strong>. Regenerating the markdown rewrites it from the raw findings, which can recover detail an earlier pass dropped. Designing an HTML version renders it as a self-contained, visual document.</p>
+    <p class="eyebrow">Remix</p>
+    <h1>Remix this report</h1>
+    <p class="remix-intro">Create a new remix of <strong>${escapeHtml(job.title || job.query)}</strong>. Regenerating the markdown rewrites it from the raw findings, which can recover detail an earlier pass dropped. Designing an HTML version renders it as a self-contained, visual document.</p>
     <fieldset class="remix-outputs">
       <label class="research-field research-check"><input type="checkbox" id="remix-markdown" checked> regenerate markdown from findings</label>
       <label class="research-field research-check" id="remix-deep-field"><input type="checkbox" id="remix-deep"> in-depth (section-by-section) report</label>
@@ -530,7 +530,7 @@ async function showReportForm(jobID) {
     <div id="remix-error"></div>
     <div class="remix-form-actions">
       <a class="btn btn-secondary" href="#${jobID}">cancel</a>
-      <button id="remix-go" class="btn btn-primary">regenerate report</button>
+      <button id="remix-go" class="btn btn-primary">create remix</button>
     </div>
   </section>`;
 
@@ -568,7 +568,7 @@ async function showReportForm(jobID) {
     btn.setAttribute('disabled', '');
     btn.setAttribute('aria-busy', 'true');
     controls.forEach((c) => { c.disabled = true; });
-    btn.textContent = 'regenerating…';
+    btn.textContent = 'remixing…';
     error.innerHTML = '';
     progress.hidden = false;
     let completed = false;
@@ -577,7 +577,7 @@ async function showReportForm(jobID) {
       btn.removeAttribute('disabled');
       btn.removeAttribute('aria-busy');
       controls.forEach((c) => { c.disabled = false; });
-      btn.textContent = 'regenerate report';
+      btn.textContent = 'create remix';
     };
     research.regenerateReport(jobID, {
       model: model.value, direction: direction.value.trim(), markdown: wantMarkdown, html: wantHTML, deepReport: deep.checked,
@@ -595,14 +595,14 @@ async function showReportForm(jobID) {
           progressCount.textContent = ev.generated ? `${ev.generated.toLocaleString()} characters` : '';
           if (ev.snippet) progressPreview.textContent = ev.snippet;
         }
-        if (ev.phase === 'saving') progressLabel.textContent = 'Saving report';
+        if (ev.phase === 'saving') progressLabel.textContent = 'Saving remix';
         if (ev.phase === 'complete' && ev.report) {
           completed = true;
           location.hash = `${jobID}/report/${ev.report.id}`;
         }
       },
       onDone: () => {
-        if (!completed && btn.disabled && !error.textContent) reset(new Error('The stream ended before the report was saved.'));
+        if (!completed && btn.disabled && !error.textContent) reset(new Error('The stream ended before the remix was saved.'));
       },
       onError: reset,
     });
@@ -616,7 +616,7 @@ async function showReport(jobID, reportID) {
   try { report = await research.getReport(jobID, reportID); } catch { location.hash = jobID; return; }
   const hasMarkdown = !!(report.markdown && report.markdown.trim());
   const hasHTML = !!report.html;
-  const label = report.direction || 'Regenerated report';
+  const label = report.direction || 'Remix';
   const openBtn = hasHTML
     ? `<a class="btn btn-sm btn-secondary" href="/api/research/${jobID}/reports/${reportID}/document" target="_blank" rel="noopener noreferrer">open HTML in new tab</a>`
     : '';
@@ -635,7 +635,7 @@ async function showReport(jobID, reportID) {
     ? `<div class="research-report" data-panel="markdown">${render(report.markdown)}</div>`
     : '';
   main.innerHTML = `<div class="remix-view-header">
-    <div><p class="eyebrow">Regenerated report</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</p></div>
+    <div><p class="eyebrow">Remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</p></div>
     <div class="remix-view-actions">${dlMdBtn}${dlHtmlBtn}${openBtn}</div>
   </div>
   ${tabs}${htmlPanel}${mdPanel}`;
@@ -650,10 +650,10 @@ async function showReport(jobID, reportID) {
     setTab('html');
   }
   document.getElementById('report-dl-md')?.addEventListener('click', () => {
-    downloadFile(`research-report-${report.id}.md`, 'text/markdown', report.markdown);
+    downloadFile(`research-remix-${report.id}.md`, 'text/markdown', report.markdown);
   });
   document.getElementById('report-dl-html')?.addEventListener('click', () => {
-    downloadFile(`research-report-${report.id}.html`, 'text/html', report.html);
+    downloadFile(`research-remix-${report.id}.html`, 'text/html', report.html);
   });
 }
 
