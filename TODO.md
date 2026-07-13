@@ -83,13 +83,13 @@ Fleshing out research so a finished job is an inspectable, reusable artifact —
 
 **This is an ordered work queue.** When the user says "let's do the next research improvement", pick the **lowest-numbered item still marked `[ ]`** in this list and do that one. The order encodes dependencies — the reports refactor (#2) underpins most of what follows — so don't skip ahead unless the user explicitly names a different item. Mark `[~]` when starting and `[x]` when done, so the "next" pointer stays accurate.
 
-- [ ] **1. Add an "explore" view for all saved job data** (`internal/server/research.go:530`, `static/js/research-app.js`)
+- [x] **1. Add an "explore" view for all saved job data** (`internal/server/research.go:530`, `static/js/research-app.js`)
   A completed job already persists every input to the final report — `findings` (with `rational`/`evidence`/`summary`), `analyzed_urls`, `queries_used`, the evolving `report`, `plan`, and `category` — but the UI only surfaces the final report. Add an explore panel that lets you browse all of it (findings grouped by source with full evidence, the query history per round, every URL attempted, the intermediate synthesis). `GetResearchJob` already returns these columns, so this is mostly a frontend build plus possibly a lighter-weight endpoint that omits nothing.
 
-- [ ] **2. Refactor: multiple reports per job** (`internal/store/research.go`, `internal/store/store.go`, `internal/store/research_remixes.go:8`)
+- [x] **2. Refactor: multiple reports per job** (`internal/store/research.go`, `internal/store/store.go`, `internal/store/research_remixes.go:8`)
   Introduce a `research_report` concept: each job has any number of reports, one by default. A report is a master markdown document (today's `final_report`) plus an optional HTML version (today's remix output). Add a numbered migration that creates the table and back-fills existing `final_report` values and `research_remix` rows into it, then repoint the report/remix read paths. This is the structural change the toggle and revamped remix build on — do it before #3–#6.
 
-- [ ] **3. Start-form option to auto-generate the HTML report** (`internal/server/research.go:441`, `internal/server/research.go:318`, `static/js/research-app.js:100`)
+- [x] **3. Start-form option to auto-generate the HTML report** (`internal/server/research.go:441`, `internal/server/research.go:318`, `static/js/research-app.js:100`)
   Add a form section with a tick box (on by default) to also produce the HTML report, plus a text box for stylistic requirements. When set, after the markdown report finishes the job automatically runs what remix does today and stores the HTML on the default report. Persist the toggle and style prompt on the job so a resumed/queued job still honours them.
 
 - [ ] **4. Optional separate model for the HTML report step** (`internal/server/research.go:441`, `internal/config/config.go:23`)
@@ -103,6 +103,9 @@ Fleshing out research so a finished job is an inspectable, reusable artifact —
 
 - [ ] **7. Holistic progressive-disclosure UI revamp** (`static/js/research-app.js:100`, `static/research.html`)
   Redesign the whole research UI around progressive disclosure: launching a job with sensible defaults should be one obvious action, with effort, mode, models, deep-report, HTML-report, Reddit-import, and time-limit controls revealed in layers as the user opts into more customisation. Applies to the start form, the job list, and the completed-report/reports view. Best done last, once #1–#6 have settled what controls exist.
+
+- [ ] **8. Preserve all sources and citations in the HTML report** (`internal/server/research_remixes.go:17`, `internal/server/research_remixes.go:116`)
+  The HTML generation step (`remixSystemPrompt`, run via `generateReportHTML`) loses reference detail: it strips every external source URL (inline citations link only to internal `#S` anchors and the source list is terse plain text with no links), lists only the ~half of sources cited inline, and drops some inline citations along with their counter-argument nuance. Verified by diffing the markdown and HTML of job #9. Fix by strengthening the prompt to require every source (with its URL) and every inline citation be carried over verbatim, and/or feed the raw `findings`/sources into the HTML step the way the deep-report pipeline does instead of summarising the already-written markdown.
 
 ## Code review (2026-06-13)
 

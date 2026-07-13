@@ -324,8 +324,12 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		data, _ := json.Marshal(map[string]any{"status": store.ResearchStatusAwaitingReddit})
 		run.finish(data)
 	case runErr == nil:
+		price := r.State().PriceUSD
+		if job.AutoHTMLReport {
+			price = s.autoGenerateHTMLReport(ctx, run, job, report, price)
+		}
 		log.Printf("Research job finished id=%d rounds=%d elapsed=%.1fs", job.ID, r.State().Round, float64(elapsedMS)/1000)
-		s.finishResearch(job.ID, run, store.ResearchStatusDone, &report, "", elapsedMS, r.State().PriceUSD)
+		s.finishResearch(job.ID, run, store.ResearchStatusDone, &report, "", elapsedMS, price)
 	case errors.Is(runErr, context.Canceled) && run.wasCancelRequested():
 		log.Printf("Research job cancelled id=%d", job.ID)
 		s.finishResearch(job.ID, run, store.ResearchStatusCancelled, nil, "", elapsedMS, r.State().PriceUSD)
@@ -333,6 +337,58 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		log.Printf("Research job failed id=%d: %v", job.ID, runErr)
 		s.finishResearch(job.ID, run, store.ResearchStatusError, nil, runErr.Error(), elapsedMS, r.State().PriceUSD)
 	}
+}
+
+// autoGenerateHTMLReport renders the finished markdown report as a designed
+// HTML document and stores it on the job's default report. It is best-effort:
+// any failure is logged and the job still completes with its markdown report.
+// The returned price includes the HTML generation cost when one was incurred.
+func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, job *store.ResearchJob, markdown string, price *float64) *float64 {
+	// The default report must exist before HTML can be attached to it.
+	if err := s.store.UpsertDefaultResearchReport(job.ID, markdown, job.Model); err != nil {
+		log.Printf("research: job %d: prepare default report for HTML: %v", job.ID, err)
+		return price
+	}
+	direction := ""
+	if job.HTMLReportDirection != nil {
+		direction = *job.HTMLReportDirection
+	}
+	title := job.Query
+	if job.Title != nil && *job.Title != "" {
+		title = *job.Title
+	}
+	data, _ := json.Marshal(research.Progress{Phase: "designing", Message: "designing the HTML report"})
+	run.broadcast(data)
+
+	timeout := time.Duration(s.cfg.Server.ResponseTimeoutSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = 10 * time.Minute
+	}
+	genCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	html, cost, err := s.generateReportHTML(genCtx, job.Model, title, markdown, direction, nil)
+	if err != nil {
+		log.Printf("research: job %d: auto HTML report: %v", job.ID, err)
+		return price
+	}
+	if err := s.store.SetDefaultResearchReportHTML(job.ID, html, direction, cost); err != nil {
+		log.Printf("research: job %d: save auto HTML report: %v", job.ID, err)
+		return price
+	}
+	log.Printf("Generated HTML report id=%d model=%q chars=%d", job.ID, job.Model, len(html))
+	return addResearchPrice(price, cost)
+}
+
+// addResearchPrice sums two optional prices, treating nil as absent.
+func addResearchPrice(a, b *float64) *float64 {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	sum := *a + *b
+	return &sum
 }
 
 // logResearchProgress writes one log line per phase event so a tailed log
@@ -441,15 +497,17 @@ func (s *Server) handleResearchDefaults(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	var req struct {
-		Title             string `json:"title"`
-		Query             string `json:"query"`
-		Model             string `json:"model"`
-		Mode              string `json:"mode"`
-		ForceSearch       bool   `json:"force_search"`
-		DeepReport        bool   `json:"deep_report"`
-		PauseRedditImport bool   `json:"pause_reddit_import"`
-		Effort            int    `json:"effort"`
-		MaxTimeMinutes    int    `json:"max_time_minutes"`
+		Title               string `json:"title"`
+		Query               string `json:"query"`
+		Model               string `json:"model"`
+		Mode                string `json:"mode"`
+		ForceSearch         bool   `json:"force_search"`
+		DeepReport          bool   `json:"deep_report"`
+		AutoHTMLReport      bool   `json:"auto_html_report"`
+		HTMLReportDirection string `json:"html_report_direction"`
+		PauseRedditImport   bool   `json:"pause_reddit_import"`
+		Effort              int    `json:"effort"`
+		MaxTimeMinutes      int    `json:"max_time_minutes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -458,6 +516,15 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 	if req.Title == "" && req.Query == "" {
 		writeError(w, http.StatusBadRequest, "title or query required")
 		return
+	}
+	req.HTMLReportDirection = strings.TrimSpace(req.HTMLReportDirection)
+	if len(req.HTMLReportDirection) > 2000 {
+		writeError(w, http.StatusBadRequest, "html report direction must be 2000 characters or fewer")
+		return
+	}
+	// The style direction is only meaningful when the HTML report is requested.
+	if !req.AutoHTMLReport {
+		req.HTMLReportDirection = ""
 	}
 	mode := req.Mode
 	if mode == "" {
@@ -496,12 +563,12 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 
 	// ForceSearch only changes brainstorm-mode behaviour; ignore it otherwise.
 	forceSearch := req.ForceSearch && mode == research.ModeBrainstorm
-	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, effort, maxTimeSeconds)
+	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, req.AutoHTMLReport, req.HTMLReportDirection, effort, maxTimeSeconds)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	log.Printf("Starting research job id=%d user_id=%d model=%q mode=%q force_search=%t deep_report=%t pause_reddit_import=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, effort, maxTimeSeconds, req.Title, req.Query)
+	log.Printf("Starting research job id=%d user_id=%d model=%q mode=%q force_search=%t deep_report=%t auto_html_report=%t pause_reddit_import=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, mode, forceSearch, req.DeepReport, req.AutoHTMLReport, req.PauseRedditImport, effort, maxTimeSeconds, req.Title, req.Query)
 	go s.runResearch(job)
 	writeJSON(w, http.StatusCreated, researchView(job))
 }
@@ -549,11 +616,47 @@ func (s *Server) handleGetResearch(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
+	// Surface whether the default report has a designed HTML version so the UI
+	// can offer to open it.
+	reportHTML := false
+	if def, err := s.store.GetDefaultResearchReport(job.ID); err == nil {
+		reportHTML = def.HTML != ""
+	} else if !errors.Is(err, store.ErrNotFound) {
+		internalError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, struct {
 		*store.ResearchJob
 		RedditRequest *redditimport.Request `json:"reddit_request,omitempty"`
 		Remixes       []store.ResearchRemix `json:"remixes"`
-	}{ResearchJob: job, RedditRequest: request, Remixes: remixes})
+		ReportHTML    bool                  `json:"report_html"`
+	}{ResearchJob: job, RedditRequest: request, Remixes: remixes, ReportHTML: reportHTML})
+}
+
+// handleGetResearchReportDocument serves the default report's designed HTML
+// document (the auto-generated or attached HTML version).
+func (s *Server) handleGetResearchReportDocument(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := s.store.GetResearchJob(id, user.ID); notFoundOr500(w, err) {
+		return
+	}
+	def, err := s.store.GetDefaultResearchReport(id)
+	if notFoundOr500(w, err) {
+		return
+	}
+	if def.HTML == "" {
+		writeError(w, http.StatusNotFound, "no HTML report")
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(def.HTML))
 }
 
 func (s *Server) handleResearchRedditImport(w http.ResponseWriter, r *http.Request) {

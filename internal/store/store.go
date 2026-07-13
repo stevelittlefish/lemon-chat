@@ -706,6 +706,70 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v33 → v34 complete")
 	}
 
+	if version < 35 {
+		log.Println("store: migrating v34 → v35 (create research_report table, back-fill reports and remixes)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE research_report (
+				id              INTEGER PRIMARY KEY,
+				research_job_id INTEGER NOT NULL REFERENCES research_job(id) ON DELETE CASCADE,
+				markdown        TEXT,
+				html            TEXT,
+				model           TEXT    NOT NULL DEFAULT '',
+				direction       TEXT    NOT NULL DEFAULT '',
+				price_usd       REAL,
+				is_default      INTEGER NOT NULL DEFAULT 0,
+				created_at      TEXT    NOT NULL,
+				updated_at      TEXT    NOT NULL
+			);
+			CREATE INDEX idx_research_report_job_id ON research_report(research_job_id);
+		`); err != nil {
+			return err
+		}
+		// Every completed job's final_report becomes its default report.
+		def, err := s.db.Exec(`
+			INSERT INTO research_report (research_job_id, markdown, html, model, direction, price_usd, is_default, created_at, updated_at)
+			SELECT id, final_report, NULL, model, '', NULL, 1, updated_at, updated_at
+			FROM research_job
+			WHERE final_report IS NOT NULL AND TRIM(final_report) <> ''`)
+		if err != nil {
+			return err
+		}
+		nDef, _ := def.RowsAffected()
+		log.Printf("store: migrating v34 → v35 — back-filled %d default report(s) from final_report", nDef)
+		// Each existing remix becomes a non-default report carrying the master
+		// markdown it was rendered from plus its HTML.
+		rem, err := s.db.Exec(`
+			INSERT INTO research_report (research_job_id, markdown, html, model, direction, price_usd, is_default, created_at, updated_at)
+			SELECT rr.research_job_id, j.final_report, rr.html, rr.model, rr.direction, rr.price_usd, 0, rr.created_at, rr.created_at
+			FROM research_remix AS rr
+			JOIN research_job AS j ON j.id = rr.research_job_id`)
+		if err != nil {
+			return err
+		}
+		nRem, _ := rem.RowsAffected()
+		log.Printf("store: migrating v34 → v35 — back-filled %d report(s) from research_remix", nRem)
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (35, ?)`, now()); err != nil {
+			return err
+		}
+		version = 35
+		log.Println("store: migration v34 → v35 complete")
+	}
+
+	if version < 36 {
+		log.Println("store: migrating v35 → v36 (add auto HTML report options to research_job)")
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN auto_html_report INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN html_report_direction TEXT`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (36, ?)`, now()); err != nil {
+			return err
+		}
+		version = 36
+		log.Println("store: migration v35 → v36 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }
