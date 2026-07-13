@@ -20,6 +20,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [x] Remove the report-remix output-token cap so providers can generate up to their supported limit.
+
 - [x] Indicate which past research results have saved remixes in the research list.
 
 - [x] Track OpenRouter response cost in the shared LLM API layer, accumulate and store research/report-remix prices, and display them in the research UI.

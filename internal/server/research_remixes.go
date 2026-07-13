@@ -96,7 +96,7 @@ func (s *Server) handleCreateResearchRemix(w http.ResponseWriter, r *http.Reques
 	lastProgress := time.Time{}
 	completion, err := llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
 		[]llm.Message{{Role: "system", Content: remixSystemPrompt}, {Role: "user", Content: userPrompt}},
-		map[string]any{"temperature": 0.7, "max_tokens": 16384}, func(delta string) {
+		map[string]any{"temperature": 0.7}, func(delta string) {
 			generated.WriteString(delta)
 			if time.Since(lastProgress) < 250*time.Millisecond {
 				return
