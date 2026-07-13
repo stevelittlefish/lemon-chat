@@ -522,8 +522,16 @@ async function showReportForm(jobID) {
       <label class="research-field research-check" id="remix-deep-field"><input type="checkbox" id="remix-deep"> in-depth (section-by-section) report</label>
       <label class="research-field research-check"><input type="checkbox" id="remix-html"> also design an HTML version</label>
     </fieldset>
-    <label class="remix-field">Model<select id="remix-model" class="input">${options}</select></label>
-    <label class="remix-field" id="remix-direction-field" hidden>Optional HTML direction<textarea id="remix-direction" class="input textarea" rows="5" maxlength="2000" placeholder="For example: use earthy greens and browns, with simple typography"></textarea></label>
+    <div class="remix-part" id="remix-markdown-opts">
+      <p class="research-section-label">markdown</p>
+      <label class="remix-field">Model<select id="remix-md-model" class="input">${options}</select></label>
+      <label class="remix-field">Optional prompt for the rewrite<textarea id="remix-md-direction" class="input textarea" rows="4" maxlength="2000" placeholder="For example: focus on trade-offs, keep it concise, add a comparison table"></textarea></label>
+    </div>
+    <div class="remix-part" id="remix-html-opts">
+      <p class="research-section-label">designed HTML</p>
+      <label class="remix-field">Model<select id="remix-html-model" class="input">${options}</select></label>
+      <label class="remix-field">Optional HTML direction<textarea id="remix-direction" class="input textarea" rows="4" maxlength="2000" placeholder="For example: use earthy greens and browns, with simple typography"></textarea></label>
+    </div>
     <div id="remix-progress" class="remix-progress" hidden aria-live="polite">
       <div class="remix-progress-heading"><span id="remix-progress-label">Preparing</span><span id="remix-progress-count"></span></div>
       <div id="remix-progress-preview" class="remix-progress-preview"></div>
@@ -538,12 +546,14 @@ async function showReportForm(jobID) {
   const markdownCheck = document.getElementById('remix-markdown');
   const htmlCheck = document.getElementById('remix-html');
   const deepField = document.getElementById('remix-deep-field');
-  const directionField = document.getElementById('remix-direction-field');
-  // The deep-report toggle only affects markdown regeneration; the direction
-  // box only affects the designed HTML version.
+  const markdownOpts = document.getElementById('remix-markdown-opts');
+  const htmlOpts = document.getElementById('remix-html-opts');
+  // Each part's model and prompt controls only show when that part is selected;
+  // the deep-report toggle only affects markdown regeneration.
   const syncOptions = () => {
     deepField.hidden = !markdownCheck.checked;
-    directionField.hidden = !htmlCheck.checked;
+    markdownOpts.hidden = !markdownCheck.checked;
+    htmlOpts.hidden = !htmlCheck.checked;
   };
   markdownCheck.addEventListener('change', syncOptions);
   htmlCheck.addEventListener('change', syncOptions);
@@ -552,7 +562,9 @@ async function showReportForm(jobID) {
   document.getElementById('remix-go').addEventListener('click', () => {
     const btn = document.getElementById('remix-go');
     const error = document.getElementById('remix-error');
-    const model = document.getElementById('remix-model');
+    const mdModel = document.getElementById('remix-md-model');
+    const mdDirection = document.getElementById('remix-md-direction');
+    const htmlModel = document.getElementById('remix-html-model');
     const direction = document.getElementById('remix-direction');
     const deep = document.getElementById('remix-deep');
     const progress = document.getElementById('remix-progress');
@@ -565,7 +577,7 @@ async function showReportForm(jobID) {
       error.innerHTML = '<div class="research-error">Select at least one output: markdown, HTML, or both.</div>';
       return;
     }
-    const controls = [model, direction, deep, markdownCheck, htmlCheck];
+    const controls = [mdModel, mdDirection, htmlModel, direction, deep, markdownCheck, htmlCheck];
     btn.setAttribute('disabled', '');
     btn.setAttribute('aria-busy', 'true');
     controls.forEach((c) => { c.disabled = true; });
@@ -581,7 +593,9 @@ async function showReportForm(jobID) {
       btn.textContent = 'create remix';
     };
     research.regenerateReport(jobID, {
-      model: model.value, direction: direction.value.trim(), markdown: wantMarkdown, html: wantHTML, deepReport: deep.checked,
+      markdownModel: mdModel.value, htmlModel: htmlModel.value,
+      markdownDirection: mdDirection.value.trim(), direction: direction.value.trim(),
+      markdown: wantMarkdown, html: wantHTML, deepReport: deep.checked,
     }, {
       onEvent: (ev) => {
         if (ev.error) { reset(new Error(ev.error)); return; }

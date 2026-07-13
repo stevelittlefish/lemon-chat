@@ -98,7 +98,11 @@ type Config struct {
 	// DeepReport replaces the single-shot final write with a section-based
 	// pipeline (outline → refine → per-section write from raw findings → glue),
 	// producing a longer, more detailed report. Applies to both modes.
-	DeepReport            bool
+	DeepReport bool
+	// ReportInstruction is an optional extra instruction from the user, appended
+	// to the report-writing prompts (single-pass final report and the deep-report
+	// outline/section writers). Empty means no extra instruction.
+	ReportInstruction     string
 	PauseRedditImport     bool
 	OnRedditPause         func(PendingRedditRound) error
 	RedditResume          *RedditResume
@@ -959,6 +963,16 @@ func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
 
 // ── Phase 8: Final report ────────────────────────────────────
 
+// reportInstructionSuffix returns the user's optional extra report instruction
+// formatted for appending to a writing prompt, or "" when none was given.
+func (r *Researcher) reportInstructionSuffix() string {
+	instruction := strings.TrimSpace(r.cfg.ReportInstruction)
+	if instruction == "" {
+		return ""
+	}
+	return "\n\nAdditional instruction from the user — follow it while writing this report:\n" + instruction
+}
+
 func (r *Researcher) finalReport(ctx context.Context) string {
 	if r.brainstorm() {
 		return r.finalBrainstorm(ctx)
@@ -971,6 +985,7 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 	if override, ok := categoryPrompts[r.state.Category]; ok {
 		prompt += override
 	}
+	prompt += r.reportInstructionSuffix()
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
@@ -1007,6 +1022,7 @@ func (r *Researcher) finalBrainstorm(ctx context.Context) string {
 	if override, ok := brainstormFormatOverrides[r.state.Category]; ok {
 		prompt += override
 	}
+	prompt += r.reportInstructionSuffix()
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
@@ -1124,6 +1140,7 @@ func (r *Researcher) outline(ctx context.Context) []reportSection {
 		}
 		draftPrompt = fmt.Sprintf(outlineDraftPrompt, r.cfg.Query, r.state.Plan, report, findings, catHint)
 	}
+	draftPrompt += r.reportInstructionSuffix()
 	draft := r.parseOutline(ctx, draftPrompt)
 	if ctx.Err() != nil || len(draft) == 0 {
 		return draft
@@ -1186,6 +1203,7 @@ func (r *Researcher) writeSection(ctx context.Context, sec reportSection, outlin
 	} else {
 		prompt = fmt.Sprintf(sectionWritePrompt, r.cfg.Query, r.state.Plan, sec.Title, sec.Intent, outline, report, findings)
 	}
+	prompt += r.reportInstructionSuffix()
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}

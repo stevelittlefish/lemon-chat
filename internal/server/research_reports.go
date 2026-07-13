@@ -50,11 +50,17 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 	}
 
 	var req struct {
-		Model      string `json:"model"`
-		Direction  string `json:"direction"`
-		Markdown   bool   `json:"markdown"`
-		HTML       bool   `json:"html"`
-		DeepReport bool   `json:"deep_report"`
+		// MarkdownModel and HTMLModel optionally use a different model for each
+		// part; an empty value falls back to the configured default model.
+		MarkdownModel string `json:"markdown_model"`
+		HTMLModel     string `json:"html_model"`
+		// MarkdownDirection is an optional extra instruction for the markdown
+		// rewriter; Direction is the art direction for the HTML design.
+		MarkdownDirection string `json:"markdown_direction"`
+		Direction         string `json:"direction"`
+		Markdown          bool   `json:"markdown"`
+		HTML              bool   `json:"html"`
+		DeepReport        bool   `json:"deep_report"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -65,21 +71,27 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 		return
 	}
 	req.Direction = strings.TrimSpace(req.Direction)
-	if len(req.Direction) > 2000 {
-		writeError(w, http.StatusBadRequest, "direction must be 2000 characters or fewer")
+	req.MarkdownDirection = strings.TrimSpace(req.MarkdownDirection)
+	if len(req.Direction) > 2000 || len(req.MarkdownDirection) > 2000 {
+		writeError(w, http.StatusBadRequest, "instructions must be 2000 characters or fewer")
 		return
 	}
-	model := strings.TrimSpace(req.Model)
-	if model == "" {
-		model = s.cfg.Server.DefaultModel
+
+	// Resolve and validate the model for each requested part independently.
+	markdownModel, htmlModel := "", ""
+	if req.Markdown {
+		markdownModel, err = s.resolveRemixModel(req.MarkdownModel)
+		if err != nil {
+			writeError(w, http.StatusUnprocessableEntity, "markdown model: "+err.Error())
+			return
+		}
 	}
-	if model == "" {
-		writeError(w, http.StatusUnprocessableEntity, "no default model configured")
-		return
-	}
-	if _, err := s.cfg.ServerForModel(model); err != nil {
-		writeError(w, http.StatusBadRequest, "unknown model")
-		return
+	if req.HTML {
+		htmlModel, err = s.resolveRemixModel(req.HTMLModel)
+		if err != nil {
+			writeError(w, http.StatusUnprocessableEntity, "HTML model: "+err.Error())
+			return
+		}
 	}
 
 	title := job.Query
@@ -106,7 +118,7 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 	var freshMarkdown string
 	var markdownCost *float64
 	if req.Markdown {
-		researcher, err := s.newReportRegenerator(job, model, req.DeepReport, func(p research.Progress) {
+		researcher, err := s.newReportRegenerator(job, markdownModel, req.DeepReport, req.MarkdownDirection, func(p research.Progress) {
 			if p.Generated > 0 {
 				writeReportEvent(w, flusher, map[string]any{"phase": "generating-markdown", "generated": p.Generated, "snippet": p.Snippet})
 			}
@@ -148,7 +160,7 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 			source = freshMarkdown
 		}
 		writeReportEvent(w, flusher, map[string]any{"phase": "generating-html", "message": "designing the HTML document"})
-		h, cost, err := s.generateReportHTML(ctx, model, title, source, req.Direction, func(generated int, tail string) {
+		h, cost, err := s.generateReportHTML(ctx, htmlModel, title, source, req.Direction, func(generated int, tail string) {
 			writeReportEvent(w, flusher, map[string]any{"phase": "generating-html", "generated": generated, "snippet": tail})
 		})
 		if err != nil {
@@ -161,17 +173,19 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 		htmlCost = cost
 	}
 
+	// The report carries one model label; show both parts when they differ.
+	storedModel := remixModelLabel(markdownModel, htmlModel)
 	writeReportEvent(w, flusher, map[string]any{"phase": "saving", "message": "saving report"})
-	report, err := s.store.CreateResearchReport(jobID, storedMarkdown, html, model, req.Direction, addCost(markdownCost, htmlCost), false)
+	report, err := s.store.CreateResearchReport(jobID, storedMarkdown, html, storedModel, req.Direction, addCost(markdownCost, htmlCost), false)
 	if err != nil {
 		log.Printf("research report: save failed job_id=%d user_id=%d: %v", job.ID, user.ID, err)
 		writeReportEvent(w, flusher, map[string]any{"error": "could not save report"})
 		writeReportDone(w, flusher)
 		return
 	}
-	log.Printf("Creating research report id=%d research_job_id=%d user_id=%d model=%q markdown=%t html=%t", report.ID, jobID, user.ID, model, storedMarkdown != nil && *storedMarkdown != "", html != "")
+	log.Printf("Creating research report id=%d research_job_id=%d user_id=%d markdown_model=%q html_model=%q markdown=%t html=%t", report.ID, jobID, user.ID, markdownModel, htmlModel, storedMarkdown != nil && *storedMarkdown != "", html != "")
 	summary := store.ResearchReportSummary{
-		ID: report.ID, ResearchJobID: jobID, Model: model, Direction: req.Direction,
+		ID: report.ID, ResearchJobID: jobID, Model: storedModel, Direction: req.Direction,
 		HasMarkdown: storedMarkdown != nil && *storedMarkdown != "", HasHTML: html != "",
 		PriceUSD: report.PriceUSD, CreatedAt: report.CreatedAt,
 	}
@@ -182,27 +196,59 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 // newReportRegenerator constructs a Researcher pre-loaded with a completed job's
 // saved state so its report phase can be re-run without searching the web again.
 // Only the writer tier is needed (the report phase never calls the worker model).
-func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deepReport bool, onProgress func(research.Progress)) (*research.Researcher, error) {
+// instruction is an optional extra prompt appended to the report-writing prompts.
+func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deepReport bool, instruction string, onProgress func(research.Progress)) (*research.Researcher, error) {
 	modelServer, err := s.cfg.ServerForModel(model)
 	if err != nil {
 		return nil, fmt.Errorf("unknown model %q", model)
 	}
 	llmQuery := researchLLMQuery(job)
 	cfg := research.Config{
-		Query:           llmQuery,
-		SlugSource:      llmQuery,
-		Model:           model,
-		Mode:            job.Mode,
-		DeepReport:      deepReport,
-		APIBase:         modelServer.APIBase,
-		APIKey:          modelServer.APIKey,
-		MaxReportTokens: s.cfg.Research.MaxReportTokens,
-		Location:        s.researchLocation(),
+		Query:             llmQuery,
+		SlugSource:        llmQuery,
+		Model:             model,
+		Mode:              job.Mode,
+		DeepReport:        deepReport,
+		ReportInstruction: instruction,
+		APIBase:           modelServer.APIBase,
+		APIKey:            modelServer.APIKey,
+		MaxReportTokens:   s.cfg.Research.MaxReportTokens,
+		Location:          s.researchLocation(),
 	}
 	state := research.UnmarshalState(job.Round, job.EmptyRounds, job.ElapsedMS,
 		job.Category, job.Slug, job.Plan, job.Report, job.Findings, job.QueriesUsed, job.AnalyzedURLs)
 	state.PriceUSD = job.PriceUSD
 	return research.New(cfg, state, onProgress, nil), nil
+}
+
+// resolveRemixModel resolves a requested remix model, falling back to the
+// configured default model, and validates that it exists.
+func (s *Server) resolveRemixModel(requested string) (string, error) {
+	model := strings.TrimSpace(requested)
+	if model == "" {
+		model = s.cfg.Server.DefaultModel
+	}
+	if model == "" {
+		return "", fmt.Errorf("no default model configured")
+	}
+	if _, err := s.cfg.ServerForModel(model); err != nil {
+		return "", fmt.Errorf("unknown model %q", model)
+	}
+	return model, nil
+}
+
+// remixModelLabel is the single model string stored on a report variant: one
+// model when both parts share it (or only one part ran), or "md / html" when the
+// markdown and HTML parts used different models.
+func remixModelLabel(markdownModel, htmlModel string) string {
+	switch {
+	case markdownModel == "" || markdownModel == htmlModel:
+		return htmlModel
+	case htmlModel == "":
+		return markdownModel
+	default:
+		return markdownModel + " / " + htmlModel
+	}
 }
 
 // generateReportHTML renders report markdown as a self-contained HTML document
