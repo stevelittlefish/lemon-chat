@@ -131,6 +131,10 @@ type Config struct {
 	// ExtraRounds is the number of bonus "creative" rounds to run after the
 	// report would normally be considered complete (effort 4 → 1, effort 5 → 2).
 	ExtraRounds int
+	// OnTrace receives immutable, structured debug events for persistence. It is
+	// independent of OnProgress: trace events are durable job artifacts, while
+	// progress events drive the live UI.
+	OnTrace func(TraceEvent)
 }
 
 // PendingRedditRound is the complete durable boundary between search and
@@ -164,6 +168,17 @@ type Progress struct {
 	TotalFindings int      `json:"total_findings,omitempty"`
 	Generated     int      `json:"generated,omitempty"` // chars generated so far in a streaming LLM call
 	Snippet       string   `json:"snippet,omitempty"`   // tail of the text being generated
+}
+
+// TraceEvent is one structured event in a research job's append-only debug
+// history. Data must contain JSON-marshalable values and must never contain
+// credentials.
+type TraceEvent struct {
+	EventType string `json:"event_type"`
+	Phase     string `json:"phase"`
+	Round     int    `json:"round,omitempty"`
+	Message   string `json:"message,omitempty"`
+	Data      any    `json:"data,omitempty"`
 }
 
 type Researcher struct {
@@ -209,13 +224,23 @@ func New(cfg Config, state State, onProgress func(Progress), onCheckpoint func(S
 func (r *Researcher) brainstorm() bool { return r.cfg.Mode == ModeBrainstorm }
 
 func (r *Researcher) progress(p Progress) {
+	if p.Generated == 0 {
+		r.trace("progress", p.Phase, p.Round, p.Message, p)
+	}
 	if r.onProgress != nil {
 		r.onProgress(p)
 	}
 }
 
+func (r *Researcher) trace(eventType, phase string, round int, message string, data any) {
+	if r.cfg.OnTrace != nil {
+		r.cfg.OnTrace(TraceEvent{EventType: eventType, Phase: phase, Round: round, Message: message, Data: data})
+	}
+}
+
 func (r *Researcher) checkpoint() {
 	r.state.ElapsedMS = r.elapsedMS()
+	r.trace("checkpoint", "checkpoint", r.state.Round, "", r.state)
 	if r.onCheckpoint != nil {
 		r.onCheckpoint(r.state)
 	}
@@ -246,6 +271,10 @@ func (r *Researcher) addPrice(cost *float64) {
 func (r *Researcher) Run(ctx context.Context) (string, error) {
 	r.startTime = time.Now()
 	r.baseElapsed = r.state.ElapsedMS
+	r.trace("run_started", "planning", r.state.Round, "", map[string]any{
+		"model": r.writer.Model, "worker_model": r.worker.Model, "mode": r.cfg.Mode,
+		"max_rounds": r.cfg.MaxRounds, "max_time_ms": r.cfg.MaxTime.Milliseconds(),
+	})
 
 	// Phases 1–2 only run before the first round (fresh job, or a job that
 	// crashed before completing round 1 with no plan persisted).
@@ -262,15 +291,18 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 			return "", ctx.Err()
 		}
 		if r.state.Plan != "" {
+			r.trace("plan_completed", "planning", 0, "", map[string]any{"plan": r.state.Plan})
 			r.progress(Progress{Phase: "planning", Message: "plan ready — " + r.state.Plan})
 		}
 	}
 	if r.state.Round == 0 && r.state.Category == "" {
 		if r.brainstorm() {
 			r.state.Category = r.classifyBrainstorm(ctx)
+			r.trace("classification_completed", "planning", 0, "", map[string]any{"category": r.state.Category})
 			r.progress(Progress{Phase: "planning", Message: "output format: " + r.state.Category})
 		} else {
 			r.state.Category = r.classify(ctx)
+			r.trace("classification_completed", "planning", 0, "", map[string]any{"category": r.state.Category})
 			r.progress(Progress{Phase: "planning", Message: "report category: " + r.state.Category})
 		}
 		if ctx.Err() != nil {
@@ -372,7 +404,9 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
-	return r.formatCompositeReport(final), nil
+	composite := r.formatCompositeReport(final)
+	r.trace("final_report_completed", "writing", r.state.Round, "", map[string]any{"report": composite})
+	return composite, nil
 }
 
 // RegenerateReport re-runs only the final-report phase over the researcher's
@@ -406,7 +440,9 @@ func (r *Researcher) RegenerateReport(ctx context.Context) (string, *float64, er
 	if strings.TrimSpace(final) == "" {
 		return "", nil, fmt.Errorf("report regeneration produced no content")
 	}
-	return r.formatCompositeReport(final), r.state.PriceUSD, nil
+	composite := r.formatCompositeReport(final)
+	r.trace("final_report_completed", "writing", r.state.Round, "", map[string]any{"report": composite, "regenerated": true})
+	return composite, r.state.PriceUSD, nil
 }
 
 func (r *Researcher) resumeRedditRound(ctx context.Context, resume RedditResume) (bool, error) {
@@ -502,7 +538,8 @@ func (r *Researcher) runBrainstormRound(ctx context.Context, round, creativity i
 	if len(queries) > 0 {
 		r.state.QueriesUsed = append(r.state.QueriesUsed, queries...)
 		r.progress(Progress{Phase: "searching", Round: round, Queries: queries, TotalSources: len(r.state.AnalyzedURLs)})
-		newURLs := r.searchAll(ctx, queries)
+		r.trace("queries_generated", "searching", round, "", map[string]any{"queries": queries, "creativity": creativity})
+		newURLs := r.searchAll(ctx, round, queries)
 		ordinaryURLs, err := r.pauseForReddit(round, creativity, queries, newURLs)
 		if err != nil {
 			return false, err
@@ -546,7 +583,8 @@ func (r *Researcher) runRound(ctx context.Context, round, creativity int) (keepG
 	r.state.QueriesUsed = append(r.state.QueriesUsed, queries...)
 	r.progress(Progress{Phase: "searching", Round: round, Queries: queries, TotalSources: len(r.state.AnalyzedURLs)})
 
-	newURLs := r.searchAll(ctx, queries)
+	r.trace("queries_generated", "searching", round, "", map[string]any{"queries": queries, "creativity": creativity})
+	newURLs := r.searchAll(ctx, round, queries)
 	ordinaryURLs, err := r.pauseForReddit(round, creativity, queries, newURLs)
 	if err != nil {
 		return false, err
@@ -778,7 +816,7 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 
 // searchAll runs all queries in parallel and returns new (unseen) URLs,
 // capped at MaxURLsPerRound × len(queries).
-func (r *Researcher) searchAll(ctx context.Context, queries []string) []AnalyzedURL {
+func (r *Researcher) searchAll(ctx context.Context, round int, queries []string) []AnalyzedURL {
 	results := make([][]searx.Result, len(queries))
 	var wg sync.WaitGroup
 	for i, q := range queries {
@@ -787,7 +825,7 @@ func (r *Researcher) searchAll(ctx context.Context, queries []string) []Analyzed
 			defer wg.Done()
 			res, err := searx.Search(ctx, r.cfg.SearXNGURL, q, 1)
 			if err != nil {
-				r.progress(Progress{Phase: "warning", Message: fmt.Sprintf("search failed for %q: %v", q, err)})
+				r.progress(Progress{Phase: "warning", Round: round, Message: fmt.Sprintf("search failed for %q: %v", q, err)})
 				return
 			}
 			if len(res) > 10 {
@@ -797,6 +835,9 @@ func (r *Researcher) searchAll(ctx context.Context, queries []string) []Analyzed
 		}(i, q)
 	}
 	wg.Wait()
+	for i, query := range queries {
+		r.trace("search_results", "searching", round, "", map[string]any{"query": query, "results": results[i]})
+	}
 
 	seen := make(map[string]bool, len(r.state.AnalyzedURLs))
 	for _, u := range r.state.AnalyzedURLs {
@@ -804,18 +845,26 @@ func (r *Researcher) searchAll(ctx context.Context, queries []string) []Analyzed
 	}
 	limit := r.cfg.MaxURLsPerRound * len(queries)
 	var newURLs []AnalyzedURL
+	var rejected []map[string]string
 	for _, res := range results {
 		for _, sr := range res {
 			if len(newURLs) >= limit {
-				break
+				rejected = append(rejected, map[string]string{"url": sr.URL, "title": sr.Title, "reason": "round_limit"})
+				continue
 			}
-			if sr.URL == "" || seen[sr.URL] {
+			if sr.URL == "" {
+				rejected = append(rejected, map[string]string{"url": sr.URL, "title": sr.Title, "reason": "empty_url"})
+				continue
+			}
+			if seen[sr.URL] {
+				rejected = append(rejected, map[string]string{"url": sr.URL, "title": sr.Title, "reason": "duplicate"})
 				continue
 			}
 			seen[sr.URL] = true
 			newURLs = append(newURLs, AnalyzedURL{URL: sr.URL, Title: sr.Title})
 		}
 	}
+	r.trace("urls_selected", "searching", round, "", map[string]any{"selected": newURLs, "rejected": rejected, "limit": limit})
 	return newURLs
 }
 
@@ -898,7 +947,7 @@ func (r *Researcher) extractAll(ctx context.Context, round int, urls []AnalyzedU
 			}
 			r.progress(Progress{Phase: "reading", Round: round, URL: u.URL, Title: u.Title,
 				TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
-			findings[i] = r.fetchAndExtract(ctx, u.URL, u.Title)
+			findings[i] = r.fetchAndExtract(ctx, round, u.URL, u.Title)
 		}(i, u)
 	}
 	wg.Wait()
@@ -909,6 +958,7 @@ func (r *Researcher) extractAll(ctx context.Context, round int, urls []AnalyzedU
 			out = append(out, *f)
 		}
 	}
+	r.trace("extraction_batch_completed", "reading", round, "", map[string]any{"attempted": len(urls), "findings": out})
 	return out
 }
 
@@ -942,6 +992,7 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 		return
 	}
 	r.state.Report = out
+	r.trace("synthesis_completed", "analyzing", round, "", map[string]any{"report": out, "new_findings": len(newFindings)})
 }
 
 // ── Phase 7: Decide ──────────────────────────────────────────
@@ -957,8 +1008,10 @@ func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
 		return false
 	}
 	decision := strings.TrimLeft(stripToolCalls(out), "*_`\"'>#- \t\n")
+	shouldStop := strings.HasPrefix(strings.ToUpper(decision), "YES")
+	r.trace("stop_decision", "deciding", round, decision, map[string]any{"stop": shouldStop, "response": out})
 	r.progress(Progress{Phase: "deciding", Round: round, Message: decision})
-	return strings.HasPrefix(strings.ToUpper(decision), "YES")
+	return shouldStop
 }
 
 // ── Phase 8: Final report ────────────────────────────────────

@@ -17,6 +17,29 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
 
+func TestProgressAndCheckpointEmitStructuredTrace(t *testing.T) {
+	var events []TraceEvent
+	r := New(Config{OnTrace: func(event TraceEvent) { events = append(events, event) }}, State{Round: 2, Report: "intermediate"}, nil, nil)
+	r.startTime = time.Now()
+	r.progress(Progress{Phase: "deciding", Round: 2, Message: "NO — evidence gap"})
+	r.progress(Progress{Phase: "writing", Generated: 100, Snippet: "stream tail"})
+	r.checkpoint()
+
+	if len(events) != 2 {
+		t.Fatalf("trace event count = %d, want 2: %+v", len(events), events)
+	}
+	if events[0].EventType != "progress" || events[0].Phase != "deciding" || events[0].Round != 2 {
+		t.Fatalf("unexpected progress trace: %+v", events[0])
+	}
+	if events[1].EventType != "checkpoint" {
+		t.Fatalf("unexpected checkpoint trace: %+v", events[1])
+	}
+	state, ok := events[1].Data.(State)
+	if !ok || state.Report != "intermediate" {
+		t.Fatalf("checkpoint did not retain state: %#v", events[1].Data)
+	}
+}
+
 func TestParseJSONStringArray(t *testing.T) {
 	cases := []struct {
 		name string

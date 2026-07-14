@@ -114,6 +114,10 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("X-Accel-Buffering", "no")
 	writeReportEvent(w, flusher, map[string]any{"phase": "connecting", "message": "connecting to model"})
+	s.appendResearchTrace(jobID, research.TraceEvent{EventType: "report_regeneration_started", Phase: "writing", Data: map[string]any{
+		"markdown": req.Markdown, "html": req.HTML, "deep_report": req.DeepReport,
+		"markdown_model": markdownModel, "html_model": htmlModel,
+	}})
 
 	// Step 1: optionally regenerate the markdown from the raw findings.
 	var freshMarkdown string
@@ -133,6 +137,7 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 		md, cost, err := researcher.RegenerateReport(ctx)
 		if err != nil {
 			log.Printf("research report: markdown regeneration failed job_id=%d user_id=%d: %v", job.ID, user.ID, err)
+			s.appendResearchTrace(jobID, research.TraceEvent{EventType: "report_regeneration_failed", Phase: "writing", Message: err.Error(), Data: map[string]any{"stage": "markdown", "model": markdownModel}})
 			writeReportEvent(w, flusher, map[string]any{"error": err.Error()})
 			writeReportDone(w, flusher)
 			return
@@ -161,17 +166,20 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 			source = freshMarkdown
 		}
 		writeReportEvent(w, flusher, map[string]any{"phase": "generating-html", "message": "designing the HTML document"})
+		s.appendResearchTrace(jobID, research.TraceEvent{EventType: "html_generation_started", Phase: "designing", Data: map[string]any{"automatic": false, "model": htmlModel}})
 		h, cost, err := s.generateReportHTML(ctx, htmlModel, title, source, req.Direction, func(generated int, tail string) {
 			writeReportEvent(w, flusher, map[string]any{"phase": "generating-html", "generated": generated, "snippet": tail})
 		})
 		if err != nil {
 			log.Printf("research report: HTML generation failed job_id=%d user_id=%d: %v", job.ID, user.ID, err)
+			s.appendResearchTrace(jobID, research.TraceEvent{EventType: "html_generation_failed", Phase: "designing", Message: err.Error(), Data: map[string]any{"stage": "generate", "model": htmlModel}})
 			writeReportEvent(w, flusher, map[string]any{"error": err.Error()})
 			writeReportDone(w, flusher)
 			return
 		}
 		html = h
 		htmlCost = cost
+		s.appendResearchTrace(jobID, research.TraceEvent{EventType: "html_generation_completed", Phase: "designing", Data: map[string]any{"automatic": false, "model": htmlModel, "characters": len(html), "cost_usd": cost}})
 	}
 
 	// The report carries one model label; show both parts when they differ.
@@ -180,11 +188,13 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 	report, err := s.store.CreateResearchReport(jobID, storedMarkdown, html, storedModel, req.Direction, addCost(markdownCost, htmlCost), false)
 	if err != nil {
 		log.Printf("research report: save failed job_id=%d user_id=%d: %v", job.ID, user.ID, err)
+		s.appendResearchTrace(jobID, research.TraceEvent{EventType: "report_regeneration_failed", Phase: "saving", Message: err.Error(), Data: map[string]any{"stage": "save"}})
 		writeReportEvent(w, flusher, map[string]any{"error": "could not save report"})
 		writeReportDone(w, flusher)
 		return
 	}
 	log.Printf("Creating research report id=%d research_job_id=%d user_id=%d markdown_model=%q html_model=%q markdown=%t html=%t", report.ID, jobID, user.ID, markdownModel, htmlModel, storedMarkdown != nil && *storedMarkdown != "", html != "")
+	s.appendResearchTrace(jobID, research.TraceEvent{EventType: "report_regeneration_completed", Phase: "terminal", Data: map[string]any{"report_id": report.ID, "price_usd": report.PriceUSD}})
 	summary := store.ResearchReportSummary{
 		ID: report.ID, ResearchJobID: jobID, Model: storedModel, Direction: req.Direction,
 		HasMarkdown: storedMarkdown != nil && *storedMarkdown != "", HasHTML: html != "",
@@ -215,6 +225,9 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 		APIKey:            modelServer.APIKey,
 		MaxReportTokens:   s.cfg.Research.MaxReportTokens,
 		Location:          s.researchLocation(),
+		OnTrace: func(event research.TraceEvent) {
+			s.appendResearchTrace(job.ID, event)
+		},
 	}
 	state := research.UnmarshalState(job.Round, job.EmptyRounds, job.ElapsedMS,
 		job.Category, job.Slug, job.Plan, job.Report, job.Findings, job.QueriesUsed, job.AnalyzedURLs)

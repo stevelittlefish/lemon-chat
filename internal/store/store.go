@@ -128,6 +128,20 @@ func (s *Store) migrate() error {
 			);
 			CREATE INDEX IF NOT EXISTS idx_research_remix_job_id ON research_remix(research_job_id);
 
+			CREATE TABLE IF NOT EXISTS research_event (
+				id              INTEGER PRIMARY KEY,
+				research_job_id INTEGER NOT NULL REFERENCES research_job(id) ON DELETE CASCADE,
+				sequence        INTEGER NOT NULL,
+				event_type      TEXT    NOT NULL,
+				phase           TEXT    NOT NULL DEFAULT '',
+				round           INTEGER NOT NULL DEFAULT 0,
+				message         TEXT    NOT NULL DEFAULT '',
+				data            TEXT    NOT NULL DEFAULT '{}',
+				created_at      TEXT    NOT NULL,
+				UNIQUE (research_job_id, sequence)
+			);
+			CREATE INDEX IF NOT EXISTS idx_research_event_job_sequence ON research_event(research_job_id, sequence);
+
 			CREATE TABLE IF NOT EXISTS schema_version (
 				version INTEGER NOT NULL
 			);
@@ -811,6 +825,32 @@ func (s *Store) migrate() error {
 		}
 		version = 39
 		log.Println("store: migration v38 → v39 complete")
+	}
+
+	if version < 40 {
+		log.Println("store: migrating v39 → v40 (create research event trace)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE IF NOT EXISTS research_event (
+				id              INTEGER PRIMARY KEY,
+				research_job_id INTEGER NOT NULL REFERENCES research_job(id) ON DELETE CASCADE,
+				sequence        INTEGER NOT NULL,
+				event_type      TEXT    NOT NULL,
+				phase           TEXT    NOT NULL DEFAULT '',
+				round           INTEGER NOT NULL DEFAULT 0,
+				message         TEXT    NOT NULL DEFAULT '',
+				data            TEXT    NOT NULL DEFAULT '{}',
+				created_at      TEXT    NOT NULL,
+				UNIQUE (research_job_id, sequence)
+			);
+			CREATE INDEX IF NOT EXISTS idx_research_event_job_sequence ON research_event(research_job_id, sequence);
+		`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (40, ?)`, now()); err != nil {
+			return err
+		}
+		version = 40
+		log.Println("store: migration v39 → v40 complete")
 	}
 
 	log.Printf("store: schema ready at version %d", version)

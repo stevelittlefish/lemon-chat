@@ -289,6 +289,9 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		SynthesisWindow:       rc.SynthesisWindow,
 		ExtraRounds:           extraRounds,
 	}
+	cfg.OnTrace = func(event research.TraceEvent) {
+		s.appendResearchTrace(job.ID, event)
+	}
 	if job.Title != nil && *job.Title != "" {
 		cfg.SlugSource = *job.Title
 	}
@@ -391,9 +394,13 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 // any failure is logged and the job still completes with its markdown report.
 // The returned price includes the HTML generation cost when one was incurred.
 func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, job *store.ResearchJob, markdown string, price *float64) *float64 {
+	s.appendResearchTrace(job.ID, research.TraceEvent{EventType: "html_generation_started", Phase: "designing", Data: map[string]any{
+		"automatic": true, "model": job.HTMLReportModel,
+	}})
 	// The default report must exist before HTML can be attached to it.
 	if err := s.store.UpsertDefaultResearchReport(job.ID, markdown, job.Model); err != nil {
 		log.Printf("research: job %d: prepare default report for HTML: %v", job.ID, err)
+		s.appendResearchTrace(job.ID, research.TraceEvent{EventType: "html_generation_failed", Phase: "designing", Message: err.Error(), Data: map[string]any{"stage": "prepare"}})
 		return price
 	}
 	// The HTML step may use a dedicated model; fall back to the job's own model.
@@ -424,14 +431,34 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 	})
 	if err != nil {
 		log.Printf("research: job %d: auto HTML report: %v", job.ID, err)
+		s.appendResearchTrace(job.ID, research.TraceEvent{EventType: "html_generation_failed", Phase: "designing", Message: err.Error(), Data: map[string]any{"stage": "generate", "model": htmlModel}})
 		return price
 	}
 	if err := s.store.SetDefaultResearchReportHTML(job.ID, html, direction, cost); err != nil {
 		log.Printf("research: job %d: save auto HTML report: %v", job.ID, err)
+		s.appendResearchTrace(job.ID, research.TraceEvent{EventType: "html_generation_failed", Phase: "designing", Message: err.Error(), Data: map[string]any{"stage": "save", "model": htmlModel}})
 		return price
 	}
 	log.Printf("Generated HTML report id=%d model=%q chars=%d", job.ID, htmlModel, len(html))
+	s.appendResearchTrace(job.ID, research.TraceEvent{EventType: "html_generation_completed", Phase: "designing", Data: map[string]any{
+		"automatic": true, "model": htmlModel, "characters": len(html), "cost_usd": cost,
+	}})
 	return addResearchPrice(price, cost)
+}
+
+func (s *Server) appendResearchTrace(jobID int64, event research.TraceEvent) {
+	data := "{}"
+	if event.Data != nil {
+		encoded, err := json.Marshal(event.Data)
+		if err != nil {
+			log.Printf("research: job %d: encode trace event %q: %v", jobID, event.EventType, err)
+			return
+		}
+		data = string(encoded)
+	}
+	if _, err := s.store.AppendResearchEvent(jobID, event.EventType, event.Phase, event.Round, event.Message, data); err != nil {
+		log.Printf("research: job %d: append trace event %q: %v", jobID, event.EventType, err)
+	}
 }
 
 // addResearchPrice sums two optional prices, treating nil as absent.
@@ -495,6 +522,9 @@ func (s *Server) finishResearch(jobID int64, run *researchRun, status string, fi
 	if err := s.store.FinishResearchJob(jobID, status, finalReport, errPtr, elapsedMS, priceUSD); err != nil {
 		log.Printf("research: job %d: finish: %v", jobID, err)
 	}
+	s.appendResearchTrace(jobID, research.TraceEvent{EventType: "run_finished", Phase: "terminal", Message: errMsg, Data: map[string]any{
+		"status": status, "elapsed_ms": elapsedMS, "price_usd": priceUSD,
+	}})
 	terminal := map[string]any{"status": status}
 	if errMsg != "" {
 		terminal["message"] = errMsg
@@ -925,6 +955,9 @@ func (s *Server) handleCancelResearch(w http.ResponseWriter, r *http.Request) {
 				internalError(w, err)
 				return
 			}
+			s.appendResearchTrace(id, research.TraceEvent{EventType: "run_finished", Phase: "terminal", Data: map[string]any{
+				"status": store.ResearchStatusCancelled, "elapsed_ms": job.ElapsedMS, "price_usd": job.PriceUSD,
+			}})
 			writeJSON(w, http.StatusOK, map[string]string{"status": store.ResearchStatusCancelled})
 			return
 		}

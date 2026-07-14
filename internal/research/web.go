@@ -98,9 +98,14 @@ func isLowQuality(summary string) bool {
 // fetchAndExtract fetches a URL, runs the goal-based LLM extraction over its
 // content, and returns a finding — or nil if the page failed to fetch or the
 // extraction was low quality.
-func (r *Researcher) fetchAndExtract(ctx context.Context, pageURL, searchTitle string) *Finding {
+func (r *Researcher) fetchAndExtract(ctx context.Context, round int, pageURL, searchTitle string) *Finding {
 	page, err := r.fetchWebpage(ctx, pageURL)
 	if err != nil || page.Content == "" {
+		message := "page returned no content"
+		if err != nil {
+			message = err.Error()
+		}
+		r.trace("fetch_failed", "reading", round, message, map[string]any{"url": pageURL, "title": searchTitle})
 		return nil
 	}
 
@@ -113,6 +118,9 @@ func (r *Researcher) fetchAndExtract(ctx context.Context, pageURL, searchTitle s
 	finding := r.ExtractText(ctx, pageURL, title, content)
 	if finding != nil {
 		finding.OGImage = page.OGImage
+		r.trace("extraction_completed", "reading", round, "", finding)
+	} else {
+		r.trace("extraction_rejected", "reading", round, "", map[string]any{"url": pageURL, "title": title})
 	}
 	return finding
 }
