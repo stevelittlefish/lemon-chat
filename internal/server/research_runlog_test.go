@@ -4,7 +4,54 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stevelittlefish/lemon-chat/internal/research"
+	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
+
+// TestRunLogPauseResumeNoCollision simulates a Reddit pause/resume: two run-log
+// invocations write to the same directory. Every checkpoint must land in its own
+// file (the engine's round number repeats across the plan checkpoint, the
+// pre-increment pause checkpoint, and the resume), and the original start time
+// must survive the resume.
+func TestRunLogPauseResumeNoCollision(t *testing.T) {
+	dataDir := t.TempDir()
+	job := &store.ResearchJob{ID: 7, Effort: 3}
+	cfg := research.Config{Model: "gemma", MaxRounds: 8, MinRounds: 2}
+
+	// First invocation: plan checkpoint (round 0) then the Reddit-pause
+	// checkpoint, which fires while state.Round is still 0.
+	rl1 := newResearchRunLog(dataDir, job.ID)
+	rl1.start(job, cfg)
+	firstStart := rl1.meta.StartedAt
+	rl1.checkpoint(research.State{Round: 0, Plan: "the plan"})
+	rl1.checkpoint(research.State{Round: 0, QueriesUsed: []string{"q1", "q2"}})
+
+	// Resume invocation reuses the directory.
+	rl2 := newResearchRunLog(dataDir, job.ID)
+	rl2.start(job, cfg)
+	rl2.checkpoint(research.State{Round: 1, Report: "round 1 report"})
+	rl2.checkpoint(research.State{Round: 2, Report: "round 2 report"})
+	rl2.finish(store.ResearchStatusDone, "final report", research.State{Round: 2}, 42000)
+
+	snaps, err := os.ReadDir(filepath.Join(researchRunLogDir(dataDir, job.ID), "snapshots"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snaps) != 4 {
+		names := make([]string, len(snaps))
+		for i, e := range snaps {
+			names[i] = e.Name()
+		}
+		t.Fatalf("expected 4 distinct snapshot files, got %d: %v", len(snaps), names)
+	}
+	if rl2.meta.StartedAt != firstStart {
+		t.Errorf("resume overwrote started_at: first=%q resumed=%q", firstStart, rl2.meta.StartedAt)
+	}
+	if rl2.meta.ElapsedMS != 42000 {
+		t.Errorf("expected server-provided elapsed 42000, got %d", rl2.meta.ElapsedMS)
+	}
+}
 
 func TestReadResearchDebug(t *testing.T) {
 	dataDir := t.TempDir()

@@ -22,15 +22,19 @@ import (
 // debugging research behaviour and is downloadable as a zip bundle. All writes
 // are best-effort — a failing run-log never affects the research run itself.
 //
+// Files are prefixed with a monotonic sequence (not the round number, which
+// repeats across the plan checkpoint, the pre-increment Reddit-pause checkpoint,
+// and resumes) so no checkpoint ever overwrites another:
+//
 //	<data_dir>/research/<job_id>/
-//	  meta.json          # config + outcome — the "why did it stop" summary
-//	  events.jsonl       # one line per milestone (the streamed progress log)
+//	  meta.json             # config + outcome — the "why did it stop" summary
+//	  events.jsonl          # one line per milestone (the streamed progress log)
 //	  reports/
-//	    round-00-plan.txt
-//	    round-NN.md      # State.Report snapshot after each round
+//	    plan.txt
+//	    NNN-round-RR.md     # State.Report snapshot at each checkpoint
 //	    final.md
 //	  snapshots/
-//	    round-NN.json    # full State per round
+//	    NNN-round-RR.json   # full State at each checkpoint
 type researchRunLog struct {
 	dir      string
 	disabled bool
@@ -38,6 +42,11 @@ type researchRunLog struct {
 	mu          sync.Mutex
 	meta        researchRunMeta
 	planWritten bool
+	// seq is a monotonic counter prefixing every snapshot/report file so no two
+	// checkpoints ever collide — the engine's round number is not unique across
+	// the plan checkpoint, the pre-increment Reddit-pause checkpoint, and resumes.
+	// It is seeded past any files a previous invocation left in this directory.
+	seq int
 	// lastDecision holds the most recent stop-check verdict; terminalReason holds
 	// a terminal note/warning (round cap, time budget, empty rounds) which, when
 	// present, is the real reason the run ended. Both are teed from onProgress so
@@ -88,6 +97,11 @@ func newResearchRunLog(dataDir string, jobID int64) *researchRunLog {
 			return rl
 		}
 	}
+	// A resumed job reuses this directory; continue the checkpoint sequence past
+	// whatever a previous invocation already wrote so files never collide.
+	if entries, err := os.ReadDir(filepath.Join(dir, "snapshots")); err == nil {
+		rl.seq = len(entries)
+	}
 	return rl
 }
 
@@ -99,6 +113,15 @@ func (rl *researchRunLog) start(job *store.ResearchJob, cfg research.Config) {
 	locale := ""
 	if cfg.Location != nil {
 		locale = cfg.Location.String()
+	}
+	// Keep the original start time across resumes: a resumed job re-invokes
+	// start(), and overwriting started_at would make wall-clock nonsense.
+	startedAt := time.Now().UTC().Format(time.RFC3339)
+	if existing, err := os.ReadFile(filepath.Join(rl.dir, "meta.json")); err == nil {
+		var prev researchRunMeta
+		if json.Unmarshal(existing, &prev) == nil && prev.StartedAt != "" {
+			startedAt = prev.StartedAt
+		}
 	}
 	rl.mu.Lock()
 	rl.meta = researchRunMeta{
@@ -114,7 +137,7 @@ func (rl *researchRunLog) start(job *store.ResearchJob, cfg research.Config) {
 		MaxTimeSeconds:    cfg.MaxTime.Seconds(),
 		Locale:            locale,
 		GitCommit:         buildCommit(),
-		StartedAt:         time.Now().UTC().Format(time.RFC3339),
+		StartedAt:         startedAt,
 	}
 	rl.writeMetaLocked()
 	rl.mu.Unlock()
@@ -163,20 +186,26 @@ func (rl *researchRunLog) checkpoint(st research.State) {
 	defer rl.mu.Unlock()
 
 	if !rl.planWritten && strings.TrimSpace(st.Plan) != "" {
-		rl.writeFile(filepath.Join("reports", "round-00-plan.txt"), []byte(st.Plan))
+		rl.writeFile(filepath.Join("reports", "plan.txt"), []byte(st.Plan))
 		rl.planWritten = true
 	}
+	// Sequence prefix keeps every checkpoint distinct and in order; the round
+	// number stays in the name for readability but no longer keys the file.
+	name := fmt.Sprintf("%03d-round-%02d", rl.seq, st.Round)
+	rl.seq++
 	if snapshot, err := json.MarshalIndent(st, "", "  "); err == nil {
-		rl.writeFile(filepath.Join("snapshots", fmt.Sprintf("round-%02d.json", st.Round)), snapshot)
+		rl.writeFile(filepath.Join("snapshots", name+".json"), snapshot)
 	}
 	if st.Report != "" {
-		rl.writeFile(filepath.Join("reports", fmt.Sprintf("round-%02d.md", st.Round)), []byte(st.Report))
+		rl.writeFile(filepath.Join("reports", name+".md"), []byte(st.Report))
 	}
 }
 
 // finish writes the final report (when present) and updates meta.json with the
 // run's outcome. stopReason falls back to the derived decision/terminal notes.
-func (rl *researchRunLog) finish(status, report string, st research.State) {
+// elapsedMS is the server's accurate total (State.ElapsedMS is only current as of
+// the last checkpoint, so it misses the final-report write).
+func (rl *researchRunLog) finish(status, report string, st research.State, elapsedMS int64) {
 	if rl == nil || rl.disabled {
 		return
 	}
@@ -193,7 +222,7 @@ func (rl *researchRunLog) finish(status, report string, st research.State) {
 	rl.meta.Status = status
 	rl.meta.StopReason = reason
 	rl.meta.RoundsCompleted = st.Round
-	rl.meta.ElapsedMS = st.ElapsedMS
+	rl.meta.ElapsedMS = elapsedMS
 	rl.meta.FindingsCount = len(st.Findings)
 	rl.meta.PriceUSD = st.PriceUSD
 	rl.meta.EndedAt = time.Now().UTC().Format(time.RFC3339)

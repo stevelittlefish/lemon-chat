@@ -391,15 +391,15 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 			price = s.autoGenerateHTMLReport(ctx, run, job, report, price)
 		}
 		log.Printf("Research job finished id=%d rounds=%d elapsed=%.1fs", job.ID, r.State().Round, float64(elapsedMS)/1000)
-		rlog.finish(store.ResearchStatusDone, report, r.State())
+		rlog.finish(store.ResearchStatusDone, report, r.State(), elapsedMS)
 		s.finishResearch(job.ID, run, store.ResearchStatusDone, &report, "", elapsedMS, price)
 	case errors.Is(runErr, context.Canceled) && run.wasCancelRequested():
 		log.Printf("Research job cancelled id=%d", job.ID)
-		rlog.finish(store.ResearchStatusCancelled, "", r.State())
+		rlog.finish(store.ResearchStatusCancelled, "", r.State(), elapsedMS)
 		s.finishResearch(job.ID, run, store.ResearchStatusCancelled, nil, "", elapsedMS, r.State().PriceUSD)
 	default:
 		log.Printf("Research job failed id=%d: %v", job.ID, runErr)
-		rlog.finish(store.ResearchStatusError, "", r.State())
+		rlog.finish(store.ResearchStatusError, "", r.State(), elapsedMS)
 		s.finishResearch(job.ID, run, store.ResearchStatusError, nil, runErr.Error(), elapsedMS, r.State().PriceUSD)
 	}
 }
