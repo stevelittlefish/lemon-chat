@@ -43,3 +43,40 @@ func TestNonDefaultResearchReports(t *testing.T) {
 		t.Fatalf("ListNonDefaultResearchReportCounts = %#v, %v; want job count 2", counts, err)
 	}
 }
+
+func TestListResearchJobsWithDefaultHTML(t *testing.T) {
+	s := newTestStore(t)
+	user, err := s.CreateUser("html-researcher", nil, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// One job whose default report has designed HTML, one with markdown only.
+	withHTML, err := s.CreateResearchJob(user.ID, "A", "Q", "model", "research", false, false, false, false, "", "", "", 3, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertDefaultResearchReport(withHTML.ID, "# md", "model"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetDefaultResearchReportHTML(withHTML.ID, "<!DOCTYPE html><html></html>", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	mdOnly, err := s.CreateResearchJob(user.ID, "B", "Q", "model", "research", false, false, false, false, "", "", "", 3, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UpsertDefaultResearchReport(mdOnly.ID, "# md only", "model"); err != nil {
+		t.Fatal(err)
+	}
+
+	has, err := s.ListResearchJobsWithDefaultHTML(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !has[withHTML.ID] {
+		t.Errorf("job with default HTML report should be present")
+	}
+	if has[mdOnly.ID] {
+		t.Errorf("markdown-only job should not be present")
+	}
+}

@@ -561,6 +561,7 @@ type researchJobView struct {
 	ElapsedMS         int64    `json:"elapsed_ms"`
 	PriceUSD          *float64 `json:"price_usd"`
 	ReportCount       int      `json:"report_count"`
+	ReportHTML        bool     `json:"report_html"`
 	Error             *string  `json:"error"`
 	CreatedAt         string   `json:"created_at"`
 	UpdatedAt         string   `json:"updated_at"`
@@ -710,10 +711,16 @@ func (s *Server) handleListResearch(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
+	htmlReports, err := s.store.ListResearchJobsWithDefaultHTML(user.ID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
 	views := make([]researchJobView, 0, len(jobs))
 	for i := range jobs {
 		view := researchView(&jobs[i])
 		view.ReportCount = reportCounts[jobs[i].ID]
+		view.ReportHTML = htmlReports[jobs[i].ID]
 		views = append(views, view)
 	}
 	writeJSON(w, http.StatusOK, views)

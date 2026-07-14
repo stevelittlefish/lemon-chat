@@ -348,6 +348,26 @@ select.input option { background: var(--paper-100); color: var(--fg); }
   white-space: nowrap;
 }
 
+.research-item-html {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  color: var(--hm-cyan);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.research-item-html:hover {
+  text-decoration: underline;
+}
+
+.research-item-html svg {
+  width: 13px;
+  height: 13px;
+}
+
 @media (max-width: 560px) {
   .research-item {
     align-items: flex-start;

@@ -126,6 +126,7 @@ async function showList() {
       <span class="research-item-details">
         <span class="research-item-model">${escapeHtml(j.model)}</span>
         ${j.report_count ? `<span class="research-item-remixes">${j.report_count} ${j.report_count === 1 ? 'remix' : 'remixes'}</span>` : ''}
+        ${j.report_html ? `<a class="research-item-html" href="/api/research/${j.id}/report/document" target="_blank" rel="noopener noreferrer" title="open the designed HTML report in a new tab">${icon('file-code', 13)} HTML</a>` : ''}
         <span class="research-item-meta">${formatDate(j.created_at)}</span>
         ${statusBadge(j.status)}
       </span>
@@ -240,6 +241,11 @@ async function showList() {
   });
   main.querySelectorAll('.research-item').forEach((el) => {
     el.addEventListener('click', () => { location.hash = el.dataset.id; });
+  });
+  // The HTML-report link opens in a new tab; keep its click from also
+  // navigating the card to the report detail page.
+  main.querySelectorAll('.research-item-html').forEach((el) => {
+    el.addEventListener('click', (e) => e.stopPropagation());
   });
 }
 
