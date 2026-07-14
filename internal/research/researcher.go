@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -119,11 +120,15 @@ type Config struct {
 	SearXNGURL    string
 	Location      *time.Location
 
-	MaxRounds             int
-	MaxTime               time.Duration
-	MaxURLsPerRound       int
-	MaxContentChars       int
-	MaxReportTokens       int
+	MaxRounds       int
+	MaxTime         time.Duration
+	MaxURLsPerRound int
+	MaxContentChars int
+	// SynthesisTokens caps the per-round synthesis call; FinalReportTokens caps
+	// the (longer) final report and deep-report section writes. Splitting these
+	// stops the final report inheriting synthesis's small budget and truncating.
+	SynthesisTokens       int
+	FinalReportTokens     int
 	ExtractionConcurrency int
 	MinRounds             int
 	MaxEmptyRounds        int
@@ -751,27 +756,65 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 		return nil
 	}
 
+	// Dedup on a token-set key rather than the exact lowercase string, so a
+	// reworded or reordered near-duplicate ("off-peak vs peak" / "peak off-peak")
+	// is recognised as the same search instead of thrashing another round on it.
 	used := make(map[string]bool, len(r.state.QueriesUsed))
 	for _, q := range r.state.QueriesUsed {
-		used[strings.ToLower(q)] = true
+		used[queryKey(q)] = true
 	}
 	var queries []string
 	for _, q := range parseJSONStringArray(out) {
 		q = strings.TrimSpace(q)
-		if q == "" || used[strings.ToLower(q)] {
+		if q == "" {
 			continue
 		}
-		used[strings.ToLower(q)] = true
+		key := queryKey(q)
+		if used[key] {
+			continue
+		}
+		used[key] = true
 		queries = append(queries, q)
 	}
 	// With the toggle on, the model occasionally still returns no usable query;
 	// fall back to the brief itself so the promised search always happens.
 	if forceSearch && len(queries) == 0 {
-		if q := strings.TrimSpace(r.cfg.Query); q != "" && !used[strings.ToLower(q)] {
+		if q := strings.TrimSpace(r.cfg.Query); q != "" && !used[queryKey(q)] {
 			queries = append(queries, q)
 		}
 	}
 	return queries
+}
+
+// queryStopwords are connective/filler tokens dropped when building a query's
+// dedup key, so two searches differing only by word order or a filler word
+// collapse to the same key.
+var queryStopwords = map[string]bool{
+	"vs": true, "and": true, "or": true, "the": true, "a": true, "an": true,
+	"of": true, "for": true, "to": true, "in": true, "on": true, "with": true,
+}
+
+// reQueryToken splits a query into alphanumeric tokens, keeping ':' so search
+// operators like site: survive. Hyphenated words split into their parts, which
+// is fine for set comparison ("off-peak" → off, peak).
+var reQueryToken = regexp.MustCompile(`[a-z0-9:]+`)
+
+// queryKey reduces a search query to an order- and filler-insensitive token-set
+// key for near-duplicate detection: two queries with the same key search the
+// same ground even if the model reworded or reordered them.
+func queryKey(q string) string {
+	tokens := reQueryToken.FindAllString(strings.ToLower(q), -1)
+	seen := make(map[string]bool, len(tokens))
+	uniq := make([]string, 0, len(tokens))
+	for _, t := range tokens {
+		if queryStopwords[t] || seen[t] {
+			continue
+		}
+		seen[t] = true
+		uniq = append(uniq, t)
+	}
+	sort.Strings(uniq)
+	return strings.Join(uniq, " ")
 }
 
 // ── Phase 4: Search ──────────────────────────────────────────
@@ -932,7 +975,7 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 	} else {
 		prompt = fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, r.formatFindings(newFindings))
 	}
-	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout,
+	out, finish, err := r.llmCallStreamFinish(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.SynthesisTokens, synthesisTimeout,
 		func(generated int, tail string) {
 			r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 		})
@@ -941,17 +984,30 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 		r.progress(Progress{Phase: "warning", Message: "synthesis failed — keeping previous report"})
 		return
 	}
+	// A truncated synthesis (hit the token limit) is a mangled working summary;
+	// overwriting memory with it would degrade every later round. Discard it and
+	// keep the prior summary — but only when there is one, since on the first
+	// round a truncated summary still beats an empty report.
+	if isTruncated(finish) && strings.TrimSpace(r.state.Report) != "" {
+		r.progress(Progress{Phase: "warning", Round: round, Message: "synthesis hit the token limit and was truncated — keeping previous report"})
+		return
+	}
 	r.state.Report = out
 }
 
 // ── Phase 7: Decide ──────────────────────────────────────────
 
 func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
-	stop := stopPrompt
+	var prompt string
 	if r.brainstorm() {
-		stop = brainstormStopPrompt
+		prompt = fmt.Sprintf(brainstormStopPrompt, r.cfg.Query, r.state.Report, round, r.cfg.MaxRounds)
+	} else {
+		plan := strings.TrimSpace(r.state.Plan)
+		if plan == "" {
+			plan = "(No explicit plan was recorded — judge against the original question.)"
+		}
+		prompt = fmt.Sprintf(stopPrompt, r.cfg.Query, plan, r.state.Report, round, r.cfg.MaxRounds)
 	}
-	prompt := fmt.Sprintf(stop, r.cfg.Query, r.state.Report, round, r.cfg.MaxRounds)
 	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 128, stopTimeout)
 	if err != nil {
 		return false
@@ -989,7 +1045,7 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.FinalReportTokens, synthesisTimeout, onDelta)
 	if err != nil || report == "" {
 		// Never return empty — fall back to the evolving synthesis.
 		return r.state.Report
@@ -1002,7 +1058,7 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 			{Role: "user", Content: prompt},
 			{Role: "assistant", Content: report},
 			{Role: "user", Content: expandReportPrompt},
-		}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+		}, 0.4, r.cfg.FinalReportTokens, synthesisTimeout, onDelta)
 		if err == nil && len(expanded) > len(report) {
 			report = expanded
 		}
@@ -1026,7 +1082,7 @@ func (r *Researcher) finalBrainstorm(ctx context.Context) string {
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, r.cfg.FinalReportTokens, synthesisTimeout, onDelta)
 	if err != nil || report == "" {
 		// Never return empty — fall back to the evolving design doc.
 		return r.state.Report
@@ -1207,7 +1263,7 @@ func (r *Researcher) writeSection(ctx context.Context, sec reportSection, outlin
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.4, r.cfg.FinalReportTokens, synthesisTimeout, onDelta)
 	if err != nil || strings.TrimSpace(out) == "" {
 		return ""
 	}

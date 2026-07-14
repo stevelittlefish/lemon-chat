@@ -17,6 +17,52 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
 
+func TestQueryKey(t *testing.T) {
+	// Near-duplicates that must collapse to the same key (order/filler differ).
+	same := [][2]string{
+		// Reordered site: operators — the case the fuzzy dedup targets.
+		{"site:reddit.com OR site:forum.com", "site:forum.com OR site:reddit.com"},
+		// Observed Gemma thrash: reordered tariff query differing only by "vs".
+		{
+			"UK time-of-use electricity tariffs July 2026 price spread off-peak vs peak",
+			"UK time-of-use electricity tariffs July 2026 peak off-peak price spread",
+		},
+		// Pure reordering with a filler word.
+		{"home battery cost and payback", "payback home battery cost"},
+	}
+	for _, pair := range same {
+		if queryKey(pair[0]) != queryKey(pair[1]) {
+			t.Errorf("expected same key:\n  %q -> %q\n  %q -> %q", pair[0], queryKey(pair[0]), pair[1], queryKey(pair[1]))
+		}
+	}
+
+	// Materially different queries must keep distinct keys.
+	diff := [][2]string{
+		{"home battery installed cost UK 2026", "home battery round-trip efficiency 2026"},
+		{"UK government grants tax incentives home battery 2026", "UK government grants home battery 2026 without solar"},
+	}
+	for _, pair := range diff {
+		if queryKey(pair[0]) == queryKey(pair[1]) {
+			t.Errorf("expected different keys but both were %q:\n  %q\n  %q", queryKey(pair[0]), pair[0], pair[1])
+		}
+	}
+}
+
+func TestIsTruncated(t *testing.T) {
+	truncated := []string{"length", "LENGTH", "max_tokens", "MAX_TOKENS", "max tokens"}
+	for _, f := range truncated {
+		if !isTruncated(f) {
+			t.Errorf("expected %q to be treated as truncated", f)
+		}
+	}
+	complete := []string{"", "stop", "end_turn", "tool_calls", "content_filter"}
+	for _, f := range complete {
+		if isTruncated(f) {
+			t.Errorf("expected %q to be treated as a natural finish", f)
+		}
+	}
+}
+
 func TestParseJSONStringArray(t *testing.T) {
 	cases := []struct {
 		name string
@@ -148,7 +194,7 @@ func TestResumeImportedRedditUsesGuardedExtractorAndSynthesizes(t *testing.T) {
 	completed := false
 	r := New(Config{
 		Query: "goal", Model: "test", APIBase: "http://model.test", MaxContentChars: 10000,
-		MaxReportTokens: 1000, SynthesisWindow: 10, MaxEmptyRounds: 2,
+		SynthesisTokens: 1000, FinalReportTokens: 2000, SynthesisWindow: 10, MaxEmptyRounds: 2,
 		OnRedditRoundComplete: func(State) error { completed = true; return nil },
 	}, State{}, nil, nil)
 	r.client = &http.Client{Transport: transport}

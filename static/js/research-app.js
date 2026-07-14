@@ -126,6 +126,7 @@ async function showList() {
       <span class="research-item-details">
         <span class="research-item-model">${escapeHtml(j.model)}</span>
         ${j.report_count ? `<span class="research-item-remixes">${j.report_count} ${j.report_count === 1 ? 'remix' : 'remixes'}</span>` : ''}
+        ${j.report_html ? `<a class="research-item-html" href="/api/research/${j.id}/report/document" target="_blank" rel="noopener noreferrer" title="open the designed HTML report in a new tab">${icon('file-code', 13)} HTML</a>` : ''}
         <span class="research-item-meta">${formatDate(j.created_at)}</span>
         ${statusBadge(j.status)}
       </span>
@@ -240,6 +241,11 @@ async function showList() {
   });
   main.querySelectorAll('.research-item').forEach((el) => {
     el.addEventListener('click', () => { location.hash = el.dataset.id; });
+  });
+  // The HTML-report link opens in a new tab; keep its click from also
+  // navigating the card to the report detail page.
+  main.querySelectorAll('.research-item-html').forEach((el) => {
+    el.addEventListener('click', (e) => e.stopPropagation());
   });
 }
 
@@ -389,18 +395,21 @@ async function showDetail(id) {
     ? `<p class="research-detail-prompt">${escapeHtml(job.query)}</p>`
     : '';
 
+  const terminal = !running && !awaitingReddit;
   main.innerHTML = `
     <div class="research-detail-heading">
       <div class="research-detail-actions">
         ${!running && hasExploreData(job) ? `<button id="research-explore" class="btn btn-sm btn-secondary">${icon('list', 14)} Explore Data</button>` : ''}
-        ${job.final_report ? `
-          <button id="research-remix" class="btn btn-sm btn-secondary">${icon('refresh-cw', 14)} Remix</button>
+        ${job.final_report ? `<button id="research-remix" class="btn btn-sm btn-secondary">${icon('refresh-cw', 14)} Remix</button>` : ''}
+        ${terminal ? `
           <div class="research-download">
             <button type="button" id="research-download-toggle" class="btn btn-sm btn-secondary" aria-haspopup="true" aria-expanded="false">${icon('download', 14)} Download ${icon('chevron-down', 14)}</button>
             <div class="menu research-download-panel" hidden>
-              <a href="/api/research/${id}/bundle" class="menu-item">${icon('download', 14)} Bundle (.zip)</a>
-              <button id="research-dl-md" class="menu-item">${icon('download', 14)} Markdown</button>
-              <button id="research-dl-html" class="menu-item">${icon('download', 14)} HTML</button>
+              ${job.final_report ? `
+                <a href="/api/research/${id}/bundle" class="menu-item">${icon('download', 14)} Bundle (.zip)</a>
+                <button id="research-dl-md" class="menu-item">${icon('download', 14)} Markdown</button>
+                <button id="research-dl-html" class="menu-item">${icon('download', 14)} HTML</button>` : ''}
+              <a href="/api/research/${id}/debug-bundle" class="menu-item" title="Diagnostic run-log (events, per-round snapshots, config, outcome)">${icon('file-text', 14)} Debug bundle (.zip)</a>
             </div>
           </div>` : ''}
         ${running || awaitingReddit
@@ -750,6 +759,10 @@ async function showExplore(id) {
   setExploreBackBtn(id);
   let job;
   try { job = await research.get(id); } catch { location.hash = ''; return; }
+  // The diagnostic run-log lives on disk, separate from the job record; a
+  // missing one (older jobs) simply yields available:false.
+  let debug;
+  try { debug = await research.debug(id); } catch { debug = { available: false }; }
 
   const findings = parseJSONArray(job.findings);
   const analyzed = parseJSONArray(job.analyzed_urls);
@@ -838,6 +851,8 @@ async function showExplore(id) {
     </div>
     <div class="explore-stats">${stats}</div>
 
+    ${diagnosticsSection(debug, id)}
+
     <section class="explore-section">
       <p class="research-section-label">research plan</p>
       <div class="research-report explore-plan">${planHtml}</div>
@@ -862,6 +877,66 @@ async function showExplore(id) {
       <p class="research-section-label">intermediate synthesis</p>
       ${intermediateHtml}
     </section>` : ''}`;
+}
+
+// diagnosticsSection renders the on-disk run-log for a job: the derived stop
+// reason, the effective config and outcome, and a collapsible milestone
+// timeline. Shown on the explore page so the debug info is viewable in the UI
+// without downloading the bundle.
+function diagnosticsSection(debug, id) {
+  if (!debug || !debug.available) {
+    return `<section class="explore-section">
+      <p class="research-section-label">diagnostics</p>
+      <p class="research-empty">no diagnostic run-log for this job</p>
+    </section>`;
+  }
+  const m = debug.meta || {};
+  const rows = [
+    ['status', m.status],
+    ['rounds', m.rounds_completed != null && m.max_rounds ? `${m.rounds_completed} of ${m.max_rounds}` : m.rounds_completed],
+    ['min rounds', m.min_rounds],
+    ['model', m.model],
+    ['worker model', m.worker_model],
+    ['mode', m.mode],
+    ['effort', m.effort],
+    ['synthesis tokens', m.synthesis_tokens],
+    ['final report tokens', m.final_report_tokens],
+    ['elapsed', m.elapsed_ms != null ? formatDuration(m.elapsed_ms) : null],
+    ['findings', m.findings_count],
+    ['cost', m.price_usd != null ? formatPrice(m.price_usd) : null],
+    ['git commit', m.git_commit],
+    ['started', m.started_at],
+    ['ended', m.ended_at],
+  ].filter(([, v]) => v != null && v !== '');
+  const metaHtml = `<dl class="debug-meta">${rows.map(([k, v]) =>
+    `<div class="debug-meta-row"><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd></div>`).join('')}</dl>`;
+
+  const stopHtml = m.stop_reason
+    ? `<div class="debug-stop"><span class="debug-stop-label">stop reason</span><p>${escapeHtml(m.stop_reason)}</p></div>`
+    : '';
+
+  const events = debug.events || [];
+  const eventsHtml = events.length
+    ? `<details class="debug-events-wrap">
+         <summary>event timeline (${events.length} milestones)</summary>
+         <ol class="debug-events">${events.map((e) => `
+           <li class="debug-ev debug-ev-${escapeHtml(e.phase)}">
+             <span class="debug-ev-round">${e.round ? 'r' + escapeHtml(String(e.round)) : ''}</span>
+             <span class="debug-ev-phase">${escapeHtml(e.phase)}</span>
+             <span class="debug-ev-msg">${escapeHtml(e.message || '')}</span>
+           </li>`).join('')}</ol>
+       </details>`
+    : '';
+
+  return `<section class="explore-section">
+    <div class="debug-head">
+      <p class="research-section-label">diagnostics</p>
+      <a class="btn btn-sm btn-secondary" href="/api/research/${id}/debug-bundle">${icon('file-text', 14)} bundle</a>
+    </div>
+    ${stopHtml}
+    ${metaHtml}
+    ${eventsHtml}
+  </section>`;
 }
 
 function redditWaitingPanel(job) {

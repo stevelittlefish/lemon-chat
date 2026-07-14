@@ -28,7 +28,9 @@ type Research struct {
 	MaxTimeSeconds        int    `toml:"max_time_seconds"`       // wall-clock budget, checked at the start of each round
 	MaxURLsPerRound       int    `toml:"max_urls_per_round"`     // URLs fetched per query per round
 	MaxContentChars       int    `toml:"max_content_chars"`      // page content truncation limit before extraction
-	MaxReportTokens       int    `toml:"max_report_tokens"`      // max_tokens for synthesis and final report calls
+	MaxReportTokens       int    `toml:"max_report_tokens"`      // backward-compat alias — seeds synthesis_tokens when that key is unset
+	SynthesisTokens       int    `toml:"synthesis_tokens"`       // max_tokens for the per-round synthesis call
+	FinalReportTokens     int    `toml:"final_report_tokens"`    // max_tokens for the final report (and deep-report section) writes
 	ExtractionConcurrency int    `toml:"extraction_concurrency"` // concurrent URL fetch+extract tasks
 	MinRounds             int    `toml:"min_rounds"`             // stop-check is skipped until this many rounds complete
 	MaxEmptyRounds        int    `toml:"max_empty_rounds"`       // consecutive zero-finding rounds before aborting
@@ -77,9 +79,9 @@ func (s *ModelServer) IsOpenRouter() bool {
 }
 
 type Model struct {
-	Name        string   `toml:"name"`
-	DisplayName string   `toml:"display_name"`
-	ModelServer string   `toml:"model_server"`
+	Name        string    `toml:"name"`
+	DisplayName string    `toml:"display_name"`
+	ModelServer string    `toml:"model_server"`
 	Modes       *[]string `toml:"modes"`
 }
 
@@ -118,6 +120,7 @@ func Load(path string) (*Config, error) {
 			MaxURLsPerRound:       3,
 			MaxContentChars:       15000,
 			MaxReportTokens:       8192,
+			FinalReportTokens:     32768,
 			ExtractionConcurrency: 3,
 			MinRounds:             2,
 			MaxEmptyRounds:        2,
@@ -134,6 +137,14 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyEnv(cfg)
+
+	// max_report_tokens historically capped both synthesis and the final report.
+	// It now only seeds synthesis_tokens, and only when the new key is unset, so
+	// existing configs keep their synthesis budget while the final report gets
+	// the roomier default.
+	if cfg.Research.SynthesisTokens == 0 {
+		cfg.Research.SynthesisTokens = cfg.Research.MaxReportTokens
+	}
 
 	if cfg.Server.DBPath == "" {
 		cfg.Server.DBPath = filepath.Join(cfg.Server.DataDir, "lemon.db")

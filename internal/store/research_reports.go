@@ -163,6 +163,29 @@ func (s *Store) ListNonDefaultResearchReportCounts(userID int64) (map[int64]int,
 	return counts, rows.Err()
 }
 
+// ListResearchJobsWithDefaultHTML returns the set of a user's jobs whose default
+// report has a designed HTML version, so the list can link straight to it.
+func (s *Store) ListResearchJobsWithDefaultHTML(userID int64) (map[int64]bool, error) {
+	rows, err := s.db.Query(`
+		SELECT rep.research_job_id
+		FROM research_report AS rep
+		JOIN research_job AS job ON job.id = rep.research_job_id
+		WHERE job.user_id = ? AND rep.is_default = 1 AND rep.html != ''`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	has := make(map[int64]bool)
+	for rows.Next() {
+		var jobID int64
+		if err := rows.Scan(&jobID); err != nil {
+			return nil, err
+		}
+		has[jobID] = true
+	}
+	return has, rows.Err()
+}
+
 func (s *Store) GetDefaultResearchReport(jobID int64) (*ResearchReport, error) {
 	return scanResearchReport(s.db.QueryRow(
 		`SELECT `+researchReportCols+` FROM research_report WHERE research_job_id = ? AND is_default = 1`, jobID))

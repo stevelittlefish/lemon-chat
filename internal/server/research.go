@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/stevelittlefish/lemon-chat/internal/debug"
 	"github.com/stevelittlefish/lemon-chat/internal/redditimport"
 	"github.com/stevelittlefish/lemon-chat/internal/research"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
@@ -282,7 +284,8 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		MaxTime:               time.Duration(maxTimeSeconds) * time.Second,
 		MaxURLsPerRound:       rc.MaxURLsPerRound,
 		MaxContentChars:       rc.MaxContentChars,
-		MaxReportTokens:       rc.MaxReportTokens,
+		SynthesisTokens:       rc.SynthesisTokens,
+		FinalReportTokens:     rc.FinalReportTokens,
 		ExtractionConcurrency: rc.ExtractionConcurrency,
 		MinRounds:             minRounds,
 		MaxEmptyRounds:        rc.MaxEmptyRounds,
@@ -331,15 +334,19 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		job.Category, job.Slug, job.Plan, job.Report, job.Findings, job.QueriesUsed, job.AnalyzedURLs)
 	state.PriceUSD = job.PriceUSD
 
+	rlog := newResearchRunLog(s.cfg.Server.DataDir, job.ID)
+	rlog.start(job, cfg)
+
 	lastPhase := ""
 	onProgress := func(p research.Progress) {
 		data, _ := json.Marshal(p)
 		run.broadcast(data)
 		// Streaming generation updates (~4/sec) are broadcast to the UI but
-		// kept out of the log and the DB.
+		// kept out of the log, the DB, and the run-log.
 		if p.Generated > 0 {
 			return
 		}
+		rlog.event(p)
 		logResearchProgress(job.ID, p)
 		if p.Phase != lastPhase && p.Phase != "warning" {
 			lastPhase = p.Phase
@@ -349,6 +356,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		}
 	}
 	onCheckpoint := func(st research.State) {
+		rlog.checkpoint(st)
 		findings, queries, urls := research.MarshalState(st)
 		if err := s.store.CheckpointResearchJob(job.ID, st.Round, st.EmptyRounds, st.ElapsedMS, st.PriceUSD,
 			st.Category, st.Slug, st.Plan, st.Report, findings, queries, urls); err != nil {
@@ -359,6 +367,13 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	if err := s.store.UpdateResearchJobPhase(job.ID, store.ResearchStatusRunning, "planning"); err != nil {
 		log.Printf("research: job %d: mark running: %v", job.ID, err)
 	}
+
+	resumeNote := ""
+	if job.Round > 0 {
+		resumeNote = fmt.Sprintf(" (resuming from round %d)", job.Round)
+	}
+	log.Printf("Starting research job_id=%d model=%q mode=%s effort=%d deep=%t query=%q%s",
+		job.ID, job.Model, job.Mode, job.Effort, job.DeepReport, clipLog(llmQuery), resumeNote)
 
 	r := research.New(cfg, state, onProgress, onCheckpoint)
 	started := time.Now()
@@ -376,12 +391,15 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 			price = s.autoGenerateHTMLReport(ctx, run, job, report, price)
 		}
 		log.Printf("Research job finished id=%d rounds=%d elapsed=%.1fs", job.ID, r.State().Round, float64(elapsedMS)/1000)
+		rlog.finish(store.ResearchStatusDone, report, r.State(), elapsedMS)
 		s.finishResearch(job.ID, run, store.ResearchStatusDone, &report, "", elapsedMS, price)
 	case errors.Is(runErr, context.Canceled) && run.wasCancelRequested():
 		log.Printf("Research job cancelled id=%d", job.ID)
+		rlog.finish(store.ResearchStatusCancelled, "", r.State(), elapsedMS)
 		s.finishResearch(job.ID, run, store.ResearchStatusCancelled, nil, "", elapsedMS, r.State().PriceUSD)
 	default:
 		log.Printf("Research job failed id=%d: %v", job.ID, runErr)
+		rlog.finish(store.ResearchStatusError, "", r.State(), elapsedMS)
 		s.finishResearch(job.ID, run, store.ResearchStatusError, nil, runErr.Error(), elapsedMS, r.State().PriceUSD)
 	}
 }
@@ -446,45 +464,65 @@ func addResearchPrice(a, b *float64) *float64 {
 	return &sum
 }
 
-// logResearchProgress writes one log line per phase event so a tailed log
-// shows what a job is doing. Streaming deltas are filtered out by the caller.
-func logResearchProgress(jobID int64, p research.Progress) {
+// clipLog collapses newlines and truncates s so a single log line stays
+// readable regardless of how much text a model emitted.
+func clipLog(s string) string {
 	const maxLogText = 300
-	clip := func(s string) string {
-		s = strings.ReplaceAll(s, "\n", " ")
-		if len(s) > maxLogText {
-			return s[:maxLogText] + "…"
-		}
-		return s
+	s = strings.ReplaceAll(s, "\n", " ")
+	if len(s) > maxLogText {
+		return s[:maxLogText] + "…"
 	}
+	return s
+}
+
+// logResearchProgress writes a small number of milestone log lines per job so a
+// plain stdout log tells the story of a run — plan, each round's search and
+// synthesis, the stop decision, and the final write — without the debug flag.
+// It targets ~5-10 lines for a typical job: the high-frequency per-page "reading"
+// events are demoted to debug logging so they don't drown out the milestones.
+func logResearchProgress(jobID int64, p research.Progress) {
 	switch p.Phase {
 	case "planning":
-		if p.Message != "" {
-			log.Printf("Planning research job_id=%d — %s", jobID, clip(p.Message))
-		} else {
-			log.Printf("Planning research job_id=%d", jobID)
+		// The empty planning event is covered by the "Starting research" line;
+		// the plan-ready event carries the full plan text (too long for stdout —
+		// it is in the run-log). Log only the concise milestones.
+		switch {
+		case strings.HasPrefix(p.Message, "plan ready"):
+			log.Printf("Planned research job_id=%d", jobID)
+		case p.Message != "":
+			log.Printf("Research job_id=%d — %s", jobID, clipLog(p.Message))
 		}
 	case "searching":
-		log.Printf("Searching web job_id=%d round=%d queries=%q", jobID, p.Round, p.Queries)
+		log.Printf("Round %d starting job_id=%d — searching %d quer%s %q",
+			p.Round, jobID, len(p.Queries), plural(len(p.Queries), "y", "ies"), p.Queries)
 	case "reading":
-		log.Printf("Reading page job_id=%d round=%d url=%s", jobID, p.Round, p.URL)
+		// One line per page fetched — too frequent for the milestone log.
+		debug.Log("Reading page job_id=%d round=%d url=%s", jobID, p.Round, p.URL)
 	case "analyzing":
-		log.Printf("Synthesizing findings job_id=%d round=%d findings=%d", jobID, p.Round, p.TotalFindings)
+		log.Printf("Round %d job_id=%d — synthesizing (%d findings so far)", p.Round, jobID, p.TotalFindings)
 	case "deciding":
-		log.Printf("Deciding whether to stop job_id=%d round=%d — %s", jobID, p.Round, clip(p.Message))
+		log.Printf("Round %d job_id=%d — stop check: %s", p.Round, jobID, clipLog(p.Message))
 	case "writing":
-		log.Printf("Writing final report job_id=%d sources=%d findings=%d", jobID, p.TotalSources, p.TotalFindings)
+		log.Printf("Writing final report job_id=%d findings=%d", jobID, p.TotalFindings)
 	case "note":
 		if p.Round > 0 {
-			log.Printf("Research note job_id=%d round=%d — %s", jobID, p.Round, clip(p.Message))
+			log.Printf("Research note job_id=%d round=%d — %s", jobID, p.Round, clipLog(p.Message))
 		} else {
-			log.Printf("Research note job_id=%d — %s", jobID, clip(p.Message))
+			log.Printf("Research note job_id=%d — %s", jobID, clipLog(p.Message))
 		}
 	case "warning":
-		log.Printf("Research warning job_id=%d — %s", jobID, clip(p.Message))
+		log.Printf("Research warning job_id=%d — %s", jobID, clipLog(p.Message))
 	default:
-		log.Printf("Research progress job_id=%d phase=%s %s", jobID, p.Phase, clip(p.Message))
+		log.Printf("Research progress job_id=%d phase=%s %s", jobID, p.Phase, clipLog(p.Message))
 	}
+}
+
+// plural picks the singular or plural suffix for n.
+func plural(n int, singular, pluralSuffix string) string {
+	if n == 1 {
+		return singular
+	}
+	return pluralSuffix
 }
 
 func (s *Server) finishResearch(jobID int64, run *researchRun, status string, finalReport *string, errMsg string, elapsedMS int64, priceUSD *float64) {
@@ -523,6 +561,7 @@ type researchJobView struct {
 	ElapsedMS         int64    `json:"elapsed_ms"`
 	PriceUSD          *float64 `json:"price_usd"`
 	ReportCount       int      `json:"report_count"`
+	ReportHTML        bool     `json:"report_html"`
 	Error             *string  `json:"error"`
 	CreatedAt         string   `json:"created_at"`
 	UpdatedAt         string   `json:"updated_at"`
@@ -672,10 +711,16 @@ func (s *Server) handleListResearch(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
+	htmlReports, err := s.store.ListResearchJobsWithDefaultHTML(user.ID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
 	views := make([]researchJobView, 0, len(jobs))
 	for i := range jobs {
 		view := researchView(&jobs[i])
 		view.ReportCount = reportCounts[jobs[i].ID]
+		view.ReportHTML = htmlReports[jobs[i].ID]
 		views = append(views, view)
 	}
 	writeJSON(w, http.StatusOK, views)
@@ -935,6 +980,21 @@ func (s *Server) handleCancelResearch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelling"})
 }
 
+// handleGetResearchDebug serves the on-disk diagnostic run-log (config, outcome,
+// and milestone timeline) as JSON so the UI can show it inline without a bundle
+// download. Returns {available:false} when the job has no run-log.
+func (s *Server) handleGetResearchDebug(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := s.store.GetResearchJob(id, user.ID); notFoundOr500(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, readResearchDebug(s.cfg.Server.DataDir, id))
+}
+
 func (s *Server) handleDeleteResearch(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	id, ok := pathID(w, r)
@@ -954,5 +1014,7 @@ func (s *Server) handleDeleteResearch(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
+	// Best-effort removal of the on-disk diagnostic run-log for this job.
+	os.RemoveAll(researchRunLogDir(s.cfg.Server.DataDir, id))
 	w.WriteHeader(http.StatusNoContent)
 }

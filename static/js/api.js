@@ -201,6 +201,7 @@ export const research = {
   list: () => request('GET', '/api/research'),
   defaults: () => request('GET', '/api/research/defaults'),
   get: (id) => request('GET', `/api/research/${id}`),
+  debug: (id) => request('GET', `/api/research/${id}/debug`),
   regenerateReport: (id, { markdownModel, htmlModel, markdownDirection, direction, markdown, html, deepReport }, { onEvent, onDone, onError }) => {
     const ctrl = new AbortController();
     fetch(`/api/research/${id}/reports`, {
