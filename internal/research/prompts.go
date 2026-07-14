@@ -238,19 +238,41 @@ Example:
     "summary": "Concise summary of how this information answers the goal"
 }`
 
-const synthesizePrompt = `You are updating an evolving research report.
+const evidenceLedgerPrompt = `You maintain compact structured research memory. Update the evidence ledger using the new findings.
 
 **Original question:** %s
 
-**Current report:**
+**Current evidence ledger (JSON, or legacy notes to convert):**
 %s
 
 **New findings from this round:**
 %s
 
-Integrate the new findings into the existing report. Produce an updated, well-organized report that answers the original question as completely as possible given all evidence so far. Remove redundancy, resolve contradictions, and maintain logical flow. Keep source IDs such as [S1] as inline citations where relevant.
+Return the COMPLETE updated ledger as one JSON object with exactly this shape:
+{
+  "claims": [
+    {
+      "claim": "one precise factual or analytical claim",
+      "supporting_sources": ["S1"],
+      "contradicting_sources": ["S2"],
+      "confidence": "high|medium|low|uncertain"
+    }
+  ],
+  "assumptions": ["an assumption that materially affects the answer"],
+  "calculations": ["formula, inputs, result, units, and source IDs where applicable"],
+  "unresolved_gaps": [
+    {"question": "one concrete unanswered question", "notes": "why it matters and what evidence is missing"}
+  ]
+}
 
-Write only the updated report — no preamble or meta-commentary.`
+Rules:
+- This is research memory, not report prose. Be terse and factual.
+- Merge duplicate claims; update their source lists and confidence instead of repeating them.
+- Preserve disagreements by listing contradicting source IDs rather than forcing consensus.
+- Use only source IDs present in the supplied findings or current ledger. Write IDs as S1, not [S1].
+- Retain still-relevant prior claims, assumptions, calculations, and gaps.
+- Remove a gap only when the evidence now answers it.
+- Do not include markdown, a preamble, or keys outside the schema.`
 
 const stopPrompt = `You are deciding whether a research report is comprehensive enough.
 
@@ -276,7 +298,7 @@ const finalReportPrompt = `Write a **long, detailed, comprehensive** research re
 
 **Question:** %s
 
-**Current synthesized analysis:**
+**Structured evidence ledger:**
 %s
 
 **Raw collected findings with source IDs:**
@@ -316,7 +338,7 @@ const outlineDraftPrompt = `You are planning the structure of a detailed researc
 **Research plan:**
 %s
 
-**Current report draft (a condensed overview):**
+**Structured evidence ledger:**
 %s
 
 **Collected evidence (raw findings):**
@@ -362,7 +384,7 @@ const sectionWritePrompt = `You are writing ONE section of a detailed, long-form
 **Full report outline (for context — avoid overlapping with the other sections):**
 %s
 
-**Condensed overview of findings so far:**
+**Structured evidence ledger:**
 %s
 
 **Collected evidence (raw findings — draw on the relevant ones):**
@@ -377,7 +399,7 @@ const reportGluePartPrompt = `You are writing one part of a detailed research re
 **Report section outline:**
 %s
 
-**Condensed overview of the report:**
+**Structured evidence ledger:**
 %s
 
 Write %s

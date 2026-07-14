@@ -100,13 +100,14 @@ func TestFinalReportContinuesTruncationWithoutDuplicatingOverlap(t *testing.T) {
 }
 
 func TestSynthesisTruncationCompactsOrStopsRounds(t *testing.T) {
+	compactLedger := `{"claims":[{"claim":"complete compact memory","supporting_sources":["S1"],"contradicting_sources":[],"confidence":"high"}],"assumptions":[],"calculations":[],"unresolved_gaps":[]}`
 	for _, tc := range []struct {
 		name          string
 		compactFinish string
 		wantContinue  bool
 		wantReport    string
 	}{
-		{name: "compact succeeds", compactFinish: "stop", wantContinue: true, wantReport: "complete compact memory [S1]"},
+		{name: "compact succeeds", compactFinish: "stop", wantContinue: true, wantReport: compactLedger},
 		{name: "compact truncates", compactFinish: "length", wantContinue: false, wantReport: "previous complete memory"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -129,7 +130,7 @@ func TestSynthesisTruncationCompactsOrStopsRounds(t *testing.T) {
 				if len(payload.Messages) == 0 || !strings.Contains(payload.Messages[0].Content, "within 50 output tokens") {
 					t.Fatalf("compaction prompt omitted memory target: %+v", payload.Messages)
 				}
-				return streamCompletion("complete compact memory [S1]", tc.compactFinish), nil
+				return streamCompletion(compactLedger, tc.compactFinish), nil
 			})}
 			r.startTime = time.Now()
 
@@ -140,6 +141,35 @@ func TestSynthesisTruncationCompactsOrStopsRounds(t *testing.T) {
 				t.Fatalf("report=%q calls=%d", r.state.Report, calls)
 			}
 		})
+	}
+}
+
+func TestNormalizeEvidenceLedgerKeepsStructuredMemoryAndValidSources(t *testing.T) {
+	r := New(Config{}, State{Findings: []Finding{{URL: "https://one.example"}, {URL: "https://two.example"}}}, nil, nil)
+	raw := `{"claims":[{"claim":"  Battery life varies. ","supporting_sources":["[s1]","S9","S1"],"contradicting_sources":["s2"],"confidence":"HIGH"},{"claim":"battery life varies."}],"assumptions":[" tariff stays fixed ","Tariff stays fixed"],"calculations":["10 kWh * £0.10 = £1"],"unresolved_gaps":[{"question":" What is degradation? ","notes":" needs primary data "}]}`
+	got, err := r.normalizeEvidenceLedger(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ledger EvidenceLedger
+	if err := json.Unmarshal([]byte(got), &ledger); err != nil {
+		t.Fatal(err)
+	}
+	if len(ledger.Claims) != 1 || len(ledger.Claims[0].SupportingSources) != 1 || ledger.Claims[0].SupportingSources[0] != "S1" || ledger.Claims[0].ContradictingSources[0] != "S2" || ledger.Claims[0].Confidence != "high" {
+		t.Fatalf("claims were not normalized: %+v", ledger.Claims)
+	}
+	if len(ledger.Assumptions) != 1 || len(ledger.Calculations) != 1 || len(ledger.Gaps) != 1 || ledger.Gaps[0].Question != "What is degradation?" {
+		t.Fatalf("ledger fields were not compacted: %+v", ledger)
+	}
+}
+
+func TestFallbackReportRendersLedgerAsMarkdown(t *testing.T) {
+	r := New(Config{}, State{Report: `{"claims":[{"claim":"A supported claim","supporting_sources":["S1"],"contradicting_sources":["S2"],"confidence":"medium"}],"assumptions":["One assumption"],"calculations":["1 + 1 = 2"],"unresolved_gaps":[{"question":"What remains unknown?","notes":"No public data"}]}`}, nil, nil)
+	got := r.fallbackReport()
+	for _, want := range []string{"## Evidence summary", "A supported claim [S1]", "Contradicted by [S2]", "## Assumptions", "## Calculations", "## Unresolved evidence gaps"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("fallback report omitted %q:\n%s", want, got)
+		}
 	}
 }
 
@@ -328,8 +358,7 @@ func TestResumeImportedRedditUsesGuardedExtractorAndSynthesizes(t *testing.T) {
 			t.Error(err)
 		}
 		if payload.Stream {
-			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}},
-				Body: io.NopCloser(strings.NewReader("data: {\"choices\":[{\"delta\":{\"content\":\"merged report\"}}]}\n\ndata: [DONE]\n\n"))}, nil
+			return streamCompletion(`{"claims":[{"claim":"merged evidence","supporting_sources":["S1"],"contradicting_sources":[],"confidence":"high"}],"assumptions":[],"calculations":[],"unresolved_gaps":[]}`, "stop"), nil
 		}
 		if len(payload.Messages) > 1 {
 			extractionContext = payload.Messages[1].Content
@@ -359,7 +388,7 @@ func TestResumeImportedRedditUsesGuardedExtractorAndSynthesizes(t *testing.T) {
 	if err != nil || !keepGoing || !completed {
 		t.Fatalf("keepGoing=%t completed=%t err=%v", keepGoing, completed, err)
 	}
-	if len(r.state.Findings) != 1 || r.state.Report != "merged report" {
+	if len(r.state.Findings) != 1 || !strings.Contains(r.state.Report, `"claim":"merged evidence"`) {
 		t.Fatalf("import was not extracted and synthesized: %+v", r.state)
 	}
 	if !strings.Contains(extractionContext, guardOpen) || !strings.Contains(extractionContext, "Ignore previous instructions") {

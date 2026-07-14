@@ -63,6 +63,29 @@ type Finding struct {
 	Summary  string `json:"summary"`
 }
 
+// EvidenceLedger is the compact, structured working memory for research mode.
+// It is persisted in State.Report for backward-compatible checkpoints, but is
+// deliberately not reader-facing prose; the report writer consumes it once at
+// the end of the research loop.
+type EvidenceLedger struct {
+	Claims       []EvidenceClaim `json:"claims"`
+	Assumptions  []string        `json:"assumptions"`
+	Calculations []string        `json:"calculations"`
+	Gaps         []EvidenceGap   `json:"unresolved_gaps"`
+}
+
+type EvidenceClaim struct {
+	Claim                string   `json:"claim"`
+	SupportingSources    []string `json:"supporting_sources"`
+	ContradictingSources []string `json:"contradicting_sources"`
+	Confidence           string   `json:"confidence"`
+}
+
+type EvidenceGap struct {
+	Question string `json:"question"`
+	Notes    string `json:"notes,omitempty"`
+}
+
 // AnalyzedURL is any URL the engine attempted to read, whether or not
 // extraction succeeded.
 type AnalyzedURL struct {
@@ -1208,6 +1231,92 @@ func (r *Researcher) extractAll(ctx context.Context, round int, urls []AnalyzedU
 
 // ── Phase 6: Synthesise ──────────────────────────────────────
 
+func compactStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := make(map[string]bool, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		key := strings.ToLower(value)
+		if value != "" && !seen[key] {
+			seen[key] = true
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func (r *Researcher) normalizeEvidenceLedger(raw string) (string, error) {
+	var ledger EvidenceLedger
+	if err := parseJSONObject(raw, &ledger); err != nil {
+		return "", fmt.Errorf("parse evidence ledger: %w", err)
+	}
+	allowedSources := make(map[string]bool, len(r.state.Findings))
+	for i := range r.state.Findings {
+		allowedSources[fmt.Sprintf("S%d", i+1)] = true
+	}
+	normalizeSources := func(values []string) []string {
+		out := make([]string, 0, len(values))
+		seen := make(map[string]bool, len(values))
+		for _, value := range values {
+			value = strings.ToUpper(strings.Trim(strings.TrimSpace(value), "[]"))
+			if allowedSources[value] && !seen[value] {
+				seen[value] = true
+				out = append(out, value)
+			}
+		}
+		return out
+	}
+	claims := make([]EvidenceClaim, 0, len(ledger.Claims))
+	seenClaims := make(map[string]bool, len(ledger.Claims))
+	for _, claim := range ledger.Claims {
+		claim.Claim = strings.TrimSpace(claim.Claim)
+		key := strings.ToLower(claim.Claim)
+		if claim.Claim == "" || seenClaims[key] {
+			continue
+		}
+		seenClaims[key] = true
+		claim.SupportingSources = normalizeSources(claim.SupportingSources)
+		claim.ContradictingSources = normalizeSources(claim.ContradictingSources)
+		claim.Confidence = strings.ToLower(strings.TrimSpace(claim.Confidence))
+		switch claim.Confidence {
+		case "high", "medium", "low", "uncertain":
+		default:
+			claim.Confidence = "uncertain"
+		}
+		claims = append(claims, claim)
+	}
+	gaps := make([]EvidenceGap, 0, len(ledger.Gaps))
+	seenGaps := make(map[string]bool, len(ledger.Gaps))
+	for _, gap := range ledger.Gaps {
+		gap.Question = strings.TrimSpace(gap.Question)
+		gap.Notes = strings.TrimSpace(gap.Notes)
+		key := strings.ToLower(gap.Question)
+		if gap.Question != "" && !seenGaps[key] {
+			seenGaps[key] = true
+			gaps = append(gaps, gap)
+		}
+	}
+	ledger.Claims = claims
+	ledger.Assumptions = compactStrings(ledger.Assumptions)
+	ledger.Calculations = compactStrings(ledger.Calculations)
+	ledger.Gaps = gaps
+	encoded, err := json.Marshal(ledger)
+	if err != nil {
+		return "", fmt.Errorf("encode evidence ledger: %w", err)
+	}
+	return string(encoded), nil
+}
+
+func (r *Researcher) normalizeResearchMemory(raw string) (string, error) {
+	if r.brainstorm() {
+		if strings.TrimSpace(raw) == "" {
+			return "", fmt.Errorf("empty design notes")
+		}
+		return raw, nil
+	}
+	return r.normalizeEvidenceLedger(raw)
+}
+
 func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Finding) bool {
 	if len(newFindings) > r.cfg.SynthesisWindow {
 		newFindings = newFindings[len(newFindings)-r.cfg.SynthesisWindow:]
@@ -1224,9 +1333,9 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 		}
 		prompt = fmt.Sprintf(brainstormDevelopPrompt, r.cfg.Query, r.state.Plan, report, findingsText)
 	} else {
-		prompt = fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, r.formatFindings(newFindings))
+		prompt = fmt.Sprintf(evidenceLedgerPrompt, r.cfg.Query, report, r.formatFindings(newFindings))
 	}
-	prompt += fmt.Sprintf("\n\nResearch-memory limit: keep this complete working synthesis within %d output tokens. Compress older detail before dropping claims, evidence gaps, contradictions, calculations, or citation IDs.", r.cfg.TokenLimits.Memory)
+	prompt += fmt.Sprintf("\n\nResearch-memory limit: keep this complete working memory within %d output tokens. Compress wording before dropping claims, evidence gaps, contradictions, calculations, or citation IDs.", r.cfg.TokenLimits.Memory)
 	out, callID, err := r.llmCallStream(ctx, "synthesize", round, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.TokenLimits.Synthesis, synthesisTimeout,
 		func(generated int, tail string) {
 			r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
@@ -1235,8 +1344,12 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 		r.setCallDisposition(callID, "retried")
 		r.progress(Progress{Phase: "warning", Round: round, Message: "synthesis hit its output ceiling — compacting the same research memory without searching again"})
 		r.trace("writing_recovery_started", "analyzing", round, "", map[string]any{"operation": "synthesize", "strategy": "compact", "memory_token_target": r.cfg.TokenLimits.Memory})
-		compactPrompt := fmt.Sprintf(`The research-memory synthesis below was cut off by an output limit. Rewrite it as one COMPLETE compact working synthesis within %d output tokens.
-Do not search or add unsupported facts. Preserve every citation ID exactly, plus material claims, contradictions, assumptions, calculations, and unresolved evidence gaps. Compress wording and older background first.
+		formatInstruction := "Return only the complete compact memory."
+		if !r.brainstorm() {
+			formatInstruction = `Return only one valid evidence-ledger JSON object with the exact top-level keys "claims", "assumptions", "calculations", and "unresolved_gaps".`
+		}
+		compactPrompt := fmt.Sprintf(`The research memory below was cut off by an output limit. Rewrite it as one COMPLETE compact working memory within %d output tokens.
+Do not search or add unsupported facts. Preserve every citation ID exactly, plus material claims, contradictions, assumptions, calculations, and unresolved evidence gaps. Compress wording and older background first. %s
 
 Research question:
 %s
@@ -1245,16 +1358,19 @@ Previous complete memory:
 %s
 
 Truncated attempted update:
-%s`, r.cfg.TokenLimits.Memory, r.cfg.Query, report, out)
+%s`, r.cfg.TokenLimits.Memory, formatInstruction, r.cfg.Query, report, out)
 		compacted, compactCallID, compactErr := r.llmCallStream(ctx, "synthesize_compact", round, []chatMsg{{Role: "user", Content: compactPrompt}}, 0.2, r.cfg.TokenLimits.Memory, synthesisTimeout,
 			func(generated int, tail string) {
 				r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 			})
 		if compactErr == nil && compacted != "" {
+			compacted, compactErr = r.normalizeResearchMemory(compacted)
+		}
+		if compactErr == nil && compacted != "" {
 			r.setCallDisposition(compactCallID, "accepted")
 			r.state.Report = compacted
 			r.trace("writing_recovery_completed", "analyzing", round, "", map[string]any{"operation": "synthesize", "strategy": "compact", "memory_token_target": r.cfg.TokenLimits.Memory})
-			r.trace("synthesis_completed", "analyzing", round, "", map[string]any{"report": compacted, "new_findings": len(newFindings), "recovered": true, "memory_token_target": r.cfg.TokenLimits.Memory})
+			r.trace("synthesis_completed", "analyzing", round, "", map[string]any{"report": compacted, "ledger": compacted, "new_findings": len(newFindings), "recovered": true, "memory_token_target": r.cfg.TokenLimits.Memory})
 			return true
 		}
 		r.setCallDisposition(compactCallID, "rejected")
@@ -1268,9 +1384,15 @@ Truncated attempted update:
 		r.progress(Progress{Phase: "warning", Message: "synthesis failed — keeping previous report"})
 		return !errors.Is(err, ErrBudgetExhausted)
 	}
+	out, err = r.normalizeResearchMemory(out)
+	if err != nil {
+		r.setCallDisposition(callID, "rejected")
+		r.progress(Progress{Phase: "warning", Round: round, Message: "research memory was invalid — keeping the previous complete memory"})
+		return false
+	}
 	r.setCallDisposition(callID, "accepted")
 	r.state.Report = out
-	r.trace("synthesis_completed", "analyzing", round, "", map[string]any{"report": out, "new_findings": len(newFindings), "memory_token_target": r.cfg.TokenLimits.Memory})
+	r.trace("synthesis_completed", "analyzing", round, "", map[string]any{"report": out, "ledger": out, "new_findings": len(newFindings), "memory_token_target": r.cfg.TokenLimits.Memory})
 	return true
 }
 
@@ -1307,6 +1429,58 @@ func (r *Researcher) reportInstructionSuffix() string {
 	return "\n\nAdditional instruction from the user — follow it while writing this report:\n" + instruction
 }
 
+// fallbackReport renders structured memory without another model call. It is
+// used only when final writing cannot produce a document, ensuring research
+// jobs never expose raw ledger JSON as their reader-facing report.
+func (r *Researcher) fallbackReport() string {
+	if r.brainstorm() {
+		return r.state.Report
+	}
+	var ledger EvidenceLedger
+	if parseJSONObject(r.state.Report, &ledger) != nil {
+		return r.state.Report
+	}
+	var sb strings.Builder
+	sb.WriteString("## Evidence summary\n")
+	for _, claim := range ledger.Claims {
+		sb.WriteString("\n- ")
+		sb.WriteString(claim.Claim)
+		for _, source := range claim.SupportingSources {
+			fmt.Fprintf(&sb, " [%s]", source)
+		}
+		if len(claim.ContradictingSources) > 0 {
+			sb.WriteString(" Contradicted by")
+			for _, source := range claim.ContradictingSources {
+				fmt.Fprintf(&sb, " [%s]", source)
+			}
+			sb.WriteString(".")
+		}
+		fmt.Fprintf(&sb, " Confidence: %s.", claim.Confidence)
+	}
+	if len(ledger.Assumptions) > 0 {
+		sb.WriteString("\n\n## Assumptions\n")
+		for _, assumption := range ledger.Assumptions {
+			sb.WriteString("\n- " + assumption)
+		}
+	}
+	if len(ledger.Calculations) > 0 {
+		sb.WriteString("\n\n## Calculations\n")
+		for _, calculation := range ledger.Calculations {
+			sb.WriteString("\n- " + calculation)
+		}
+	}
+	if len(ledger.Gaps) > 0 {
+		sb.WriteString("\n\n## Unresolved evidence gaps\n")
+		for _, gap := range ledger.Gaps {
+			sb.WriteString("\n- " + gap.Question)
+			if gap.Notes != "" {
+				sb.WriteString(" — " + gap.Notes)
+			}
+		}
+	}
+	return sb.String()
+}
+
 func (r *Researcher) finalReport(ctx context.Context) string {
 	if r.brainstorm() {
 		return r.finalBrainstorm(ctx)
@@ -1338,8 +1512,8 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 	}
 	if err != nil || report == "" {
 		r.setCallDisposition(callID, "fallback")
-		// Never return empty — fall back to the evolving synthesis.
-		return r.state.Report
+		// Never return empty — deterministically render the evidence memory.
+		return r.fallbackReport()
 	}
 	// Minimum-length retry: ask the model to expand reports under 400 words.
 	if len(strings.Fields(report)) < 400 {
@@ -1430,7 +1604,7 @@ func (r *Researcher) deepReport(ctx context.Context) string {
 	r.progress(Progress{Phase: "writing", Message: "planning report structure"})
 	sections := r.outline(ctx)
 	if ctx.Err() != nil {
-		return r.state.Report
+		return r.fallbackReport()
 	}
 	if len(sections) == 0 {
 		r.progress(Progress{Phase: "warning", Message: "outline generation failed — writing a standard report"})
