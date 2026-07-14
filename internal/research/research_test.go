@@ -17,6 +17,37 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
 
+func TestQueryKey(t *testing.T) {
+	// Near-duplicates that must collapse to the same key (order/filler differ).
+	same := [][2]string{
+		// Reordered site: operators — the case the fuzzy dedup targets.
+		{"site:reddit.com OR site:forum.com", "site:forum.com OR site:reddit.com"},
+		// Observed Gemma thrash: reordered tariff query differing only by "vs".
+		{
+			"UK time-of-use electricity tariffs July 2026 price spread off-peak vs peak",
+			"UK time-of-use electricity tariffs July 2026 peak off-peak price spread",
+		},
+		// Pure reordering with a filler word.
+		{"home battery cost and payback", "payback home battery cost"},
+	}
+	for _, pair := range same {
+		if queryKey(pair[0]) != queryKey(pair[1]) {
+			t.Errorf("expected same key:\n  %q -> %q\n  %q -> %q", pair[0], queryKey(pair[0]), pair[1], queryKey(pair[1]))
+		}
+	}
+
+	// Materially different queries must keep distinct keys.
+	diff := [][2]string{
+		{"home battery installed cost UK 2026", "home battery round-trip efficiency 2026"},
+		{"UK government grants tax incentives home battery 2026", "UK government grants home battery 2026 without solar"},
+	}
+	for _, pair := range diff {
+		if queryKey(pair[0]) == queryKey(pair[1]) {
+			t.Errorf("expected different keys but both were %q:\n  %q\n  %q", queryKey(pair[0]), pair[0], pair[1])
+		}
+	}
+}
+
 func TestParseJSONStringArray(t *testing.T) {
 	cases := []struct {
 		name string

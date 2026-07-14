@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -755,27 +756,65 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 		return nil
 	}
 
+	// Dedup on a token-set key rather than the exact lowercase string, so a
+	// reworded or reordered near-duplicate ("off-peak vs peak" / "peak off-peak")
+	// is recognised as the same search instead of thrashing another round on it.
 	used := make(map[string]bool, len(r.state.QueriesUsed))
 	for _, q := range r.state.QueriesUsed {
-		used[strings.ToLower(q)] = true
+		used[queryKey(q)] = true
 	}
 	var queries []string
 	for _, q := range parseJSONStringArray(out) {
 		q = strings.TrimSpace(q)
-		if q == "" || used[strings.ToLower(q)] {
+		if q == "" {
 			continue
 		}
-		used[strings.ToLower(q)] = true
+		key := queryKey(q)
+		if used[key] {
+			continue
+		}
+		used[key] = true
 		queries = append(queries, q)
 	}
 	// With the toggle on, the model occasionally still returns no usable query;
 	// fall back to the brief itself so the promised search always happens.
 	if forceSearch && len(queries) == 0 {
-		if q := strings.TrimSpace(r.cfg.Query); q != "" && !used[strings.ToLower(q)] {
+		if q := strings.TrimSpace(r.cfg.Query); q != "" && !used[queryKey(q)] {
 			queries = append(queries, q)
 		}
 	}
 	return queries
+}
+
+// queryStopwords are connective/filler tokens dropped when building a query's
+// dedup key, so two searches differing only by word order or a filler word
+// collapse to the same key.
+var queryStopwords = map[string]bool{
+	"vs": true, "and": true, "or": true, "the": true, "a": true, "an": true,
+	"of": true, "for": true, "to": true, "in": true, "on": true, "with": true,
+}
+
+// reQueryToken splits a query into alphanumeric tokens, keeping ':' so search
+// operators like site: survive. Hyphenated words split into their parts, which
+// is fine for set comparison ("off-peak" → off, peak).
+var reQueryToken = regexp.MustCompile(`[a-z0-9:]+`)
+
+// queryKey reduces a search query to an order- and filler-insensitive token-set
+// key for near-duplicate detection: two queries with the same key search the
+// same ground even if the model reworded or reordered them.
+func queryKey(q string) string {
+	tokens := reQueryToken.FindAllString(strings.ToLower(q), -1)
+	seen := make(map[string]bool, len(tokens))
+	uniq := make([]string, 0, len(tokens))
+	for _, t := range tokens {
+		if queryStopwords[t] || seen[t] {
+			continue
+		}
+		seen[t] = true
+		uniq = append(uniq, t)
+	}
+	sort.Strings(uniq)
+	return strings.Join(uniq, " ")
 }
 
 // ── Phase 4: Search ──────────────────────────────────────────

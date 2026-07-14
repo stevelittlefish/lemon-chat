@@ -172,9 +172,12 @@ Do NOT do these preemptively. Run the validation first.
       comes back truncated, discard it and keep the previous round's summary
       instead of overwriting memory with a mangled version. No continuation-merge,
       no recovery loop.
-- [ ] **Fuzzy query dedup (~15 lines).** `main` dedups queries by exact lowercase
+- [x] **Fuzzy query dedup (~15 lines).** `main` dedups queries by exact lowercase
       match, so reordered `site:X OR site:Y` slips through. Add a token-set
       equality check in query generation to catch near-identical thrash.
+      Justified by the validation: Gemma re-issued reworded near-duplicate
+      queries in round 2. Implemented as `queryKey()` (token-set, order- and
+      filler-insensitive) in `generateQueries`, with a `TestQueryKey` unit test.
 - [ ] **Per-domain source cap (~10 lines).** In `searchAll`, cap results per
       domain per round to stop SEO-page spam crowding out primary sources.
 
@@ -201,13 +204,19 @@ consider lightweight structured memory — validated first, as a last resort.
 
 After Parts 1 + 2, before any of Part 3:
 
-- [ ] Run the home-battery brief (the original failing query) on **Gemma 4B-class
-      AND a strong model**.
-- [ ] Download the debug bundle for each and check two numbers: **rounds-to-stop**
-      and **whether the final report is complete** (not truncated).
-- [ ] Confirm from `events.jsonl` that it stops for a *sensible* reason (gaps
-      genuinely unanswerable / plan satisfied), not the round cap.
-- [ ] Only reach for Part 3 items that a real run proves necessary.
+- [x] Run the home-battery brief (the original failing query) on **Gemma 4B-class
+      AND a strong model**. Done: `gemma4-31b` (job 12) and `x-ai/grok-4.5` (job 13).
+- [x] Download the debug bundle for each and check two numbers: **rounds-to-stop**
+      and **whether the final report is complete** (not truncated). Both stopped at
+      round 2 of 8; both reports complete (4,357 / 6,762 words, no truncation).
+- [x] Confirm from `events.jsonl` that it stops for a *sensible* reason (gaps
+      genuinely unanswerable / plan satisfied), not the round cap. Both YES'd on
+      plan coverage, correctly citing private quotes / personal half-hourly data
+      as the un-web-answerable remainder.
+- [x] Only reach for Part 3 items that a real run proves necessary. Only 3b (fuzzy
+      query dedup) was justified — Gemma reworded round-1 queries in round 2.
+      Truncation-detection (3a) and per-domain cap (3c) showed no need; left unbuilt.
 
-Target: ~90% of the old rework's value at a fraction of the complexity and none
-of the small-model regression.
+Result: hit the target — the original runaway-loop + truncated-report failure is
+gone on both the small local model and the strong model, with no small-model
+regression.
