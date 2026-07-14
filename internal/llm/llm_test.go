@@ -151,6 +151,28 @@ func TestChatCompleteNoAuthWhenKeyEmpty(t *testing.T) {
 	}
 }
 
+func TestCompletionTruncated(t *testing.T) {
+	usageAtLimit := &Usage{CompletionTokens: 8192}
+	for _, tc := range []struct {
+		name       string
+		completion Completion
+		maxTokens  int
+		want       bool
+	}{
+		{"length", Completion{FinishReason: "length"}, 0, true},
+		{"provider max tokens", Completion{FinishReason: "max_tokens"}, 0, true},
+		{"usage fallback", Completion{Usage: usageAtLimit}, 8192, true},
+		{"ordinary stop", Completion{FinishReason: "stop", Usage: usageAtLimit}, 8192, false},
+		{"below limit", Completion{Usage: &Usage{CompletionTokens: 100}}, 8192, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.completion.Truncated(tc.maxTokens); got != tc.want {
+				t.Fatalf("Truncated(%d) = %t, want %t", tc.maxTokens, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestChatCompleteErrorStatus(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)

@@ -3,6 +3,7 @@ package research
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/stevelittlefish/lemon-chat/internal/llm"
 )
+
+var ErrOutputTruncated = errors.New("model output truncated")
 
 type chatMsg struct {
 	Role    string `json:"role"`
@@ -54,7 +57,12 @@ func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, operation 
 		return "", callID, err
 	}
 	r.addPrice(result.UsageCost())
-	return stripThinking(result.Content), callID, nil
+	out := stripThinking(result.Content)
+	if result.Truncated(maxTokens) {
+		r.progress(Progress{Phase: "warning", Round: round, Message: fmt.Sprintf("%s output was truncated at the model token limit", operation)})
+		return out, callID, fmt.Errorf("%w: %s finish_reason=%q", ErrOutputTruncated, operation, result.FinishReason)
+	}
+	return out, callID, nil
 }
 
 // llmCallStream is llmCall with stream=true. onDelta is invoked at most every
@@ -85,6 +93,10 @@ func (r *Researcher) llmCallStream(ctx context.Context, operation string, round 
 	r.addPrice(result.UsageCost())
 
 	out := stripToolCalls(stripThinking(result.Content))
+	if result.Truncated(maxTokens) {
+		r.progress(Progress{Phase: "warning", Round: round, Message: fmt.Sprintf("%s output was truncated at the model token limit", operation)})
+		return out, callID, fmt.Errorf("%w: %s finish_reason=%q", ErrOutputTruncated, operation, result.FinishReason)
+	}
 	if out == "" {
 		return "", callID, fmt.Errorf("empty response from model")
 	}

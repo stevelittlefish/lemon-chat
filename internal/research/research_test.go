@@ -80,6 +80,35 @@ func TestLLMCallHooksCaptureRequestResponseAndDisposition(t *testing.T) {
 	}
 }
 
+func TestLLMCallRejectsTruncatedOutputButRetainsPartialResponse(t *testing.T) {
+	var finished LLMCallFinish
+	var warnings []Progress
+	r := New(Config{
+		Model: "writer", APIBase: "https://models.example/v1",
+		OnLLMCallStart:  func(LLMCallStart) int64 { return 9 },
+		OnLLMCallFinish: func(call LLMCallFinish) { finished = call },
+	}, State{}, func(progress Progress) {
+		if progress.Phase == "warning" {
+			warnings = append(warnings, progress)
+		}
+	}, nil)
+	r.client = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		body := `{"choices":[{"message":{"content":"partial answer"},"finish_reason":"length"}],"usage":{"completion_tokens":100,"cost":0.03}}`
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}
+
+	out, callID, err := r.llmCall(context.Background(), "plan", 0, []chatMsg{{Role: "user", Content: "prompt"}}, 0.3, 100, time.Second)
+	if !errors.Is(err, ErrOutputTruncated) || out != "partial answer" || callID != 9 {
+		t.Fatalf("llmCall = %q, %d, %v", out, callID, err)
+	}
+	if finished.Response != "partial answer" || finished.FinishReason != "length" || finished.PriceUSD == nil {
+		t.Fatalf("partial call was not retained: %+v", finished)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0].Message, "truncated") {
+		t.Fatalf("truncation warning = %+v", warnings)
+	}
+}
+
 func TestParseJSONStringArray(t *testing.T) {
 	cases := []struct {
 		name string

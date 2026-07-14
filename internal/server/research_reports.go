@@ -324,6 +324,12 @@ func (s *Server) generateReportHTML(ctx context.Context, jobID int64, model, tit
 		}
 		return "", nil, fmt.Errorf("HTML generation failed: %w", err)
 	}
+	if completion.Truncated(0) {
+		if callID != 0 {
+			_ = s.store.SetResearchLLMCallDisposition(callID, "rejected")
+		}
+		return "", nil, fmt.Errorf("HTML generation was truncated at the model token limit (finish_reason=%q)", completion.FinishReason)
+	}
 	html, err := normalizeReportHTML(completion.Content)
 	if err != nil {
 		if callID != 0 {

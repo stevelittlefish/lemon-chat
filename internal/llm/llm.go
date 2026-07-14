@@ -67,6 +67,17 @@ type Completion struct {
 	RawUsage     json.RawMessage
 }
 
+// Truncated reports whether a provider ended generation because it exhausted
+// the requested output allowance. The token-count fallback covers compatible
+// servers that omit finish_reason but report usage.
+func (c Completion) Truncated(maxTokens int) bool {
+	reason := strings.ToLower(strings.TrimSpace(c.FinishReason))
+	if reason == "length" || reason == "max_tokens" || reason == "max_output_tokens" {
+		return true
+	}
+	return reason == "" && maxTokens > 0 && c.Usage != nil && c.Usage.CompletionTokens >= maxTokens
+}
+
 func (c Completion) UsageCost() *float64 {
 	if c.Usage == nil {
 		return nil
@@ -152,7 +163,8 @@ func ChatCompleteWithUsage(ctx context.Context, client *http.Client, chatURL, ap
 			Message struct {
 				Content string `json:"content"`
 			} `json:"message"`
-			FinishReason string `json:"finish_reason"`
+			FinishReason       string `json:"finish_reason"`
+			NativeFinishReason string `json:"native_finish_reason"`
 		} `json:"choices"`
 		Usage json.RawMessage `json:"usage"`
 	}
@@ -169,7 +181,11 @@ func ChatCompleteWithUsage(ctx context.Context, client *http.Client, chatURL, ap
 			usage = &parsed
 		}
 	}
-	return Completion{Content: result.Choices[0].Message.Content, FinishReason: result.Choices[0].FinishReason, Usage: usage, RawUsage: result.Usage}, nil
+	finishReason := result.Choices[0].FinishReason
+	if finishReason == "" {
+		finishReason = result.Choices[0].NativeFinishReason
+	}
+	return Completion{Content: result.Choices[0].Message.Content, FinishReason: finishReason, Usage: usage, RawUsage: result.Usage}, nil
 }
 
 // ChatCompleteStream makes a streaming chat-completion request. It returns the
@@ -218,7 +234,8 @@ func ChatCompleteStreamWithUsage(ctx context.Context, client *http.Client, chatU
 				Delta struct {
 					Content string `json:"content"`
 				} `json:"delta"`
-				FinishReason string `json:"finish_reason"`
+				FinishReason       string `json:"finish_reason"`
+				NativeFinishReason string `json:"native_finish_reason"`
 			} `json:"choices"`
 			Usage json.RawMessage `json:"usage"`
 		}
@@ -237,6 +254,8 @@ func ChatCompleteStreamWithUsage(ctx context.Context, client *http.Client, chatU
 		}
 		if chunk.Choices[0].FinishReason != "" {
 			finishReason = chunk.Choices[0].FinishReason
+		} else if chunk.Choices[0].NativeFinishReason != "" {
+			finishReason = chunk.Choices[0].NativeFinishReason
 		}
 		delta := chunk.Choices[0].Delta.Content
 		if delta != "" {

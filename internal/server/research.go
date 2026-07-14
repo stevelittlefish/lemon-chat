@@ -395,6 +395,10 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 // any failure is logged and the job still completes with its markdown report.
 // The returned price includes the HTML generation cost when one was incurred.
 func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, job *store.ResearchJob, markdown string, price *float64) *float64 {
+	warn := func(message string) {
+		data, _ := json.Marshal(research.Progress{Phase: "warning", Message: message})
+		run.broadcast(data)
+	}
 	s.appendResearchTrace(job.ID, research.TraceEvent{EventType: "html_generation_started", Phase: "designing", Data: map[string]any{
 		"automatic": true, "model": job.HTMLReportModel,
 	}})
@@ -402,6 +406,7 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 	if err := s.store.UpsertDefaultResearchReport(job.ID, markdown, job.Model); err != nil {
 		log.Printf("research: job %d: prepare default report for HTML: %v", job.ID, err)
 		s.appendResearchTrace(job.ID, research.TraceEvent{EventType: "html_generation_failed", Phase: "designing", Message: err.Error(), Data: map[string]any{"stage": "prepare"}})
+		warn("automatic HTML report failed while preparing the report: " + err.Error())
 		return price
 	}
 	// The HTML step may use a dedicated model; fall back to the job's own model.
@@ -433,11 +438,13 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 	if err != nil {
 		log.Printf("research: job %d: auto HTML report: %v", job.ID, err)
 		s.appendResearchTrace(job.ID, research.TraceEvent{EventType: "html_generation_failed", Phase: "designing", Message: err.Error(), Data: map[string]any{"stage": "generate", "model": htmlModel}})
+		warn("automatic HTML report failed: " + err.Error())
 		return price
 	}
 	if err := s.store.SetDefaultResearchReportHTML(job.ID, html, direction, cost); err != nil {
 		log.Printf("research: job %d: save auto HTML report: %v", job.ID, err)
 		s.appendResearchTrace(job.ID, research.TraceEvent{EventType: "html_generation_failed", Phase: "designing", Message: err.Error(), Data: map[string]any{"stage": "save", "model": htmlModel}})
+		warn("automatic HTML report could not be saved: " + err.Error())
 		return price
 	}
 	log.Printf("Generated HTML report id=%d model=%q chars=%d", job.ID, htmlModel, len(html))
