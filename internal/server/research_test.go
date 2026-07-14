@@ -123,6 +123,46 @@ func TestCancelAwaitingRedditJob(t *testing.T) {
 	}
 }
 
+func TestGetResearchTraceIsOwnerScoped(t *testing.T) {
+	s, owner, job := newAwaitingRedditJob(t)
+	other, err := s.store.CreateUser("trace-other", nil, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.store.AppendResearchEvent(job.ID, "stop_decision", "deciding", 1, "YES — enough evidence", `{"stop":true}`); err != nil {
+		t.Fatal(err)
+	}
+	call, err := s.store.BeginResearchLLMCall(job.ID, "deciding", "stop_decision", 1, "model", "https://models.example/v1", `[]`, `{}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.store.CompleteResearchLLMCall(call.ID, 125, "YES", "stop", `{"total_tokens":12}`, nil, http.StatusOK, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name string
+		user *store.User
+		want int
+	}{
+		{name: "owner", user: owner, want: http.StatusOK},
+		{name: "other user", user: other, want: http.StatusNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := requestAsUser(http.MethodGet, "/api/research/42/trace", tc.user)
+			req.SetPathValue("id", fmt.Sprint(job.ID))
+			recorder := httptest.NewRecorder()
+			s.handleGetResearchTrace(recorder, req)
+			if recorder.Code != tc.want {
+				t.Fatalf("status=%d body=%s, want %d", recorder.Code, recorder.Body.String(), tc.want)
+			}
+			if tc.want == http.StatusOK && (!strings.Contains(recorder.Body.String(), "stop_decision") || !strings.Contains(recorder.Body.String(), `\"total_tokens\":12`)) {
+				t.Fatalf("trace response missing event or call: %s", recorder.Body.String())
+			}
+		})
+	}
+}
+
 func TestRedditImportRejectsWrongOwnerAndStaleRequest(t *testing.T) {
 	s, owner, job := newAwaitingRedditJob(t)
 	other, err := s.store.CreateUser("other", nil, false, nil)

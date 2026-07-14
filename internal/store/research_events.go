@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"time"
 )
 
 // ResearchEvent is one immutable entry in a research job's structured debug
@@ -25,7 +26,7 @@ func (s *Store) AppendResearchEvent(jobID int64, eventType, phase string, round 
 	if data == "" {
 		data = "{}"
 	}
-	createdAt := now()
+	createdAt := time.Now().UTC().Format(time.RFC3339Nano)
 	res, err := s.db.Exec(`
 		INSERT INTO research_event (research_job_id, sequence, event_type, phase, round, message, data, created_at)
 		SELECT ?, COALESCE(MAX(sequence), 0) + 1, ?, ?, ?, ?, ?, ?

@@ -795,6 +795,35 @@ func (s *Server) handleGetResearch(w http.ResponseWriter, r *http.Request) {
 	}{ResearchJob: job, RedditRequest: request, Reports: reports, ReportHTML: reportHTML})
 }
 
+// handleGetResearchTrace returns the durable event and model-call history used
+// by the Explore Data view. Large request and response bodies remain present,
+// but the frontend keeps them collapsed until explicitly opened.
+func (s *Server) handleGetResearchTrace(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := s.store.GetResearchJob(id, user.ID); notFoundOr500(w, err) {
+		return
+	}
+	log.Printf("Exploring research trace id=%d user_id=%d", id, user.ID)
+	events, err := s.store.ListResearchEvents(id)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	calls, err := s.store.ListResearchLLMCalls(id)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Events []store.ResearchEvent   `json:"events"`
+		Calls  []store.ResearchLLMCall `json:"calls"`
+	}{Events: events, Calls: calls})
+}
+
 // handleGetResearchReportDocument serves the default report's designed HTML
 // document (the auto-generated or attached HTML version).
 func (s *Server) handleGetResearchReportDocument(w http.ResponseWriter, r *http.Request) {

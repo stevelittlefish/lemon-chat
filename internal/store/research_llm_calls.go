@@ -1,6 +1,9 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+	"time"
+)
 
 // ResearchLLMCall is one complete or interrupted model request made for a
 // research job. Requests and responses are retained without content truncation
@@ -32,7 +35,7 @@ type ResearchLLMCall struct {
 }
 
 func (s *Store) BeginResearchLLMCall(jobID int64, phase, operation string, round int, model, apiBase, messages, parameters string) (*ResearchLLMCall, error) {
-	startedAt := now()
+	startedAt := time.Now().UTC().Format(time.RFC3339Nano)
 	res, err := s.db.Exec(`
 		INSERT INTO research_llm_call (
 			research_job_id, sequence, phase, operation, round, attempt, model, api_base,
@@ -55,7 +58,7 @@ func (s *Store) BeginResearchLLMCall(jobID int64, phase, operation string, round
 }
 
 func (s *Store) CompleteResearchLLMCall(id int64, durationMS int64, response, finishReason, usage string, priceUSD *float64, httpStatus int, errMessage string) error {
-	completedAt := now()
+	completedAt := time.Now().UTC().Format(time.RFC3339Nano)
 	var responseValue, finishValue, usageValue, statusValue, errorValue any
 	if response != "" {
 		responseValue = response

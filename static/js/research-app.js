@@ -76,6 +76,12 @@ function parseJSONArray(value) {
   catch { return []; }
 }
 
+function parseJSON(value, fallback = {}) {
+  if (!value) return fallback;
+  try { return typeof value === 'string' ? JSON.parse(value) : value; }
+  catch { return fallback; }
+}
+
 // Mirrors the backend sourceID(): a finding's stable citation number is the
 // 1-based position of the first finding sharing its URL.
 function sourceIDs(findings) {
@@ -84,12 +90,10 @@ function sourceIDs(findings) {
   return map;
 }
 
-// A job is worth exploring once it has collected any queries, URLs, or sources
-// — even if it errored or was cancelled before a final report was written.
+// Every new job has a structured trace, including jobs that fail before they
+// collect a query or source. Older jobs still expose their saved job data.
 function hasExploreData(job) {
-  return parseJSONArray(job.findings).length > 0
-    || parseJSONArray(job.analyzed_urls).length > 0
-    || parseJSONArray(job.queries_used).length > 0;
+  return job?.id != null;
 }
 
 function statusBadge(status) {
@@ -745,11 +749,207 @@ function setExploreBackBtn(jobID) {
   document.getElementById('back-label').textContent = 'report';
 }
 
+const TRACE_EVENT_LABELS = {
+  run_started: 'Research started',
+  run_finished: 'Research finished',
+  plan_completed: 'Plan completed',
+  classification_completed: 'Output classified',
+  queries_generated: 'Queries generated',
+  search_results: 'Search results received',
+  urls_selected: 'URLs selected',
+  fetch_failed: 'Page fetch failed',
+  extraction_completed: 'Source extracted',
+  extraction_rejected: 'Source rejected',
+  extraction_batch_completed: 'Extraction batch completed',
+  synthesis_completed: 'Synthesis version saved',
+  stop_decision: 'Stop decision',
+  checkpoint: 'Checkpoint saved',
+  final_report_completed: 'Final report completed',
+  report_regeneration_started: 'Report regeneration started',
+  report_regeneration_completed: 'Report regeneration completed',
+  report_regeneration_failed: 'Report regeneration failed',
+  html_generation_started: 'HTML generation started',
+  html_generation_completed: 'HTML generation completed',
+  html_generation_failed: 'HTML generation failed',
+  warning: 'Warning',
+  progress: 'Progress',
+};
+
+function traceLabel(value) {
+  return TRACE_EVENT_LABELS[value] || value.replaceAll('_', ' ').replace(/^./, (c) => c.toUpperCase());
+}
+
+function formatTraceTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value || '';
+  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function formatTraceDuration(ms) {
+  if (ms == null) return 'pending';
+  if (ms < 1000) return `${ms}ms`;
+  return formatDuration(ms);
+}
+
+function usageMetrics(call) {
+  const usage = parseJSON(call.usage, {});
+  const prompt = Number(usage.prompt_tokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.inputTokens ?? 0);
+  const completion = Number(usage.completion_tokens ?? usage.output_tokens ?? usage.completionTokens ?? usage.outputTokens ?? 0);
+  const total = Number(usage.total_tokens ?? usage.totalTokens ?? (prompt + completion));
+  return { prompt, completion, total };
+}
+
+function isTruncatedCall(call) {
+  const reason = String(call.finish_reason || '').toLowerCase();
+  return reason === 'length' || reason.includes('max_token') || reason.includes('max token');
+}
+
+function traceFlags(call) {
+  const flags = [];
+  if (isTruncatedCall(call)) flags.push('<span class="trace-flag danger">truncated</span>');
+  if (call.attempt > 1) flags.push(`<span class="trace-flag warn">attempt ${call.attempt}</span>`);
+  if (call.disposition === 'retried') flags.push('<span class="trace-flag warn">retried</span>');
+  if (call.disposition === 'fallback') flags.push('<span class="trace-flag warn">fallback</span>');
+  if (call.outcome === 'failed' || call.disposition === 'rejected') flags.push(`<span class="trace-flag danger">${escapeHtml(call.outcome === 'failed' ? 'failed' : 'rejected')}</span>`);
+  if (!flags.length && call.disposition) flags.push(`<span class="trace-flag ok">${escapeHtml(call.disposition)}</span>`);
+  return flags.join('');
+}
+
+function prettyJSON(value) {
+  const parsed = parseJSON(value, null);
+  return parsed == null ? String(value || '') : JSON.stringify(parsed, null, 2);
+}
+
+function renderCallDetails(call, compact = false) {
+  const usage = usageMetrics(call);
+  const meta = [
+    call.model,
+    formatTraceDuration(call.duration_ms),
+    usage.total ? `${usage.prompt.toLocaleString()} in · ${usage.completion.toLocaleString()} out` : null,
+    call.price_usd != null ? formatPrice(call.price_usd) : null,
+    call.finish_reason ? `finish: ${call.finish_reason}` : null,
+  ].filter(Boolean).map((item) => `<span>${escapeHtml(String(item))}</span>`).join('');
+  const body = compact ? '' : `
+    <div class="trace-call-payloads">
+      <details><summary>Request messages</summary><pre>${escapeHtml(prettyJSON(call.request_messages))}</pre></details>
+      <details><summary>Parameters</summary><pre>${escapeHtml(prettyJSON(call.parameters))}</pre></details>
+      ${call.response != null ? `<details><summary>Response</summary><pre>${escapeHtml(call.response)}</pre></details>` : ''}
+      ${call.usage ? `<details><summary>Raw usage</summary><pre>${escapeHtml(prettyJSON(call.usage))}</pre></details>` : ''}
+      ${call.error ? `<p class="trace-error">${escapeHtml(call.error)}</p>` : ''}
+    </div>`;
+  return `<article class="trace-call${isTruncatedCall(call) ? ' is-danger' : ''}">
+    <div class="trace-item-head">
+      <strong>${escapeHtml(traceLabel(call.operation))}</strong>
+      <span class="trace-flags">${traceFlags(call)}</span>
+    </div>
+    <div class="trace-meta">${meta}</div>
+    ${body}
+  </article>`;
+}
+
+function eventSummary(event, data) {
+  if (event.message) return event.message;
+  if (event.event_type === 'queries_generated') return `${(data.queries || []).length} quer${(data.queries || []).length === 1 ? 'y' : 'ies'}`;
+  if (event.event_type === 'search_results') return `${(data.results || []).length} results for “${data.query || ''}”`;
+  if (event.event_type === 'urls_selected') return `${(data.selected || []).length} selected · ${(data.rejected || []).length} rejected`;
+  if (event.event_type === 'extraction_batch_completed') return `${data.attempted || 0} attempted · ${(data.findings || []).length} kept`;
+  if (event.event_type === 'synthesis_completed') return `${String(data.report || '').length.toLocaleString()} characters`;
+  if (event.event_type === 'final_report_completed') return `${String(data.report || '').length.toLocaleString()} characters`;
+  if (event.event_type === 'stop_decision') return data.stop ? 'Stop: sufficient evidence' : 'Continue: more research requested';
+  if (event.event_type === 'html_generation_completed') return `${data.characters || 0} characters${data.model ? ` · ${data.model}` : ''}`;
+  if (event.event_type === 'html_generation_failed') return `${data.stage || 'generation'} failed`;
+  return '';
+}
+
+function isProblemEvent(event) {
+  return event.event_type.endsWith('_failed') || event.event_type === 'fetch_failed'
+    || event.phase === 'warning' || /truncat|failed|error/i.test(event.message || '');
+}
+
+function renderEventDetails(event, compact = false) {
+  const data = parseJSON(event.data, {});
+  const summary = eventSummary(event, data);
+  const hasData = event.data && event.data !== '{}';
+  return `<article class="trace-event${isProblemEvent(event) ? ' is-danger' : ''}">
+    <div class="trace-item-head">
+      <strong>${escapeHtml(traceLabel(event.event_type))}</strong>
+      ${isProblemEvent(event) ? '<span class="trace-flag danger">warning</span>' : ''}
+    </div>
+    ${summary ? `<p class="trace-summary">${escapeHtml(summary)}</p>` : ''}
+    ${!compact && hasData ? `<details class="trace-payload"><summary>Recorded data</summary><pre>${escapeHtml(prettyJSON(event.data))}</pre></details>` : ''}
+  </article>`;
+}
+
+function renderTraceTimeline(events, calls) {
+  const rows = [
+    ...events.map((event) => ({ kind: 'event', at: event.created_at, sequence: event.sequence, value: event })),
+    ...calls.map((call) => ({ kind: 'call', at: call.started_at, sequence: call.sequence, value: call })),
+  ].sort((a, b) => {
+    const timeDifference = new Date(a.at) - new Date(b.at);
+    if (timeDifference) return timeDifference;
+    if (a.kind !== b.kind) return a.kind === 'event' ? -1 : 1;
+    return a.sequence - b.sequence;
+  });
+  if (!rows.length) return '<p class="research-empty">no structured trace was recorded for this job</p>';
+  return `<div class="trace-timeline">${rows.map((row) => {
+    const item = row.value;
+    const phase = item.phase || 'research';
+    const round = item.round > 0 ? `round ${item.round}` : 'job';
+    return `<div class="trace-row">
+      <div class="trace-when"><time>${escapeHtml(formatTraceTime(row.at))}</time><span>${escapeHtml(phase)}</span><span>${round}</span></div>
+      <div class="trace-marker ${row.kind}"></div>
+      <div class="trace-content">${row.kind === 'call' ? renderCallDetails(item) : renderEventDetails(item)}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderRoundTrace(events, calls) {
+  const rounds = [...new Set([...events, ...calls].map((item) => item.round).filter((round) => round > 0))].sort((a, b) => a - b);
+  if (!rounds.length) return '<p class="research-empty">no rounds were recorded</p>';
+  return `<div class="trace-rounds">${rounds.map((round) => {
+    const roundEvents = events.filter((event) => event.round === round && event.event_type !== 'progress' && event.event_type !== 'checkpoint');
+    const roundCalls = calls.filter((call) => call.round === round);
+    const queries = roundEvents.filter((event) => event.event_type === 'queries_generated')
+      .flatMap((event) => parseJSON(event.data, {}).queries || []);
+    const findings = roundEvents.filter((event) => event.event_type === 'extraction_completed').length;
+    const synthesis = roundEvents.findLast((event) => event.event_type === 'synthesis_completed');
+    const decision = roundEvents.findLast((event) => event.event_type === 'stop_decision');
+    const activity = roundEvents.filter((event) =>
+      ['search_results', 'urls_selected', 'extraction_batch_completed'].includes(event.event_type));
+    return `<details class="trace-round"${round === rounds.at(-1) ? ' open' : ''}>
+      <summary><strong>Round ${round}</strong><span>${queries.length} queries · ${findings} findings · ${roundCalls.length} model calls</span></summary>
+      ${queries.length ? `<div class="trace-round-block"><span class="eyebrow">Inputs</span><ol class="explore-queries">${queries.map((query) => `<li>${escapeHtml(query)}</li>`).join('')}</ol></div>` : ''}
+      ${activity.length ? `<div class="trace-round-block"><span class="eyebrow">Search and extraction outputs</span>${activity.map((event) => renderEventDetails(event, true)).join('')}</div>` : ''}
+      <div class="trace-round-block"><span class="eyebrow">Model calls</span>${roundCalls.map((call) => renderCallDetails(call, true)).join('') || '<p class="research-empty">none</p>'}</div>
+      ${synthesis ? `<details class="trace-version"><summary>Synthesis output</summary><div class="research-report">${render(parseJSON(synthesis.data, {}).report || '')}</div></details>` : ''}
+      ${decision ? `<div class="trace-decision"><span class="eyebrow">Stop rationale</span><p>${escapeHtml(decision.message || parseJSON(decision.data, {}).response || '')}</p></div>` : ''}
+    </details>`;
+  }).join('')}</div>`;
+}
+
+function renderVersions(events) {
+  const versions = events.filter((event) => ['synthesis_completed', 'final_report_completed'].includes(event.event_type));
+  if (!versions.length) return '<p class="research-empty">no intermediate versions were recorded</p>';
+  return versions.map((event, index) => {
+    const report = parseJSON(event.data, {}).report || '';
+    const title = event.event_type === 'final_report_completed' ? 'Final report' : `Synthesis ${index + 1} · round ${event.round}`;
+    return `<details class="trace-version"><summary>${escapeHtml(title)} <span>${report.length.toLocaleString()} characters</span></summary><div class="research-report">${render(report)}</div></details>`;
+  }).join('');
+}
+
 async function showExplore(id) {
   stopEvents();
   setExploreBackBtn(id);
   let job;
-  try { job = await research.get(id); } catch { location.hash = ''; return; }
+  let trace = { events: [], calls: [] };
+  try {
+    [job, trace] = await Promise.all([research.get(id), research.trace(id)]);
+  } catch {
+    try { job = await research.get(id); } catch { location.hash = ''; return; }
+  }
+
+  const events = trace.events || [];
+  const calls = trace.calls || [];
 
   const findings = parseJSONArray(job.findings);
   const analyzed = parseJSONArray(job.analyzed_urls);
@@ -758,6 +958,22 @@ async function showExplore(id) {
   const findingURLs = new Set(findings.map((f) => f.url));
   const displayTitle = job.title || job.query;
 
+  const callUsage = calls.reduce((sum, call) => {
+    const usage = usageMetrics(call);
+    sum.prompt += usage.prompt;
+    sum.completion += usage.completion;
+    sum.total += usage.total;
+    return sum;
+  }, { prompt: 0, completion: 0, total: 0 });
+  const callCost = calls.reduce((sum, call) => sum + Number(call.price_usd || 0), 0);
+  const problemCalls = calls.filter((call) => isTruncatedCall(call) || call.attempt > 1
+    || ['failed'].includes(call.outcome) || ['rejected', 'retried', 'fallback'].includes(call.disposition));
+  const htmlEvents = events.filter((event) => event.event_type.startsWith('html_generation_'));
+  const htmlOutcome = htmlEvents.at(-1);
+  const htmlOutcomeText = htmlOutcome
+    ? `${traceLabel(htmlOutcome.event_type)}${htmlOutcome.message ? ` — ${htmlOutcome.message}` : ''}`
+    : 'No HTML generation attempt was recorded';
+
   const stats = [
     ['rounds', job.round || 0],
     ['queries', queries.length],
@@ -765,6 +981,10 @@ async function showExplore(id) {
     ['sources kept', findings.length],
     job.elapsed_ms ? ['duration', formatDuration(job.elapsed_ms)] : null,
     job.price_usd != null ? ['cost', formatPrice(job.price_usd)] : null,
+    calls.length ? ['model calls', calls.length] : null,
+    callUsage.total ? ['tokens', callUsage.total.toLocaleString()] : null,
+    callCost ? ['trace cost', formatPrice(callCost)] : null,
+    problemCalls.length ? ['retries / issues', problemCalls.length] : null,
   ].filter(Boolean).map(([label, value]) =>
     `<div class="explore-stat"><span class="explore-stat-value">${escapeHtml(String(value))}</span><span class="explore-stat-label">${escapeHtml(label)}</span></div>`).join('');
 
@@ -837,6 +1057,31 @@ async function showExplore(id) {
       </div>
     </div>
     <div class="explore-stats">${stats}</div>
+
+    <section class="explore-section">
+      <p class="research-section-label">trace overview</p>
+      <div class="trace-overview">
+        <div><span class="eyebrow">Token breakdown</span><strong>${callUsage.prompt.toLocaleString()} input · ${callUsage.completion.toLocaleString()} output</strong></div>
+        <div class="${htmlOutcome && isProblemEvent(htmlOutcome) ? 'is-danger' : ''}"><span class="eyebrow">HTML report</span><strong>${escapeHtml(htmlOutcomeText)}</strong></div>
+      </div>
+    </section>
+
+    <section class="explore-section">
+      <p class="research-section-label">round inputs and outputs</p>
+      ${renderRoundTrace(events, calls)}
+    </section>
+
+    <section class="explore-section">
+      <p class="research-section-label">intermediate versions</p>
+      ${renderVersions(events)}
+    </section>
+
+    <section class="explore-section">
+      <details class="trace-full">
+        <summary><span class="research-section-label">chronological trace (${events.length} events · ${calls.length} calls)</span><span>open timeline</span></summary>
+        ${renderTraceTimeline(events, calls)}
+      </details>
+    </section>
 
     <section class="explore-section">
       <p class="research-section-label">research plan</p>
