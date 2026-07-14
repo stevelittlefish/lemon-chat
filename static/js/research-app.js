@@ -405,7 +405,8 @@ async function showDetail(id) {
           </div>` : ''}
         ${running || awaitingReddit
           ? `<button id="research-cancel" class="btn btn-sm btn-secondary">${icon('x', 14)} Cancel</button>`
-          : `<button id="research-delete" class="btn btn-sm btn-danger">${icon('trash', 14)} Delete</button>`}
+          : `<a href="/api/research/${id}/debug-bundle" class="btn btn-sm btn-secondary" title="Diagnostic run-log (events, per-round snapshots, config, outcome)">${icon('file-text', 14)} Debug bundle</a>
+             <button id="research-delete" class="btn btn-sm btn-danger">${icon('trash', 14)} Delete</button>`}
       </div>
       <div class="research-detail-copy">
         <h1 class="research-detail-query">${escapeHtml(displayTitle)}</h1>

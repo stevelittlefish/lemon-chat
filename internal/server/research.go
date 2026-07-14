@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -282,7 +283,8 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		MaxTime:               time.Duration(maxTimeSeconds) * time.Second,
 		MaxURLsPerRound:       rc.MaxURLsPerRound,
 		MaxContentChars:       rc.MaxContentChars,
-		MaxReportTokens:       rc.MaxReportTokens,
+		SynthesisTokens:       rc.SynthesisTokens,
+		FinalReportTokens:     rc.FinalReportTokens,
 		ExtractionConcurrency: rc.ExtractionConcurrency,
 		MinRounds:             minRounds,
 		MaxEmptyRounds:        rc.MaxEmptyRounds,
@@ -331,15 +333,19 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		job.Category, job.Slug, job.Plan, job.Report, job.Findings, job.QueriesUsed, job.AnalyzedURLs)
 	state.PriceUSD = job.PriceUSD
 
+	rlog := newResearchRunLog(s.cfg.Server.DataDir, job.ID)
+	rlog.start(job, cfg)
+
 	lastPhase := ""
 	onProgress := func(p research.Progress) {
 		data, _ := json.Marshal(p)
 		run.broadcast(data)
 		// Streaming generation updates (~4/sec) are broadcast to the UI but
-		// kept out of the log and the DB.
+		// kept out of the log, the DB, and the run-log.
 		if p.Generated > 0 {
 			return
 		}
+		rlog.event(p)
 		logResearchProgress(job.ID, p)
 		if p.Phase != lastPhase && p.Phase != "warning" {
 			lastPhase = p.Phase
@@ -349,6 +355,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		}
 	}
 	onCheckpoint := func(st research.State) {
+		rlog.checkpoint(st)
 		findings, queries, urls := research.MarshalState(st)
 		if err := s.store.CheckpointResearchJob(job.ID, st.Round, st.EmptyRounds, st.ElapsedMS, st.PriceUSD,
 			st.Category, st.Slug, st.Plan, st.Report, findings, queries, urls); err != nil {
@@ -376,12 +383,15 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 			price = s.autoGenerateHTMLReport(ctx, run, job, report, price)
 		}
 		log.Printf("Research job finished id=%d rounds=%d elapsed=%.1fs", job.ID, r.State().Round, float64(elapsedMS)/1000)
+		rlog.finish(store.ResearchStatusDone, report, r.State())
 		s.finishResearch(job.ID, run, store.ResearchStatusDone, &report, "", elapsedMS, price)
 	case errors.Is(runErr, context.Canceled) && run.wasCancelRequested():
 		log.Printf("Research job cancelled id=%d", job.ID)
+		rlog.finish(store.ResearchStatusCancelled, "", r.State())
 		s.finishResearch(job.ID, run, store.ResearchStatusCancelled, nil, "", elapsedMS, r.State().PriceUSD)
 	default:
 		log.Printf("Research job failed id=%d: %v", job.ID, runErr)
+		rlog.finish(store.ResearchStatusError, "", r.State())
 		s.finishResearch(job.ID, run, store.ResearchStatusError, nil, runErr.Error(), elapsedMS, r.State().PriceUSD)
 	}
 }
@@ -954,5 +964,7 @@ func (s *Server) handleDeleteResearch(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
+	// Best-effort removal of the on-disk diagnostic run-log for this job.
+	os.RemoveAll(researchRunLogDir(s.cfg.Server.DataDir, id))
 	w.WriteHeader(http.StatusNoContent)
 }

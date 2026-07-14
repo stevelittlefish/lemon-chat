@@ -119,11 +119,15 @@ type Config struct {
 	SearXNGURL    string
 	Location      *time.Location
 
-	MaxRounds             int
-	MaxTime               time.Duration
-	MaxURLsPerRound       int
-	MaxContentChars       int
-	MaxReportTokens       int
+	MaxRounds       int
+	MaxTime         time.Duration
+	MaxURLsPerRound int
+	MaxContentChars int
+	// SynthesisTokens caps the per-round synthesis call; FinalReportTokens caps
+	// the (longer) final report and deep-report section writes. Splitting these
+	// stops the final report inheriting synthesis's small budget and truncating.
+	SynthesisTokens       int
+	FinalReportTokens     int
 	ExtractionConcurrency int
 	MinRounds             int
 	MaxEmptyRounds        int
@@ -932,7 +936,7 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 	} else {
 		prompt = fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, r.formatFindings(newFindings))
 	}
-	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout,
+	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.SynthesisTokens, synthesisTimeout,
 		func(generated int, tail string) {
 			r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 		})
@@ -947,11 +951,16 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 // ── Phase 7: Decide ──────────────────────────────────────────
 
 func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
-	stop := stopPrompt
+	var prompt string
 	if r.brainstorm() {
-		stop = brainstormStopPrompt
+		prompt = fmt.Sprintf(brainstormStopPrompt, r.cfg.Query, r.state.Report, round, r.cfg.MaxRounds)
+	} else {
+		plan := strings.TrimSpace(r.state.Plan)
+		if plan == "" {
+			plan = "(No explicit plan was recorded — judge against the original question.)"
+		}
+		prompt = fmt.Sprintf(stopPrompt, r.cfg.Query, plan, r.state.Report, round, r.cfg.MaxRounds)
 	}
-	prompt := fmt.Sprintf(stop, r.cfg.Query, r.state.Report, round, r.cfg.MaxRounds)
 	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 128, stopTimeout)
 	if err != nil {
 		return false
@@ -989,7 +998,7 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.FinalReportTokens, synthesisTimeout, onDelta)
 	if err != nil || report == "" {
 		// Never return empty — fall back to the evolving synthesis.
 		return r.state.Report
@@ -1002,7 +1011,7 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 			{Role: "user", Content: prompt},
 			{Role: "assistant", Content: report},
 			{Role: "user", Content: expandReportPrompt},
-		}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+		}, 0.4, r.cfg.FinalReportTokens, synthesisTimeout, onDelta)
 		if err == nil && len(expanded) > len(report) {
 			report = expanded
 		}
@@ -1026,7 +1035,7 @@ func (r *Researcher) finalBrainstorm(ctx context.Context) string {
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, r.cfg.FinalReportTokens, synthesisTimeout, onDelta)
 	if err != nil || report == "" {
 		// Never return empty — fall back to the evolving design doc.
 		return r.state.Report
@@ -1207,7 +1216,7 @@ func (r *Researcher) writeSection(ctx context.Context, sec reportSection, outlin
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.4, r.cfg.FinalReportTokens, synthesisTimeout, onDelta)
 	if err != nil || strings.TrimSpace(out) == "" {
 		return ""
 	}

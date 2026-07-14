@@ -213,7 +213,8 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 		ReportInstruction: instruction,
 		APIBase:           modelServer.APIBase,
 		APIKey:            modelServer.APIKey,
-		MaxReportTokens:   s.cfg.Research.MaxReportTokens,
+		SynthesisTokens:   s.cfg.Research.SynthesisTokens,
+		FinalReportTokens: s.cfg.Research.FinalReportTokens,
 		Location:          s.researchLocation(),
 	}
 	state := research.UnmarshalState(job.Round, job.EmptyRounds, job.ElapsedMS,

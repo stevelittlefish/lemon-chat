@@ -148,7 +148,7 @@ func TestResumeImportedRedditUsesGuardedExtractorAndSynthesizes(t *testing.T) {
 	completed := false
 	r := New(Config{
 		Query: "goal", Model: "test", APIBase: "http://model.test", MaxContentChars: 10000,
-		MaxReportTokens: 1000, SynthesisWindow: 10, MaxEmptyRounds: 2,
+		SynthesisTokens: 1000, FinalReportTokens: 2000, SynthesisWindow: 10, MaxEmptyRounds: 2,
 		OnRedditRoundComplete: func(State) error { completed = true; return nil },
 	}, State{}, nil, nil)
 	r.client = &http.Client{Transport: transport}

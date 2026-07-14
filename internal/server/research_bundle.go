@@ -9,6 +9,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -230,6 +232,72 @@ func writeResearchBundle(dst io.Writer, job *store.ResearchJob, reports []store.
 		return err
 	}
 	return zw.close()
+}
+
+// writeResearchDebugBundle zips the on-disk diagnostic run-log directory for a
+// job (events.jsonl, per-round snapshots and reports, meta.json, and llm.jsonl
+// when captured) under a single root folder. Files are read into memory — a
+// run-log is small — and stored uncompressed via the shared bundle writer.
+func writeResearchDebugBundle(dst io.Writer, root, dir string) (int, error) {
+	zw := &bundleZipWriter{dst: dst}
+	count := 0
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		count++
+		return zw.add(root+"/"+filepath.ToSlash(rel), string(content))
+	})
+	if err != nil {
+		return 0, err
+	}
+	if err := zw.close(); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (s *Server) handleDownloadResearchDebugBundle(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	jobID, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	// Ownership check — the job must exist and belong to this user.
+	job, err := s.store.GetResearchJob(jobID, user.ID)
+	if notFoundOr500(w, err) {
+		return
+	}
+	dir := researchRunLogDir(s.cfg.Server.DataDir, job.ID)
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		writeError(w, http.StatusNotFound, "no debug data for this job")
+		return
+	}
+
+	root := fmt.Sprintf("research-%d-debug", job.ID)
+	var bundle bytes.Buffer
+	count, err := writeResearchDebugBundle(&bundle, root, dir)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	log.Printf("Downloading research debug bundle id=%d user_id=%d files=%d", job.ID, user.ID, count)
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.zip"`, root))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", bundle.Len()))
+	w.WriteHeader(http.StatusOK)
+	_, _ = bundle.WriteTo(w)
 }
 
 func (s *Server) handleDownloadResearchBundle(w http.ResponseWriter, r *http.Request) {

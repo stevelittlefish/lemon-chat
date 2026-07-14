@@ -250,27 +250,34 @@ const synthesizePrompt = `You are updating an evolving research report.
 
 Integrate the new findings into the existing report. Produce an updated, well-organized report that answers the original question as completely as possible given all evidence so far. Remove redundancy, resolve contradictions, and maintain logical flow. Keep source IDs such as [S1] as inline citations where relevant.
 
+Keep this working summary under ~1,500 words. It is scratch memory, not the final report — when it grows too long, compress or drop older background rather than letting it sprawl. Drop anything carrying a citation [S#] only as a last resort, after everything uncited has already been trimmed.
+
 Write only the updated report — no preamble or meta-commentary.`
 
-const stopPrompt = `You are deciding whether a research report is comprehensive enough.
+const stopPrompt = `You are deciding whether to STOP web research and write the final report.
 
 **Original question:** %s
 
-**Current report:**
+**Research plan (sub-questions and success criteria):**
+%s
+
+**Working summary so far:**
 %s
 
 **Rounds completed:** %d of %d
 
-Based on the report so far, do we have enough information to answer the question comprehensively?  Consider:
-- Are the key aspects of the question addressed?
-- Are there obvious gaps or unanswered sub-questions?
-- Is the evidence sufficient and from multiple sources?
+The working summary is rough scratch notes, not the final report. **Ignore prose polish, formatting, missing citations, and length** — a terse or cut-off summary is fine. Judge only whether the *evidence* needed to answer the plan has been gathered.
 
-If rounds completed is well below the target, prefer continuing unless the report is already exhaustive.
+Answer NO (keep researching) only if ALL of the following hold:
+1. A **specific** sub-question or success criterion in the plan still lacks evidence, AND
+2. That gap is something public web search could **plausibly** answer, AND
+3. There is a **materially different** search to try — not a rewording of one already run.
+
+Answer YES (stop) if the plan is substantially covered, or if the only remaining gaps are things web search cannot resolve. The following do **not** justify another round: private or proprietary facts (live prices, personal quotes), future or unknowable outcomes, unverifiable real-time data, and searches already effectively tried.
 
 Reply with ONLY "YES" or "NO" followed by a brief one-sentence reason.
-Example: "YES — The report covers all major aspects with evidence from multiple sources."
-Example: "NO — We still lack information about the economic impact."`
+Example: "YES — Every sub-question has supporting evidence; remaining gaps need private quotes web search can't provide."
+Example: "NO — The plan asks for real-world failure rates and no search has targeted longevity data yet."`
 
 const finalReportPrompt = `Write a **long, detailed, comprehensive** research report answering this question:
 

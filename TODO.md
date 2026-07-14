@@ -6,7 +6,7 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research algorithm rework
 
-- [ ] **Research engine rework — diagnostic logging + algorithm fixes.** Full plan in [`RESEARCH_TODO.md`](RESEARCH_TODO.md). Discards the oversized structured-ledger / JSON-contract / new-DB-tables approach in favour of a token-budget split, two free-text prompt rewrites, and a disk-based downloadable debug bundle — ~90% of the value at a fraction of the complexity, and no small-model (Gemma) regression. When ready, say "let's do the research changes" and work through that file top-to-bottom.
+- [~] **Research engine rework — diagnostic logging + algorithm fixes.** Full plan in [`RESEARCH_TODO.md`](RESEARCH_TODO.md). Discards the oversized structured-ledger / JSON-contract / new-DB-tables approach in favour of a token-budget split, two free-text prompt rewrites, and a disk-based downloadable debug bundle — ~90% of the value at a fraction of the complexity, and no small-model (Gemma) regression. Parts 1a/1b (disk run-log + debug bundle) and Part 2 (token-budget split, synthesis memory bound, stop-check rewrite) are done. Next: run the Part 2 validation before touching Part 1c / Part 3.
 
 ## Manually Added by User
 

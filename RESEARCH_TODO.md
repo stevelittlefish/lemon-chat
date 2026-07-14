@@ -69,32 +69,32 @@ Directory layout, keyed by job id (mirror attachments):
     round-NN.json    # full State per round (findings, queries, URLs, elapsed)
 ```
 
-- [ ] `events.jsonl`: in the wrapped `onProgress`, append `{ts, phase, round,
+- [x] `events.jsonl`: in the wrapped `onProgress`, append `{ts, phase, round,
       message}` as one JSON line **only when `p.Generated == 0`** (skips the
       250ms token-stream ticks; leaves exactly the milestone log). Guard the
       append with a `sync.Mutex` — `progress()` is called from the concurrent
       extraction goroutines.
-- [ ] `snapshots/round-NN.json` + `reports/round-NN.md`: in the wrapped
+- [x] `snapshots/round-NN.json` + `reports/round-NN.md`: in the wrapped
       `onCheckpoint`, dump `State` as JSON and pull `State.Report` into a `.md`
       for easy reading. Write `reports/round-00-plan.txt` when the plan first
       appears; `reports/final.md` at the end.
-- [ ] `meta.json`: write once at job start with the effective config (model,
+- [x] `meta.json`: write once at job start with the effective config (model,
       worker_model, effort, token limits, max_rounds, max_time, **git commit**,
       start time, locale). Update at end with `status`, `stop_reason`,
       `rounds_completed`, `elapsed_ms`, `findings_count`, `price_usd`. Derive
       `stop_reason` in the server from the last `deciding`/`warning` event teed
       through `onProgress` — no engine change needed.
-- [ ] Delete the job's dir when the job row is deleted (one line in the delete
+- [x] Delete the job's dir when the job row is deleted (one line in the delete
       handler).
 
 ### 1b. Bundle download
 
-- [ ] `GET /api/research/{id}/bundle`: walk `<data_dir>/research/<id>/`,
+- [x] `GET /api/research/{id}/bundle`: walk `<data_dir>/research/<id>/`,
       `archive/zip` it, stream as `research-<id>.zip`. Stdlib only (~30 lines).
-- [ ] Add a "Download debug bundle" button to the job view in
+- [x] Add a "Download debug bundle" button to the job view in
       `static/js/research-app.js` (+ `static/js/api.js` wrapper). Add any new
       icon name to the `ICONS` array in `icons.js`.
-- [ ] Log one line when a bundle is downloaded (non-hot-path handler convention).
+- [x] Log one line when a bundle is downloaded (non-hot-path handler convention).
 
 ### 1c. Raw model I/O capture — OPTIONAL, debug-gated
 
@@ -122,11 +122,11 @@ four-hook trace system, or disposition state machines. That was the old rework.
 `main` shares `MaxReportTokens=8192` between synthesis and the final report, so
 the report is hard-capped at 8k. This is the single biggest user-visible symptom.
 
-- [ ] In `internal/config/config.go`, add `synthesis_tokens` (default ~8192) and
+- [x] In `internal/config/config.go`, add `synthesis_tokens` (default ~8192) and
       `final_report_tokens` (default ~32768). Keep `max_report_tokens` as a
       backward-compat alias that maps to `synthesis_tokens` if the new key is
       unset. Document in `lemon.toml.example`.
-- [ ] In `internal/research/researcher.go`, use `synthesis_tokens` for
+- [x] In `internal/research/researcher.go`, use `synthesis_tokens` for
       `synthesize()` and `final_report_tokens` for `finalReport()` (and section
       writes if deep-report is on) instead of the single `MaxReportTokens`.
 
@@ -135,7 +135,7 @@ the report is hard-capped at 8k. This is the single biggest user-visible symptom
 The evolving prose report grows every round and eventually truncates regardless
 of budget. Fix it in the prompt, not with a structured ledger.
 
-- [ ] In `internal/research/prompts.go`, add to `synthesizePrompt`: *"Keep this
+- [x] In `internal/research/prompts.go`, add to `synthesizePrompt`: *"Keep this
       working summary under ~1,500 words. Compress or drop older background
       before dropping anything with a citation [S#]."* A report that stays
       ~1,500 words never approaches even the 8k ceiling.
@@ -145,7 +145,7 @@ of budget. Fix it in the prompt, not with a structured ledger.
 Keep it **free-text `YES/NO — reason`**. No JSON. This is the contract that
 already works on small models and is exactly what the old rework broke.
 
-- [ ] In `prompts.go`, rewrite `stopPrompt` to:
+- [x] In `prompts.go`, rewrite `stopPrompt` to:
   - Explicitly say: **ignore prose polish, formatting, citation completeness, and
     length** (kills the "cuts off mid-conclusion → NO" misread).
   - Anchor completion on the plan we **already generate**: `state.Plan` already
@@ -157,8 +157,8 @@ already works on small models and is exactly what the old rework broke.
     already tried. State that private facts, future outcomes, unverifiable live
     data, and already-tried searches do **not** justify another round.
   - Keep output `YES/NO — one-sentence reason`.
-- [ ] In `researcher.go`, pass `state.Plan` into the stop-check call.
-- [ ] **Keep `MinRounds` as a floor.** The old rework deleted it and immediately
+- [x] In `researcher.go`, pass `state.Plan` into the stop-check call.
+- [x] **Keep `MinRounds` as a floor.** The old rework deleted it and immediately
       got a 1-round premature stop. A minimum-rounds floor is a free guardrail.
 
 ---
