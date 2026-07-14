@@ -135,6 +135,12 @@ type Config struct {
 	// independent of OnProgress: trace events are durable job artifacts, while
 	// progress events drive the live UI.
 	OnTrace func(TraceEvent)
+	// LLM call hooks persist requests before transport starts and finalize them
+	// afterward. The returned ID is opaque to the engine and is used only to
+	// associate completion and semantic-disposition updates.
+	OnLLMCallStart       func(LLMCallStart) int64
+	OnLLMCallFinish      func(LLMCallFinish)
+	OnLLMCallDisposition func(callID int64, disposition string)
 }
 
 // PendingRedditRound is the complete durable boundary between search and
@@ -179,6 +185,27 @@ type TraceEvent struct {
 	Round     int    `json:"round,omitempty"`
 	Message   string `json:"message,omitempty"`
 	Data      any    `json:"data,omitempty"`
+}
+
+type LLMCallStart struct {
+	Operation  string              `json:"operation"`
+	Phase      string              `json:"phase"`
+	Round      int                 `json:"round"`
+	Model      string              `json:"model"`
+	APIBase    string              `json:"api_base"`
+	Messages   []map[string]string `json:"messages"`
+	Parameters map[string]any      `json:"parameters"`
+}
+
+type LLMCallFinish struct {
+	CallID       int64           `json:"call_id"`
+	DurationMS   int64           `json:"duration_ms"`
+	Response     string          `json:"response"`
+	FinishReason string          `json:"finish_reason"`
+	Usage        json.RawMessage `json:"usage"`
+	PriceUSD     *float64        `json:"price_usd"`
+	HTTPStatus   int             `json:"http_status"`
+	Error        string          `json:"error"`
 }
 
 type Researcher struct {
@@ -464,7 +491,7 @@ func (r *Researcher) resumeRedditRound(ctx context.Context, resume RedditResume)
 			}
 			r.progress(Progress{Phase: "reading", Round: pending.Round, URL: page.URL, Title: page.Title,
 				TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
-			if finding := r.ExtractText(ctx, page.URL, page.Title, page.Content); finding != nil {
+			if finding := r.ExtractText(ctx, pending.Round, page.URL, page.Title, page.Content); finding != nil {
 				findings = append(findings, *finding)
 			}
 		}
@@ -627,12 +654,14 @@ func (r *Researcher) generateSlug(ctx context.Context) string {
 	if source == "" {
 		source = r.cfg.Query
 	}
-	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(slugPrompt, source)}}, 0.2, 64, planningTimeout)
+	out, callID, err := r.llmCallWorker(ctx, "slug", 0, []chatMsg{{Role: "user", Content: fmt.Sprintf(slugPrompt, source)}}, 0.2, 64, planningTimeout)
 	if err == nil {
 		if slug := normalizeSlug(out); slug != "" {
+			r.setCallDisposition(callID, "accepted")
 			return slug
 		}
 	}
+	r.setCallDisposition(callID, "fallback")
 	if err != nil {
 		r.progress(Progress{Phase: "warning", Message: "research name generation failed: " + err.Error()})
 	}
@@ -668,16 +697,19 @@ func normalizeSlug(value string) string {
 func (r *Researcher) plan(ctx context.Context) string {
 	if r.brainstorm() {
 		prompt := currentDateContext(r.cfg.Location) + fmt.Sprintf(brainstormPlanPrompt, r.cfg.Query)
-		out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.6, 1024, planningTimeout)
+		out, callID, err := r.llmCall(ctx, "plan", 0, []chatMsg{{Role: "user", Content: prompt}}, 0.6, 1024, planningTimeout)
 		if err != nil {
+			r.setCallDisposition(callID, "rejected")
 			r.progress(Progress{Phase: "warning", Message: "planning failed: " + err.Error()})
 			return ""
 		}
+		r.setCallDisposition(callID, "accepted")
 		return stripToolCalls(out)
 	}
 	prompt := currentDateContext(r.cfg.Location) + fmt.Sprintf(researchPlanPrompt, r.cfg.Query)
-	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, 1024, planningTimeout)
+	out, callID, err := r.llmCall(ctx, "plan", 0, []chatMsg{{Role: "user", Content: prompt}}, 0.3, 1024, planningTimeout)
 	if err != nil {
+		r.setCallDisposition(callID, "rejected")
 		r.progress(Progress{Phase: "warning", Message: "planning failed: " + err.Error()})
 		return ""
 	}
@@ -688,8 +720,10 @@ func (r *Researcher) plan(ctx context.Context) string {
 	}
 	if parseJSONObject(out, &plan) != nil {
 		// JSON parsing failed — use the raw text as the plan.
+		r.setCallDisposition(callID, "fallback")
 		return stripToolCalls(out)
 	}
+	r.setCallDisposition(callID, "accepted")
 	return fmt.Sprintf("Sub-questions: %s\nKey topics: %s\nSuccess: %s",
 		strings.Join(plan.SubQuestions, "; "), strings.Join(plan.KeyTopics, ", "), plan.SuccessCriteria)
 }
@@ -700,39 +734,47 @@ func (r *Researcher) plan(ctx context.Context) string {
 // "general" value also marks the job as classified so a resumed run does not
 // repeat this phase.
 func (r *Researcher) classify(ctx context.Context) string {
-	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(classifyPrompt, r.cfg.Query)}}, 0, 20, classifyTimeout)
+	out, callID, err := r.llmCallWorker(ctx, "classify", 0, []chatMsg{{Role: "user", Content: fmt.Sprintf(classifyPrompt, r.cfg.Query)}}, 0, 20, classifyTimeout)
 	if err != nil {
+		r.setCallDisposition(callID, "fallback")
 		return "general"
 	}
 	first := strings.ToLower(strings.Trim(strings.Fields(out + " x")[0], ".,!:;\"'"))
 	if validCategories[first] {
+		r.setCallDisposition(callID, "accepted")
 		return first
 	}
 	for _, word := range strings.Fields(strings.ToLower(out)) {
 		if validCategories[strings.Trim(word, ".,!:;\"'")] {
+			r.setCallDisposition(callID, "accepted")
 			return strings.Trim(word, ".,!:;\"'")
 		}
 	}
+	r.setCallDisposition(callID, "fallback")
 	return "general"
 }
 
 // classifyBrainstorm returns the output format for a brainstorm run, defaulting
 // to "design-doc" when no other format fits. Mirrors classify for research mode.
 func (r *Researcher) classifyBrainstorm(ctx context.Context) string {
-	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: fmt.Sprintf(brainstormClassifyPrompt, r.cfg.Query)}}, 0, 20, classifyTimeout)
+	out, callID, err := r.llmCallWorker(ctx, "brainstorm_classify", 0, []chatMsg{{Role: "user", Content: fmt.Sprintf(brainstormClassifyPrompt, r.cfg.Query)}}, 0, 20, classifyTimeout)
 	if err != nil {
+		r.setCallDisposition(callID, "fallback")
 		return "design-doc"
 	}
 	first := strings.ToLower(strings.Trim(strings.Fields(out + " x")[0], ".,!:;\"'"))
 	if validBrainstormFormats[first] {
+		r.setCallDisposition(callID, "accepted")
 		return first
 	}
 	for _, word := range strings.Fields(strings.ToLower(out)) {
 		w := strings.Trim(word, ".,!:;\"'")
 		if validBrainstormFormats[w] {
+			r.setCallDisposition(callID, "accepted")
 			return w
 		}
 	}
+	r.setCallDisposition(callID, "fallback")
 	return "design-doc"
 }
 
@@ -783,8 +825,9 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 			fmt.Sprintf(queryGenPrompt, r.cfg.Query, r.state.Plan, report, round, numQueries, instruction)
 	}
 
-	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, 4096, queryTimeout)
+	out, callID, err := r.llmCallWorker(ctx, "query_generation", round, []chatMsg{{Role: "user", Content: prompt}}, 0.5, 4096, queryTimeout)
 	if err != nil {
+		r.setCallDisposition(callID, "rejected")
 		r.progress(Progress{Phase: "warning", Round: round, Message: "query generation failed: " + err.Error()})
 		return nil
 	}
@@ -804,10 +847,19 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 	}
 	// With the toggle on, the model occasionally still returns no usable query;
 	// fall back to the brief itself so the promised search always happens.
+	usedFallback := false
 	if forceSearch && len(queries) == 0 {
 		if q := strings.TrimSpace(r.cfg.Query); q != "" && !used[strings.ToLower(q)] {
 			queries = append(queries, q)
+			usedFallback = true
 		}
+	}
+	if usedFallback {
+		r.setCallDisposition(callID, "fallback")
+	} else if len(queries) == 0 {
+		r.setCallDisposition(callID, "rejected")
+	} else {
+		r.setCallDisposition(callID, "accepted")
 	}
 	return queries
 }
@@ -982,15 +1034,17 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 	} else {
 		prompt = fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, r.formatFindings(newFindings))
 	}
-	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout,
+	out, callID, err := r.llmCallStream(ctx, "synthesize", round, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout,
 		func(generated int, tail string) {
 			r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 		})
 	if err != nil || out == "" {
+		r.setCallDisposition(callID, "rejected")
 		// Keep the current report unchanged.
 		r.progress(Progress{Phase: "warning", Message: "synthesis failed — keeping previous report"})
 		return
 	}
+	r.setCallDisposition(callID, "accepted")
 	r.state.Report = out
 	r.trace("synthesis_completed", "analyzing", round, "", map[string]any{"report": out, "new_findings": len(newFindings)})
 }
@@ -1003,10 +1057,12 @@ func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
 		stop = brainstormStopPrompt
 	}
 	prompt := fmt.Sprintf(stop, r.cfg.Query, r.state.Report, round, r.cfg.MaxRounds)
-	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 128, stopTimeout)
+	out, callID, err := r.llmCallWorker(ctx, "stop_decision", round, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 128, stopTimeout)
 	if err != nil {
+		r.setCallDisposition(callID, "fallback")
 		return false
 	}
+	r.setCallDisposition(callID, "accepted")
 	decision := strings.TrimLeft(stripToolCalls(out), "*_`\"'>#- \t\n")
 	shouldStop := strings.HasPrefix(strings.ToUpper(decision), "YES")
 	r.trace("stop_decision", "deciding", round, decision, map[string]any{"stop": shouldStop, "response": out})
@@ -1042,23 +1098,29 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	report, callID, err := r.llmCallStream(ctx, "final_report", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
 	if err != nil || report == "" {
+		r.setCallDisposition(callID, "fallback")
 		// Never return empty — fall back to the evolving synthesis.
 		return r.state.Report
 	}
-
 	// Minimum-length retry: ask the model to expand reports under 400 words.
 	if len(strings.Fields(report)) < 400 {
+		r.setCallDisposition(callID, "retried")
 		r.progress(Progress{Phase: "warning", Message: fmt.Sprintf("report is short (%d words) — asking the model to expand it", len(strings.Fields(report)))})
-		expanded, err := r.llmCallStream(ctx, []chatMsg{
+		expanded, expandCallID, err := r.llmCallStream(ctx, "final_report_expand", r.state.Round, []chatMsg{
 			{Role: "user", Content: prompt},
 			{Role: "assistant", Content: report},
 			{Role: "user", Content: expandReportPrompt},
 		}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
 		if err == nil && len(expanded) > len(report) {
+			r.setCallDisposition(expandCallID, "accepted")
 			report = expanded
+		} else {
+			r.setCallDisposition(expandCallID, "rejected")
 		}
+	} else {
+		r.setCallDisposition(callID, "accepted")
 	}
 	return report
 }
@@ -1079,11 +1141,13 @@ func (r *Researcher) finalBrainstorm(ctx context.Context) string {
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	report, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	report, callID, err := r.llmCallStream(ctx, "final_brainstorm", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.5, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
 	if err != nil || report == "" {
+		r.setCallDisposition(callID, "fallback")
 		// Never return empty — fall back to the evolving design doc.
 		return r.state.Report
 	}
+	r.setCallDisposition(callID, "accepted")
 	return report
 }
 
@@ -1194,7 +1258,7 @@ func (r *Researcher) outline(ctx context.Context) []reportSection {
 		draftPrompt = fmt.Sprintf(outlineDraftPrompt, r.cfg.Query, r.state.Plan, report, findings, catHint)
 	}
 	draftPrompt += r.reportInstructionSuffix()
-	draft := r.parseOutline(ctx, draftPrompt)
+	draft := r.parseOutline(ctx, "outline", draftPrompt)
 	if ctx.Err() != nil || len(draft) == 0 {
 		return draft
 	}
@@ -1205,22 +1269,24 @@ func (r *Researcher) outline(ctx context.Context) []reportSection {
 	} else {
 		refinePrompt = fmt.Sprintf(outlineRefinePrompt, r.cfg.Query, r.state.Plan, findings, marshalOutline(draft))
 	}
-	if refined := r.parseOutline(ctx, refinePrompt); len(refined) > 0 {
+	if refined := r.parseOutline(ctx, "outline_refine", refinePrompt); len(refined) > 0 {
 		return refined
 	}
 	return draft // refine failed — the draft is still usable
 }
 
 // parseOutline runs one outline LLM call and parses {"sections": [...]}.
-func (r *Researcher) parseOutline(ctx context.Context, prompt string) []reportSection {
-	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, 1024, planningTimeout)
+func (r *Researcher) parseOutline(ctx context.Context, operation, prompt string) []reportSection {
+	out, callID, err := r.llmCall(ctx, operation, r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.3, 1024, planningTimeout)
 	if err != nil {
+		r.setCallDisposition(callID, "rejected")
 		return nil
 	}
 	var parsed struct {
 		Sections []reportSection `json:"sections"`
 	}
 	if parseJSONObject(out, &parsed) != nil {
+		r.setCallDisposition(callID, "rejected")
 		return nil
 	}
 	var sections []reportSection
@@ -1229,6 +1295,11 @@ func (r *Researcher) parseOutline(ctx context.Context, prompt string) []reportSe
 		if s.Title != "" {
 			sections = append(sections, s)
 		}
+	}
+	if len(sections) == 0 {
+		r.setCallDisposition(callID, "rejected")
+	} else {
+		r.setCallDisposition(callID, "accepted")
 	}
 	return sections
 }
@@ -1260,10 +1331,12 @@ func (r *Researcher) writeSection(ctx context.Context, sec reportSection, outlin
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	out, callID, err := r.llmCallStream(ctx, "write_section", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
 	if err != nil || strings.TrimSpace(out) == "" {
+		r.setCallDisposition(callID, "rejected")
 		return ""
 	}
+	r.setCallDisposition(callID, "accepted")
 	out = strings.TrimSpace(out)
 	if !strings.HasPrefix(out, "#") {
 		out = "## " + sec.Title + "\n\n" + out
@@ -1282,10 +1355,12 @@ func (r *Researcher) gluePart(ctx context.Context, outline, report, instruction 
 		tmpl = brainstormGluePartPrompt
 	}
 	prompt := fmt.Sprintf(tmpl, r.cfg.Query, outline, report, instruction)
-	out, err := r.llmCall(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, 1500, synthesisTimeout)
+	out, callID, err := r.llmCall(ctx, "write_glue", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.3, 1500, synthesisTimeout)
 	if err != nil {
+		r.setCallDisposition(callID, "rejected")
 		return ""
 	}
+	r.setCallDisposition(callID, "accepted")
 	return stripToolCalls(out)
 }
 

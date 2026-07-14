@@ -115,7 +115,7 @@ func (r *Researcher) fetchAndExtract(ctx context.Context, round int, pageURL, se
 	}
 
 	content := truncateContent(page.Content, r.cfg.MaxContentChars)
-	finding := r.ExtractText(ctx, pageURL, title, content)
+	finding := r.ExtractText(ctx, round, pageURL, title, content)
 	if finding != nil {
 		finding.OGImage = page.OGImage
 		r.trace("extraction_completed", "reading", round, "", finding)
@@ -128,7 +128,7 @@ func (r *Researcher) fetchAndExtract(ctx context.Context, round int, pageURL, se
 // ExtractText runs already-fetched text through the production goal-based
 // extractor. Browser-imported content uses this entry point so it receives the
 // same prompt-injection guard and quality filtering as ordinary webpages.
-func (r *Researcher) ExtractText(ctx context.Context, pageURL, title, content string) *Finding {
+func (r *Researcher) ExtractText(ctx context.Context, round int, pageURL, title, content string) *Finding {
 	content = truncateContent(content, r.cfg.MaxContentChars)
 
 	// Two-message structure: extraction prompt, then the page content wrapped
@@ -137,8 +137,9 @@ func (r *Researcher) ExtractText(ctx context.Context, pageURL, title, content st
 		{Role: "user", Content: fmt.Sprintf(extractorSystem, r.cfg.Query)},
 		{Role: "user", Content: untrustedContextMessage("webpage", content)},
 	}
-	out, err := r.llmCallWorker(ctx, msgs, 0.2, 2048, extractionTimeout)
+	out, callID, err := r.llmCallWorker(ctx, "extract", round, msgs, 0.2, 2048, extractionTimeout)
 	if err != nil {
+		r.setCallDisposition(callID, "rejected")
 		return nil
 	}
 
@@ -149,11 +150,13 @@ func (r *Researcher) ExtractText(ctx context.Context, pageURL, title, content st
 		Summary  string `json:"summary"`
 	}
 	if parseJSONObject(out, &extracted) == nil && extracted.Summary != "" {
+		r.setCallDisposition(callID, "accepted")
 		finding.Rational = extracted.Rational
 		finding.Evidence = extracted.Evidence
 		finding.Summary = extracted.Summary
 	} else {
 		// Fallback: raw response as evidence, first 500 chars as summary.
+		r.setCallDisposition(callID, "fallback")
 		finding.Evidence = out
 		if len(out) > 500 {
 			finding.Summary = out[:500]
@@ -163,6 +166,7 @@ func (r *Researcher) ExtractText(ctx context.Context, pageURL, title, content st
 	}
 
 	if isLowQuality(finding.Summary) {
+		r.setCallDisposition(callID, "rejected")
 		return nil
 	}
 	return finding

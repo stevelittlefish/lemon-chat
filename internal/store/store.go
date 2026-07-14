@@ -142,6 +142,34 @@ func (s *Store) migrate() error {
 			);
 			CREATE INDEX IF NOT EXISTS idx_research_event_job_sequence ON research_event(research_job_id, sequence);
 
+			CREATE TABLE IF NOT EXISTS research_llm_call (
+				id               INTEGER PRIMARY KEY,
+				research_job_id  INTEGER NOT NULL REFERENCES research_job(id) ON DELETE CASCADE,
+				sequence         INTEGER NOT NULL,
+				phase            TEXT    NOT NULL,
+				operation        TEXT    NOT NULL,
+				round            INTEGER NOT NULL DEFAULT 0,
+				attempt          INTEGER NOT NULL,
+				model            TEXT    NOT NULL,
+				api_base         TEXT    NOT NULL,
+				request_messages TEXT    NOT NULL,
+				parameters       TEXT    NOT NULL,
+				started_at       TEXT    NOT NULL,
+				completed_at     TEXT,
+				duration_ms      INTEGER,
+				response         TEXT,
+				finish_reason    TEXT,
+				usage            TEXT,
+				price_usd        REAL,
+				http_status      INTEGER,
+				error            TEXT,
+				outcome          TEXT    NOT NULL DEFAULT 'in_progress',
+				disposition      TEXT    NOT NULL DEFAULT 'pending',
+				UNIQUE (research_job_id, sequence),
+				UNIQUE (research_job_id, phase, operation, round, attempt)
+			);
+			CREATE INDEX IF NOT EXISTS idx_research_llm_call_job_sequence ON research_llm_call(research_job_id, sequence);
+
 			CREATE TABLE IF NOT EXISTS schema_version (
 				version INTEGER NOT NULL
 			);
@@ -851,6 +879,46 @@ func (s *Store) migrate() error {
 		}
 		version = 40
 		log.Println("store: migration v39 → v40 complete")
+	}
+
+	if version < 41 {
+		log.Println("store: migrating v40 → v41 (create research LLM call trace)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE IF NOT EXISTS research_llm_call (
+				id               INTEGER PRIMARY KEY,
+				research_job_id  INTEGER NOT NULL REFERENCES research_job(id) ON DELETE CASCADE,
+				sequence         INTEGER NOT NULL,
+				phase            TEXT    NOT NULL,
+				operation        TEXT    NOT NULL,
+				round            INTEGER NOT NULL DEFAULT 0,
+				attempt          INTEGER NOT NULL,
+				model            TEXT    NOT NULL,
+				api_base         TEXT    NOT NULL,
+				request_messages TEXT    NOT NULL,
+				parameters       TEXT    NOT NULL,
+				started_at       TEXT    NOT NULL,
+				completed_at     TEXT,
+				duration_ms      INTEGER,
+				response         TEXT,
+				finish_reason    TEXT,
+				usage            TEXT,
+				price_usd        REAL,
+				http_status      INTEGER,
+				error            TEXT,
+				outcome          TEXT    NOT NULL DEFAULT 'in_progress',
+				disposition      TEXT    NOT NULL DEFAULT 'pending',
+				UNIQUE (research_job_id, sequence),
+				UNIQUE (research_job_id, phase, operation, round, attempt)
+			);
+			CREATE INDEX IF NOT EXISTS idx_research_llm_call_job_sequence ON research_llm_call(research_job_id, sequence);
+		`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (41, ?)`, now()); err != nil {
+			return err
+		}
+		version = 41
+		log.Println("store: migration v40 → v41 complete")
 	}
 
 	log.Printf("store: schema ready at version %d", version)

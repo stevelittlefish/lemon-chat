@@ -292,6 +292,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	cfg.OnTrace = func(event research.TraceEvent) {
 		s.appendResearchTrace(job.ID, event)
 	}
+	s.configureResearchCallTrace(job.ID, &cfg)
 	if job.Title != nil && *job.Title != "" {
 		cfg.SlugSource = *job.Title
 	}
@@ -425,7 +426,7 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 	}
 	genCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	html, cost, err := s.generateReportHTML(genCtx, htmlModel, title, markdown, direction, func(generated int, tail string) {
+	html, cost, err := s.generateReportHTML(genCtx, job.ID, htmlModel, title, markdown, direction, func(generated int, tail string) {
 		data, _ := json.Marshal(research.Progress{Phase: "designing", Generated: generated, Snippet: tail})
 		run.broadcast(data)
 	})
@@ -458,6 +459,43 @@ func (s *Server) appendResearchTrace(jobID int64, event research.TraceEvent) {
 	}
 	if _, err := s.store.AppendResearchEvent(jobID, event.EventType, event.Phase, event.Round, event.Message, data); err != nil {
 		log.Printf("research: job %d: append trace event %q: %v", jobID, event.EventType, err)
+	}
+}
+
+func (s *Server) configureResearchCallTrace(jobID int64, cfg *research.Config) {
+	cfg.OnLLMCallStart = func(call research.LLMCallStart) int64 {
+		messages, err := json.Marshal(call.Messages)
+		if err != nil {
+			log.Printf("research: job %d: encode LLM call messages: %v", jobID, err)
+			return 0
+		}
+		parameters, err := json.Marshal(call.Parameters)
+		if err != nil {
+			log.Printf("research: job %d: encode LLM call parameters: %v", jobID, err)
+			return 0
+		}
+		record, err := s.store.BeginResearchLLMCall(jobID, call.Phase, call.Operation, call.Round,
+			call.Model, call.APIBase, string(messages), string(parameters))
+		if err != nil {
+			log.Printf("research: job %d: begin LLM call %q: %v", jobID, call.Operation, err)
+			return 0
+		}
+		return record.ID
+	}
+	cfg.OnLLMCallFinish = func(call research.LLMCallFinish) {
+		usage := ""
+		if len(call.Usage) > 0 {
+			usage = string(call.Usage)
+		}
+		if err := s.store.CompleteResearchLLMCall(call.CallID, call.DurationMS, call.Response,
+			call.FinishReason, usage, call.PriceUSD, call.HTTPStatus, call.Error); err != nil {
+			log.Printf("research: job %d: finish LLM call id=%d: %v", jobID, call.CallID, err)
+		}
+	}
+	cfg.OnLLMCallDisposition = func(callID int64, disposition string) {
+		if err := s.store.SetResearchLLMCallDisposition(callID, disposition); err != nil {
+			log.Printf("research: job %d: set LLM call id=%d disposition=%q: %v", jobID, callID, disposition, err)
+		}
 	}
 }
 

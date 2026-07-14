@@ -167,7 +167,7 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 		}
 		writeReportEvent(w, flusher, map[string]any{"phase": "generating-html", "message": "designing the HTML document"})
 		s.appendResearchTrace(jobID, research.TraceEvent{EventType: "html_generation_started", Phase: "designing", Data: map[string]any{"automatic": false, "model": htmlModel}})
-		h, cost, err := s.generateReportHTML(ctx, htmlModel, title, source, req.Direction, func(generated int, tail string) {
+		h, cost, err := s.generateReportHTML(ctx, jobID, htmlModel, title, source, req.Direction, func(generated int, tail string) {
 			writeReportEvent(w, flusher, map[string]any{"phase": "generating-html", "generated": generated, "snippet": tail})
 		})
 		if err != nil {
@@ -232,6 +232,7 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 	state := research.UnmarshalState(job.Round, job.EmptyRounds, job.ElapsedMS,
 		job.Category, job.Slug, job.Plan, job.Report, job.Findings, job.QueriesUsed, job.AnalyzedURLs)
 	state.PriceUSD = job.PriceUSD
+	s.configureResearchCallTrace(job.ID, &cfg)
 	return research.New(cfg, state, onProgress, nil), nil
 }
 
@@ -269,7 +270,7 @@ func remixModelLabel(markdownModel, htmlModel string) string {
 // using the editorial-design prompt shared by the interactive regenerate flow
 // and the auto-generated report step. onProgress, if non-nil, receives throttled
 // updates carrying the characters generated so far and the tail of the output.
-func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown, direction string, onProgress func(generated int, tail string)) (string, *float64, error) {
+func (s *Server) generateReportHTML(ctx context.Context, jobID int64, model, title, markdown, direction string, onProgress func(generated int, tail string)) (string, *float64, error) {
 	modelServer, err := s.cfg.ServerForModel(model)
 	if err != nil {
 		return "", nil, fmt.Errorf("unknown model %q", model)
@@ -280,9 +281,20 @@ func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown,
 	}
 	var generated strings.Builder
 	lastProgress := time.Time{}
+	messages := []llm.Message{{Role: "system", Content: reportHTMLSystemPrompt}, {Role: "user", Content: userPrompt}}
+	parameters := map[string]any{"temperature": 0.7, "stream": true}
+	encodedMessages, _ := json.Marshal(messages)
+	encodedParameters, _ := json.Marshal(parameters)
+	call, callErr := s.store.BeginResearchLLMCall(jobID, "designing", "html_report", 0, model, modelServer.APIBase, string(encodedMessages), string(encodedParameters))
+	callID := int64(0)
+	if callErr != nil {
+		log.Printf("research: job %d: begin HTML LLM call: %v", jobID, callErr)
+	} else {
+		callID = call.ID
+	}
+	started := time.Now()
 	completion, err := llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
-		[]llm.Message{{Role: "system", Content: reportHTMLSystemPrompt}, {Role: "user", Content: userPrompt}},
-		map[string]any{"temperature": 0.7}, func(delta string) {
+		messages, parameters, func(delta string) {
 			generated.WriteString(delta)
 			if onProgress == nil || time.Since(lastProgress) < 250*time.Millisecond {
 				return
@@ -294,12 +306,33 @@ func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown,
 			}
 			onProgress(generated.Len(), tail)
 		})
+	if callID != 0 {
+		errMessage := ""
+		status := http.StatusOK
+		if err != nil {
+			errMessage = err.Error()
+			status = llm.ErrorHTTPStatus(err)
+		}
+		if completeErr := s.store.CompleteResearchLLMCall(callID, time.Since(started).Milliseconds(), completion.Content,
+			completion.FinishReason, string(completion.RawUsage), completion.UsageCost(), status, errMessage); completeErr != nil {
+			log.Printf("research: job %d: finish HTML LLM call id=%d: %v", jobID, callID, completeErr)
+		}
+	}
 	if err != nil {
+		if callID != 0 {
+			_ = s.store.SetResearchLLMCallDisposition(callID, "rejected")
+		}
 		return "", nil, fmt.Errorf("HTML generation failed: %w", err)
 	}
 	html, err := normalizeReportHTML(completion.Content)
 	if err != nil {
+		if callID != 0 {
+			_ = s.store.SetResearchLLMCallDisposition(callID, "rejected")
+		}
 		return "", nil, err
+	}
+	if callID != 0 {
+		_ = s.store.SetResearchLLMCallDisposition(callID, "accepted")
 	}
 	return html, completion.UsageCost(), nil
 }

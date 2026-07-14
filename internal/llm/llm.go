@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +22,25 @@ const sseDataPrefix = "data: "
 // maxResponseBytes caps how much of a non-streaming response body we read, so a
 // misbehaving or malicious model server cannot exhaust memory.
 const maxResponseBytes = 20 * 1024 * 1024
+
+type HTTPStatusError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *HTTPStatusError) Error() string {
+	return fmt.Sprintf("model server returned %d: %.300s", e.StatusCode, e.Body)
+}
+
+// ErrorHTTPStatus returns the provider HTTP status carried by err, or zero for
+// transport, timeout, decoding, and other non-HTTP failures.
+func ErrorHTTPStatus(err error) int {
+	var statusErr *HTTPStatusError
+	if errors.As(err, &statusErr) {
+		return statusErr.StatusCode
+	}
+	return 0
+}
 
 // Message is a single OpenAI-style chat message.
 type Message struct {
@@ -41,8 +61,10 @@ type Usage struct {
 }
 
 type Completion struct {
-	Content string
-	Usage   *Usage
+	Content      string
+	FinishReason string
+	Usage        *Usage
+	RawUsage     json.RawMessage
 }
 
 func (c Completion) UsageCost() *float64 {
@@ -122,7 +144,7 @@ func ChatCompleteWithUsage(ctx context.Context, client *http.Client, chatURL, ap
 		return Completion{}, fmt.Errorf("read response: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return Completion{}, fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
+		return Completion{}, &HTTPStatusError{StatusCode: resp.StatusCode, Body: string(respBody)}
 	}
 
 	var result struct {
@@ -130,8 +152,9 @@ func ChatCompleteWithUsage(ctx context.Context, client *http.Client, chatURL, ap
 			Message struct {
 				Content string `json:"content"`
 			} `json:"message"`
+			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
-		Usage *Usage `json:"usage"`
+		Usage json.RawMessage `json:"usage"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return Completion{}, fmt.Errorf("decode response: %w", err)
@@ -139,7 +162,14 @@ func ChatCompleteWithUsage(ctx context.Context, client *http.Client, chatURL, ap
 	if len(result.Choices) == 0 {
 		return Completion{}, fmt.Errorf("no choices in response")
 	}
-	return Completion{Content: result.Choices[0].Message.Content, Usage: result.Usage}, nil
+	var usage *Usage
+	if len(result.Usage) > 0 && string(result.Usage) != "null" {
+		var parsed Usage
+		if json.Unmarshal(result.Usage, &parsed) == nil {
+			usage = &parsed
+		}
+	}
+	return Completion{Content: result.Choices[0].Message.Content, FinishReason: result.Choices[0].FinishReason, Usage: usage, RawUsage: result.Usage}, nil
 }
 
 // ChatCompleteStream makes a streaming chat-completion request. It returns the
@@ -176,27 +206,37 @@ func ChatCompleteStreamWithUsage(ctx context.Context, client *http.Client, chatU
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return Completion{}, fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
+		return Completion{}, &HTTPStatusError{StatusCode: resp.StatusCode, Body: string(respBody)}
 	}
 	var full strings.Builder
 	var usage *Usage
+	var rawUsage json.RawMessage
+	var finishReason string
 	err = ScanSSE(resp.Body, func(data string) error {
 		var chunk struct {
 			Choices []struct {
 				Delta struct {
 					Content string `json:"content"`
 				} `json:"delta"`
+				FinishReason string `json:"finish_reason"`
 			} `json:"choices"`
-			Usage *Usage `json:"usage"`
+			Usage json.RawMessage `json:"usage"`
 		}
 		if json.Unmarshal([]byte(data), &chunk) != nil {
 			return nil
 		}
-		if chunk.Usage != nil {
-			usage = chunk.Usage
+		if len(chunk.Usage) > 0 && string(chunk.Usage) != "null" {
+			rawUsage = append(rawUsage[:0], chunk.Usage...)
+			var parsed Usage
+			if json.Unmarshal(chunk.Usage, &parsed) == nil {
+				usage = &parsed
+			}
 		}
 		if len(chunk.Choices) == 0 {
 			return nil
+		}
+		if chunk.Choices[0].FinishReason != "" {
+			finishReason = chunk.Choices[0].FinishReason
 		}
 		delta := chunk.Choices[0].Delta.Content
 		if delta != "" {
@@ -207,8 +247,9 @@ func ChatCompleteStreamWithUsage(ctx context.Context, client *http.Client, chatU
 		}
 		return nil
 	})
-	if err != nil && full.Len() == 0 {
-		return Completion{}, fmt.Errorf("stream read failed: %w", err)
+	completion := Completion{Content: full.String(), FinishReason: finishReason, Usage: usage, RawUsage: rawUsage}
+	if err != nil {
+		return completion, fmt.Errorf("stream read failed: %w", err)
 	}
-	return Completion{Content: full.String(), Usage: usage}, nil
+	return completion, nil
 }

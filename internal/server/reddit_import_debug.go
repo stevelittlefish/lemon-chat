@@ -120,7 +120,7 @@ func (s *Server) handleRedditHarnessValidate(w http.ResponseWriter, r *http.Requ
 			if page.Failure != "" {
 				continue
 			}
-			if finding := researcher.ExtractText(r.Context(), page.URL, page.Title, page.Content); finding != nil {
+			if finding := researcher.ExtractText(r.Context(), 0, page.URL, page.Title, page.Content); finding != nil {
 				findings = append(findings, *finding)
 			}
 		}

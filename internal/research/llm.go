@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -30,59 +31,118 @@ type modelEndpoint struct {
 // llmCall makes a non-streaming chat completion request on the writer endpoint
 // (the strong job model) and returns the response content with any reasoning
 // blocks stripped.
-func (r *Researcher) llmCall(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, error) {
-	return r.llmCallOn(ctx, r.writer, msgs, temperature, maxTokens, timeout)
+func (r *Researcher) llmCall(ctx context.Context, operation string, round int, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, int64, error) {
+	return r.llmCallOn(ctx, r.writer, operation, round, msgs, temperature, maxTokens, timeout)
 }
 
 // llmCallWorker is llmCall on the worker endpoint — the cheap/fast model used
 // for extraction and the mechanical phases (slug, classify, query-gen, decide).
-func (r *Researcher) llmCallWorker(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, error) {
-	return r.llmCallOn(ctx, r.worker, msgs, temperature, maxTokens, timeout)
+func (r *Researcher) llmCallWorker(ctx context.Context, operation string, round int, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, int64, error) {
+	return r.llmCallOn(ctx, r.worker, operation, round, msgs, temperature, maxTokens, timeout)
 }
 
-func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, error) {
+func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, operation string, round int, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, int64, error) {
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	parameters := map[string]any{"temperature": temperature, "max_tokens": maxTokens, "stream": false}
+	callID := r.beginLLMCall(ep, operation, round, msgs, parameters)
+	started := time.Now()
 
-	result, err := llm.ChatCompleteWithUsage(callCtx, r.client, ep.APIBase+"/chat/completions", ep.APIKey, ep.Model, msgs, map[string]any{
-		"temperature": temperature,
-		"max_tokens":  maxTokens,
-	})
+	result, err := llm.ChatCompleteWithUsage(callCtx, r.client, ep.APIBase+"/chat/completions", ep.APIKey, ep.Model, msgs, parameters)
+	r.finishLLMCall(callID, started, result, err)
 	if err != nil {
-		return "", err
+		return "", callID, err
 	}
 	r.addPrice(result.UsageCost())
-	return stripThinking(result.Content), nil
+	return stripThinking(result.Content), callID, nil
 }
 
 // llmCallStream is llmCall with stream=true. onDelta is invoked at most every
 // 250ms with the number of characters generated so far and the tail of the
 // output, so long generations (synthesis, final report) can show live
 // progress instead of appearing stuck.
-func (r *Researcher) llmCallStream(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration, onDelta func(generated int, tail string)) (string, error) {
+func (r *Researcher) llmCallStream(ctx context.Context, operation string, round int, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration, onDelta func(generated int, tail string)) (string, int64, error) {
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	parameters := map[string]any{"temperature": temperature, "max_tokens": maxTokens, "stream": true}
+	callID := r.beginLLMCall(r.writer, operation, round, msgs, parameters)
+	started := time.Now()
 
 	var full strings.Builder
 	var lastEmit time.Time
 	result, err := llm.ChatCompleteStreamWithUsage(callCtx, r.client, r.writer.APIBase+"/chat/completions", r.writer.APIKey, r.writer.Model, msgs,
-		map[string]any{"temperature": temperature, "max_tokens": maxTokens}, func(text string) {
+		parameters, func(text string) {
 			full.WriteString(text)
 			if onDelta != nil && time.Since(lastEmit) >= 250*time.Millisecond {
 				lastEmit = time.Now()
 				onDelta(full.Len(), tailOf(full.String(), 300))
 			}
 		})
+	r.finishLLMCall(callID, started, result, err)
 	if err != nil {
-		return "", err
+		return result.Content, callID, err
 	}
 	r.addPrice(result.UsageCost())
 
 	out := stripToolCalls(stripThinking(result.Content))
 	if out == "" {
-		return "", fmt.Errorf("empty response from model")
+		return "", callID, fmt.Errorf("empty response from model")
 	}
-	return out, nil
+	return out, callID, nil
+}
+
+func llmOperationPhase(operation string) string {
+	switch operation {
+	case "slug", "plan", "classify", "brainstorm_classify", "outline", "outline_refine":
+		return "planning"
+	case "query_generation":
+		return "searching"
+	case "extract":
+		return "reading"
+	case "synthesize":
+		return "analyzing"
+	case "stop_decision":
+		return "deciding"
+	default:
+		return "writing"
+	}
+}
+
+func traceMessages(msgs []chatMsg) []map[string]string {
+	out := make([]map[string]string, len(msgs))
+	for i, msg := range msgs {
+		out[i] = map[string]string{"role": msg.Role, "content": msg.Content}
+	}
+	return out
+}
+
+func (r *Researcher) beginLLMCall(ep modelEndpoint, operation string, round int, msgs []chatMsg, parameters map[string]any) int64 {
+	if r.cfg.OnLLMCallStart == nil {
+		return 0
+	}
+	return r.cfg.OnLLMCallStart(LLMCallStart{Operation: operation, Phase: llmOperationPhase(operation), Round: round,
+		Model: ep.Model, APIBase: ep.APIBase, Messages: traceMessages(msgs), Parameters: parameters})
+}
+
+func (r *Researcher) finishLLMCall(callID int64, started time.Time, result llm.Completion, callErr error) {
+	if callID == 0 || r.cfg.OnLLMCallFinish == nil {
+		return
+	}
+	errMessage := ""
+	httpStatus := http.StatusOK
+	if callErr != nil {
+		errMessage = callErr.Error()
+		httpStatus = llm.ErrorHTTPStatus(callErr)
+	}
+	r.cfg.OnLLMCallFinish(LLMCallFinish{CallID: callID, DurationMS: time.Since(started).Milliseconds(),
+		Response: result.Content, FinishReason: result.FinishReason, Usage: result.RawUsage,
+		PriceUSD: result.UsageCost(), HTTPStatus: httpStatus, Error: errMessage})
+}
+
+func (r *Researcher) setCallDisposition(callID int64, disposition string) {
+	if callID != 0 && r.cfg.OnLLMCallDisposition != nil {
+		r.cfg.OnLLMCallDisposition(callID, disposition)
+	}
 }
 
 // tailOf returns the last n runes of s on a valid UTF-8 boundary.

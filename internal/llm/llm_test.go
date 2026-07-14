@@ -88,12 +88,15 @@ func TestChatComplete(t *testing.T) {
 
 func TestChatCompleteWithUsage(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"choices":[{"message":{"content":"priced"}}],"usage":{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12,"cost":0.00125}}`))
+		w.Write([]byte(`{"choices":[{"message":{"content":"priced"},"finish_reason":"length"}],"usage":{"prompt_tokens":10,"completion_tokens":2,"total_tokens":12,"cost":0.00125,"completion_tokens_details":{"reasoning_tokens":1}}}`))
 	}))
 	defer srv.Close()
 	result, err := ChatCompleteWithUsage(context.Background(), http.DefaultClient, srv.URL, "", "model", []Message{}, nil)
 	if err != nil || result.UsageCost() == nil || *result.UsageCost() != 0.00125 {
 		t.Fatalf("result = %+v, err = %v", result, err)
+	}
+	if result.FinishReason != "length" || !strings.Contains(string(result.RawUsage), "reasoning_tokens") {
+		t.Fatalf("completion metadata not retained: %+v raw=%s", result, result.RawUsage)
 	}
 }
 
@@ -104,6 +107,7 @@ func TestChatCompleteStream(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"hello \"}}]}\n\n"))
 		w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"world\"}}]}\n\n"))
+		w.Write([]byte("data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"))
 		w.Write([]byte("data: {\"choices\":[],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":2,\"total_tokens\":6,\"cost\":0.0007}}\n\n"))
 		w.Write([]byte("data: [DONE]\n\n"))
 	}))
@@ -122,6 +126,9 @@ func TestChatCompleteStream(t *testing.T) {
 	}
 	if result.UsageCost() == nil || *result.UsageCost() != 0.0007 {
 		t.Fatalf("usage = %+v, want cost 0.0007", result.Usage)
+	}
+	if result.FinishReason != "stop" || !strings.Contains(string(result.RawUsage), "prompt_tokens") {
+		t.Fatalf("stream metadata not retained: %+v raw=%s", result, result.RawUsage)
 	}
 	if gotPayload["stream"] != true {
 		t.Fatalf("payload stream = %v, want true", gotPayload["stream"])
@@ -153,6 +160,8 @@ func TestChatCompleteErrorStatus(t *testing.T) {
 
 	if _, err := ChatComplete(context.Background(), http.DefaultClient, srv.URL, "", "m", []Message{}, nil); err == nil {
 		t.Fatal("ChatComplete error = nil, want non-nil for 500 status")
+	} else if ErrorHTTPStatus(err) != http.StatusInternalServerError {
+		t.Fatalf("ErrorHTTPStatus = %d, want 500", ErrorHTTPStatus(err))
 	}
 }
 

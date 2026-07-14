@@ -40,6 +40,46 @@ func TestProgressAndCheckpointEmitStructuredTrace(t *testing.T) {
 	}
 }
 
+func TestLLMCallHooksCaptureRequestResponseAndDisposition(t *testing.T) {
+	var started LLMCallStart
+	var finished LLMCallFinish
+	disposition := ""
+	r := New(Config{
+		Model: "writer", APIBase: "https://models.example/v1", APIKey: "must-not-be-traced",
+		OnLLMCallStart:  func(call LLMCallStart) int64 { started = call; return 42 },
+		OnLLMCallFinish: func(call LLMCallFinish) { finished = call },
+		OnLLMCallDisposition: func(callID int64, value string) {
+			if callID != 42 {
+				t.Fatalf("disposition call ID = %d", callID)
+			}
+			disposition = value
+		},
+	}, State{}, nil, nil)
+	r.client = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		body := `{"choices":[{"message":{"content":"answer"},"finish_reason":"stop"}],"usage":{"total_tokens":7,"cost":0.02}}`
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}
+
+	out, callID, err := r.llmCall(context.Background(), "plan", 2, []chatMsg{{Role: "user", Content: "prompt"}}, 0.3, 100, time.Second)
+	if err != nil || out != "answer" || callID != 42 {
+		t.Fatalf("llmCall = %q, %d, %v", out, callID, err)
+	}
+	r.setCallDisposition(callID, "accepted")
+	if started.Operation != "plan" || started.Phase != "planning" || started.Round != 2 || started.Messages[0]["content"] != "prompt" {
+		t.Fatalf("start metadata = %+v", started)
+	}
+	encoded, _ := json.Marshal(started)
+	if strings.Contains(string(encoded), "must-not-be-traced") {
+		t.Fatalf("call trace leaked API key: %s", encoded)
+	}
+	if finished.CallID != 42 || finished.Response != "answer" || finished.FinishReason != "stop" || finished.HTTPStatus != 200 || finished.PriceUSD == nil {
+		t.Fatalf("finish metadata = %+v", finished)
+	}
+	if disposition != "accepted" {
+		t.Fatalf("disposition = %q", disposition)
+	}
+}
+
 func TestParseJSONStringArray(t *testing.T) {
 	cases := []struct {
 		name string
