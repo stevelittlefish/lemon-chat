@@ -407,6 +407,7 @@ async function showDetail(id) {
               <button id="research-dl-html" class="menu-item">${icon('download', 14)} HTML</button>
             </div>
           </div>` : ''}
+        ${!running && !job.final_report ? `<a href="/api/research/${id}/bundle" class="btn btn-sm btn-secondary">${icon('download', 14)} Download bundle</a>` : ''}
         ${running || awaitingReddit
           ? `<button id="research-cancel" class="btn btn-sm btn-secondary">${icon('x', 14)} Cancel</button>`
           : `<button id="research-delete" class="btn btn-sm btn-danger">${icon('trash', 14)} Delete</button>`}
