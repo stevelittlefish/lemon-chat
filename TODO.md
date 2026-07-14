@@ -4,6 +4,34 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 --
 
+## Research algorithm changes
+
+The current Plan → Search → Extract → Synthesise → Decide loop can repeatedly rewrite an ever-growing report into a fixed output-token limit. Because the shared LLM layer does not retain `finish_reason`, a response truncated with `finish_reason: length` can be accepted as a successful synthesis; the stop checker then sees an incomplete report and buys another search and full rewrite instead of fixing the writing failure. The loop currently overwrites intermediate reports and sends most progress only to ephemeral SSE/container logs, making expensive failures difficult to reconstruct.
+
+The before-change benchmark is saved under `benchmark/old_algorithm/` for the same home-battery prompt across five useful capability/cost tiers: `gemma4-31b`, `google/gemini-3.5-flash`, `anthropic/claude-sonnet-4.6`, `openai/gpt-5.6-luna`, and `openai/gpt-5.6-terra`. Preserve it unchanged and repeat the benchmark after the rework. The new protocol must be explicit and simple enough for the weaker local and budget models to follow reliably; success with only top-tier reasoning models is not sufficient.
+
+This is an ordered work queue. Mark items `[~]` when starting and `[x]` when complete.
+
+- [ ] **1. Persist an append-only structured research trace.** Add per-job sequenced, timestamped records for every meaningful phase event: planning/classification, queries, search results, URL selection/rejection, fetch/extraction results and failures, synthesis versions, stop decisions and explanations, warnings, limits, retries, final writing, HTML generation, and terminal status. Store structured events rather than relying on global container log lines; preserve the existing current-state checkpoints for crash recovery.
+
+- [ ] **2. Record every LLM call as a debuggable attempt.** Persist phase, round, attempt, model/endpoint identity (never credentials), request messages, temperature, requested output limit, complete or partial response, start/end/duration, HTTP outcome/error, provider `finish_reason`, token-usage categories, provider-reported cost, and whether the result was accepted, rejected, retried, or used as a fallback. Persist intermediate synthesis/report versions instead of overwriting the only copy. Add an explicit retention/size policy for fetched page content while retaining at least the exact extracted material given to the model.
+
+- [ ] **3. Preserve and act on provider completion metadata.** Extend shared streaming and non-streaming LLM results to capture `finish_reason` and all available usage fields. Treat `length` as a first-class truncation outcome, retain the partial output, surface it in progress/UI/debug data, and never silently accept it as a complete synthesis or report. Record incomplete/failed automatic HTML generation instead of leaving a completed job with no explanation.
+
+- [ ] **4. Make the trace inspectable in the research UI.** Extend Explore Data with a chronological phase timeline, per-round inputs/outputs, intermediate versions, call duration/token/cost breakdowns, stop rationale, truncation and retry indicators, and HTML-generation outcome. Keep large prompts/responses progressively disclosed so ordinary report reading remains uncluttered.
+
+- [ ] **5. Expand bundle downloads with a self-contained `debug/` tree.** Include a readable `events.jsonl`, trace summary, plan/classification, per-round queries/search results/findings/synthesis/decision artifacts, per-call JSON records, source/analyzed-URL data, every partial/intermediate output, errors, limit decisions, and HTML-generation attempts alongside all reports. The archive must be sufficient to reproduce the UI trace and diagnose a run after container logs are gone, without exposing API keys, authorization headers, or other secrets.
+
+- [ ] **6. Replace the single report-token setting with phase- and model-aware budgets.** Keep finite safety ceilings, but do not reuse one 8,192-token cap for evolving synthesis, final reports, deep-report sections, and other different jobs. Use substantially higher supported ceilings for final output, expose effective limits in job/debug metadata, add a configurable per-job cost budget, and reserve enough time/cost for final writing rather than spending the entire allowance on additional rounds. Check budgets around expensive calls, not only between rounds.
+
+- [ ] **7. Add bounded truncation recovery that cannot trigger irrelevant research.** When writing hits an output ceiling, continue/compact the same writing task or switch to deterministic section-based generation; do not launch another web-search round unless evidence is genuinely missing. Keep research memory within an explicit size target and warn the model when it must compress or continue. Ensure partial continuations preserve citation IDs and do not duplicate or omit sections.
+
+- [ ] **8. Separate research memory from report prose.** Replace full-document rewriting after every round with a compact structured evidence ledger containing claims, supporting/contradicting source IDs, confidence, assumptions, calculations, and unresolved evidence gaps. Update that ledger incrementally, then write the reader-facing report once at the end—preferably in bounded sections assembled without a final lossy whole-document rewrite.
+
+- [ ] **9. Redesign stopping around evidence and marginal value.** Judge concrete unresolved evidence gaps rather than the polish, citation formatting, or completeness of intermediate prose. Require another round to name a specific answerable gap and a materially different search/source strategy; deduplicate repeated queries and recognize evidence that is private, future, inherently uncertain, or unavailable on the public web. Remove the bias to continue merely because the run is below a target round count, and stop when additional searches have low expected value.
+
+- [ ] **10. Re-run and compare the five-model benchmark.** Use the identical prompt and comparable settings, retaining both old and new bundles. Compare completion, final-report quality, citation fidelity, rounds/searches/findings, truncations/retries, wall-clock and phase timing, prompt/completion tokens, total cost including HTML/remixes, and whether the stop decisions were justified. Specifically verify that `gemma4-31b` and `gemini-3.5-flash` can follow the new evidence-ledger, stopping, and recovery protocol without relying on advanced implicit reasoning.
+
 ## Manually Added by User
 
 - [x] Add a benchmark folder with the home-battery-without-solar research prompt.
