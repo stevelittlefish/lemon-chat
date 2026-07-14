@@ -8,7 +8,7 @@ const ICONS = [
   'layout-grid',
   'play', 'rotate-ccw', 'rotate-cw', 'sliders', 'save',
   'globe',
-  'file-text', 'file-code', 'file', 'download', 'image',
+  'file-text', 'file-code', 'file', 'download', 'external-link', 'image',
   'star',
 ];
 

@@ -294,6 +294,13 @@ select.input option { background: var(--paper-100); color: var(--fg); }
   gap: var(--space-2);
 }
 
+.research-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
 .research-item {
   display: flex;
   align-items: center;
@@ -349,23 +356,33 @@ select.input option { background: var(--paper-100); color: var(--fg); }
 }
 
 .research-item-html {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: var(--space-1);
   font-family: var(--font-mono);
   font-size: var(--fs-12);
   color: var(--hm-cyan);
-  white-space: nowrap;
+  background: var(--paper-100);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   text-decoration: none;
+  transition: color var(--dur-fast) var(--ease),
+              background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              transform var(--dur-fast) var(--ease);
 }
 
 .research-item-html:hover {
-  text-decoration: underline;
+  color: var(--lemon-900);
+  background: var(--hm-cyan);
+  border-color: var(--hm-cyan);
+  transform: translate(2px, -2px);
 }
 
 .research-item-html svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
 @media (max-width: 560px) {
