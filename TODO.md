@@ -26,6 +26,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [x] Make the backend research log tell the story of a run in ~5-10 always-on stdout lines (start, plan, per-round search + synthesis, stop decision, final write, finish); the high-frequency per-page "reading" line is demoted to `debug.Log`. `logResearchProgress` in `research.go`.
+
 - [x] Fold the debug run-log bundle into the job view's Download drop-down (shown for any terminal job, so failed/cancelled jobs can grab it too), and add an in-UI diagnostics view on the Explore page — stop reason, effective config/outcome, and a collapsible event timeline — served from `GET /api/research/{id}/debug` (`readResearchDebug`). No download needed.
 
 - [x] Add a ZIP bundle download containing every research report and the job's displayed metadata and statistics.
