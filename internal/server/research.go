@@ -165,6 +165,7 @@ func (s *Server) researchTokenLimits(writerModel, htmlModel string) research.Tok
 	writerLimit := s.cfg.ModelOutputLimit(writerModel)
 	return research.TokenLimits{
 		Synthesis:   clampResearchTokens(rc.SynthesisTokens, writerLimit),
+		Memory:      clampResearchTokens(rc.MemoryTokens, writerLimit),
 		FinalReport: clampResearchTokens(rc.FinalReportTokens, writerLimit),
 		Section:     clampResearchTokens(rc.SectionTokens, writerLimit),
 		HTMLReport:  clampResearchTokens(rc.HTMLReportTokens, s.cfg.ModelOutputLimit(htmlModel)),
@@ -173,7 +174,7 @@ func (s *Server) researchTokenLimits(writerModel, htmlModel string) research.Tok
 
 func (s *Server) jobTokenLimits(job *store.ResearchJob) research.TokenLimits {
 	var limits research.TokenLimits
-	if json.Unmarshal([]byte(job.TokenLimits), &limits) == nil && limits.Synthesis > 0 && limits.FinalReport > 0 && limits.Section > 0 && limits.HTMLReport > 0 {
+	if json.Unmarshal([]byte(job.TokenLimits), &limits) == nil && limits.Synthesis > 0 && limits.Memory > 0 && limits.FinalReport > 0 && limits.Section > 0 && limits.HTMLReport > 0 {
 		return limits
 	}
 	htmlModel := job.Model
@@ -301,32 +302,33 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		maxCostUSD = rc.MaxCostUSD
 	}
 	cfg := research.Config{
-		Query:                 llmQuery,
-		SlugSource:            llmQuery,
-		Model:                 job.Model,
-		Mode:                  job.Mode,
-		ForceSearch:           job.ForceSearch,
-		DeepReport:            job.DeepReport,
-		PauseRedditImport:     job.PauseRedditImport,
-		APIBase:               modelServer.APIBase,
-		APIKey:                modelServer.APIKey,
-		WorkerModel:           workerModel,
-		WorkerAPIBase:         workerAPIBase,
-		WorkerAPIKey:          workerAPIKey,
-		SearXNGURL:            s.cfg.SearXNG.URL,
-		Location:              loc,
-		MaxRounds:             maxRounds,
-		MaxTime:               time.Duration(maxTimeSeconds) * time.Second,
-		MaxURLsPerRound:       rc.MaxURLsPerRound,
-		MaxContentChars:       rc.MaxContentChars,
-		TokenLimits:           s.jobTokenLimits(job),
-		MaxCostUSD:            maxCostUSD,
-		FinalReservePercent:   rc.FinalReservePercent,
-		ExtractionConcurrency: rc.ExtractionConcurrency,
-		MinRounds:             minRounds,
-		MaxEmptyRounds:        rc.MaxEmptyRounds,
-		SynthesisWindow:       rc.SynthesisWindow,
-		ExtraRounds:           extraRounds,
+		Query:                   llmQuery,
+		SlugSource:              llmQuery,
+		Model:                   job.Model,
+		Mode:                    job.Mode,
+		ForceSearch:             job.ForceSearch,
+		DeepReport:              job.DeepReport,
+		PauseRedditImport:       job.PauseRedditImport,
+		APIBase:                 modelServer.APIBase,
+		APIKey:                  modelServer.APIKey,
+		WorkerModel:             workerModel,
+		WorkerAPIBase:           workerAPIBase,
+		WorkerAPIKey:            workerAPIKey,
+		SearXNGURL:              s.cfg.SearXNG.URL,
+		Location:                loc,
+		MaxRounds:               maxRounds,
+		MaxTime:                 time.Duration(maxTimeSeconds) * time.Second,
+		MaxURLsPerRound:         rc.MaxURLsPerRound,
+		MaxContentChars:         rc.MaxContentChars,
+		TokenLimits:             s.jobTokenLimits(job),
+		MaxCostUSD:              maxCostUSD,
+		FinalReservePercent:     rc.FinalReservePercent,
+		MaxWritingContinuations: rc.MaxWritingContinuations,
+		ExtractionConcurrency:   rc.ExtractionConcurrency,
+		MinRounds:               minRounds,
+		MaxEmptyRounds:          rc.MaxEmptyRounds,
+		SynthesisWindow:         rc.SynthesisWindow,
+		ExtraRounds:             extraRounds,
 	}
 	cfg.OnTrace = func(event research.TraceEvent) {
 		s.appendResearchTrace(job.ID, event)

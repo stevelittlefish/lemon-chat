@@ -230,19 +230,20 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 		return nil, err
 	}
 	cfg := research.Config{
-		Query:               llmQuery,
-		SlugSource:          llmQuery,
-		Model:               model,
-		Mode:                job.Mode,
-		DeepReport:          deepReport,
-		ReportInstruction:   instruction,
-		APIBase:             modelServer.APIBase,
-		APIKey:              modelServer.APIKey,
-		TokenLimits:         limits,
-		MaxTime:             time.Duration(maxTimeSeconds) * time.Second,
-		MaxCostUSD:          maxCostUSD,
-		FinalReservePercent: 0,
-		Location:            s.researchLocation(),
+		Query:                   llmQuery,
+		SlugSource:              llmQuery,
+		Model:                   model,
+		Mode:                    job.Mode,
+		DeepReport:              deepReport,
+		ReportInstruction:       instruction,
+		APIBase:                 modelServer.APIBase,
+		APIKey:                  modelServer.APIKey,
+		TokenLimits:             limits,
+		MaxTime:                 time.Duration(maxTimeSeconds) * time.Second,
+		MaxCostUSD:              maxCostUSD,
+		FinalReservePercent:     0,
+		MaxWritingContinuations: s.cfg.Research.MaxWritingContinuations,
+		Location:                s.researchLocation(),
 		OnTrace: func(event research.TraceEvent) {
 			s.appendResearchTrace(job.ID, event)
 		},

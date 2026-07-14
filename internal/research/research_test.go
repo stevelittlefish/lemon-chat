@@ -64,6 +64,85 @@ func TestResearchBudgetReserveProtectsFinalWriting(t *testing.T) {
 	}
 }
 
+func streamCompletion(content, finishReason string) *http.Response {
+	delta, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"delta": map[string]string{"content": content}}}})
+	finish, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"delta": map[string]string{}, "finish_reason": finishReason}}})
+	body := "data: " + string(delta) + "\n\ndata: " + string(finish) + "\n\ndata: [DONE]\n\n"
+	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(body))}
+}
+
+func TestFinalReportContinuesTruncationWithoutDuplicatingOverlap(t *testing.T) {
+	partial := "## Findings\n\n" + strings.TrimSpace(strings.Repeat("supported evidence [S1] remains important. ", 260))
+	overlap := continuationOverlap(partial, 240)
+	continuation := overlap + "\n\n## Conclusion\n\n" + strings.TrimSpace(strings.Repeat("The answer follows from the evidence [S1]. ", 180))
+	calls := 0
+	r := New(Config{
+		Query: "question", Model: "writer", APIBase: "http://model.test", MaxWritingContinuations: 2,
+		TokenLimits: TokenLimits{Synthesis: 100, Memory: 80, FinalReport: 200, Section: 100, HTMLReport: 200},
+	}, State{Round: 2, Report: "complete fallback", Findings: []Finding{{URL: "https://example.com", Summary: "evidence"}}}, nil, nil)
+	r.client = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		calls++
+		if calls == 1 {
+			return streamCompletion(partial, "length"), nil
+		}
+		return streamCompletion(continuation, "stop"), nil
+	})}
+	r.startTime = time.Now()
+
+	report := r.finalReport(context.Background())
+	if calls != 2 {
+		t.Fatalf("model calls = %d, want initial plus one continuation", calls)
+	}
+	wantLength := len(partial) + len(continuation) - len(overlap)
+	if !strings.HasPrefix(report, partial) || len(report) != wantLength || !strings.Contains(report, "## Conclusion") || !strings.Contains(report, "[S1]") {
+		t.Fatalf("continuation was not merged safely: length=%d want=%d report_tail=%q", len(report), wantLength, continuationOverlap(report, 300))
+	}
+}
+
+func TestSynthesisTruncationCompactsOrStopsRounds(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		compactFinish string
+		wantContinue  bool
+		wantReport    string
+	}{
+		{name: "compact succeeds", compactFinish: "stop", wantContinue: true, wantReport: "complete compact memory [S1]"},
+		{name: "compact truncates", compactFinish: "length", wantContinue: false, wantReport: "previous complete memory"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			r := New(Config{
+				Query: "question", Model: "writer", APIBase: "http://model.test",
+				TokenLimits: TokenLimits{Synthesis: 100, Memory: 50, FinalReport: 200, Section: 100, HTMLReport: 200},
+			}, State{Report: "previous complete memory", Findings: []Finding{{URL: "https://example.com", Summary: "evidence"}}}, nil, nil)
+			r.client = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				calls++
+				if calls == 1 {
+					return streamCompletion("partial synthesis [S1]", "length"), nil
+				}
+				var payload struct {
+					Messages []struct {
+						Content string `json:"content"`
+					} `json:"messages"`
+				}
+				_ = json.NewDecoder(req.Body).Decode(&payload)
+				if len(payload.Messages) == 0 || !strings.Contains(payload.Messages[0].Content, "within 50 output tokens") {
+					t.Fatalf("compaction prompt omitted memory target: %+v", payload.Messages)
+				}
+				return streamCompletion("complete compact memory [S1]", tc.compactFinish), nil
+			})}
+			r.startTime = time.Now()
+
+			if got := r.synthesize(context.Background(), 1, r.state.Findings); got != tc.wantContinue {
+				t.Fatalf("synthesize continue=%t, want %t", got, tc.wantContinue)
+			}
+			if r.state.Report != tc.wantReport || calls != 2 {
+				t.Fatalf("report=%q calls=%d", r.state.Report, calls)
+			}
+		})
+	}
+}
+
 func TestLLMCallHooksCaptureRequestResponseAndDisposition(t *testing.T) {
 	var started LLMCallStart
 	var finished LLMCallFinish

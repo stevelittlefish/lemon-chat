@@ -91,6 +91,7 @@ type State struct {
 // a job so resumed runs use the same budgets even if server config changes.
 type TokenLimits struct {
 	Synthesis   int `json:"synthesis"`
+	Memory      int `json:"memory"`
 	FinalReport int `json:"final_report"`
 	Section     int `json:"section"`
 	HTMLReport  int `json:"html_report"`
@@ -130,17 +131,18 @@ type Config struct {
 	SearXNGURL    string
 	Location      *time.Location
 
-	MaxRounds             int
-	MaxTime               time.Duration
-	MaxURLsPerRound       int
-	MaxContentChars       int
-	TokenLimits           TokenLimits
-	MaxCostUSD            float64
-	FinalReservePercent   int
-	ExtractionConcurrency int
-	MinRounds             int
-	MaxEmptyRounds        int
-	SynthesisWindow       int
+	MaxRounds               int
+	MaxTime                 time.Duration
+	MaxURLsPerRound         int
+	MaxContentChars         int
+	TokenLimits             TokenLimits
+	MaxCostUSD              float64
+	FinalReservePercent     int
+	MaxWritingContinuations int
+	ExtractionConcurrency   int
+	MinRounds               int
+	MaxEmptyRounds          int
+	SynthesisWindow         int
 	// ExtraRounds is the number of bonus "creative" rounds to run after the
 	// report would normally be considered complete (effort 4 → 1, effort 5 → 2).
 	ExtraRounds int
@@ -257,6 +259,9 @@ func New(cfg Config, state State, onProgress func(Progress), onCheckpoint func(S
 	if cfg.TokenLimits.FinalReport <= 0 {
 		cfg.TokenLimits.FinalReport = 32768
 	}
+	if cfg.TokenLimits.Memory <= 0 {
+		cfg.TokenLimits.Memory = 6000
+	}
 	if cfg.TokenLimits.Section <= 0 {
 		cfg.TokenLimits.Section = 12288
 	}
@@ -329,12 +334,95 @@ func (r *Researcher) knownCostUSD() float64 {
 }
 
 func (r *Researcher) finalWritingOperation(operation string) bool {
+	if strings.HasSuffix(operation, "_continue") {
+		return true
+	}
 	switch operation {
 	case "final_report", "final_report_expand", "final_brainstorm", "outline", "outline_refine", "write_section", "write_glue":
 		return true
 	default:
 		return false
 	}
+}
+
+func continuationOverlap(text string, maxRunes int) string {
+	runes := []rune(text)
+	if len(runes) > maxRunes {
+		runes = runes[len(runes)-maxRunes:]
+	}
+	return string(runes)
+}
+
+// mergeWritingContinuation removes only an exact suffix/prefix overlap. It
+// never rewrites either segment, so citation IDs and already-written prose are
+// preserved byte-for-byte.
+func mergeWritingContinuation(base, continuation string) string {
+	if base == "" {
+		return continuation
+	}
+	if continuation == "" {
+		return base
+	}
+	maxOverlap := len(base)
+	if len(continuation) < maxOverlap {
+		maxOverlap = len(continuation)
+	}
+	if maxOverlap > 4096 {
+		maxOverlap = 4096
+	}
+	for overlap := maxOverlap; overlap >= 32; overlap-- {
+		if base[len(base)-overlap:] == continuation[:overlap] {
+			return base + continuation[overlap:]
+		}
+	}
+	return strings.TrimRight(base, " \t\n") + "\n\n" + strings.TrimLeft(continuation, " \t\n")
+}
+
+func errorString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+func (r *Researcher) continueWriting(ctx context.Context, operation string, round int, original []chatMsg, partial string, temperature float64, maxTokens int, timeout time.Duration, onDelta func(int, string)) (string, bool) {
+	assembled := partial
+	if strings.TrimSpace(assembled) == "" || r.cfg.MaxWritingContinuations <= 0 {
+		return assembled, false
+	}
+	r.trace("writing_recovery_started", "writing", round, "", map[string]any{
+		"operation": operation, "partial_characters": len(partial), "max_continuations": r.cfg.MaxWritingContinuations,
+	})
+	for attempt := 1; attempt <= r.cfg.MaxWritingContinuations; attempt++ {
+		overlap := continuationOverlap(assembled, 240)
+		instruction := fmt.Sprintf(`The previous response hit its output ceiling. Continue the SAME document; do not search, restart, summarize, or repeat completed sections.
+Begin by repeating the required overlap text below exactly, then continue from that point. Preserve every citation ID exactly (for example [S3]). Finish all remaining sections without omitting any.
+
+<required_overlap>%s</required_overlap>`, overlap)
+		messages := append([]chatMsg(nil), original...)
+		messages = append(messages, chatMsg{Role: "assistant", Content: assembled}, chatMsg{Role: "user", Content: instruction})
+		continued, callID, err := r.llmCallStream(ctx, operation+"_continue", round, messages, temperature, maxTokens, timeout, onDelta)
+		if continued != "" {
+			assembled = mergeWritingContinuation(assembled, continued)
+		}
+		if err == nil && continued != "" {
+			r.setCallDisposition(callID, "accepted")
+			r.trace("writing_recovery_completed", "writing", round, "", map[string]any{
+				"operation": operation, "continuations": attempt, "characters": len(assembled),
+			})
+			return assembled, true
+		}
+		if errors.Is(err, ErrOutputTruncated) && attempt < r.cfg.MaxWritingContinuations {
+			r.setCallDisposition(callID, "retried")
+			continue
+		}
+		r.setCallDisposition(callID, "rejected")
+		break
+	}
+	r.trace("writing_recovery_exhausted", "warning", round, "bounded continuation recovery was exhausted", map[string]any{
+		"operation": operation, "characters": len(assembled),
+	})
+	return assembled, false
 }
 
 func (r *Researcher) budgetFraction(finalWriting bool) float64 {
@@ -603,7 +691,9 @@ func (r *Researcher) resumeRedditRound(ctx context.Context, resume RedditResume)
 	if r.brainstorm() {
 		r.state.Findings = append(r.state.Findings, findings...)
 		r.progress(Progress{Phase: "analyzing", Round: pending.Round, TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
-		r.synthesize(ctx, pending.Round, findings)
+		if !r.synthesize(ctx, pending.Round, findings) {
+			keepGoing = false
+		}
 	} else if len(findings) == 0 {
 		r.state.EmptyRounds++
 		if r.state.EmptyRounds >= r.cfg.MaxEmptyRounds {
@@ -617,7 +707,9 @@ func (r *Researcher) resumeRedditRound(ctx context.Context, resume RedditResume)
 		r.state.EmptyRounds = 0
 		r.state.Findings = append(r.state.Findings, findings...)
 		r.progress(Progress{Phase: "analyzing", Round: pending.Round, TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
-		r.synthesize(ctx, pending.Round, findings)
+		if !r.synthesize(ctx, pending.Round, findings) {
+			keepGoing = false
+		}
 	}
 	if ctx.Err() != nil {
 		return false, ctx.Err()
@@ -677,7 +769,9 @@ func (r *Researcher) runBrainstormRound(ctx context.Context, round, creativity i
 	}
 
 	r.progress(Progress{Phase: "analyzing", Round: round, TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
-	r.synthesize(ctx, round, findings)
+	if !r.synthesize(ctx, round, findings) {
+		return false, nil
+	}
 	if ctx.Err() != nil {
 		return false, nil
 	}
@@ -730,7 +824,11 @@ func (r *Researcher) runRound(ctx context.Context, round, creativity int) (keepG
 		r.state.EmptyRounds = 0
 		r.state.Findings = append(r.state.Findings, findings...)
 		r.progress(Progress{Phase: "analyzing", Round: round, TotalSources: len(r.state.AnalyzedURLs), TotalFindings: len(r.state.Findings)})
-		r.synthesize(ctx, round, findings)
+		if !r.synthesize(ctx, round, findings) {
+			r.state.Round = round
+			r.checkpoint()
+			return false, nil
+		}
 		if ctx.Err() != nil {
 			return false, nil
 		}
@@ -1110,7 +1208,7 @@ func (r *Researcher) extractAll(ctx context.Context, round int, urls []AnalyzedU
 
 // ── Phase 6: Synthesise ──────────────────────────────────────
 
-func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Finding) {
+func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Finding) bool {
 	if len(newFindings) > r.cfg.SynthesisWindow {
 		newFindings = newFindings[len(newFindings)-r.cfg.SynthesisWindow:]
 	}
@@ -1128,19 +1226,52 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 	} else {
 		prompt = fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, r.formatFindings(newFindings))
 	}
+	prompt += fmt.Sprintf("\n\nResearch-memory limit: keep this complete working synthesis within %d output tokens. Compress older detail before dropping claims, evidence gaps, contradictions, calculations, or citation IDs.", r.cfg.TokenLimits.Memory)
 	out, callID, err := r.llmCallStream(ctx, "synthesize", round, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.TokenLimits.Synthesis, synthesisTimeout,
 		func(generated int, tail string) {
 			r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 		})
+	if errors.Is(err, ErrOutputTruncated) && out != "" {
+		r.setCallDisposition(callID, "retried")
+		r.progress(Progress{Phase: "warning", Round: round, Message: "synthesis hit its output ceiling — compacting the same research memory without searching again"})
+		r.trace("writing_recovery_started", "analyzing", round, "", map[string]any{"operation": "synthesize", "strategy": "compact", "memory_token_target": r.cfg.TokenLimits.Memory})
+		compactPrompt := fmt.Sprintf(`The research-memory synthesis below was cut off by an output limit. Rewrite it as one COMPLETE compact working synthesis within %d output tokens.
+Do not search or add unsupported facts. Preserve every citation ID exactly, plus material claims, contradictions, assumptions, calculations, and unresolved evidence gaps. Compress wording and older background first.
+
+Research question:
+%s
+
+Previous complete memory:
+%s
+
+Truncated attempted update:
+%s`, r.cfg.TokenLimits.Memory, r.cfg.Query, report, out)
+		compacted, compactCallID, compactErr := r.llmCallStream(ctx, "synthesize_compact", round, []chatMsg{{Role: "user", Content: compactPrompt}}, 0.2, r.cfg.TokenLimits.Memory, synthesisTimeout,
+			func(generated int, tail string) {
+				r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
+			})
+		if compactErr == nil && compacted != "" {
+			r.setCallDisposition(compactCallID, "accepted")
+			r.state.Report = compacted
+			r.trace("writing_recovery_completed", "analyzing", round, "", map[string]any{"operation": "synthesize", "strategy": "compact", "memory_token_target": r.cfg.TokenLimits.Memory})
+			r.trace("synthesis_completed", "analyzing", round, "", map[string]any{"report": compacted, "new_findings": len(newFindings), "recovered": true, "memory_token_target": r.cfg.TokenLimits.Memory})
+			return true
+		}
+		r.setCallDisposition(compactCallID, "rejected")
+		r.trace("writing_recovery_exhausted", "warning", round, "synthesis compaction failed; stopping research rounds", map[string]any{"operation": "synthesize", "error": errorString(compactErr)})
+		r.progress(Progress{Phase: "warning", Round: round, Message: "synthesis recovery failed — stopping research and writing from evidence already collected"})
+		return false
+	}
 	if err != nil || out == "" {
 		r.setCallDisposition(callID, "rejected")
 		// Keep the current report unchanged.
 		r.progress(Progress{Phase: "warning", Message: "synthesis failed — keeping previous report"})
-		return
+		return !errors.Is(err, ErrBudgetExhausted)
 	}
 	r.setCallDisposition(callID, "accepted")
 	r.state.Report = out
-	r.trace("synthesis_completed", "analyzing", round, "", map[string]any{"report": out, "new_findings": len(newFindings)})
+	r.trace("synthesis_completed", "analyzing", round, "", map[string]any{"report": out, "new_findings": len(newFindings), "memory_token_target": r.cfg.TokenLimits.Memory})
+	return true
 }
 
 // ── Phase 7: Decide ──────────────────────────────────────────
@@ -1192,7 +1323,19 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	report, callID, err := r.llmCallStream(ctx, "final_report", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
+	messages := []chatMsg{{Role: "user", Content: prompt}}
+	report, callID, err := r.llmCallStream(ctx, "final_report", r.state.Round, messages, 0.3, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
+	continuedReport := false
+	if errors.Is(err, ErrOutputTruncated) && report != "" {
+		r.setCallDisposition(callID, "retried")
+		recovered, complete := r.continueWriting(ctx, "final_report", r.state.Round, messages, report, 0.3, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
+		if complete {
+			report, err = recovered, nil
+			continuedReport = true
+		} else {
+			r.setCallDisposition(callID, "rejected")
+		}
+	}
 	if err != nil || report == "" {
 		r.setCallDisposition(callID, "fallback")
 		// Never return empty — fall back to the evolving synthesis.
@@ -1202,18 +1345,27 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 	if len(strings.Fields(report)) < 400 {
 		r.setCallDisposition(callID, "retried")
 		r.progress(Progress{Phase: "warning", Message: fmt.Sprintf("report is short (%d words) — asking the model to expand it", len(strings.Fields(report)))})
-		expanded, expandCallID, err := r.llmCallStream(ctx, "final_report_expand", r.state.Round, []chatMsg{
+		expandMessages := []chatMsg{
 			{Role: "user", Content: prompt},
 			{Role: "assistant", Content: report},
 			{Role: "user", Content: expandReportPrompt},
-		}, 0.4, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
+		}
+		expanded, expandCallID, err := r.llmCallStream(ctx, "final_report_expand", r.state.Round, expandMessages, 0.4, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
+		if errors.Is(err, ErrOutputTruncated) && expanded != "" {
+			r.setCallDisposition(expandCallID, "retried")
+			var complete bool
+			expanded, complete = r.continueWriting(ctx, "final_report_expand", r.state.Round, expandMessages, expanded, 0.4, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
+			if complete {
+				err = nil
+			}
+		}
 		if err == nil && len(expanded) > len(report) {
 			r.setCallDisposition(expandCallID, "accepted")
 			report = expanded
 		} else {
 			r.setCallDisposition(expandCallID, "rejected")
 		}
-	} else {
+	} else if !continuedReport {
 		r.setCallDisposition(callID, "accepted")
 	}
 	return report
@@ -1235,13 +1387,27 @@ func (r *Researcher) finalBrainstorm(ctx context.Context) string {
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	report, callID, err := r.llmCallStream(ctx, "final_brainstorm", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.5, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
+	messages := []chatMsg{{Role: "user", Content: prompt}}
+	report, callID, err := r.llmCallStream(ctx, "final_brainstorm", r.state.Round, messages, 0.5, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
+	continuedReport := false
+	if errors.Is(err, ErrOutputTruncated) && report != "" {
+		r.setCallDisposition(callID, "retried")
+		recovered, complete := r.continueWriting(ctx, "final_brainstorm", r.state.Round, messages, report, 0.5, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
+		if complete {
+			report, err = recovered, nil
+			continuedReport = true
+		} else {
+			r.setCallDisposition(callID, "rejected")
+		}
+	}
 	if err != nil || report == "" {
 		r.setCallDisposition(callID, "fallback")
 		// Never return empty — fall back to the evolving design doc.
 		return r.state.Report
 	}
-	r.setCallDisposition(callID, "accepted")
+	if !continuedReport {
+		r.setCallDisposition(callID, "accepted")
+	}
 	return report
 }
 
@@ -1425,12 +1591,26 @@ func (r *Researcher) writeSection(ctx context.Context, sec reportSection, outlin
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	out, callID, err := r.llmCallStream(ctx, "write_section", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.4, r.cfg.TokenLimits.Section, synthesisTimeout, onDelta)
+	messages := []chatMsg{{Role: "user", Content: prompt}}
+	out, callID, err := r.llmCallStream(ctx, "write_section", r.state.Round, messages, 0.4, r.cfg.TokenLimits.Section, synthesisTimeout, onDelta)
+	continuedSection := false
+	if errors.Is(err, ErrOutputTruncated) && out != "" {
+		r.setCallDisposition(callID, "retried")
+		recovered, complete := r.continueWriting(ctx, "write_section", r.state.Round, messages, out, 0.4, r.cfg.TokenLimits.Section, synthesisTimeout, onDelta)
+		if complete {
+			out, err = recovered, nil
+			continuedSection = true
+		} else {
+			r.setCallDisposition(callID, "rejected")
+		}
+	}
 	if err != nil || strings.TrimSpace(out) == "" {
 		r.setCallDisposition(callID, "rejected")
 		return ""
 	}
-	r.setCallDisposition(callID, "accepted")
+	if !continuedSection {
+		r.setCallDisposition(callID, "accepted")
+	}
 	out = strings.TrimSpace(out)
 	if !strings.HasPrefix(out, "#") {
 		out = "## " + sec.Title + "\n\n" + out

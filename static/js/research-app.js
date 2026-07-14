@@ -1071,7 +1071,7 @@ async function showExplore(id) {
       <p class="research-section-label">trace overview</p>
       <div class="trace-overview">
         <div><span class="eyebrow">Token breakdown</span><strong>${callUsage.prompt.toLocaleString()} input · ${callUsage.completion.toLocaleString()} output</strong></div>
-        <div><span class="eyebrow">Effective output limits</span><strong>synthesis ${Number(effectiveLimits.synthesis || 0).toLocaleString()} · final ${Number(effectiveLimits.final_report || 0).toLocaleString()} · section ${Number(effectiveLimits.section || 0).toLocaleString()} · HTML ${Number(effectiveLimits.html_report || 0).toLocaleString()}</strong></div>
+        <div><span class="eyebrow">Effective output limits</span><strong>memory ${Number(effectiveLimits.memory || 0).toLocaleString()} · synthesis ${Number(effectiveLimits.synthesis || 0).toLocaleString()} · final ${Number(effectiveLimits.final_report || 0).toLocaleString()} · section ${Number(effectiveLimits.section || 0).toLocaleString()} · HTML ${Number(effectiveLimits.html_report || 0).toLocaleString()}</strong></div>
         <div class="${htmlOutcome && isProblemEvent(htmlOutcome) ? 'is-danger' : ''}"><span class="eyebrow">HTML report</span><strong>${escapeHtml(htmlOutcomeText)}</strong></div>
       </div>
     </section>

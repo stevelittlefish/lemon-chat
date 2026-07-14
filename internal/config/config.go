@@ -21,24 +21,26 @@ type Config struct {
 }
 
 type Research struct {
-	Model                 string  `toml:"model"`                  // default model for research jobs (falls back to server.default_model)
-	HTMLReportModel       string  `toml:"html_report_model"`      // default model for the HTML report step (falls back to the job's model)
-	WorkerModel           string  `toml:"worker_model"`           // default model for the worker tier — extraction + slug/classify/query-gen/decide (falls back to the job's model)
-	MaxRounds             int     `toml:"max_rounds"`             // hard upper bound on research rounds
-	MaxTimeSeconds        int     `toml:"max_time_seconds"`       // wall-clock budget, checked at the start of each round
-	MaxURLsPerRound       int     `toml:"max_urls_per_round"`     // URLs fetched per query per round
-	MaxContentChars       int     `toml:"max_content_chars"`      // page content truncation limit before extraction
-	MaxReportTokens       int     `toml:"max_report_tokens"`      // deprecated compatibility alias for synthesis_tokens
-	SynthesisTokens       int     `toml:"synthesis_tokens"`       // output ceiling for each evolving synthesis
-	FinalReportTokens     int     `toml:"final_report_tokens"`    // output ceiling for a single-pass final report
-	SectionTokens         int     `toml:"section_tokens"`         // output ceiling for each in-depth report section
-	HTMLReportTokens      int     `toml:"html_report_tokens"`     // output ceiling for designed HTML
-	MaxCostUSD            float64 `toml:"max_cost_usd"`           // default per-job known-cost ceiling; 0 disables
-	FinalReservePercent   int     `toml:"final_reserve_percent"`  // time and known cost held back for final writing
-	ExtractionConcurrency int     `toml:"extraction_concurrency"` // concurrent URL fetch+extract tasks
-	MinRounds             int     `toml:"min_rounds"`             // stop-check is skipped until this many rounds complete
-	MaxEmptyRounds        int     `toml:"max_empty_rounds"`       // consecutive zero-finding rounds before aborting
-	SynthesisWindow       int     `toml:"synthesis_window"`       // only the last N findings are passed to each synthesis call
+	Model                   string  `toml:"model"`                     // default model for research jobs (falls back to server.default_model)
+	HTMLReportModel         string  `toml:"html_report_model"`         // default model for the HTML report step (falls back to the job's model)
+	WorkerModel             string  `toml:"worker_model"`              // default model for the worker tier — extraction + slug/classify/query-gen/decide (falls back to the job's model)
+	MaxRounds               int     `toml:"max_rounds"`                // hard upper bound on research rounds
+	MaxTimeSeconds          int     `toml:"max_time_seconds"`          // wall-clock budget, checked at the start of each round
+	MaxURLsPerRound         int     `toml:"max_urls_per_round"`        // URLs fetched per query per round
+	MaxContentChars         int     `toml:"max_content_chars"`         // page content truncation limit before extraction
+	MaxReportTokens         int     `toml:"max_report_tokens"`         // deprecated compatibility alias for synthesis_tokens
+	SynthesisTokens         int     `toml:"synthesis_tokens"`          // output ceiling for each evolving synthesis
+	FinalReportTokens       int     `toml:"final_report_tokens"`       // output ceiling for a single-pass final report
+	SectionTokens           int     `toml:"section_tokens"`            // output ceiling for each in-depth report section
+	HTMLReportTokens        int     `toml:"html_report_tokens"`        // output ceiling for designed HTML
+	MemoryTokens            int     `toml:"memory_tokens"`             // compact evolving research-memory target
+	MaxWritingContinuations int     `toml:"max_writing_continuations"` // bounded same-task recovery attempts
+	MaxCostUSD              float64 `toml:"max_cost_usd"`              // default per-job known-cost ceiling; 0 disables
+	FinalReservePercent     int     `toml:"final_reserve_percent"`     // time and known cost held back for final writing
+	ExtractionConcurrency   int     `toml:"extraction_concurrency"`    // concurrent URL fetch+extract tasks
+	MinRounds               int     `toml:"min_rounds"`                // stop-check is skipped until this many rounds complete
+	MaxEmptyRounds          int     `toml:"max_empty_rounds"`          // consecutive zero-finding rounds before aborting
+	SynthesisWindow         int     `toml:"synthesis_window"`          // only the last N findings are passed to each synthesis call
 }
 
 type SearXNG struct {
@@ -120,19 +122,21 @@ func Load(path string) (*Config, error) {
 			AdminUsername: "admin",
 		},
 		Research: Research{
-			MaxRounds:             8,
-			MaxTimeSeconds:        600,
-			MaxURLsPerRound:       3,
-			MaxContentChars:       15000,
-			SynthesisTokens:       8192,
-			FinalReportTokens:     32768,
-			SectionTokens:         12288,
-			HTMLReportTokens:      32768,
-			FinalReservePercent:   25,
-			ExtractionConcurrency: 3,
-			MinRounds:             2,
-			MaxEmptyRounds:        2,
-			SynthesisWindow:       10,
+			MaxRounds:               8,
+			MaxTimeSeconds:          600,
+			MaxURLsPerRound:         3,
+			MaxContentChars:         15000,
+			SynthesisTokens:         8192,
+			FinalReportTokens:       32768,
+			SectionTokens:           12288,
+			HTMLReportTokens:        32768,
+			MemoryTokens:            6000,
+			MaxWritingContinuations: 2,
+			FinalReservePercent:     25,
+			ExtractionConcurrency:   3,
+			MinRounds:               2,
+			MaxEmptyRounds:          2,
+			SynthesisWindow:         10,
 		},
 	}
 
@@ -179,7 +183,7 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("config: model %q max_output_tokens cannot be negative", m.Name)
 		}
 	}
-	if c.Research.SynthesisTokens < 1 || c.Research.FinalReportTokens < 1 || c.Research.SectionTokens < 1 || c.Research.HTMLReportTokens < 1 {
+	if c.Research.SynthesisTokens < 1 || c.Research.FinalReportTokens < 1 || c.Research.SectionTokens < 1 || c.Research.HTMLReportTokens < 1 || c.Research.MemoryTokens < 1 {
 		return fmt.Errorf("config: research token ceilings must be positive")
 	}
 	if c.Research.MaxCostUSD < 0 {
@@ -187,6 +191,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Research.FinalReservePercent < 0 || c.Research.FinalReservePercent > 90 {
 		return fmt.Errorf("config: research final_reserve_percent must be between 0 and 90")
+	}
+	if c.Research.MaxWritingContinuations < 0 || c.Research.MaxWritingContinuations > 5 {
+		return fmt.Errorf("config: research max_writing_continuations must be between 0 and 5")
 	}
 	return nil
 }

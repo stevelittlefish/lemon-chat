@@ -117,7 +117,7 @@ func llmOperationPhase(operation string) string {
 		return "searching"
 	case "extract":
 		return "reading"
-	case "synthesize":
+	case "synthesize", "synthesize_compact":
 		return "analyzing"
 	case "stop_decision":
 		return "deciding"
