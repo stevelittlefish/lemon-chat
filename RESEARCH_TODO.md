@@ -167,11 +167,16 @@ already works on small models and is exactly what the old rework broke.
 
 Do NOT do these preemptively. Run the validation first.
 
-- [ ] **Truncation detection, used minimally (~10 lines).** Plumb `finish_reason`
+- [x] **Truncation detection, used minimally (~10 lines).** Plumb `finish_reason`
       through `internal/llm/llm.go`. Use it for one thing: if `synthesize()`
       comes back truncated, discard it and keep the previous round's summary
       instead of overwriting memory with a mangled version. No continuation-merge,
-      no recovery loop.
+      no recovery loop. Done as insurance for the long-run path the short
+      validation didn't exercise: `Completion.FinishReason` is populated on both
+      the streaming and non-streaming calls; `synthesize()` discards a truncated
+      result (`isTruncated`) when a prior summary exists (round 1 keeps it, since
+      truncated beats empty). The discard emits a warning event, so it also shows
+      up in the run-log. `TestIsTruncated` covers the reason strings.
 - [x] **Fuzzy query dedup (~15 lines).** `main` dedups queries by exact lowercase
       match, so reordered `site:X OR site:Y` slips through. Add a token-set
       equality check in query generation to catch near-identical thrash.

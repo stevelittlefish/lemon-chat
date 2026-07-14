@@ -60,6 +60,14 @@ func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []cha
 // output, so long generations (synthesis, final report) can show live
 // progress instead of appearing stuck.
 func (r *Researcher) llmCallStream(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration, onDelta func(generated int, tail string)) (string, error) {
+	out, _, err := r.llmCallStreamFinish(ctx, msgs, temperature, maxTokens, timeout, onDelta)
+	return out, err
+}
+
+// llmCallStreamFinish is llmCallStream that also returns the provider's finish
+// reason, so callers that care about truncation (synthesis) can react to a
+// "length" stop without every other caller having to thread the value through.
+func (r *Researcher) llmCallStreamFinish(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration, onDelta func(generated int, tail string)) (string, string, error) {
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -74,15 +82,23 @@ func (r *Researcher) llmCallStream(ctx context.Context, msgs []chatMsg, temperat
 			}
 		})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	r.addPrice(result.UsageCost())
 
 	out := stripToolCalls(stripThinking(result.Content))
 	if out == "" {
-		return "", fmt.Errorf("empty response from model")
+		return "", result.FinishReason, fmt.Errorf("empty response from model")
 	}
-	return out, nil
+	return out, result.FinishReason, nil
+}
+
+// isTruncated reports whether a finish reason indicates the output was cut off
+// at the token limit rather than completing naturally. Providers spell it
+// differently ("length", "max_tokens", "MAX_TOKENS").
+func isTruncated(finishReason string) bool {
+	f := strings.ToLower(finishReason)
+	return f == "length" || strings.Contains(f, "max_tokens") || strings.Contains(f, "max tokens")
 }
 
 // tailOf returns the last n runes of s on a valid UTF-8 boundary.

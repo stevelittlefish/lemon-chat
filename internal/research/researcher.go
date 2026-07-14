@@ -975,13 +975,21 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 	} else {
 		prompt = fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, r.formatFindings(newFindings))
 	}
-	out, err := r.llmCallStream(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.SynthesisTokens, synthesisTimeout,
+	out, finish, err := r.llmCallStreamFinish(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.SynthesisTokens, synthesisTimeout,
 		func(generated int, tail string) {
 			r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 		})
 	if err != nil || out == "" {
 		// Keep the current report unchanged.
 		r.progress(Progress{Phase: "warning", Message: "synthesis failed — keeping previous report"})
+		return
+	}
+	// A truncated synthesis (hit the token limit) is a mangled working summary;
+	// overwriting memory with it would degrade every later round. Discard it and
+	// keep the prior summary — but only when there is one, since on the first
+	// round a truncated summary still beats an empty report.
+	if isTruncated(finish) && strings.TrimSpace(r.state.Report) != "" {
+		r.progress(Progress{Phase: "warning", Round: round, Message: "synthesis hit the token limit and was truncated — keeping previous report"})
 		return
 	}
 	r.state.Report = out

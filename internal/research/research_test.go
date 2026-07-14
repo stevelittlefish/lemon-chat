@@ -48,6 +48,21 @@ func TestQueryKey(t *testing.T) {
 	}
 }
 
+func TestIsTruncated(t *testing.T) {
+	truncated := []string{"length", "LENGTH", "max_tokens", "MAX_TOKENS", "max tokens"}
+	for _, f := range truncated {
+		if !isTruncated(f) {
+			t.Errorf("expected %q to be treated as truncated", f)
+		}
+	}
+	complete := []string{"", "stop", "end_turn", "tool_calls", "content_filter"}
+	for _, f := range complete {
+		if isTruncated(f) {
+			t.Errorf("expected %q to be treated as a natural finish", f)
+		}
+	}
+}
+
 func TestParseJSONStringArray(t *testing.T) {
 	cases := []struct {
 		name string

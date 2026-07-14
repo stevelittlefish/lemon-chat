@@ -43,6 +43,10 @@ type Usage struct {
 type Completion struct {
 	Content string
 	Usage   *Usage
+	// FinishReason is the provider's stop reason for the first choice, e.g.
+	// "stop" (natural end) or "length" (hit max_tokens — output truncated).
+	// Empty when the provider did not report one.
+	FinishReason string
 }
 
 func (c Completion) UsageCost() *float64 {
@@ -130,6 +134,7 @@ func ChatCompleteWithUsage(ctx context.Context, client *http.Client, chatURL, ap
 			Message struct {
 				Content string `json:"content"`
 			} `json:"message"`
+			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
 		Usage *Usage `json:"usage"`
 	}
@@ -139,7 +144,11 @@ func ChatCompleteWithUsage(ctx context.Context, client *http.Client, chatURL, ap
 	if len(result.Choices) == 0 {
 		return Completion{}, fmt.Errorf("no choices in response")
 	}
-	return Completion{Content: result.Choices[0].Message.Content, Usage: result.Usage}, nil
+	return Completion{
+		Content:      result.Choices[0].Message.Content,
+		Usage:        result.Usage,
+		FinishReason: result.Choices[0].FinishReason,
+	}, nil
 }
 
 // ChatCompleteStream makes a streaming chat-completion request. It returns the
@@ -180,12 +189,14 @@ func ChatCompleteStreamWithUsage(ctx context.Context, client *http.Client, chatU
 	}
 	var full strings.Builder
 	var usage *Usage
+	var finishReason string
 	err = ScanSSE(resp.Body, func(data string) error {
 		var chunk struct {
 			Choices []struct {
 				Delta struct {
 					Content string `json:"content"`
 				} `json:"delta"`
+				FinishReason string `json:"finish_reason"`
 			} `json:"choices"`
 			Usage *Usage `json:"usage"`
 		}
@@ -197,6 +208,9 @@ func ChatCompleteStreamWithUsage(ctx context.Context, client *http.Client, chatU
 		}
 		if len(chunk.Choices) == 0 {
 			return nil
+		}
+		if chunk.Choices[0].FinishReason != "" {
+			finishReason = chunk.Choices[0].FinishReason
 		}
 		delta := chunk.Choices[0].Delta.Content
 		if delta != "" {
@@ -210,5 +224,5 @@ func ChatCompleteStreamWithUsage(ctx context.Context, client *http.Client, chatU
 	if err != nil && full.Len() == 0 {
 		return Completion{}, fmt.Errorf("stream read failed: %w", err)
 	}
-	return Completion{Content: full.String(), Usage: usage}, nil
+	return Completion{Content: full.String(), Usage: usage, FinishReason: finishReason}, nil
 }
