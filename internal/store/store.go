@@ -813,6 +813,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v38 → v39 complete")
 	}
 
+	if version < 40 {
+		log.Println("store: migrating v39 → v40 (research_report.markdown_direction)")
+		if _, err := s.db.Exec(`ALTER TABLE research_report ADD COLUMN markdown_direction TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (40, ?)`, now()); err != nil {
+			return err
+		}
+		version = 40
+		log.Println("store: migration v39 → v40 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

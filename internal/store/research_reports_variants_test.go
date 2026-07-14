@@ -19,10 +19,10 @@ func TestNonDefaultResearchReports(t *testing.T) {
 	price := 0.02
 	md := "# fresh markdown"
 	// A markdown-only regeneration and an HTML-only variant.
-	if _, err := s.CreateResearchReport(job.ID, &md, "", "writer", "", &price, false); err != nil {
+	if _, err := s.CreateResearchReport(job.ID, &md, "", "writer", "", "include examples", &price, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CreateResearchReport(job.ID, nil, "<!DOCTYPE html><html></html>", "designer", "earthy", &price, false); err != nil {
+	if _, err := s.CreateResearchReport(job.ID, nil, "<!DOCTYPE html><html></html>", "designer", "earthy", "", &price, false); err != nil {
 		t.Fatal(err)
 	}
 

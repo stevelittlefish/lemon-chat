@@ -198,17 +198,23 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 
 	// The report carries one model label; show both parts when they differ.
 	storedModel := remixModelLabel(markdownModel, htmlModel)
+	// Persist the markdown rewrite instruction only when markdown was actually
+	// regenerated, so it reflects what produced this variant's prose.
+	storedMarkdownDirection := ""
+	if req.Markdown {
+		storedMarkdownDirection = req.MarkdownDirection
+	}
 	writeReportEvent(w, flusher, map[string]any{"phase": "saving", "message": "saving report"})
-	report, err := s.store.CreateResearchReport(jobID, storedMarkdown, html, storedModel, req.Direction, addCost(markdownCost, htmlCost), false)
+	report, err := s.store.CreateResearchReport(jobID, storedMarkdown, html, storedModel, req.Direction, storedMarkdownDirection, addCost(markdownCost, htmlCost), false)
 	if err != nil {
 		log.Printf("research report: save failed job_id=%d user_id=%d: %v", job.ID, user.ID, err)
 		writeReportEvent(w, flusher, map[string]any{"error": "could not save report"})
 		writeReportDone(w, flusher)
 		return
 	}
-	log.Printf("Creating research report id=%d research_job_id=%d user_id=%d markdown_model=%q html_model=%q markdown=%t html=%t", report.ID, jobID, user.ID, markdownModel, htmlModel, storedMarkdown != nil && *storedMarkdown != "", html != "")
+	log.Printf("Creating research report id=%d research_job_id=%d user_id=%d markdown_model=%q html_model=%q markdown=%t html=%t resynthesize=%t", report.ID, jobID, user.ID, markdownModel, htmlModel, storedMarkdown != nil && *storedMarkdown != "", html != "", req.Resynthesize)
 	summary := store.ResearchReportSummary{
-		ID: report.ID, ResearchJobID: jobID, Model: storedModel, Direction: req.Direction,
+		ID: report.ID, ResearchJobID: jobID, Model: storedModel, Direction: req.Direction, MarkdownDirection: storedMarkdownDirection,
 		HasMarkdown: storedMarkdown != nil && *storedMarkdown != "", HasHTML: html != "",
 		PriceUSD: report.PriceUSD, CreatedAt: report.CreatedAt,
 	}

@@ -550,7 +550,7 @@ function reportShelf(job) {
   if (!job.reports?.length) return '';
   const items = (job.reports || []).map((report, index) => {
     const kinds = [report.has_markdown ? 'markdown' : '', report.has_html ? 'designed' : ''].filter(Boolean).join(' + ');
-    const label = report.direction || `Remix ${(job.reports.length - index)}`;
+    const label = report.direction || report.markdown_direction || `Remix ${(job.reports.length - index)}`;
     return `<button class="research-remix-item" data-report-id="${report.id}">
       <span>${escapeHtml(label)}${kinds ? ` <span class="research-report-kinds">${kinds}</span>` : ''}</span>
       <small>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</small>
@@ -700,7 +700,13 @@ async function showReport(jobID, reportID) {
   try { report = await research.getReport(jobID, reportID); } catch { location.hash = jobID; return; }
   const hasMarkdown = !!(report.markdown && report.markdown.trim());
   const hasHTML = !!report.html;
-  const label = report.direction || 'Remix';
+  const label = report.direction || report.markdown_direction || 'Remix';
+  // Show the instructions that produced this variant, labelled by which part
+  // they steered, so a saved remix records what was asked for.
+  const directions = [
+    report.markdown_direction ? `rewrite: ${report.markdown_direction}` : '',
+    report.direction ? `HTML: ${report.direction}` : '',
+  ].filter(Boolean).join(' · ');
   const openBtn = hasHTML
     ? `<a class="btn btn-sm btn-secondary" href="/api/research/${jobID}/reports/${reportID}/document" target="_blank" rel="noopener noreferrer">open HTML in new tab</a>`
     : '';
@@ -719,7 +725,7 @@ async function showReport(jobID, reportID) {
     ? `<div class="research-report" data-panel="markdown">${render(report.markdown)}</div>`
     : '';
   main.innerHTML = `<div class="remix-view-header">
-    <div><p class="eyebrow">Remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</p></div>
+    <div><p class="eyebrow">Remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</p>${directions ? `<p class="remix-view-directions">${escapeHtml(directions)}</p>` : ''}</div>
     <div class="remix-view-actions">${dlMdBtn}${dlHtmlBtn}${openBtn}</div>
   </div>
   ${tabs}${htmlPanel}${mdPanel}`;

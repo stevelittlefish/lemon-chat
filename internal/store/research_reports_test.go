@@ -36,7 +36,7 @@ func TestResearchReportDefaultUpsert(t *testing.T) {
 	// An HTML report variant becomes a non-default report carrying its own
 	// markdown copy (the regenerate handler copies the master markdown when only
 	// an HTML rendering is requested).
-	if _, err := s.CreateResearchReport(job.ID, &report2, "<!DOCTYPE html><html></html>", "model-b", "bold", nil, false); err != nil {
+	if _, err := s.CreateResearchReport(job.ID, &report2, "<!DOCTYPE html><html></html>", "model-b", "bold", "", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	reports, err = s.ListResearchReports(job.ID)

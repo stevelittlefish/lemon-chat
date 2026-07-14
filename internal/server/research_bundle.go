@@ -53,16 +53,17 @@ type researchBundleInfo struct {
 }
 
 type researchBundleReportInfo struct {
-	ID          int64    `json:"id"`
-	Folder      string   `json:"folder,omitempty"`
-	Model       string   `json:"model"`
-	Direction   string   `json:"direction"`
-	PriceUSD    *float64 `json:"price_usd"`
-	IsDefault   bool     `json:"is_default"`
-	HasMarkdown bool     `json:"has_markdown"`
-	HasHTML     bool     `json:"has_html"`
-	CreatedAt   string   `json:"created_at"`
-	UpdatedAt   string   `json:"updated_at"`
+	ID                int64    `json:"id"`
+	Folder            string   `json:"folder,omitempty"`
+	Model             string   `json:"model"`
+	Direction         string   `json:"direction"`
+	MarkdownDirection string   `json:"markdown_direction,omitempty"`
+	PriceUSD          *float64 `json:"price_usd"`
+	IsDefault         bool     `json:"is_default"`
+	HasMarkdown       bool     `json:"has_markdown"`
+	HasHTML           bool     `json:"has_html"`
+	CreatedAt         string   `json:"created_at"`
+	UpdatedAt         string   `json:"updated_at"`
 }
 
 func bundleSlug(text string, fallback string) string {
@@ -204,7 +205,8 @@ func writeResearchBundle(dst io.Writer, job *store.ResearchJob, reports []store.
 		}
 		info.Reports = append(info.Reports, researchBundleReportInfo{
 			ID: report.ID, Folder: folder, Model: report.Model, Direction: report.Direction,
-			PriceUSD: report.PriceUSD, IsDefault: report.IsDefault,
+			MarkdownDirection: report.MarkdownDirection,
+			PriceUSD:          report.PriceUSD, IsDefault: report.IsDefault,
 			HasMarkdown: report.Markdown != nil && *report.Markdown != "", HasHTML: report.HTML != "",
 			CreatedAt: report.CreatedAt, UpdatedAt: report.UpdatedAt,
 		})
