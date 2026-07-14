@@ -150,6 +150,39 @@ func researchEffortRounds(effort, defaultMaxRounds, defaultMinRounds int) (maxRo
 	return maxRounds, minRounds, extraRounds
 }
 
+func clampResearchTokens(requested, modelLimit int) int {
+	if modelLimit > 0 && modelLimit < requested {
+		return modelLimit
+	}
+	return requested
+}
+
+func (s *Server) researchTokenLimits(writerModel, htmlModel string) research.TokenLimits {
+	rc := s.cfg.Research
+	if htmlModel == "" {
+		htmlModel = writerModel
+	}
+	writerLimit := s.cfg.ModelOutputLimit(writerModel)
+	return research.TokenLimits{
+		Synthesis:   clampResearchTokens(rc.SynthesisTokens, writerLimit),
+		FinalReport: clampResearchTokens(rc.FinalReportTokens, writerLimit),
+		Section:     clampResearchTokens(rc.SectionTokens, writerLimit),
+		HTMLReport:  clampResearchTokens(rc.HTMLReportTokens, s.cfg.ModelOutputLimit(htmlModel)),
+	}
+}
+
+func (s *Server) jobTokenLimits(job *store.ResearchJob) research.TokenLimits {
+	var limits research.TokenLimits
+	if json.Unmarshal([]byte(job.TokenLimits), &limits) == nil && limits.Synthesis > 0 && limits.FinalReport > 0 && limits.Section > 0 && limits.HTMLReport > 0 {
+		return limits
+	}
+	htmlModel := job.Model
+	if job.HTMLReportModel != nil && *job.HTMLReportModel != "" {
+		htmlModel = *job.HTMLReportModel
+	}
+	return s.researchTokenLimits(job.Model, htmlModel)
+}
+
 // researchModel resolves the model to use for a research job.
 func (s *Server) researchModel(requested string) string {
 	if requested != "" {
@@ -263,6 +296,10 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	if job.MaxTimeSeconds > 0 {
 		maxTimeSeconds = job.MaxTimeSeconds
 	}
+	maxCostUSD := job.MaxCostUSD
+	if maxCostUSD <= 0 {
+		maxCostUSD = rc.MaxCostUSD
+	}
 	cfg := research.Config{
 		Query:                 llmQuery,
 		SlugSource:            llmQuery,
@@ -282,7 +319,9 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		MaxTime:               time.Duration(maxTimeSeconds) * time.Second,
 		MaxURLsPerRound:       rc.MaxURLsPerRound,
 		MaxContentChars:       rc.MaxContentChars,
-		MaxReportTokens:       rc.MaxReportTokens,
+		TokenLimits:           s.jobTokenLimits(job),
+		MaxCostUSD:            maxCostUSD,
+		FinalReservePercent:   rc.FinalReservePercent,
 		ExtractionConcurrency: rc.ExtractionConcurrency,
 		MinRounds:             minRounds,
 		MaxEmptyRounds:        rc.MaxEmptyRounds,
@@ -377,7 +416,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	case runErr == nil:
 		price := r.State().PriceUSD
 		if job.AutoHTMLReport {
-			price = s.autoGenerateHTMLReport(ctx, run, job, report, price)
+			price = s.autoGenerateHTMLReport(ctx, run, job, report, elapsedMS, price)
 		}
 		log.Printf("Research job finished id=%d rounds=%d elapsed=%.1fs", job.ID, r.State().Round, float64(elapsedMS)/1000)
 		s.finishResearch(job.ID, run, store.ResearchStatusDone, &report, "", elapsedMS, price)
@@ -394,7 +433,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 // HTML document and stores it on the job's default report. It is best-effort:
 // any failure is logged and the job still completes with its markdown report.
 // The returned price includes the HTML generation cost when one was incurred.
-func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, job *store.ResearchJob, markdown string, price *float64) *float64 {
+func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, job *store.ResearchJob, markdown string, elapsedMS int64, price *float64) *float64 {
 	warn := func(message string) {
 		data, _ := json.Marshal(research.Progress{Phase: "warning", Message: message})
 		run.broadcast(data)
@@ -422,12 +461,38 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 	if job.Title != nil && *job.Title != "" {
 		title = *job.Title
 	}
+	maxCostUSD := job.MaxCostUSD
+	if maxCostUSD <= 0 {
+		maxCostUSD = s.cfg.Research.MaxCostUSD
+	}
+	if maxCostUSD > 0 && price != nil && *price >= maxCostUSD {
+		message := "automatic HTML report skipped because the research cost budget is exhausted"
+		s.appendResearchTrace(job.ID, research.TraceEvent{EventType: "html_generation_failed", Phase: "designing", Message: message, Data: map[string]any{"stage": "budget", "model": htmlModel}})
+		warn(message)
+		return price
+	}
 	data, _ := json.Marshal(research.Progress{Phase: "designing", Message: "designing the HTML report"})
 	run.broadcast(data)
 
 	timeout := time.Duration(s.cfg.Server.ResponseTimeoutSeconds) * time.Second
 	if timeout <= 0 {
 		timeout = 10 * time.Minute
+	}
+	maxTimeSeconds := job.MaxTimeSeconds
+	if maxTimeSeconds <= 0 {
+		maxTimeSeconds = s.cfg.Research.MaxTimeSeconds
+	}
+	if maxTimeSeconds > 0 {
+		remaining := time.Duration(maxTimeSeconds)*time.Second - time.Duration(elapsedMS)*time.Millisecond
+		if remaining <= 0 {
+			message := "automatic HTML report skipped because the research time budget is exhausted"
+			s.appendResearchTrace(job.ID, research.TraceEvent{EventType: "html_generation_failed", Phase: "designing", Message: message, Data: map[string]any{"stage": "budget", "model": htmlModel}})
+			warn(message)
+			return price
+		}
+		if remaining < timeout {
+			timeout = remaining
+		}
 	}
 	genCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -594,6 +659,8 @@ type researchJobView struct {
 	Phase             *string  `json:"phase"`
 	Effort            int      `json:"effort"`
 	MaxTimeSeconds    int      `json:"max_time_seconds"`
+	MaxCostUSD        float64  `json:"max_cost_usd"`
+	TokenLimits       string   `json:"token_limits"`
 	Round             int      `json:"round"`
 	ElapsedMS         int64    `json:"elapsed_ms"`
 	PriceUSD          *float64 `json:"price_usd"`
@@ -606,7 +673,7 @@ type researchJobView struct {
 func researchView(j *store.ResearchJob) researchJobView {
 	return researchJobView{
 		ID: j.ID, Title: j.Title, Query: j.Query, Model: j.Model, Mode: j.Mode, ForceSearch: j.ForceSearch, DeepReport: j.DeepReport, PauseRedditImport: j.PauseRedditImport, Status: j.Status, Phase: j.Phase,
-		Effort: j.Effort, MaxTimeSeconds: j.MaxTimeSeconds,
+		Effort: j.Effort, MaxTimeSeconds: j.MaxTimeSeconds, MaxCostUSD: j.MaxCostUSD, TokenLimits: j.TokenLimits,
 		Round: j.Round, ElapsedMS: j.ElapsedMS, PriceUSD: j.PriceUSD, Error: j.Error, CreatedAt: j.CreatedAt, UpdatedAt: j.UpdatedAt,
 	}
 }
@@ -618,28 +685,30 @@ func (s *Server) handleResearchDefaults(w http.ResponseWriter, r *http.Request) 
 	if maxTimeMinutes < 1 {
 		maxTimeMinutes = 10
 	}
-	writeJSON(w, http.StatusOK, map[string]int{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"effort":           3,
 		"max_time_minutes": maxTimeMinutes,
+		"max_cost_usd":     s.cfg.Research.MaxCostUSD,
 	})
 }
 
 func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	var req struct {
-		Title               string `json:"title"`
-		Query               string `json:"query"`
-		Model               string `json:"model"`
-		Mode                string `json:"mode"`
-		ForceSearch         bool   `json:"force_search"`
-		DeepReport          bool   `json:"deep_report"`
-		AutoHTMLReport      bool   `json:"auto_html_report"`
-		HTMLReportDirection string `json:"html_report_direction"`
-		HTMLReportModel     string `json:"html_report_model"`
-		WorkerModel         string `json:"worker_model"`
-		PauseRedditImport   bool   `json:"pause_reddit_import"`
-		Effort              int    `json:"effort"`
-		MaxTimeMinutes      int    `json:"max_time_minutes"`
+		Title               string  `json:"title"`
+		Query               string  `json:"query"`
+		Model               string  `json:"model"`
+		Mode                string  `json:"mode"`
+		ForceSearch         bool    `json:"force_search"`
+		DeepReport          bool    `json:"deep_report"`
+		AutoHTMLReport      bool    `json:"auto_html_report"`
+		HTMLReportDirection string  `json:"html_report_direction"`
+		HTMLReportModel     string  `json:"html_report_model"`
+		WorkerModel         string  `json:"worker_model"`
+		PauseRedditImport   bool    `json:"pause_reddit_import"`
+		Effort              int     `json:"effort"`
+		MaxTimeMinutes      int     `json:"max_time_minutes"`
+		MaxCostUSD          float64 `json:"max_cost_usd"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -683,6 +752,14 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 	if req.MaxTimeMinutes > 0 {
 		maxTimeSeconds = req.MaxTimeMinutes * 60
 	}
+	if req.MaxCostUSD < 0 {
+		writeError(w, http.StatusBadRequest, "cost budget cannot be negative")
+		return
+	}
+	maxCostUSD := req.MaxCostUSD
+	if maxCostUSD == 0 {
+		maxCostUSD = s.cfg.Research.MaxCostUSD
+	}
 	if s.cfg.SearXNG.URL == "" {
 		writeError(w, http.StatusUnprocessableEntity, "research requires SearXNG — add [searxng] url to lemon.toml")
 		return
@@ -725,12 +802,14 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 
 	// ForceSearch only changes brainstorm-mode behaviour; ignore it otherwise.
 	forceSearch := req.ForceSearch && mode == research.ModeBrainstorm
-	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, req.AutoHTMLReport, req.HTMLReportDirection, htmlReportModel, workerModel, effort, maxTimeSeconds)
+	tokenLimits := s.researchTokenLimits(model, htmlReportModel)
+	encodedTokenLimits, _ := json.Marshal(tokenLimits)
+	job, err := s.store.CreateResearchJob(user.ID, req.Title, req.Query, model, mode, forceSearch, req.DeepReport, req.PauseRedditImport, req.AutoHTMLReport, req.HTMLReportDirection, htmlReportModel, workerModel, effort, maxTimeSeconds, maxCostUSD, string(encodedTokenLimits))
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	log.Printf("Starting research job id=%d user_id=%d model=%q worker_model=%q mode=%q force_search=%t deep_report=%t auto_html_report=%t html_report_model=%q pause_reddit_import=%t effort=%d max_time_s=%d title=%q query=%q", job.ID, user.ID, model, workerModel, mode, forceSearch, req.DeepReport, req.AutoHTMLReport, htmlReportModel, req.PauseRedditImport, effort, maxTimeSeconds, req.Title, req.Query)
+	log.Printf("Starting research job id=%d user_id=%d model=%q worker_model=%q mode=%q force_search=%t deep_report=%t auto_html_report=%t html_report_model=%q pause_reddit_import=%t effort=%d max_time_s=%d max_cost_usd=%.4f title=%q query=%q", job.ID, user.ID, model, workerModel, mode, forceSearch, req.DeepReport, req.AutoHTMLReport, htmlReportModel, req.PauseRedditImport, effort, maxTimeSeconds, maxCostUSD, req.Title, req.Query)
 	go s.runResearch(job)
 	writeJSON(w, http.StatusCreated, researchView(job))
 }

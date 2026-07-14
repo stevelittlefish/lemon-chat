@@ -222,13 +222,13 @@ export const research = {
     return () => ctrl.abort();
   },
   getReport: (id, reportId) => request('GET', `/api/research/${id}/reports/${reportId}`),
-  start: (title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, htmlReportModel, workerModel, effort, maxTimeMinutes) =>
+  start: (title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, htmlReportModel, workerModel, effort, maxTimeMinutes, maxCostUSD) =>
     request('POST', '/api/research', {
       title, query, ...(model ? { model } : {}), mode, force_search: forceSearch, deep_report: deepReport,
       auto_html_report: autoHtmlReport, html_report_direction: htmlReportDirection,
       ...(htmlReportModel ? { html_report_model: htmlReportModel } : {}),
       ...(workerModel ? { worker_model: workerModel } : {}),
-      pause_reddit_import: pauseRedditImport, effort, max_time_minutes: maxTimeMinutes,
+      pause_reddit_import: pauseRedditImport, effort, max_time_minutes: maxTimeMinutes, max_cost_usd: maxCostUSD,
     }),
   cancel: (id) => request('POST', `/api/research/${id}/cancel`),
   importReddit: (id, response) => request('POST', `/api/research/${id}/reddit-import`, response),

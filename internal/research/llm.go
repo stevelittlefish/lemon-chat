@@ -45,7 +45,10 @@ func (r *Researcher) llmCallWorker(ctx context.Context, operation string, round 
 }
 
 func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, operation string, round int, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, int64, error) {
-	callCtx, cancel := context.WithTimeout(ctx, timeout)
+	callCtx, cancel, err := r.callContext(ctx, operation, timeout)
+	if err != nil {
+		return "", 0, err
+	}
 	defer cancel()
 	parameters := map[string]any{"temperature": temperature, "max_tokens": maxTokens, "stream": false}
 	callID := r.beginLLMCall(ep, operation, round, msgs, parameters)
@@ -70,7 +73,10 @@ func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, operation 
 // output, so long generations (synthesis, final report) can show live
 // progress instead of appearing stuck.
 func (r *Researcher) llmCallStream(ctx context.Context, operation string, round int, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration, onDelta func(generated int, tail string)) (string, int64, error) {
-	callCtx, cancel := context.WithTimeout(ctx, timeout)
+	callCtx, cancel, err := r.callContext(ctx, operation, timeout)
+	if err != nil {
+		return "", 0, err
+	}
 	defer cancel()
 	parameters := map[string]any{"temperature": temperature, "max_tokens": maxTokens, "stream": true}
 	callID := r.beginLLMCall(r.writer, operation, round, msgs, parameters)

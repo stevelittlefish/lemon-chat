@@ -50,6 +50,17 @@ func TestSubscribeAfterFinish(t *testing.T) {
 	}
 }
 
+func TestResearchTokenLimitsAreClampedPerModel(t *testing.T) {
+	s := &Server{cfg: &config.Config{
+		Models:   []config.Model{{Name: "writer", MaxOutputTokens: 16000}, {Name: "html", MaxOutputTokens: 24000}},
+		Research: config.Research{SynthesisTokens: 8192, FinalReportTokens: 32768, SectionTokens: 12288, HTMLReportTokens: 32768},
+	}}
+	limits := s.researchTokenLimits("writer", "html")
+	if limits.Synthesis != 8192 || limits.FinalReport != 16000 || limits.Section != 12288 || limits.HTMLReport != 24000 {
+		t.Fatalf("unexpected effective limits: %+v", limits)
+	}
+}
+
 func TestPendingRedditRequestMatchesDurableRequestID(t *testing.T) {
 	pendingJSON, err := json.Marshal(research.PendingRedditRound{Request: redditimport.Request{
 		Version: redditimport.SchemaVersion, RequestID: "request-1",
@@ -83,7 +94,7 @@ func newAwaitingRedditJob(t *testing.T) (*Server, *store.User, *store.ResearchJo
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := st.CreateResearchJob(user.ID, "", "query", "model", "research", false, false, true, false, "", "", "", 3, 600)
+	job, err := st.CreateResearchJob(user.ID, "", "query", "model", "research", false, false, true, false, "", "", "", 3, 600, 0, "{}")
 	if err != nil {
 		t.Fatal(err)
 	}

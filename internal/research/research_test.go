@@ -40,6 +40,30 @@ func TestProgressAndCheckpointEmitStructuredTrace(t *testing.T) {
 	}
 }
 
+func TestResearchBudgetReserveProtectsFinalWriting(t *testing.T) {
+	price := 7.5
+	r := New(Config{MaxTime: 10 * time.Second, MaxCostUSD: 10, FinalReservePercent: 25}, State{ElapsedMS: 7600, PriceUSD: &price}, nil, nil)
+	r.startTime = time.Now()
+
+	if exhausted, _ := r.budgetExhausted(false); !exhausted {
+		t.Fatal("research allocation should be exhausted at the 75% reserve boundary")
+	}
+	if exhausted, message := r.budgetExhausted(true); exhausted {
+		t.Fatalf("final-writing reserve should remain available: %s", message)
+	}
+	if _, _, err := r.callContext(context.Background(), "synthesize", time.Second); !errors.Is(err, ErrBudgetExhausted) {
+		t.Fatalf("synthesis call was not stopped at reserve boundary: %v", err)
+	}
+	ctx, cancel, err := r.callContext(context.Background(), "final_report", time.Second)
+	if err != nil {
+		t.Fatalf("final report could not use reserved budget: %v", err)
+	}
+	cancel()
+	if ctx == nil {
+		t.Fatal("final report context is nil")
+	}
+}
+
 func TestLLMCallHooksCaptureRequestResponseAndDisposition(t *testing.T) {
 	var started LLMCallStart
 	var finished LLMCallFinish
@@ -240,7 +264,7 @@ func TestResumeImportedRedditUsesGuardedExtractorAndSynthesizes(t *testing.T) {
 	completed := false
 	r := New(Config{
 		Query: "goal", Model: "test", APIBase: "http://model.test", MaxContentChars: 10000,
-		MaxReportTokens: 1000, SynthesisWindow: 10, MaxEmptyRounds: 2,
+		TokenLimits: TokenLimits{Synthesis: 1000, FinalReport: 2000, Section: 1500, HTMLReport: 2000}, SynthesisWindow: 10, MaxEmptyRounds: 2,
 		OnRedditRoundComplete: func(State) error { completed = true; return nil },
 	}, State{}, nil, nil)
 	r.client = &http.Client{Transport: transport}

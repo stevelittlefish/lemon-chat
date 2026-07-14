@@ -8,7 +8,7 @@ func TestResearchLLMCallLifecycleAndAttempts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := s.CreateResearchJob(user.ID, "Calls", "Question", "model", "research", false, false, false, false, "", "", "", 3, 600)
+	job, err := s.CreateResearchJob(user.ID, "Calls", "Question", "model", "research", false, false, false, false, "", "", "", 3, 600, 0, "{}")
 	if err != nil {
 		t.Fatal(err)
 	}

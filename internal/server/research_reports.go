@@ -161,6 +161,12 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 	var html string
 	var htmlCost *float64
 	if req.HTML {
+		if _, budgetErr := s.remainingResearchCostBudget(job); budgetErr != nil {
+			s.appendResearchTrace(jobID, research.TraceEvent{EventType: "html_generation_failed", Phase: "designing", Message: budgetErr.Error(), Data: map[string]any{"stage": "budget", "model": htmlModel}})
+			writeReportEvent(w, flusher, map[string]any{"error": budgetErr.Error()})
+			writeReportDone(w, flusher)
+			return
+		}
 		source := *job.FinalReport
 		if freshMarkdown != "" {
 			source = freshMarkdown
@@ -214,17 +220,29 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 		return nil, fmt.Errorf("unknown model %q", model)
 	}
 	llmQuery := researchLLMQuery(job)
+	limits := s.researchTokenLimits(model, model)
+	maxTimeSeconds := job.MaxTimeSeconds
+	if maxTimeSeconds <= 0 {
+		maxTimeSeconds = s.cfg.Research.MaxTimeSeconds
+	}
+	maxCostUSD, err := s.remainingResearchCostBudget(job)
+	if err != nil {
+		return nil, err
+	}
 	cfg := research.Config{
-		Query:             llmQuery,
-		SlugSource:        llmQuery,
-		Model:             model,
-		Mode:              job.Mode,
-		DeepReport:        deepReport,
-		ReportInstruction: instruction,
-		APIBase:           modelServer.APIBase,
-		APIKey:            modelServer.APIKey,
-		MaxReportTokens:   s.cfg.Research.MaxReportTokens,
-		Location:          s.researchLocation(),
+		Query:               llmQuery,
+		SlugSource:          llmQuery,
+		Model:               model,
+		Mode:                job.Mode,
+		DeepReport:          deepReport,
+		ReportInstruction:   instruction,
+		APIBase:             modelServer.APIBase,
+		APIKey:              modelServer.APIKey,
+		TokenLimits:         limits,
+		MaxTime:             time.Duration(maxTimeSeconds) * time.Second,
+		MaxCostUSD:          maxCostUSD,
+		FinalReservePercent: 0,
+		Location:            s.researchLocation(),
 		OnTrace: func(event research.TraceEvent) {
 			s.appendResearchTrace(job.ID, event)
 		},
@@ -232,8 +250,36 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 	state := research.UnmarshalState(job.Round, job.EmptyRounds, job.ElapsedMS,
 		job.Category, job.Slug, job.Plan, job.Report, job.Findings, job.QueriesUsed, job.AnalyzedURLs)
 	state.PriceUSD = job.PriceUSD
+	state.ElapsedMS = 0
 	s.configureResearchCallTrace(job.ID, &cfg)
 	return research.New(cfg, state, onProgress, nil), nil
+}
+
+// remainingResearchCostBudget returns the known-cost allowance left across all
+// calls belonging to a job. Zero means cost limiting is disabled.
+func (s *Server) remainingResearchCostBudget(job *store.ResearchJob) (float64, error) {
+	limit := job.MaxCostUSD
+	if limit <= 0 {
+		limit = s.cfg.Research.MaxCostUSD
+	}
+	if limit <= 0 {
+		return 0, nil
+	}
+	calls, err := s.store.ListResearchLLMCalls(job.ID)
+	if err != nil {
+		return 0, err
+	}
+	spent := 0.0
+	for _, call := range calls {
+		if call.PriceUSD != nil {
+			spent += *call.PriceUSD
+		}
+	}
+	remaining := limit - spent
+	if remaining <= 0 {
+		return 0, fmt.Errorf("research cost budget is exhausted")
+	}
+	return remaining, nil
 }
 
 // resolveRemixModel resolves a requested remix model, falling back to the
@@ -282,7 +328,8 @@ func (s *Server) generateReportHTML(ctx context.Context, jobID int64, model, tit
 	var generated strings.Builder
 	lastProgress := time.Time{}
 	messages := []llm.Message{{Role: "system", Content: reportHTMLSystemPrompt}, {Role: "user", Content: userPrompt}}
-	parameters := map[string]any{"temperature": 0.7, "stream": true}
+	htmlTokenLimit := s.researchTokenLimits(model, model).HTMLReport
+	parameters := map[string]any{"temperature": 0.7, "stream": true, "max_tokens": htmlTokenLimit}
 	encodedMessages, _ := json.Marshal(messages)
 	encodedParameters, _ := json.Marshal(parameters)
 	call, callErr := s.store.BeginResearchLLMCall(jobID, "designing", "html_report", 0, model, modelServer.APIBase, string(encodedMessages), string(encodedParameters))
@@ -324,7 +371,7 @@ func (s *Server) generateReportHTML(ctx context.Context, jobID int64, model, tit
 		}
 		return "", nil, fmt.Errorf("HTML generation failed: %w", err)
 	}
-	if completion.Truncated(0) {
+	if completion.Truncated(htmlTokenLimit) {
 		if callID != 0 {
 			_ = s.store.SetResearchLLMCallDisposition(callID, "rejected")
 		}

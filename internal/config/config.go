@@ -21,18 +21,24 @@ type Config struct {
 }
 
 type Research struct {
-	Model                 string `toml:"model"`                  // default model for research jobs (falls back to server.default_model)
-	HTMLReportModel       string `toml:"html_report_model"`      // default model for the HTML report step (falls back to the job's model)
-	WorkerModel           string `toml:"worker_model"`           // default model for the worker tier — extraction + slug/classify/query-gen/decide (falls back to the job's model)
-	MaxRounds             int    `toml:"max_rounds"`             // hard upper bound on research rounds
-	MaxTimeSeconds        int    `toml:"max_time_seconds"`       // wall-clock budget, checked at the start of each round
-	MaxURLsPerRound       int    `toml:"max_urls_per_round"`     // URLs fetched per query per round
-	MaxContentChars       int    `toml:"max_content_chars"`      // page content truncation limit before extraction
-	MaxReportTokens       int    `toml:"max_report_tokens"`      // max_tokens for synthesis and final report calls
-	ExtractionConcurrency int    `toml:"extraction_concurrency"` // concurrent URL fetch+extract tasks
-	MinRounds             int    `toml:"min_rounds"`             // stop-check is skipped until this many rounds complete
-	MaxEmptyRounds        int    `toml:"max_empty_rounds"`       // consecutive zero-finding rounds before aborting
-	SynthesisWindow       int    `toml:"synthesis_window"`       // only the last N findings are passed to each synthesis call
+	Model                 string  `toml:"model"`                  // default model for research jobs (falls back to server.default_model)
+	HTMLReportModel       string  `toml:"html_report_model"`      // default model for the HTML report step (falls back to the job's model)
+	WorkerModel           string  `toml:"worker_model"`           // default model for the worker tier — extraction + slug/classify/query-gen/decide (falls back to the job's model)
+	MaxRounds             int     `toml:"max_rounds"`             // hard upper bound on research rounds
+	MaxTimeSeconds        int     `toml:"max_time_seconds"`       // wall-clock budget, checked at the start of each round
+	MaxURLsPerRound       int     `toml:"max_urls_per_round"`     // URLs fetched per query per round
+	MaxContentChars       int     `toml:"max_content_chars"`      // page content truncation limit before extraction
+	MaxReportTokens       int     `toml:"max_report_tokens"`      // deprecated compatibility alias for synthesis_tokens
+	SynthesisTokens       int     `toml:"synthesis_tokens"`       // output ceiling for each evolving synthesis
+	FinalReportTokens     int     `toml:"final_report_tokens"`    // output ceiling for a single-pass final report
+	SectionTokens         int     `toml:"section_tokens"`         // output ceiling for each in-depth report section
+	HTMLReportTokens      int     `toml:"html_report_tokens"`     // output ceiling for designed HTML
+	MaxCostUSD            float64 `toml:"max_cost_usd"`           // default per-job known-cost ceiling; 0 disables
+	FinalReservePercent   int     `toml:"final_reserve_percent"`  // time and known cost held back for final writing
+	ExtractionConcurrency int     `toml:"extraction_concurrency"` // concurrent URL fetch+extract tasks
+	MinRounds             int     `toml:"min_rounds"`             // stop-check is skipped until this many rounds complete
+	MaxEmptyRounds        int     `toml:"max_empty_rounds"`       // consecutive zero-finding rounds before aborting
+	SynthesisWindow       int     `toml:"synthesis_window"`       // only the last N findings are passed to each synthesis call
 }
 
 type SearXNG struct {
@@ -77,10 +83,11 @@ func (s *ModelServer) IsOpenRouter() bool {
 }
 
 type Model struct {
-	Name        string   `toml:"name"`
-	DisplayName string   `toml:"display_name"`
-	ModelServer string   `toml:"model_server"`
-	Modes       *[]string `toml:"modes"`
+	Name            string    `toml:"name"`
+	DisplayName     string    `toml:"display_name"`
+	ModelServer     string    `toml:"model_server"`
+	Modes           *[]string `toml:"modes"`
+	MaxOutputTokens int       `toml:"max_output_tokens"` // optional provider/model output ceiling used to clamp phase budgets
 }
 
 // AvailableIn reports whether the model is available in the given mode.
@@ -117,7 +124,11 @@ func Load(path string) (*Config, error) {
 			MaxTimeSeconds:        600,
 			MaxURLsPerRound:       3,
 			MaxContentChars:       15000,
-			MaxReportTokens:       8192,
+			SynthesisTokens:       8192,
+			FinalReportTokens:     32768,
+			SectionTokens:         12288,
+			HTMLReportTokens:      32768,
+			FinalReservePercent:   25,
 			ExtractionConcurrency: 3,
 			MinRounds:             2,
 			MaxEmptyRounds:        2,
@@ -131,6 +142,9 @@ func Load(path string) (*Config, error) {
 	}
 	if keys := meta.Undecoded(); len(keys) > 0 {
 		return nil, fmt.Errorf("config: unknown or misplaced keys: %v", keys)
+	}
+	if meta.IsDefined("research", "max_report_tokens") && !meta.IsDefined("research", "synthesis_tokens") {
+		cfg.Research.SynthesisTokens = cfg.Research.MaxReportTokens
 	}
 
 	applyEnv(cfg)
@@ -161,8 +175,31 @@ func (c *Config) Validate() error {
 		if _, ok := serverNames[m.ModelServer]; !ok {
 			return fmt.Errorf("config: model %q references unknown model_server %q", m.Name, m.ModelServer)
 		}
+		if m.MaxOutputTokens < 0 {
+			return fmt.Errorf("config: model %q max_output_tokens cannot be negative", m.Name)
+		}
+	}
+	if c.Research.SynthesisTokens < 1 || c.Research.FinalReportTokens < 1 || c.Research.SectionTokens < 1 || c.Research.HTMLReportTokens < 1 {
+		return fmt.Errorf("config: research token ceilings must be positive")
+	}
+	if c.Research.MaxCostUSD < 0 {
+		return fmt.Errorf("config: research max_cost_usd cannot be negative")
+	}
+	if c.Research.FinalReservePercent < 0 || c.Research.FinalReservePercent > 90 {
+		return fmt.Errorf("config: research final_reserve_percent must be between 0 and 90")
 	}
 	return nil
+}
+
+// ModelOutputLimit returns a configured provider/model output ceiling. Zero
+// means the model did not declare one, so phase safety ceilings apply alone.
+func (c *Config) ModelOutputLimit(modelName string) int {
+	for _, model := range c.Models {
+		if model.Name == modelName {
+			return model.MaxOutputTokens
+		}
+	}
+	return 0
 }
 
 // ServerForModel returns the ModelServer that hosts modelName.

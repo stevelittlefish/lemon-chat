@@ -8,7 +8,7 @@ import { preload as preloadIcons, icon } from './icons.js';
 const main = document.getElementById('research-main');
 
 let modelList = [];
-let formDefaults = { effort: 3, max_time_minutes: 10 };
+let formDefaults = { effort: 3, max_time_minutes: 10, max_cost_usd: 0 };
 let abortEvents = null; // aborts the active SSE subscription
 
 // Effort levels — value matches the 1–5 scale the backend expects.
@@ -174,6 +174,10 @@ async function showList() {
             <input id="research-time" class="input research-time-input" type="number" min="1" max="240"
               value="${formDefaults.max_time_minutes}"> min
           </label>
+          <label class="research-field">cost budget
+            <input id="research-cost" class="input research-time-input" type="number" min="0" step="0.01"
+              value="${formDefaults.max_cost_usd || ''}" placeholder="no cap"> USD
+          </label>
         </div>
         <p class="research-field-hint">worker model handles page reading and the mechanical steps; a small local model here can cut cost and time</p>
         <div class="research-form-options">
@@ -262,10 +266,11 @@ async function startResearch() {
   const pauseRedditImport = document.getElementById('research-pause-reddit').checked;
   const effort = parseInt(document.getElementById('research-effort').value, 10) || formDefaults.effort;
   const maxTimeMinutes = parseInt(document.getElementById('research-time').value, 10) || formDefaults.max_time_minutes;
+  const maxCostUSD = parseFloat(document.getElementById('research-cost').value) || formDefaults.max_cost_usd || 0;
   const btn = document.getElementById('research-start');
   btn.disabled = true;
   try {
-    const job = await research.start(title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, htmlReportModel, workerModel, effort, maxTimeMinutes);
+    const job = await research.start(title, query, model, mode, forceSearch, deepReport, pauseRedditImport, autoHtmlReport, htmlReportDirection, htmlReportModel, workerModel, effort, maxTimeMinutes, maxCostUSD);
     location.hash = job.id;
   } catch (err) {
     btn.disabled = false;
@@ -389,6 +394,7 @@ async function showDetail(id) {
   const awaitingReddit = job.status === 'awaiting_reddit';
   const running = job.status === 'running' || job.status === 'pending';
   const displayTitle = job.title || job.query;
+  const effectiveLimits = parseJSON(job.token_limits, {});
   const promptHtml = job.title && job.query
     ? `<p class="research-detail-prompt">${escapeHtml(job.query)}</p>`
     : '';
@@ -429,6 +435,7 @@ async function showDetail(id) {
       <span>${formatDate(job.created_at)}</span>
       ${job.elapsed_ms ? `<span>${formatDuration(job.elapsed_ms)}</span>` : ''}
       ${job.price_usd != null ? `<span>${formatPrice(job.price_usd)}</span>` : ''}
+      ${job.max_cost_usd > 0 ? `<span>budget: ${formatPrice(job.max_cost_usd)}</span>` : ''}
     </div>
     ${running ? '<div id="research-progress" class="research-progress"></div>' : ''}
     ${awaitingReddit ? redditWaitingPanel(job) : ''}
@@ -982,6 +989,7 @@ async function showExplore(id) {
     ['sources kept', findings.length],
     job.elapsed_ms ? ['duration', formatDuration(job.elapsed_ms)] : null,
     job.price_usd != null ? ['cost', formatPrice(job.price_usd)] : null,
+    job.max_cost_usd > 0 ? ['cost budget', formatPrice(job.max_cost_usd)] : null,
     calls.length ? ['model calls', calls.length] : null,
     callUsage.total ? ['tokens', callUsage.total.toLocaleString()] : null,
     callCost ? ['trace cost', formatPrice(callCost)] : null,
@@ -1063,6 +1071,7 @@ async function showExplore(id) {
       <p class="research-section-label">trace overview</p>
       <div class="trace-overview">
         <div><span class="eyebrow">Token breakdown</span><strong>${callUsage.prompt.toLocaleString()} input · ${callUsage.completion.toLocaleString()} output</strong></div>
+        <div><span class="eyebrow">Effective output limits</span><strong>synthesis ${Number(effectiveLimits.synthesis || 0).toLocaleString()} · final ${Number(effectiveLimits.final_report || 0).toLocaleString()} · section ${Number(effectiveLimits.section || 0).toLocaleString()} · HTML ${Number(effectiveLimits.html_report || 0).toLocaleString()}</strong></div>
         <div class="${htmlOutcome && isProblemEvent(htmlOutcome) ? 'is-danger' : ''}"><span class="eyebrow">HTML report</span><strong>${escapeHtml(htmlOutcomeText)}</strong></div>
       </div>
     </section>

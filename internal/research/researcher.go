@@ -43,6 +43,8 @@ var validBrainstormFormats = map[string]bool{
 
 var reCombinedSourceCitation = regexp.MustCompile(`\[((?:S\d+\s*(?:[,;]|\band\b)?\s*){2,})\]`)
 
+var ErrBudgetExhausted = errors.New("research budget exhausted")
+
 // Research modes. "research" is the default web-search-driven pipeline;
 // "brainstorm" is an ideation-driven variant where each round the model
 // develops ideas and decides for itself whether it needs to search the web.
@@ -85,6 +87,15 @@ type State struct {
 	PriceUSD     *float64      `json:"price_usd,omitempty"`
 }
 
+// TokenLimits are the effective, model-clamped output ceilings persisted with
+// a job so resumed runs use the same budgets even if server config changes.
+type TokenLimits struct {
+	Synthesis   int `json:"synthesis"`
+	FinalReport int `json:"final_report"`
+	Section     int `json:"section"`
+	HTMLReport  int `json:"html_report"`
+}
+
 // Config carries everything a run needs; all tuning parameters come from the
 // [research] section of lemon.toml.
 type Config struct {
@@ -123,7 +134,9 @@ type Config struct {
 	MaxTime               time.Duration
 	MaxURLsPerRound       int
 	MaxContentChars       int
-	MaxReportTokens       int
+	TokenLimits           TokenLimits
+	MaxCostUSD            float64
+	FinalReservePercent   int
 	ExtractionConcurrency int
 	MinRounds             int
 	MaxEmptyRounds        int
@@ -238,6 +251,18 @@ func New(cfg Config, state State, onProgress func(Progress), onCheckpoint func(S
 	if cfg.Mode == "" {
 		cfg.Mode = ModeResearch
 	}
+	if cfg.TokenLimits.Synthesis <= 0 {
+		cfg.TokenLimits.Synthesis = 8192
+	}
+	if cfg.TokenLimits.FinalReport <= 0 {
+		cfg.TokenLimits.FinalReport = 32768
+	}
+	if cfg.TokenLimits.Section <= 0 {
+		cfg.TokenLimits.Section = 12288
+	}
+	if cfg.TokenLimits.HTMLReport <= 0 {
+		cfg.TokenLimits.HTMLReport = 32768
+	}
 	writer := modelEndpoint{Model: cfg.Model, APIBase: cfg.APIBase, APIKey: cfg.APIKey}
 	worker := writer
 	if cfg.WorkerModel != "" {
@@ -294,6 +319,78 @@ func (r *Researcher) addPrice(cost *float64) {
 	*r.state.PriceUSD += *cost
 }
 
+func (r *Researcher) knownCostUSD() float64 {
+	r.priceMu.Lock()
+	defer r.priceMu.Unlock()
+	if r.state.PriceUSD == nil {
+		return 0
+	}
+	return *r.state.PriceUSD
+}
+
+func (r *Researcher) finalWritingOperation(operation string) bool {
+	switch operation {
+	case "final_report", "final_report_expand", "final_brainstorm", "outline", "outline_refine", "write_section", "write_glue":
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *Researcher) budgetFraction(finalWriting bool) float64 {
+	if finalWriting {
+		return 1
+	}
+	reserve := r.cfg.FinalReservePercent
+	if reserve < 0 {
+		reserve = 0
+	}
+	if reserve > 90 {
+		reserve = 90
+	}
+	return float64(100-reserve) / 100
+}
+
+func (r *Researcher) budgetExhausted(finalWriting bool) (bool, string) {
+	fraction := r.budgetFraction(finalWriting)
+	if r.cfg.MaxTime > 0 && time.Duration(r.elapsedMS())*time.Millisecond >= time.Duration(float64(r.cfg.MaxTime)*fraction) {
+		if finalWriting {
+			return true, "time budget exhausted"
+		}
+		return true, "research time allocation reached — reserving the remainder for final writing"
+	}
+	if r.cfg.MaxCostUSD > 0 && r.knownCostUSD() >= r.cfg.MaxCostUSD*fraction {
+		if finalWriting {
+			return true, "cost budget exhausted"
+		}
+		return true, "research cost allocation reached — reserving the remainder for final writing"
+	}
+	return false, ""
+}
+
+func (r *Researcher) callContext(parent context.Context, operation string, requested time.Duration) (context.Context, context.CancelFunc, error) {
+	finalWriting := r.finalWritingOperation(operation)
+	if exhausted, message := r.budgetExhausted(finalWriting); exhausted {
+		return nil, nil, fmt.Errorf("%w: %s", ErrBudgetExhausted, message)
+	}
+	limit := requested
+	if r.cfg.MaxTime > 0 {
+		available := time.Duration(float64(r.cfg.MaxTime)*r.budgetFraction(finalWriting)) - time.Duration(r.elapsedMS())*time.Millisecond
+		if available <= 0 {
+			return nil, nil, fmt.Errorf("%w: no time remains for %s", ErrBudgetExhausted, operation)
+		}
+		if limit <= 0 || available < limit {
+			limit = available
+		}
+	}
+	if limit > 0 {
+		ctx, cancel := context.WithTimeout(parent, limit)
+		return ctx, cancel, nil
+	}
+	ctx, cancel := context.WithCancel(parent)
+	return ctx, cancel, nil
+}
+
 // Run executes the research loop and returns the formatted composite report.
 func (r *Researcher) Run(ctx context.Context) (string, error) {
 	r.startTime = time.Now()
@@ -301,6 +398,8 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 	r.trace("run_started", "planning", r.state.Round, "", map[string]any{
 		"model": r.writer.Model, "worker_model": r.worker.Model, "mode": r.cfg.Mode,
 		"max_rounds": r.cfg.MaxRounds, "max_time_ms": r.cfg.MaxTime.Milliseconds(),
+		"max_cost_usd": r.cfg.MaxCostUSD, "final_reserve_percent": r.cfg.FinalReservePercent,
+		"token_limits": r.cfg.TokenLimits,
 	})
 
 	// Phases 1–2 only run before the first round (fresh job, or a job that
@@ -353,8 +452,8 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
-		if r.timeExhausted() {
-			r.progress(Progress{Phase: "warning", Message: "time budget exhausted — writing report with findings so far"})
+		if exhausted, message := r.budgetExhausted(false); exhausted {
+			r.progress(Progress{Phase: "warning", Message: message})
 			break
 		}
 
@@ -392,8 +491,8 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 			if ctx.Err() != nil {
 				return "", ctx.Err()
 			}
-			if r.timeExhausted() {
-				r.progress(Progress{Phase: "warning", Message: "time budget exhausted — writing report with findings so far"})
+			if exhausted, message := r.budgetExhausted(false); exhausted {
+				r.progress(Progress{Phase: "warning", Message: message})
 				break
 			}
 			round := r.state.Round + 1
@@ -533,11 +632,6 @@ func (r *Researcher) resumeRedditRound(ctx context.Context, resume RedditResume)
 		r.checkpoint()
 	}
 	return keepGoing, nil
-}
-
-// timeExhausted reports whether the wall-clock budget has been spent.
-func (r *Researcher) timeExhausted() bool {
-	return time.Duration(r.elapsedMS())*time.Millisecond > r.cfg.MaxTime
 }
 
 // runOneRound dispatches to the round implementation for the active mode.
@@ -1034,7 +1128,7 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 	} else {
 		prompt = fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, r.formatFindings(newFindings))
 	}
-	out, callID, err := r.llmCallStream(ctx, "synthesize", round, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout,
+	out, callID, err := r.llmCallStream(ctx, "synthesize", round, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.TokenLimits.Synthesis, synthesisTimeout,
 		func(generated int, tail string) {
 			r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 		})
@@ -1098,7 +1192,7 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	report, callID, err := r.llmCallStream(ctx, "final_report", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	report, callID, err := r.llmCallStream(ctx, "final_report", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
 	if err != nil || report == "" {
 		r.setCallDisposition(callID, "fallback")
 		// Never return empty — fall back to the evolving synthesis.
@@ -1112,7 +1206,7 @@ func (r *Researcher) finalReport(ctx context.Context) string {
 			{Role: "user", Content: prompt},
 			{Role: "assistant", Content: report},
 			{Role: "user", Content: expandReportPrompt},
-		}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+		}, 0.4, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
 		if err == nil && len(expanded) > len(report) {
 			r.setCallDisposition(expandCallID, "accepted")
 			report = expanded
@@ -1141,7 +1235,7 @@ func (r *Researcher) finalBrainstorm(ctx context.Context) string {
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	report, callID, err := r.llmCallStream(ctx, "final_brainstorm", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.5, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	report, callID, err := r.llmCallStream(ctx, "final_brainstorm", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.5, r.cfg.TokenLimits.FinalReport, synthesisTimeout, onDelta)
 	if err != nil || report == "" {
 		r.setCallDisposition(callID, "fallback")
 		// Never return empty — fall back to the evolving design doc.
@@ -1331,7 +1425,7 @@ func (r *Researcher) writeSection(ctx context.Context, sec reportSection, outlin
 	onDelta := func(generated int, tail string) {
 		r.progress(Progress{Phase: "writing", TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 	}
-	out, callID, err := r.llmCallStream(ctx, "write_section", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.4, r.cfg.MaxReportTokens, synthesisTimeout, onDelta)
+	out, callID, err := r.llmCallStream(ctx, "write_section", r.state.Round, []chatMsg{{Role: "user", Content: prompt}}, 0.4, r.cfg.TokenLimits.Section, synthesisTimeout, onDelta)
 	if err != nil || strings.TrimSpace(out) == "" {
 		r.setCallDisposition(callID, "rejected")
 		return ""

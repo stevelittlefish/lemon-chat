@@ -36,6 +36,8 @@ type researchBundleInfo struct {
 	Phase               *string                    `json:"phase"`
 	Effort              int                        `json:"effort"`
 	MaxTimeSeconds      int                        `json:"max_time_seconds"`
+	MaxCostUSD          float64                    `json:"max_cost_usd"`
+	TokenLimits         any                        `json:"token_limits"`
 	Rounds              int                        `json:"rounds"`
 	EmptyRounds         int                        `json:"empty_rounds"`
 	ElapsedMS           int64                      `json:"elapsed_ms"`
@@ -448,6 +450,7 @@ redacted defensively.
 		"auto_html_report": job.AutoHTMLReport, "html_report_direction": job.HTMLReportDirection,
 		"pause_reddit_import": job.PauseRedditImport, "status": job.Status, "phase": job.Phase,
 		"effort": job.Effort, "max_time_seconds": job.MaxTimeSeconds, "round": job.Round,
+		"max_cost_usd": job.MaxCostUSD, "token_limits": decodedBundleJSON(job.TokenLimits),
 		"empty_rounds": job.EmptyRounds, "elapsed_ms": job.ElapsedMS, "price_usd": job.PriceUSD,
 		"category": job.Category, "slug": job.Slug, "plan": job.Plan, "report": job.Report,
 		"final_report": job.FinalReport, "findings": decodedBundleJSON(pointerString(job.Findings)),
@@ -638,7 +641,7 @@ func writeResearchBundle(dst io.Writer, job *store.ResearchJob, reports []store.
 		Mode: job.Mode, ForceSearch: job.ForceSearch, DeepReport: job.DeepReport,
 		AutoHTMLReport: job.AutoHTMLReport, HTMLReportDirection: job.HTMLReportDirection,
 		PauseRedditImport: job.PauseRedditImport, Status: job.Status, Phase: job.Phase,
-		Effort: job.Effort, MaxTimeSeconds: job.MaxTimeSeconds, Rounds: job.Round,
+		Effort: job.Effort, MaxTimeSeconds: job.MaxTimeSeconds, MaxCostUSD: job.MaxCostUSD, TokenLimits: decodedBundleJSON(job.TokenLimits), Rounds: job.Round,
 		EmptyRounds: job.EmptyRounds, ElapsedMS: job.ElapsedMS, PriceUSD: job.PriceUSD,
 		Category: job.Category, Slug: job.Slug, QueryCount: jsonArrayLength(job.QueriesUsed),
 		AnalyzedURLCount: jsonArrayLength(job.AnalyzedURLs), FindingCount: jsonArrayLength(job.Findings),

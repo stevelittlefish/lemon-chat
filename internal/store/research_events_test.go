@@ -11,7 +11,7 @@ func TestResearchEventsAreAppendOnlyAndSequencedPerJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := s.CreateResearchJob(user.ID, "Trace", "Question", "model", "research", false, false, false, false, "", "", "", 3, 600)
+	job, err := s.CreateResearchJob(user.ID, "Trace", "Question", "model", "research", false, false, false, false, "", "", "", 3, 600, 0, "{}")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestResearchEventsSequenceConcurrentAppends(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := s.CreateResearchJob(user.ID, "Trace", "Question", "model", "research", false, false, false, false, "", "", "", 3, 600)
+	job, err := s.CreateResearchJob(user.ID, "Trace", "Question", "model", "research", false, false, false, false, "", "", "", 3, 600, 0, "{}")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestDeletingResearchJobDeletesTrace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := s.CreateResearchJob(user.ID, "Trace", "Question", "model", "research", false, false, false, false, "", "", "", 3, 600)
+	job, err := s.CreateResearchJob(user.ID, "Trace", "Question", "model", "research", false, false, false, false, "", "", "", 3, 600, 0, "{}")
 	if err != nil {
 		t.Fatal(err)
 	}

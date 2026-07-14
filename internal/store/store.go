@@ -921,6 +921,21 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v40 → v41 complete")
 	}
 
+	if version < 42 {
+		log.Println("store: migrating v41 → v42 (add research cost and token budgets)")
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN max_cost_usd REAL NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`ALTER TABLE research_job ADD COLUMN token_limits TEXT NOT NULL DEFAULT '{}'`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (42, ?)`, now()); err != nil {
+			return err
+		}
+		version = 42
+		log.Println("store: migration v41 → v42 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

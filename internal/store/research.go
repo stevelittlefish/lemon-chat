@@ -55,6 +55,8 @@ type ResearchJob struct {
 	// per-job wall-clock budget (0 means use the configured default).
 	Effort         int      `json:"effort"`
 	MaxTimeSeconds int      `json:"max_time_seconds"`
+	MaxCostUSD     float64  `json:"max_cost_usd"`
+	TokenLimits    string   `json:"token_limits"`
 	Round          int      `json:"round"`
 	EmptyRounds    int      `json:"empty_rounds"`
 	ElapsedMS      int64    `json:"elapsed_ms"`
@@ -81,12 +83,12 @@ type ResearchJob struct {
 	UpdatedAt          string  `json:"updated_at"`
 }
 
-const researchJobCols = `id, user_id, title, query, model, mode, force_search, deep_report, auto_html_report, html_report_direction, html_report_model, worker_model, pause_reddit_import, status, phase, effort, max_time_seconds, round, empty_rounds, elapsed_ms, price_usd,
+const researchJobCols = `id, user_id, title, query, model, mode, force_search, deep_report, auto_html_report, html_report_direction, html_report_model, worker_model, pause_reddit_import, status, phase, effort, max_time_seconds, max_cost_usd, token_limits, round, empty_rounds, elapsed_ms, price_usd,
 	category, slug, plan, report, final_report, findings, queries_used, analyzed_urls, reddit_request_id, pending_reddit_round, reddit_response, reddit_skipped, error, created_at, updated_at`
 
 func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) {
 	var j ResearchJob
-	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Mode, &j.ForceSearch, &j.DeepReport, &j.AutoHTMLReport, &j.HTMLReportDirection, &j.HTMLReportModel, &j.WorkerModel, &j.PauseRedditImport, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.Round, &j.EmptyRounds, &j.ElapsedMS, &j.PriceUSD,
+	err := row.Scan(&j.ID, &j.UserID, &j.Title, &j.Query, &j.Model, &j.Mode, &j.ForceSearch, &j.DeepReport, &j.AutoHTMLReport, &j.HTMLReportDirection, &j.HTMLReportModel, &j.WorkerModel, &j.PauseRedditImport, &j.Status, &j.Phase, &j.Effort, &j.MaxTimeSeconds, &j.MaxCostUSD, &j.TokenLimits, &j.Round, &j.EmptyRounds, &j.ElapsedMS, &j.PriceUSD,
 		&j.Category, &j.Slug, &j.Plan, &j.Report, &j.FinalReport, &j.Findings, &j.QueriesUsed, &j.AnalyzedURLs, &j.RedditRequestID, &j.PendingRedditRound, &j.RedditResponse, &j.RedditSkipped, &j.Error, &j.CreatedAt, &j.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -97,7 +99,7 @@ func scanResearchJob(row interface{ Scan(...any) error }) (*ResearchJob, error) 
 	return &j, nil
 }
 
-func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string, forceSearch, deepReport, pauseRedditImport, autoHTMLReport bool, htmlReportDirection, htmlReportModel, workerModel string, effort, maxTimeSeconds int) (*ResearchJob, error) {
+func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string, forceSearch, deepReport, pauseRedditImport, autoHTMLReport bool, htmlReportDirection, htmlReportModel, workerModel string, effort, maxTimeSeconds int, maxCostUSD float64, tokenLimits string) (*ResearchJob, error) {
 	t := now()
 	var titlePtr *string
 	if title != "" {
@@ -116,9 +118,9 @@ func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string
 		workerModelPtr = &workerModel
 	}
 	res, err := s.db.Exec(
-		`INSERT INTO research_job (user_id, title, query, model, mode, force_search, deep_report, auto_html_report, html_report_direction, html_report_model, worker_model, pause_reddit_import, status, effort, max_time_seconds, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
-		userID, titlePtr, query, model, mode, forceSearch, deepReport, autoHTMLReport, directionPtr, htmlModelPtr, workerModelPtr, pauseRedditImport, effort, maxTimeSeconds, t, t,
+		`INSERT INTO research_job (user_id, title, query, model, mode, force_search, deep_report, auto_html_report, html_report_direction, html_report_model, worker_model, pause_reddit_import, status, effort, max_time_seconds, max_cost_usd, token_limits, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
+		userID, titlePtr, query, model, mode, forceSearch, deepReport, autoHTMLReport, directionPtr, htmlModelPtr, workerModelPtr, pauseRedditImport, effort, maxTimeSeconds, maxCostUSD, tokenLimits, t, t,
 	)
 	if err != nil {
 		return nil, err
@@ -126,7 +128,7 @@ func (s *Store) CreateResearchJob(userID int64, title, query, model, mode string
 	id, _ := res.LastInsertId()
 	return &ResearchJob{ID: id, UserID: userID, Title: titlePtr, Query: query, Model: model, Mode: mode, ForceSearch: forceSearch, DeepReport: deepReport,
 		AutoHTMLReport: autoHTMLReport, HTMLReportDirection: directionPtr, HTMLReportModel: htmlModelPtr, WorkerModel: workerModelPtr, PauseRedditImport: pauseRedditImport, Status: ResearchStatusPending,
-		Effort: effort, MaxTimeSeconds: maxTimeSeconds, CreatedAt: t, UpdatedAt: t}, nil
+		Effort: effort, MaxTimeSeconds: maxTimeSeconds, MaxCostUSD: maxCostUSD, TokenLimits: tokenLimits, CreatedAt: t, UpdatedAt: t}, nil
 }
 
 func (s *Store) GetResearchJob(id, userID int64) (*ResearchJob, error) {
