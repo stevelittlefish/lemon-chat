@@ -223,6 +223,51 @@ func (rl *researchRunLog) appendFile(name string, data []byte) {
 	_, _ = f.Write(data)
 }
 
+// researchDebugEvent is one milestone read back from events.jsonl for the UI
+// diagnostics view. It mirrors the shape written by researchRunLog.event.
+type researchDebugEvent struct {
+	TS      string `json:"ts"`
+	Phase   string `json:"phase"`
+	Round   int    `json:"round,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+// researchDebug is the diagnostics payload served to the UI: the run's config
+// and outcome plus its milestone timeline, read from the on-disk run-log.
+// Available is false when a job has no run-log (e.g. it predates the feature).
+type researchDebug struct {
+	Available bool                 `json:"available"`
+	Meta      *researchRunMeta     `json:"meta,omitempty"`
+	Events    []researchDebugEvent `json:"events,omitempty"`
+}
+
+// readResearchDebug loads a job's diagnostic run-log from disk. It never errors:
+// a missing or unreadable run-log simply yields Available=false.
+func readResearchDebug(dataDir string, jobID int64) researchDebug {
+	dir := researchRunLogDir(dataDir, jobID)
+	metaBytes, err := os.ReadFile(filepath.Join(dir, "meta.json"))
+	if err != nil {
+		return researchDebug{Available: false}
+	}
+	var meta researchRunMeta
+	if json.Unmarshal(metaBytes, &meta) != nil {
+		return researchDebug{Available: false}
+	}
+	dbg := researchDebug{Available: true, Meta: &meta}
+	if raw, err := os.ReadFile(filepath.Join(dir, "events.jsonl")); err == nil {
+		for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+			if line == "" {
+				continue
+			}
+			var e researchDebugEvent
+			if json.Unmarshal([]byte(line), &e) == nil {
+				dbg.Events = append(dbg.Events, e)
+			}
+		}
+	}
+	return dbg
+}
+
 // isTerminalReason matches the milestone messages that signal the run ended for
 // a structural reason (round cap, time budget, exhausted searches) rather than a
 // transient warning, so they can be recorded as the stop_reason.

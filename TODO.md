@@ -26,6 +26,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [x] Fold the debug run-log bundle into the job view's Download drop-down (shown for any terminal job, so failed/cancelled jobs can grab it too), and add an in-UI diagnostics view on the Explore page — stop reason, effective config/outcome, and a collapsible event timeline — served from `GET /api/research/{id}/debug` (`readResearchDebug`). No download needed.
+
 - [x] Add a ZIP bundle download containing every research report and the job's displayed metadata and statistics.
 
 - [x] Stream live generation progress for the auto HTML report's "designing the HTML report" phase. `autoGenerateHTMLReport` now passes an `onProgress` callback to `generateReportHTML` that broadcasts `research.Progress{Phase: "designing", Generated, Snippet}` over SSE, and `updateStream` labels the phase "designing HTML report", so the phase streams like the other long generation steps.

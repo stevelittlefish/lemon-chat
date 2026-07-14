@@ -945,6 +945,21 @@ func (s *Server) handleCancelResearch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelling"})
 }
 
+// handleGetResearchDebug serves the on-disk diagnostic run-log (config, outcome,
+// and milestone timeline) as JSON so the UI can show it inline without a bundle
+// download. Returns {available:false} when the job has no run-log.
+func (s *Server) handleGetResearchDebug(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := s.store.GetResearchJob(id, user.ID); notFoundOr500(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, readResearchDebug(s.cfg.Server.DataDir, id))
+}
+
 func (s *Server) handleDeleteResearch(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	id, ok := pathID(w, r)
