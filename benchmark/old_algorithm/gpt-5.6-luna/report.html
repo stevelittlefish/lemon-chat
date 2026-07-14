@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Is a Home Battery Worthwhile Without Solar Panels for a UK Home?</title>
+<style>
+:root{
+  --ink:#17212b;--muted:#5f6c78;--paper:#f7f9fb;--card:#fff;--line:#dce4ea;
+  --navy:#12344d;--teal:#087f8c;--mint:#dff4f1;--amber:#f6c453;--rose:#f6e4df;
+  --shadow:0 12px 30px rgba(18,52,77,.08);--radius:18px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+a{color:#006b78;text-decoration-thickness:1.5px;text-underline-offset:2px}
+a:hover{color:#b14d22}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;line-height:1.15;color:var(--navy);margin:0 0 .7rem}
+h1{font-size:clamp(2.4rem,6vw,5.5rem);letter-spacing:-.045em}
+h2{font-size:clamp(1.8rem,3vw,2.8rem);margin-top:3.5rem}
+h3{font-size:1.35rem;margin-top:1.8rem}
+p{max-width:78ch}
+header{background:linear-gradient(135deg,#12344d 0%,#0c6874 100%);color:#fff;padding:clamp(2rem,6vw,6rem) 5vw 4rem;position:relative;overflow:hidden}
+header:after{content:"";position:absolute;width:45vw;height:45vw;border:1px solid rgba(255,255,255,.2);border-radius:50%;right:-15vw;top:-20vw;box-shadow:0 0 0 40px rgba(255,255,255,.04),0 0 0 80px rgba(255,255,255,.03)}
+header h1{color:white;max-width:900px;position:relative;z-index:1}
+.kicker{font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#b9eee9;font-size:.78rem;margin-bottom:1.2rem}
+.subtitle{font-size:clamp(1.1rem,2vw,1.45rem);max-width:760px;color:#e4f5f3;position:relative;z-index:1}
+.meta{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:2rem;position:relative;z-index:1}
+.meta span{border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:.35rem .75rem;font-size:.85rem;color:#e8ffff}
+main{max-width:1240px;margin:auto;padding:0 5vw 5rem}
+.hero-grid{display:grid;grid-template-columns:1.35fr .85fr;gap:1.25rem;margin-top:-2rem;position:relative;z-index:2}
+.card,.callout,.stat,.table-wrap,.source-group{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card{padding:1.4rem}
+.verdict{padding:1.7rem;border-top:7px solid var(--amber)}
+.verdict strong{font-size:1.35rem;color:var(--navy)}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:1.5rem 0}
+.stat{padding:1.2rem}
+.stat b{display:block;font:700 2rem Georgia,serif;color:var(--teal)}
+.stat small{color:var(--muted)}
+nav{display:flex;gap:.5rem;flex-wrap:wrap;padding:1.3rem 0;border-bottom:1px solid var(--line)}
+nav a{background:#e8f1f4;border-radius:999px;padding:.35rem .75rem;text-decoration:none;font-size:.88rem}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:1.2rem}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem}
+.badge{display:inline-block;border-radius:999px;padding:.25rem .65rem;font-weight:700;font-size:.78rem;background:var(--mint);color:#075c65}
+.badge.warn{background:#fff0c7;color:#704e00}.badge.red{background:var(--rose);color:#873b28}
+.callout{padding:1.35rem;margin:1.4rem 0;border-left:6px solid var(--teal);box-shadow:none}
+.callout.warn{border-color:var(--amber);background:#fffaf0}
+.callout h3{margin-top:0}
+ul,ol{padding-left:1.25rem}
+li{margin:.35rem 0}
+.table-wrap{overflow:auto;margin:1.2rem 0}
+table{border-collapse:collapse;width:100%;min-width:690px}
+caption{text-align:left;padding:1rem 1rem .4rem;font-weight:700;color:var(--navy)}
+th,td{text-align:left;padding:.75rem .9rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:#edf4f6;color:var(--navy);font-size:.88rem}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;white-space:nowrap}
+.highlight{background:#f1fbfa}
+.note{font-size:.9rem;color:var(--muted)}
+.formula{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#eef3f5;border-radius:10px;padding:.8rem 1rem;display:block;overflow:auto}
+.timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:1.5rem 0}
+.step{padding:1.1rem;border-top:4px solid var(--teal);background:#fff}
+.step:not(:last-child){border-right:1px solid var(--line)}
+.step b{display:block;color:var(--teal);font-size:1.5rem}
+svg{width:100%;height:auto;display:block}
+.chart{padding:1rem;background:#fff;border:1px solid var(--line);border-radius:var(--radius)}
+.sources{margin-top:3rem}
+.source-grid{columns:2 320px;column-gap:2rem}
+.source-grid li{break-inside:avoid;margin:.45rem 0;font-size:.9rem;line-height:1.4}
+footer{background:var(--navy);color:#d9e8ed;padding:2rem 5vw}
+footer p{margin:.3rem 0}
+@media(max-width:850px){
+ .hero-grid,.grid-2,.grid-3{grid-template-columns:1fr}
+ .stat-grid{grid-template-columns:repeat(2,1fr)}
+ .timeline{grid-template-columns:1fr}
+ .step:not(:last-child){border-right:0;border-bottom:1px solid var(--line)}
+}
+@media(max-width:520px){
+ body{font-size:15px}.stat-grid{grid-template-columns:1fr 1fr}
+ .stat b{font-size:1.55rem}main{padding-left:4vw;padding-right:4vw}
+}
+@media print{
+ body{background:#fff;color:#000}header{padding:1rem;color:#000;background:#fff;border-bottom:2px solid #000}
+ header h1{color:#000}.subtitle,.meta{color:#000}.meta span{border-color:#777}
+ nav,.sources{display:none}.card,.stat,.table-wrap,.callout{box-shadow:none;break-inside:avoid}
+ a{color:#000;text-decoration:none}h2{break-before:page}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="kicker">England • illustrative assessment • 14 July 2026</div>
+  <h1>Is a home battery worthwhile without solar panels?</h1>
+  <p class="subtitle">For this 9,000 kWh home with substantial daytime home-office use, a grid-charged battery can work technically—but is unlikely to repay its installed cost under ordinary central-case assumptions.</p>
+  <div class="meta"><span>9,000 kWh/year</span><span>Smart meter</span><span>Gas heating</span><span>No solar planned</span><span>10-year horizon</span></div>
+</header>
+
+<main>
+  <div class="hero-grid">
+    <section class="card verdict" aria-labelledby="answer">
+      <span class="badge warn">Bottom line</span>
+      <h2 id="answer">Change tariff first; buy storage only on measured evidence.</h2>
+      <p>The strongest low-risk choice is a competitive flat tariff. A suitable time-of-use tariff is worth testing, particularly if its cheap period overlaps with daytime office demand. If a battery is still attractive after analysing 12 months of half-hourly data, the approximately <strong>5 kWh system is preferable</strong> to 10 kWh—but neither is financially compelling at the assumed installed prices.</p>
+    </section>
+    <aside class="card">
+      <h3>Central-case outcome</h3>
+      <p><strong>5 kWh battery:</strong> £4,500 installed, about £252 first-year battery saving, approximately 17.9-year simple payback.</p>
+      <p><strong>10 kWh battery:</strong> £7,000 installed, about £328 first-year battery saving, approximately 21.3-year simple payback.</p>
+      <p class="note">These are illustrative figures, not predictions. They exclude the value of backup power, maintenance, financing, replacement and tariff changes.</p>
+    </aside>
+  </div>
+
+  <div class="stat-grid" aria-label="Key figures">
+    <div class="stat"><b>£2,257</b><small>Competitive flat tariff, first-year bill</small></div>
+    <div class="stat"><b>£2,243</b><small>TOU tariff, no battery</small></div>
+    <div class="stat"><b>£2,060</b><small>Approximate 10-year disadvantage of 5 kWh vs flat tariff</small></div>
+    <div class="stat"><b>£3,865</b><small>Approximate 10-year disadvantage of 10 kWh vs flat tariff</small></div>
+  </div>
+
+  <nav aria-label="Document navigation">
+    <a href="#comparison">Comparison</a><a href="#mechanism">How arbitrage works</a><a href="#options">Options</a><a href="#economics">Economics</a><a href="#risks">Risks and conditions</a><a href="#action">What to obtain</a><a href="#sources">Sources</a>
+  </nav>
+
+  <section id="comparison">
+    <h2>Four options at a glance</h2>
+    <div class="table-wrap">
+      <table>
+        <caption>Central illustrative comparison</caption>
+        <thead><tr><th>Option</th><th class="num">First-year bill</th><th class="num">Saving vs current tariff</th><th class="num">Upfront cost</th><th>Verdict</th></tr></thead>
+        <tbody>
+          <tr class="highlight"><td><strong>1. Competitive flat tariff</strong></td><td class="num">£2,257</td><td class="num">£167/year</td><td class="num">£0</td><td>Best low-risk benchmark</td></tr>
+          <tr><td><strong>2. TOU, no battery</strong></td><td class="num">£2,243</td><td class="num">£180/year</td><td class="num">£0</td><td>Worth testing; reversible</td></tr>
+          <tr><td><strong>3. TOU + 5 kWh</strong></td><td class="num">£1,991</td><td class="num">£432/year</td><td class="num">≈£4,500</td><td>Best battery option, weak return</td></tr>
+          <tr><td><strong>4. TOU + 10 kWh</strong></td><td class="num">£1,915</td><td class="num">£508/year</td><td class="num">≈£7,000</td><td>Least attractive financially</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Battery-inclusive bills show energy costs only; capital cost is not deducted. The 10 kWh battery lowers the annual bill most, but costs about £2,500 more for only around £76 of additional first-year battery saving.</p>
+  </section>
+
+  <section id="mechanism">
+    <h2>How a battery without solar makes money</h2>
+    <div class="grid-2">
+      <div>
+        <p>The battery’s main financial mechanism is simple: buy electricity cheaply, store it, and use it when imports are expensive. The relevant value is the price spread after losses—not the peak import price itself.</p>
+        <span class="formula">1 kWh delivered ÷ 0.88 round-trip efficiency = 1.136 kWh bought</span>
+        <span class="formula">30p peak − (10p ÷ 0.88) = 18.64p gross saving per delivered kWh</span>
+        <p>That 18.64p margin must cover capital cost, unused capacity, standby consumption, degradation, maintenance and eventual replacement.</p>
+      </div>
+      <div class="chart">
+        <h3>Illustrative energy flow</h3>
+        <svg viewBox="0 0 700 230" role="img" aria-labelledby="flowtitle flowdesc">
+          <title id="flowtitle">Grid-to-battery arbitrage flow</title>
+          <desc id="flowdesc">Cheap grid electricity enters the battery, twelve percent is lost, and the remainder serves expensive-period household demand.</desc>
+          <rect x="15" y="72" width="150" height="76" rx="14" fill="#dff4f1" stroke="#087f8c" stroke-width="2"/>
+          <text x="90" y="104" text-anchor="middle" fill="#12344d" font-weight="700">Cheap grid</text><text x="90" y="127" text-anchor="middle" fill="#12344d">10p/kWh</text>
+          <path d="M170 110 H280" stroke="#087f8c" stroke-width="5" marker-end="url(#arrow)"/>
+          <rect x="285" y="55" width="150" height="110" rx="14" fill="#fff0c7" stroke="#c58c00" stroke-width="2"/>
+          <text x="360" y="91" text-anchor="middle" fill="#12344d" font-weight="700">Battery</text><text x="360" y="116" text-anchor="middle" fill="#12344d">88% efficient</text><text x="360" y="140" text-anchor="middle" fill="#704e00">12% loss</text>
+          <path d="M440 110 H550" stroke="#087f8c" stroke-width="5" marker-end="url(#arrow)"/>
+          <rect x="555" y="72" width="130" height="76" rx="14" fill="#f6e4df" stroke="#b14d22" stroke-width="2"/>
+          <text x="620" y="104" text-anchor="middle" fill="#12344d" font-weight="700">Home load</text><text x="620" y="127" text-anchor="middle" fill="#12344d">30p peak</text>
+          <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#087f8c"/></marker></defs>
+        </svg>
+      </div>
+    </div>
+    <div class="callout warn"><h3>Why this household is difficult to optimise</h3><p>The office uses 10–20 kWh per day, but much of it is consumed during daytime working hours. A battery charged overnight helps only if it has enough stored energy, can discharge during that period, has sufficient inverter power, and does not empty before a more expensive evening window. Direct overnight use may also be cheaper than routing that electricity through a battery.</p></div>
+    <p>Flexible consumption can reduce peak exposure, as recognised in Ofgem and government material <a href="https://www.gov.uk/government/publications/clean-flexibility-roadmap/clean-flexibility-roadmap" target="_blank" rel="noopener noreferrer">[S54]</a> <a href="https://www.gov.uk/government/publications/clean-flexibility-roadmap/clean-flexibility-roadmap-july-2026-update-accessible-webpage" target="_blank" rel="noopener noreferrer">[S53]</a>. Government consultation material cites savings of more than £200 per year for some households avoiding peak periods, but that conditional figure should not be applied automatically here <a href="https://www.gov.uk/government/consultations/smart-secure-electricity-systems-sses-programme-first-phase-energy-smart-appliances-regulations/smart-secure-electricity-systems-sses-programme-first-phase-energy-smart-appliances-regulations-consultation-document-accessible-webpage" target="_blank" rel="noopener noreferrer">[S56]</a> <a href="https://www.gov.uk/government/consultations/smart-secure-electricity-systems-programme-sses-enduring-governance/smart-secure-electricity-systems-sses-programme-enduring-governance-accessible-webpage" target="_blank" rel="noopener noreferrer">[S58]</a>.</p>
+  </section>
+
+  <section>
+    <h2>Central assumptions</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Household profile</h3>
+        <ul><li>England; assessment date 14 July 2026</li><li>9,000 kWh annual electricity use</li><li>Current flat rate: 24.7p/kWh</li><li>Gas heating; smart meter; homeowner</li><li>High daytime office demand; limited manual shifting</li><li>No solar expected during the 10-year period</li><li>Financial savings valued above backup power</li></ul>
+      </div>
+      <div class="card">
+        <h3>Model inputs</h3>
+        <ul><li>Standing charge: £200/year</li><li>Competitive flat: 22.85p/kWh</li><li>TOU: 10p overnight, 30p peak, 24p shoulder</li><li>Consumption shares: 20% / 25% / 55%</li><li>Round-trip efficiency: 88%</li><li>Degradation: 2% annually</li><li>Installed prices: £4,500 / £7,000</li></ul>
+      </div>
+    </div>
+    <p>The current-rate baseline is <span class="formula">9,000 × £0.247 + £200 = £2,423</span>. The July–September 2026 price-cap benchmark is approximately 26.11p/kWh and 57.19p/day, or about £2,559 at 9,000 kWh including standing charge <a href="https://www.edfenergy.com/energywise/energy-price-cap-july-2026" target="_blank" rel="noopener noreferrer">[S40]</a>. A competitive tariff may be cheaper, but postcode-specific quotes are essential. Market pages cite rates beginning around 22.85p/kWh, while some regional fixed examples around 27.78p/kWh are worse than the assumed current rate <a href="https://www.energyplus.co.uk/suppliers/octopus-energy" target="_blank" rel="noopener noreferrer">[S3]</a>.</p>
+  </section>
+
+  <section id="options">
+    <h2>Assessing the choices</h2>
+    <div class="grid-2">
+      <article class="card">
+        <span class="badge">Option 1</span>
+        <h3>Competitive flat tariff</h3>
+        <p><strong>£2,256.50</strong> calculated as 9,000 × £0.2285 + £200. Rounded, this is £2,257—about £167 below the current baseline.</p>
+        <p>It requires no capital, installation, control platform or battery warranty. Its saving is independent of consumption timing, making it a strong fit for a daytime-heavy profile.</p>
+        <p class="note">Weakness: it does not exploit unusually cheap overnight or dynamic prices, and tariff renewal may change the result.</p>
+      </article>
+      <article class="card">
+        <span class="badge">Option 2</span>
+        <h3>TOU tariff without a battery</h3>
+        <p>The model’s weighted rate is:</p><span class="formula">(20% × 10p) + (25% × 30p) + (55% × 24p) = 22.7p/kWh</span>
+        <p>That produces £2,243/year—only about £13.50 below the competitive flat option. It is reversible and avoids battery losses.</p>
+        <p>A cheap daytime period may suit the office better than overnight-only pricing. EDF has described an amber period of roughly 6am–4pm <a href="https://www.edfenergy.com/media-centre/edf-launches-first-its-kind-three-rate-tariff-free-electricity-hours" target="_blank" rel="noopener noreferrer">[S42]</a>. However, smart tariffs can cost more when substantial use remains in peak periods <a href="https://www.energyplus.co.uk/costsavingadvice/smart-meter-tariffs-ranked" target="_blank" rel="noopener noreferrer">[S2]</a>.</p>
+      </article>
+      <article class="card">
+        <span class="badge">Option 3</span>
+        <h3>Approximately 5 kWh battery</h3>
+        <p>Assuming 4.5 kWh usable capacity and 300 equivalent cycles:</p><span class="formula">4.5 kWh × 300 = 1,350 kWh delivered</span>
+        <p>At 18.64p per delivered kWh, the first-year battery-specific saving is approximately <strong>£252</strong>. Payback at £4,500 is approximately <strong>17.9 years</strong>.</p>
+        <p>It is more likely to be used regularly than a larger system, but remains outside the 10-year financial horizon in the central case.</p>
+      </article>
+      <article class="card">
+        <span class="badge red">Option 4</span>
+        <h3>Approximately 10 kWh battery</h3>
+        <p>Assuming 8 kWh usable capacity and 220 equivalent cycles:</p><span class="formula">8 kWh × 220 = 1,760 kWh delivered</span>
+        <p>That creates approximately <strong>£328</strong> of first-year battery saving. At £7,000, simple payback is approximately <strong>21.3 years</strong>.</p>
+        <p>Filling it requires about 9.09 kWh of charging electricity. With only around 4.9 kWh/day of overnight consumption on average, much of its capacity may be unused on many days.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="economics">
+    <h2>Ten-year economics</h2>
+    <div class="table-wrap">
+      <table>
+        <caption>Electricity cost, capital and total over ten years</caption>
+        <thead><tr><th>Option</th><th class="num">10-year electricity cost</th><th class="num">Capital cost</th><th class="num">10-year total</th></tr></thead>
+        <tbody>
+          <tr><td>Competitive flat tariff</td><td class="num">£22,565</td><td class="num">£0</td><td class="num">£22,565</td></tr>
+          <tr><td>TOU, no battery</td><td class="num">£22,430</td><td class="num">£0</td><td class="num">£22,430</td></tr>
+          <tr><td>TOU + 5 kWh battery</td><td class="num">≈£20,124</td><td class="num">£4,500</td><td class="num">£24,624</td></tr>
+          <tr><td>TOU + 10 kWh battery</td><td class="num">≈£19,429</td><td class="num">£7,000</td><td class="num">£26,429</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout"><h3>Why the lowest annual bill is not the best investment</h3><p>After 2% annual degradation, approximate ten-year gross battery savings are £2,306 for 5 kWh and £3,001 for 10 kWh. Against the competitive flat tariff, the TOU-only option is around £135 better; the 5 kWh system is around £2,059 worse; and the 10 kWh system around £3,864 worse.</p></div>
+
+    <h3>Sensitivity: the spread matters most</h3>
+    <div class="table-wrap">
+      <table>
+        <caption>Illustrative first-year value at different off-peak and peak prices</caption>
+        <thead><tr><th>Off-peak</th><th>Peak</th><th class="num">Saving per delivered kWh</th><th class="num">5 kWh value</th><th class="num">10 kWh value</th></tr></thead>
+        <tbody>
+          <tr><td>15p</td><td>25p</td><td class="num">7.95p</td><td class="num">£107</td><td class="num">£140</td></tr>
+          <tr><td>10p</td><td>30p</td><td class="num">18.64p</td><td class="num">£252</td><td class="num">£328</td></tr>
+          <tr><td>5p</td><td>35p</td><td class="num">29.32p</td><td class="num">£396</td><td class="num">£516</td></tr>
+          <tr><td>5p</td><td>45p</td><td class="num">39.32p</td><td class="num">£531</td><td class="num">£692</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>At a persistent 5p/35p spread, 5 kWh ten-year gross savings after degradation could approach £3,620—still below £4,500. At 5p/45p, they could approach £4,860, making payback possible but still vulnerable to maintenance, replacement and tariff changes. Dynamic tariffs can be volatile and may sometimes cost more than standard tariffs <a href="https://octopus.energy/agile/" target="_blank" rel="noopener noreferrer">[S1]</a> <a href="https://octopus.energy/smart/tracker/" target="_blank" rel="noopener noreferrer">[S5]</a> <a href="https://octopus.energy/policies/smart-tariffs-terms-and-condition/" target="_blank" rel="noopener noreferrer">[S21]</a>.</p>
+
+    <h3>Other sensitivities</h3>
+    <div class="grid-3">
+      <div class="card"><h3>Peak share</h3><p>At 15% peak use, the illustrative TOU average is 22.1p/kWh; at 25%, 22.7p; at 35%, 23.3p. At 35%, TOU is already more expensive than the 22.85p flat benchmark before a battery.</p></div>
+      <div class="card"><h3>Efficiency</h3><p>At 88%, 1.14 kWh must be bought per delivered kWh. At 80%, it is 1.25 kWh; at 70%, 1.43 kWh. Usable AC-side energy matters more than headline capacity.</p></div>
+      <div class="card"><h3>Degradation</h3><p>At 4% annual degradation, average annual battery savings fall to about £209 for 5 kWh and £272 for 10 kWh. Maintenance, monitoring or a £2,000 inverter replacement materially worsens results.</p></div>
+    </div>
+  </section>
+
+  <section id="risks">
+    <h2>Shared considerations before buying</h2>
+    <div class="grid-2">
+      <div class="card"><h3>Tariff eligibility</h3><p>Some cheap overnight tariffs are designed for EVs and may require a vehicle or charger <a href="https://octopus.energy/go/" target="_blank" rel="noopener noreferrer">[S20]</a> <a href="https://www.edfenergy.com/electric-cars/ev-tariffs/goelectric" target="_blank" rel="noopener noreferrer">[S49]</a>. Some battery tariffs require solar, an export MPAN or approved equipment <a href="https://octopus.energy/smart/flux/" target="_blank" rel="noopener noreferrer">[S22]</a> <a href="https://octopus.energy/smart/intelligent-octopus-flux/" target="_blank" rel="noopener noreferrer">[S24]</a> <a href="https://octopus.energy/intelligent-flux-faqs/" target="_blank" rel="noopener noreferrer">[S25]</a>. Obtain written confirmation that grid charging and household discharge are permitted.</p></div>
+      <div class="card"><h3>VAT and incentives</h3><p>HMRC guidance indicates that qualifying energy-saving-material installations may receive 0% VAT during the relevant period, important before 31 March 2027 <a href="https://www.gov.uk/guidance/vat-on-energy-saving-materials-and-heating-equipment-notice-7086" target="_blank" rel="noopener noreferrer">[S26]</a>. Installer commentary argues that standalone batteries can qualify without solar <a href="https://www.mackie-electrical.co.uk/zero-vat-battery-storage-guide" target="_blank" rel="noopener noreferrer">[S59]</a>; verify the precise statutory basis and invoice treatment.</p></div>
+      <div class="card"><h3>Exports and FIT</h3><p>The Feed-in Tariff closed to new applicants on 1 April 2019, so a new standalone battery should not be treated as FIT-eligible <a href="https://www.ofgem.gov.uk/environmental-and-social-schemes/feed-tariffs-fit" target="_blank" rel="noopener noreferrer">[S55]</a>. Do not assume SEG or flexibility income for grid-charged exports; model zero unless a supplier confirms eligibility <a href="https://www.edfenergy.com/energy-efficiency/smart-export-tariff" target="_blank" rel="noopener noreferrer">[S38]</a>.</p></div>
+      <div class="card"><h3>Power and backup</h3><p>Capacity is measured in kWh; inverter delivery capability is measured in kW. A 10 kWh battery with a 2.5 kW inverter cannot supply a simultaneous 4–5 kW load. Standard grid-connected systems may not work in a power cut; backup needs a gateway, changeover equipment, protected circuits and additional cost.</p></div>
+      <div class="card"><h3>Warranty and replacement</h3><p>Check grid-arbitrage permission, throughput or cycle limits, retained capacity, inverter cover, labour, call-outs, software support and replacement arrangements. The central model assumes no maintenance and no replacement, which favours the battery.</p></div>
+      <div class="card"><h3>Direct demand matters</h3><p>More total consumption does not automatically mean more battery value. Extra usage improves the case only when it occurs during the profitable discharge window and can be physically served by the battery.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>When the conclusion could change</h2>
+    <div class="callout">
+      <h3>A battery becomes plausible if most of these are true</h3>
+      <ul>
+        <li>Off-peak electricity is consistently around 5–8p/kWh.</li>
+        <li>Peak electricity is reliably 35–45p/kWh or higher.</li>
+        <li>The spread persists for much of the battery’s useful life.</li>
+        <li>The home has substantial 4pm–7pm or evening demand.</li>
+        <li>A 5 kWh system can complete roughly 300–350 useful cycles annually.</li>
+        <li>The additional 10 kWh capacity is regularly used if selected.</li>
+        <li>The inverter can meet simultaneous household demand.</li>
+        <li>Installation is around £2,500–£3,000 for 5 kWh, or materially below £7,000 for 10 kWh.</li>
+        <li>Warranty terms allow grid arbitrage and degradation is modest.</li>
+      </ul>
+    </div>
+    <p>A cheap daytime period matching the office load would strengthen the tariff-only case. Conversely, the battery case weakens when overnight demand is already high, peak consumption is low or inflexible, a large backup reserve is required, or cheap hours do not match the household’s operating pattern.</p>
+  </section>
+
+  <section id="action">
+    <h2>A practical decision process</h2>
+    <div class="timeline" aria-label="Recommended decision process">
+      <div class="step"><b>1</b><strong>Measure</strong><p>Download at least 12 months of half-hourly import data.</p></div>
+      <div class="step"><b>2</b><strong>Compare</strong><p>Model a competitive flat tariff and complete TOU schedules.</p></div>
+      <div class="step"><b>3</b><strong>Quote</strong><p>Obtain at least three fully itemised battery quotations.</p></div>
+      <div class="step"><b>4</b><strong>Verify</strong><p>Require an installer simulation using the home’s actual data.</p></div>
+    </div>
+    <div class="grid-2">
+      <div class="card"><h3>Consumption data to request</h3><ul><li>Weekday and weekend profiles</li><li>Overnight and 4pm–7pm use</li><li>Office load by hour</li><li>Maximum half-hourly import</li><li>Seasonal variation</li><li>Flexible appliances and direct overnight use</li><li>Demand physically serviceable by storage</li></ul></div>
+      <div class="card"><h3>Tariff information to obtain</h3><ul><li>Every import rate and exact time band</li><li>Standing charge, VAT and contract length</li><li>Eligibility and exit fees</li><li>Grid-charging permission</li><li>EV, solar or approved-equipment requirements</li><li>Supplier-control and software terms</li><li>Export rules and rate-change mechanisms</li></ul></div>
+      <div class="card"><h3>Battery quotation must show</h3><ul><li>Nominal and usable capacity</li><li>Continuous and peak charge/discharge power</li><li>AC-side efficiency and standby consumption</li><li>Inverter rating and DNO work</li><li>Minimum state of charge and backup circuits</li><li>Installation, VAT and electrical modifications</li></ul></div>
+      <div class="card"><h3>Warranty and modelling checks</h3><ul><li>End-of-warranty retained capacity</li><li>Throughput and cycle limits</li><li>Maintenance and software fees</li><li>Inverter and battery replacement assumptions</li><li>Actual state-of-charge simulation</li><li>Degradation, reserve and periods of under-use</li></ul></div>
+    </div>
+    <div class="callout warn"><h3>Reject optimistic estimates</h3><p>Do not accept a calculation that assumes one complete charge-discharge cycle every day without demonstrating that the tariff windows, charging energy, load profile, usable capacity and power limits support it.</p></div>
+  </section>
+
+  <section>
+    <h2>Final verdict</h2>
+    <p>A grid-charged battery without solar can save money, but this home’s high daytime office demand and limited flexibility make frequent profitable cycling uncertain. Under the central assumptions, neither battery repays its capital cost within ten years.</p>
+    <div class="grid-3">
+      <div class="card"><span class="badge">Lowest risk</span><h3>Competitive flat tariff</h3><p>Best financial benchmark and most predictable fit.</p></div>
+      <div class="card"><span class="badge">Test first</span><h3>TOU without battery</h3><p>Potentially useful if cheap hours match office or measured demand.</p></div>
+      <div class="card"><span class="badge warn">If buying storage</span><h3>Approximately 5 kWh</h3><p>More credible than 10 kWh because it is more likely to cycle regularly.</p></div>
+    </div>
+    <p>The strongest argument against the conclusion is that future price spreads could become much larger. That possibility is not, by itself, a dependable ten-year investment case. Buy only when actual half-hourly data, complete tariff terms and comparable quotations show that expected savings—not merely a lower annual bill—recover the capital cost.</p>
+  </section>
+
+  <section id="sources" class="sources">
+    <h2>Sources</h2>
+    <p class="note">All source entries link directly to the external source in a new tab.</p>
+    <ol class="source-grid">
+      <li><a href="https://octopus.energy/agile/" target="_blank" rel="noopener noreferrer">Agile Octopus | Half-hourly UK Wholesale Price Tracker</a></li>
+      <li><a href="https://www.energyplus.co.uk/costsavingadvice/smart-meter-tariffs-ranked" target="_blank" rel="noopener noreferrer">Smart Meter Tariffs Ranked July 2026</a></li>
+      <li><a href="https://www.energyplus.co.uk/suppliers/octopus-energy" target="_blank" rel="noopener noreferrer">Octopus Energy Tariffs &amp; Rates UK</a></li>
+      <li><a href="https://energysavingtrust.org.uk/time-use-tariffs-all-you-need-know/" target="_blank" rel="noopener noreferrer">Smart time of use tariffs</a></li>
+      <li><a href="https://octopus.energy/smart/tracker/" target="_blank" rel="noopener noreferrer">Octopus Tracker</a></li>
+      <li><a href="https://octopus.energy/blog/april-2026-price-cap-updates/" target="_blank" rel="noopener noreferrer">April 2026 energy price cut</a></li>
+      <li><a href="https://switchtooctopus.co.uk/docs/tariffs/understanding-tariffs/" target="_blank" rel="noopener noreferrer">Understanding Octopus tariffs</a></li>
+      <li><a href="https://www.moneysavingexpert.com/utilities/are-there-any-cheap-fixed-energy-deals-currently-worth-it/" target="_blank" rel="noopener noreferrer">Martin Lewis: fix or stay on the Price Cap</a></li>
+      <li><a href="https://www.energyplus.co.uk/solar/should-i-add-a-battery-to-my-solar-panels-in-2026" target="_blank" rel="noopener noreferrer">Should I Add a Solar Battery in 2026?</a></li>
+      <li><a href="https://www.ukem.co.uk/solar-battery-storage/" target="_blank" rel="noopener noreferrer">Solar Battery Storage System for UK Homes</a></li>
+      <li><a href="https://octopus.energy/" target="_blank" rel="noopener noreferrer">Octopus Energy</a></li>
+      <li><a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer">Best Time-of-Use Tariff UK 2026</a></li>
+      <li><a href="https://www.energyplus.co.uk/costsavingadvice/energy-suppliers-offering-free-electricity-hours-tariff-uk" target="_blank" rel="noopener noreferrer">Free electricity hours tariffs</a></li>
+      <li><a href="https://www.ovoenergy.com/" target="_blank" rel="noopener noreferrer">OVO Energy</a></li>
+      <li><a href="https://cucumbereco.co.uk/blog/heat-pump-tariffs-2026" target="_blank" rel="noopener noreferrer">Best Heat Pump Tariffs in 2026</a></li>
+      <li><a href="https://www.sunsave.energy/solar-panels-advice/exporting-to-the-grid/best-seg-rates" target="_blank" rel="noopener noreferrer">Best SEG rates</a></li>
+      <li><a href="https://www.moneysavingexpert.com/news/2026/05/martin-lewis-energy-price-cap-rise-july/" target="_blank" rel="noopener noreferrer">July’s Energy Price Cap rise</a></li>
+      <li><a href="https://www.energyplus.co.uk/solar/home-battery-storage-without-solar-panels-uk" target="_blank" rel="noopener noreferrer">Home Battery Storage Without Solar Panels UK</a></li>
+      <li><a href="https://switchtogether.co.uk/resource-hub/blog/solar-export-tariffs" target="_blank" rel="noopener noreferrer">Solar Export Tariffs in 2026</a></li>
+      <li><a href="https://octopus.energy/go/" target="_blank" rel="noopener noreferrer">Octopus Go</a></li>
+      <li><a href="https://octopus.energy/policies/smart-tariffs-terms-and-condition/" target="_blank" rel="noopener noreferrer">Smart Tariffs: Terms and Conditions</a></li>
+      <li><a href="https://octopus.energy/smart/flux/" target="_blank" rel="noopener noreferrer">Octopus Flux</a></li>
+      <li><a href="https://octopus.energy/ev-charger-faq/" target="_blank" rel="noopener noreferrer">EV charger installation FAQs</a></li>
+      <li><a href="https://octopus.energy/smart/intelligent-octopus-flux/" target="_blank" rel="noopener noreferrer">Intelligent Octopus Flux</a></li>
+      <li><a href="https://octopus.energy/intelligent-flux-faqs/" target="_blank" rel="noopener noreferrer">Intelligent Octopus Flux FAQs</a></li>
+      <li><a href="https://www.gov.uk/guidance/vat-on-energy-saving-materials-and-heating-equipment-notice-7086" target="_blank" rel="noopener noreferrer">HMRC VAT Notice 708/6</a></li>
+      <li><a href="https://www.gov.uk/guidance/the-vat-domestic-reverse-charge-procedure-notice-735" target="_blank" rel="noopener noreferrer">HMRC VAT Notice 735</a></li>
+      <li><a href="https://www.gov.uk/government/publications/warm-homes-plan/warm-homes-plan-html" target="_blank" rel="noopener noreferrer">Warm Homes Plan</a></li>
+      <li><a href="https://www.sunsave.energy/solar-panels-advice/exporting-to-the-grid/best-ev-charging-tariffs" target="_blank" rel="noopener noreferrer">Best EV tariffs</a></li>
+      <li><a href="https://www.loveelectric.cars/blog/best-ev-tariff-uk" target="_blank" rel="noopener noreferrer">Best EV Tariff UK 2026</a></li>
+      <li><a href="https://www.edfenergy.com/solar/solar-tariffs" target="_blank" rel="noopener noreferrer">EDF Solar Tariffs</a></li>
+      <li><a href="https://octopus.energy/blog/battery-only-installation/" target="_blank" rel="noopener noreferrer">Battery-only installation with Octopus</a></li>
+      <li><a href="https://www.gridguru.co.uk/post/grid-guru-july-2026-newsletter" target="_blank" rel="noopener noreferrer">Grid Guru July 2026 Newsletter</a></li>
+      <li><a href="https://www.eonnext.com/energy/guides/time-of-use-tariffs" target="_blank" rel="noopener noreferrer">Understanding time-of-use tariffs</a></li>
+      <li><a href="https://solargridcheck.co.uk/best-home-batteries-uk" target="_blank" rel="noopener noreferrer">Best Solar Batteries UK 2026</a></li>
+      <li><a href="https://www.edfenergy.com/media-centre/edf-launches-britains-first-solar-tariff-no-standing-charge" target="_blank" rel="noopener noreferrer">EDF no-standing-charge solar tariff</a></li>
+      <li><a href="https://www.edfenergy.com/gas-and-electricity/change-energy-tariff" target="_blank" rel="noopener noreferrer">Change or Renew Your Energy Tariff</a></li>
+      <li><a href="https://www.edfenergy.com/energy-efficiency/smart-export-tariff" target="_blank" rel="noopener noreferrer">Smart Export Guarantee &amp; Tariff</a></li>
+      <li><a href="https://www.edfenergy.com/energywise/choosing-best-energy-tariff" target="_blank" rel="noopener noreferrer">Choosing the Best Energy Tariffs</a></li>
+      <li><a href="https://www.edfenergy.com/energywise/energy-price-cap-july-2026" target="_blank" rel="noopener noreferrer">July 2026 Energy Price Cap</a></li>
+      <li><a href="https://octopus.energy/blog/should-I-fix-before-july-2026-price-cap/" target="_blank" rel="noopener noreferrer">Fix before the July price cap?</a></li>
+      <li><a href="https://www.edfenergy.com/media-centre/edf-launches-first-its-kind-three-rate-tariff-free-electricity-hours" target="_blank" rel="noopener noreferrer">EDF three-rate tariff</a></li>
+      <li><a href="https://www.edfenergy.com/electric-cars/tariffs-guide" target="_blank" rel="noopener noreferrer">Electricity tariffs guide</a></li>
+      <li><a href="https://www.gov.uk/government/consultations/improving-the-energy-efficiency-of-socially-rented-homes-in-england/outcome/improving-the-energy-efficiency-of-socially-rented-homes-in-england-government-response" target="_blank" rel="noopener noreferrer">Improving energy efficiency of socially rented homes</a></li>
+      <li><a href="https://www.edfenergy.com/electric-cars/ev-tariffs" target="_blank" rel="noopener noreferrer">EDF EV tariffs</a></li>
+      <li><a href="https://www.edfenergy.com/media-centre/edf-launches-cheapest-overnight-charging-ev-tariffs" target="_blank" rel="noopener noreferrer">EDF cheapest overnight charging</a></li>
+      <li><a href="https://www.ovoenergy.com/pricecap" target="_blank" rel="noopener noreferrer">OVO Energy Price Cap guide</a></li>
+      <li><a href="https://www.edfenergy.com/energy-efficiency/sunday-saver-challenge" target="_blank" rel="noopener noreferrer">EDF Sunday Saver Challenge</a></li>
+      <li><a href="https://www.edfenergy.com/electric-cars/ev-tariffs/goelectric" target="_blank" rel="noopener noreferrer">EDF GoElectric</a></li>
+      <li><a href="https://www.ofgem.gov.uk/environmental-and-social-schemes/boiler-upgrade-scheme-bus/boiler-upgrade-scheme-bus-property-owners" target="_blank" rel="noopener noreferrer">Boiler Upgrade Scheme</a></li>
+      <li><a href="https://www.bakewelltowncouncil.gov.uk/uploads/bakewell-town-guide-2025.pdf?v=1750841577" target="_blank" rel="noopener noreferrer">Bakewell Town Guide 2025</a></li>
+      <li><a href="https://assets.publishing.service.gov.uk/media/60bdd2d2e90e0743ae8c284e/uk-integrated-national-energy-climate-plan-necp-31-january-2020.pdf" target="_blank" rel="noopener noreferrer">UK Integrated National Energy and Climate Plan</a></li>
+      <li><a href="https://www.gov.uk/government/publications/clean-flexibility-roadmap/clean-flexibility-roadmap-july-2026-update-accessible-webpage" target="_blank" rel="noopener noreferrer">Clean flexibility roadmap: July 2026 update</a></li>
+      <li><a href="https://www.gov.uk/government/publications/clean-flexibility-roadmap/clean-flexibility-roadmap" target="_blank" rel="noopener noreferrer">Clean flexibility roadmap</a></li>
+      <li><a href="https://www.ofgem.gov.uk/environmental-and-social-schemes/feed-tariffs-fit" target="_blank" rel="noopener noreferrer">Feed-in Tariffs</a></li>
+      <li><a href="https://www.gov.uk/government/consultations/smart-secure-electricity-systems-sses-programme-first-phase-energy-smart-appliances-regulations/smart-secure-electricity-systems-sses-programme-first-phase-energy-smart-appliances-regulations-consultation-document-accessible-webpage" target="_blank" rel="noopener noreferrer">SSES consultation document</a></li>
+      <li><a href="https://assets.publishing.service.gov.uk/media/6a2041a058aae59498cb29e5/assessing-the-case-for-community-batteries-call-for-evidence.pdf" target="_blank" rel="noopener noreferrer">Assessing the case for community batteries</a></li>
+      <li><a href="https://www.gov.uk/government/consultations/smart-secure-electricity-systems-programme-sses-enduring-governance/smart-secure-electricity-systems-sses-enduring-governance-accessible-webpage" target="_blank" rel="noopener noreferrer">SSES enduring governance</a></li>
+      <li><a href="https://www.mackie-electrical.co.uk/zero-vat-battery-storage-guide" target="_blank" rel="noopener noreferrer">Zero VAT on Home Battery Storage</a></li>
+      <li><a href="https://heatpumpsandsolar.co.uk/insights/battery-storage-without-solar-uk" target="_blank" rel="noopener noreferrer">Battery Storage Without Solar UK 2026</a></li>
+      <li><a href="https://scottishenergyefficiency.co.uk/battery-storage-scotland" target="_blank" rel="noopener noreferrer">Battery Storage Scotland</a></li>
+    </ol>
+  </section>
+</main>
+
+<footer>
+  <p><strong>Research context:</strong> 661.3 seconds • 8 rounds • 23 queries • 69 URLs analysed.</p>
+  <p>This assessment uses constant real prices for illustration. Actual tariffs, eligibility, installation prices and technical performance require verification before purchase.</p>
+</footer>
+</body>
+</html>

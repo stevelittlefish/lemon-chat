@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Is a Home Battery Worthwhile Without Solar Panels? — UK Financial Assessment, July 2026</title>
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #f7f8fa;
+    --surface:   #ffffff;
+    --border:    #e2e6ed;
+    --text:      #1a1d23;
+    --muted:     #5a6275;
+    --accent:    #1d6fce;
+    --accent-lt: #e8f1fb;
+    --danger:    #c0392b;
+    --danger-lt: #fdf0ee;
+    --warn:      #b45309;
+    --warn-lt:   #fef9ec;
+    --success:   #1a7c4f;
+    --success-lt:#edf7f2;
+    --neutral-lt:#f0f2f5;
+    --radius:    8px;
+    --shadow:    0 1px 4px rgba(0,0,0,.08), 0 2px 12px rgba(0,0,0,.06);
+  }
+
+  html { font-size: 16px; scroll-behavior: smooth; }
+
+  body {
+    font-family: Georgia, 'Times New Roman', serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  /* ── Layout ── */
+  .page-wrap { max-width: 900px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+
+  /* ── Typography ── */
+  h1, h2, h3, h4, h5 {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    line-height: 1.25;
+    color: var(--text);
+  }
+  h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 800; }
+  h2 { font-size: clamp(1.2rem, 3vw, 1.55rem); font-weight: 700; margin-bottom: .5rem; }
+  h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: .35rem; }
+  h4 { font-size: .95rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: .5rem; }
+
+  p { margin-bottom: .85rem; }
+  p:last-child { margin-bottom: 0; }
+
+  a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+  a:hover { text-decoration: none; }
+
+  sup a {
+    font-size: .7em;
+    font-family: system-ui, sans-serif;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+    background: var(--accent-lt);
+    border-radius: 3px;
+    padding: 0 3px;
+    vertical-align: super;
+    white-space: nowrap;
+  }
+  sup a:hover { background: var(--accent); color: #fff; }
+
+  ul, ol { padding-left: 1.4rem; margin-bottom: .85rem; }
+  li { margin-bottom: .3rem; }
+
+  strong { font-weight: 700; }
+
+  /* ── Header ── */
+  .site-header {
+    background: linear-gradient(135deg, #0f2d5e 0%, #1d6fce 100%);
+    color: #fff;
+    padding: 2.5rem 1.25rem 2rem;
+    margin-bottom: 2rem;
+  }
+  .site-header .inner { max-width: 900px; margin: 0 auto; }
+  .site-header .kicker {
+    font-family: system-ui, sans-serif;
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    opacity: .75;
+    margin-bottom: .6rem;
+  }
+  .site-header h1 { color: #fff; margin-bottom: .6rem; }
+  .site-header .subtitle {
+    font-family: system-ui, sans-serif;
+    font-size: .95rem;
+    opacity: .85;
+    max-width: 680px;
+  }
+
+  /* ── Meta bar ── */
+  .meta-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem .75rem;
+    font-family: system-ui, sans-serif;
+    font-size: .78rem;
+    color: var(--muted);
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .meta-bar span { display: flex; align-items: center; gap: .3rem; }
+
+  /* ── Verdict Banner ── */
+  .verdict-banner {
+    background: var(--danger-lt);
+    border: 2px solid var(--danger);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .verdict-banner .icon {
+    font-size: 2rem;
+    line-height: 1;
+    flex-shrink: 0;
+    margin-top: .1rem;
+  }
+  .verdict-banner h2 { color: var(--danger); font-size: 1.25rem; margin-bottom: .3rem; }
+  .verdict-banner p { font-family: system-ui, sans-serif; font-size: .9rem; color: #3d1a17; }
+
+  /* ── Section ── */
+  .section { margin-bottom: 2.5rem; }
+  .section-label {
+    font-family: system-ui, sans-serif;
+    font-size: .72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--accent);
+    margin-bottom: .6rem;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.4rem;
+    box-shadow: var(--shadow);
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.25rem;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+  .stat-card .stat-val {
+    font-family: system-ui, sans-serif;
+    font-size: 1.9rem;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: .25rem;
+  }
+  .stat-card .stat-label {
+    font-family: system-ui, sans-serif;
+    font-size: .78rem;
+    color: var(--muted);
+    line-height: 1.3;
+  }
+  .stat-card.danger .stat-val { color: var(--danger); }
+  .stat-card.warn .stat-val   { color: var(--warn); }
+  .stat-card.success .stat-val{ color: var(--success); }
+  .stat-card.neutral .stat-val{ color: var(--text); }
+
+  /* ── Callout ── */
+  .callout {
+    border-left: 4px solid;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    font-family: system-ui, sans-serif;
+    font-size: .9rem;
+  }
+  .callout.danger  { border-color: var(--danger);  background: var(--danger-lt);  color: #3d1a17; }
+  .callout.warn    { border-color: var(--warn);    background: var(--warn-lt);    color: #3d1200; }
+  .callout.success { border-color: var(--success); background: var(--success-lt); color: #0d3320; }
+  .callout.info    { border-color: var(--accent);  background: var(--accent-lt);  color: #0d2d5a; }
+  .callout strong  { display: block; margin-bottom: .25rem; }
+
+  /* ── Comparison Table ── */
+  .table-wrap { overflow-x: auto; margin-bottom: 1.5rem; -webkit-overflow-scrolling: touch; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: system-ui, sans-serif;
+    font-size: .875rem;
+    background: var(--surface);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  thead { background: #1a2540; color: #fff; }
+  thead th { padding: .75rem 1rem; text-align: left; font-weight: 700; font-size: .8rem; letter-spacing: .03em; white-space: nowrap; }
+  tbody tr:nth-child(even) { background: var(--neutral-lt); }
+  tbody td { padding: .7rem 1rem; vertical-align: top; border-bottom: 1px solid var(--border); }
+  tbody tr:last-child td { border-bottom: none; }
+  .td-good  { color: var(--success); font-weight: 700; }
+  .td-bad   { color: var(--danger);  font-weight: 700; }
+  .td-warn  { color: var(--warn);    font-weight: 700; }
+  .td-best  { background: #edf7f2 !important; }
+
+  /* ── Evidence Tags ── */
+  .ev-tag {
+    display: inline-block;
+    font-family: system-ui, sans-serif;
+    font-size: .7rem;
+    font-weight: 700;
+    padding: .15em .5em;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-left: .3em;
+  }
+  .ev-strong  { background: #d1fae5; color: #065f46; }
+  .ev-moderate{ background: #fef3c7; color: #92400e; }
+  .ev-weak    { background: #fee2e2; color: #991b1b; }
+
+  /* ── Visual: Arbitrage Diagram ── */
+  .arb-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 1.5rem;
+  }
+  .arb-diagram h3 { margin-bottom: 1rem; font-size: .95rem; }
+
+  /* ── Visual: Payback Bar Chart ── */
+  .bar-chart { margin-bottom: 1.5rem; }
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: .6rem;
+    font-family: system-ui, sans-serif;
+    font-size: .82rem;
+  }
+  .bar-label { width: 160px; flex-shrink: 0; text-align: right; color: var(--muted); }
+  .bar-outer { flex: 1; background: var(--neutral-lt); border-radius: 4px; height: 28px; overflow: hidden; position: relative; }
+  .bar-inner { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: .5rem; font-weight: 700; font-size: .78rem; color: #fff; white-space: nowrap; transition: width .3s; }
+  .bar-life  { position: absolute; top: 0; height: 100%; border-left: 2px dashed #1a7c4f; opacity: .7; }
+  .bar-legend { font-family: system-ui, sans-serif; font-size: .75rem; color: var(--muted); display: flex; gap: 1rem; margin-top: .5rem; flex-wrap: wrap; }
+  .bar-legend span { display: flex; align-items: center; gap: .3rem; }
+  .bar-legend .dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  /* ── Scenario toggle visual ── */
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  @media (max-width: 560px) { .scenario-grid { grid-template-columns: 1fr; } }
+
+  .scenario-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    font-family: system-ui, sans-serif;
+    font-size: .85rem;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  .scenario-card .sc-head {
+    padding: .6rem 1rem;
+    font-weight: 700;
+    font-size: .8rem;
+    color: #fff;
+  }
+  .scenario-card .sc-body { padding: .85rem 1rem; }
+  .scenario-card .sc-row { display: flex; justify-content: space-between; padding: .2rem 0; border-bottom: 1px solid var(--border); }
+  .scenario-card .sc-row:last-child { border-bottom: none; }
+  .scenario-card .sc-key { color: var(--muted); }
+  .scenario-card .sc-val { font-weight: 700; }
+
+  /* ── Checklist ── */
+  .checklist { list-style: none; padding: 0; }
+  .checklist li {
+    display: flex;
+    gap: .75rem;
+    padding: .6rem 0;
+    border-bottom: 1px solid var(--border);
+    font-family: system-ui, sans-serif;
+    font-size: .9rem;
+    align-items: flex-start;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist .ci { font-size: 1.1rem; flex-shrink: 0; margin-top: .1rem; }
+
+  /* ── Evidence Pills ── */
+  .evidence-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+    box-shadow: var(--shadow);
+  }
+  .evidence-block .eb-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .75rem 1.1rem;
+    background: var(--neutral-lt);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+  .evidence-block .eb-head h3 { font-size: .9rem; margin: 0; }
+  .evidence-block .eb-body { padding: .85rem 1.1rem; font-size: .88rem; }
+
+  /* ── Sources ── */
+  .sources-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: .6rem;
+  }
+  .source-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .6rem .85rem;
+    font-family: system-ui, sans-serif;
+    font-size: .78rem;
+    display: flex;
+    gap: .5rem;
+    align-items: flex-start;
+  }
+  .source-item .s-num {
+    background: var(--accent-lt);
+    color: var(--accent);
+    font-weight: 800;
+    border-radius: 3px;
+    padding: .1em .4em;
+    flex-shrink: 0;
+    font-size: .72rem;
+  }
+  .source-item a { color: var(--text); font-weight: 600; text-decoration: none; }
+  .source-item a:hover { color: var(--accent); text-decoration: underline; }
+
+  /* ── Divider ── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  /* ── Print ── */
+  @media print {
+    body { background: #fff; font-size: 11pt; }
+    .site-header { background: #1a2540 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .card, .evidence-block, table { box-shadow: none; border: 1px solid #ccc; }
+    a { color: #000; text-decoration: underline; }
+    sup a { background: #eee; color: #000; }
+    .bar-inner { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .card-grid { grid-template-columns: 1fr 1fr; }
+    thead th, tbody td { padding: .55rem .65rem; font-size: .78rem; }
+    .bar-label { width: 110px; font-size: .74rem; }
+  }
+  @media (max-width: 420px) {
+    .card-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header" role="banner">
+  <div class="inner">
+    <p class="kicker">Financial Fact-Check · England · July 2026</p>
+    <h1>Is a Home Battery Worthwhile Without Solar Panels?</h1>
+    <p class="subtitle">A comprehensive financial assessment for a high-consumption UK household (9,000 kWh/yr) with a home office and no plans for solar panels.</p>
+  </div>
+</header>
+
+<div class="page-wrap">
+
+  <div class="meta-bar" role="complementary" aria-label="Report metadata">
+    <span>📋 10 queries · 30 sources analysed</span>
+    <span>📅 Assessment date: July 2026</span>
+    <span>🏠 Household: 9,000 kWh/yr · Home office · Gas heating · Smart meter</span>
+    <span>⚡ No solar panels planned</span>
+  </div>
+
+  <!-- VERDICT -->
+  <div class="verdict-banner" role="region" aria-label="Overall verdict">
+    <div class="icon" aria-hidden="true">✗</div>
+    <div>
+      <h2>Verdict: Not Financially Worthwhile — Under Current Conditions</h2>
+      <p>Neither a 5 kWh nor a 10 kWh battery pays for itself within its useful life for this household. Switching to a time-of-use tariff <em>without</em> a battery would add roughly <strong>£270/year</strong> to the bill. The best financial option is to <strong>remain on the current flat-rate tariff</strong> and reassess if costs fall or circumstances change.</p>
+    </div>
+  </div>
+
+  <!-- KEY NUMBERS -->
+  <section class="section" aria-labelledby="key-numbers-heading">
+    <p class="section-label">Key Numbers at a Glance</p>
+    <h2 id="key-numbers-heading" style="margin-bottom:1rem;">The Critical Figures</h2>
+    <div class="card-grid">
+      <div class="stat-card danger">
+        <div class="stat-val">−£270</div>
+        <div class="stat-label">Extra cost per year switching to Octopus Go <em>without</em> a battery</div>
+      </div>
+      <div class="stat-card danger">
+        <div class="stat-val">−£96</div>
+        <div class="stat-label">Net annual outcome with a 5 kWh battery + Octopus Go</div>
+      </div>
+      <div class="stat-card warn">
+        <div class="stat-val">+£170</div>
+        <div class="stat-label">Net annual saving with a 10 kWh battery + Octopus Go (central case)</div>
+      </div>
+      <div class="stat-card danger">
+        <div class="stat-val">~32 yrs</div>
+        <div class="stat-label">Simple payback for 10 kWh battery at central estimate (useful life: 10–12 yrs)</div>
+      </div>
+      <div class="stat-card neutral">
+        <div class="stat-val">21.6p</div>
+        <div class="stat-label">Gross tariff spread: Octopus Go off-peak (8.5p) vs standard rate (30.1p) per kWh <sup><a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">S22</a></sup></div>
+      </div>
+      <div class="stat-card danger">
+        <div class="stat-val">5.4p</div>
+        <div class="stat-label">Penalty per kWh: Octopus Go standard rate (30.1p) vs current flat rate (24.7p) <sup><a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">S22</a></sup></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW THE ARBITRAGE WORKS -->
+  <section class="section" aria-labelledby="arb-heading">
+    <p class="section-label">The Core Mechanism</p>
+    <h2 id="arb-heading">How Tariff Arbitrage Works — And Why It Fails Here</h2>
+
+    <div class="arb-diagram" role="img" aria-label="Diagram showing tariff arbitrage flow: charge overnight at 8.5p, discharge during day at 30.1p, net saving 19.9p per kWh after 92% round-trip efficiency">
+      <h3>Tariff Arbitrage Flow — Octopus Go</h3>
+      <svg viewBox="0 0 700 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px;display:block;margin:0 auto;" aria-hidden="true">
+        <!-- Off-peak block -->
+        <rect x="10" y="30" width="160" height="100" rx="8" fill="#1d6fce" opacity=".15" stroke="#1d6fce" stroke-width="1.5"/>
+        <text x="90" y="60" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#0d2d5a" font-weight="700">OFF-PEAK WINDOW</text>
+        <text x="90" y="78" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#0d2d5a">00:30 – 05:30</text>
+        <text x="90" y="100" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" fill="#1d6fce" font-weight="800">8.5p</text>
+        <text x="90" y="118" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#0d2d5a">per kWh charged</text>
+
+        <!-- Arrow charge -->
+        <path d="M175 80 L225 80" stroke="#1d6fce" stroke-width="2" fill="none" marker-end="url(#arr-blue)"/>
+        <text x="200" y="72" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#1d6fce" font-weight="700">CHARGE</text>
+
+        <!-- Battery block -->
+        <rect x="230" y="30" width="140" height="100" rx="8" fill="#f0f2f5" stroke="#9ca3af" stroke-width="1.5"/>
+        <text x="300" y="60" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#374151" font-weight="700">HOME BATTERY</text>
+        <text x="300" y="78" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#374151">~92% round-trip</text>
+        <text x="300" y="96" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#374151">efficiency (LFP)</text>
+        <text x="300" y="116" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#6b7280">5 kWh or 10 kWh</text>
+
+        <!-- Arrow discharge -->
+        <path d="M375 80 L425 80" stroke="#c0392b" stroke-width="2" fill="none" marker-end="url(#arr-red)"/>
+        <text x="400" y="72" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#c0392b" font-weight="700">DISCHARGE</text>
+
+        <!-- Peak block -->
+        <rect x="430" y="30" width="160" height="100" rx="8" fill="#c0392b" opacity=".1" stroke="#c0392b" stroke-width="1.5"/>
+        <text x="510" y="60" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#7b1d1d" font-weight="700">STANDARD RATE</text>
+        <text x="510" y="78" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#7b1d1d">All other hours</text>
+        <text x="510" y="100" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" fill="#c0392b" font-weight="800">30.1p</text>
+        <text x="510" y="118" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#7b1d1d">per kWh displaced</text>
+
+        <!-- Net saving label -->
+        <text x="600" y="78" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#1a7c4f" font-weight="800">≈ 19.9p</text>
+        <text x="600" y="93" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#1a7c4f">net saving/kWh</text>
+
+        <!-- Defs -->
+        <defs>
+          <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#1d6fce"/>
+          </marker>
+          <marker id="arr-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#c0392b"/>
+          </marker>
+        </defs>
+      </svg>
+      <p style="font-family:system-ui,sans-serif;font-size:.78rem;color:var(--muted);margin-top:.6rem;text-align:center;">
+        Gross spread: 21.6p/kWh · After 92% round-trip efficiency: ~19.9p/kWh net saving per usable kWh cycled.
+        <sup><a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">S22</a></sup>
+        <sup><a href="https://avebattery.com/blog/best-solar-battery-storage-uk/" target="_blank" rel="noopener noreferrer">S8</a></sup>
+      </p>
+    </div>
+
+    <div class="callout danger">
+      <strong>⚠ The Hidden Penalty: Standard Rate on Octopus Go</strong>
+      The Octopus Go standard rate is <strong>30.1p/kWh</strong> — but this household's current flat rate is only <strong>24.7p/kWh</strong>. Every kWh consumed outside the off-peak window costs <strong>5.4p more</strong> after switching. With ~8,200 kWh/year unavoidably consumed at standard rates, that is a <strong>£443/year penalty</strong> just for switching tariff — which a battery must overcome before generating any net saving.
+      <sup><a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">S22</a></sup>
+      <sup><a href="https://www.energyplus.co.uk/energy-tariff-calculator" target="_blank" rel="noopener noreferrer">S24</a></sup>
+    </div>
+  </section>
+
+  <!-- FOUR OPTIONS COMPARISON TABLE -->
+  <section class="section" aria-labelledby="options-heading">
+    <p class="section-label">Side-by-Side Comparison</p>
+    <h2 id="options-heading">The Four Options — Annual Costs &amp; Outcomes</h2>
+
+    <div class="table-wrap">
+      <table>
+        <caption style="font-family:system-ui,sans-serif;font-size:.78rem;color:var(--muted);text-align:left;padding:.5rem 0 .75rem;">
+          All figures based on confirmed Octopus Go rates (8.5p off-peak / 30.1p standard)
+          <sup><a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">S22</a></sup>
+          and current flat rate of 24.7p/kWh.
+          <sup><a href="https://www.energyplus.co.uk/energy-tariff-calculator" target="_blank" rel="noopener noreferrer">S24</a></sup>
+          Household: 9,000 kWh/yr.
+        </caption>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Tariff</th>
+            <th>Battery</th>
+            <th>Annual Net Saving vs. Option 1</th>
+            <th>Capital Cost</th>
+            <th>Simple Payback</th>
+            <th>10-Year Net Outcome</th>
+            <th>Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="td-best">
+            <td><strong>1 ✓ Best</strong></td>
+            <td>Flat rate (24.7p)</td>
+            <td>None</td>
+            <td class="td-good">Baseline (£0)</td>
+            <td>£0</td>
+            <td>N/A</td>
+            <td class="td-good">£0</td>
+            <td class="td-good">✓ Recommended</td>
+          </tr>
+          <tr>
+            <td><strong>2</strong></td>
+            <td>Octopus Go</td>
+            <td>None</td>
+            <td class="td-bad">−£270/yr</td>
+            <td>£0</td>
+            <td>Never</td>
+            <td class="td-bad">−£2,700</td>
+            <td class="td-bad">✗ Avoid</td>
+          </tr>
+          <tr>
+            <td><strong>3</strong></td>
+            <td>Octopus Go</td>
+            <td>~5 kWh</td>
+            <td class="td-bad">−£96/yr</td>
+            <td>£2,500–£5,500 <sup><a href="https://renewablesexcellence.co.uk/battery-storage-installation-costs-uk/" target="_blank" rel="noopener noreferrer">S2</a></sup><sup><a href="https://www.greentechrenewables.co.uk/battery-storage/cost-uk" target="_blank" rel="noopener noreferrer">S3</a></sup></td>
+            <td class="td-bad">Never</td>
+            <td class="td-bad">−£3,460+</td>
+            <td class="td-bad">✗ Avoid</td>
+          </tr>
+          <tr>
+            <td><strong>4</strong></td>
+            <td>Octopus Go</td>
+            <td>~10 kWh</td>
+            <td class="td-warn">+£170/yr (central)<br>+£292/yr (optimistic)</td>
+            <td>£4,500–£8,000 <sup><a href="https://www.depthoflight.co.uk/blog/givenergy-alternatives-uk/" target="_blank" rel="noopener noreferrer">S27</a></sup><sup><a href="https://alpselectrical.com/blog/tesla-powerwall-3-review-uk/" target="_blank" rel="noopener noreferrer">S28</a></sup></td>
+            <td class="td-bad">~32 yrs (central)<br>~15 yrs (optimistic)</td>
+            <td class="td-bad">−£3,936 (central)<br>−£1,814 (optimistic)</td>
+            <td class="td-warn">⚠ Marginal only</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-family:system-ui,sans-serif;font-size:.78rem;color:var(--muted);">
+      Battery useful life: 10–12 years with ~80% capacity at year 10.
+      <sup><a href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">S5</a></sup>
+      <sup><a href="https://avebattery.com/blog/best-solar-battery-storage-uk/" target="_blank" rel="noopener noreferrer">S8</a></sup>
+      <sup><a href="https://www.depthoflight.co.uk/blog/givenergy-alternatives-uk/" target="_blank" rel="noopener noreferrer">S27</a></sup>
+      Optimistic scenario assumes £4,500 installed cost, 0.90 daily cycle rate.
+    </p>
+  </section>
+
+  <!-- PAYBACK CHART -->
+  <section class="section" aria-labelledby="payback-heading">
+    <p class="section-label">Visual Summary</p>
+    <h2 id="payback-heading">Payback Period vs Battery Useful Life</h2>
+    <p style="font-family:system-ui,sans-serif;font-size:.88rem;color:var(--muted);margin-bottom:1rem;">The dashed green line marks the typical 10-year warranted battery life. Payback must fall <em>before</em> this line to be financially worthwhile.</p>
+
+    <div class="bar-chart" role="img" aria-label="Bar chart comparing payback periods. 5 kWh battery: never pays back. 10 kWh central: 32 years. 10 kWh optimistic: 15 years. Battery warranted life: 10 years.">
+      <div class="bar-row">
+        <div class="bar-label">5 kWh battery<br><span style="font-size:.7rem;">(central)</span></div>
+        <div class="bar-outer">
+          <div class="bar-inner" style="width:100%;background:#c0392b;">Never pays back</div>
+          <div class="bar-life" style="left:31.25%;" title="10-year battery life"></div>
+        </div>
+        <div style="font-family:system-ui,sans-serif;font-size:.8rem;font-weight:700;color:#c0392b;width:60px;flex-shrink:0;">Never</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">10 kWh battery<br><span style="font-size:.7rem;">(central, £5,500)</span></div>
+        <div class="bar-outer">
+          <div class="bar-inner" style="width:100%;background:#b45309;">32 years</div>
+          <div class="bar-life" style="left:31.25%;" title="10-year battery life"></div>
+        </div>
+        <div style="font-family:system-ui,sans-serif;font-size:.8rem;font-weight:700;color:#b45309;width:60px;flex-shrink:0;">32 yrs</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">10 kWh battery<br><span style="font-size:.7rem;">(optimistic, £4,500)</span></div>
+        <div class="bar-outer">
+          <div class="bar-inner" style="width:46.9%;background:#d97706;">15 years</div>
+          <div class="bar-life" style="left:31.25%;" title="10-year battery life"></div>
+        </div>
+        <div style="font-family:system-ui,sans-serif;font-size:.8rem;font-weight:700;color:#d97706;width:60px;flex-shrink:0;">15 yrs</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">10 kWh battery<br><span style="font-size:.7rem;">(best case, £3,500)</span></div>
+        <div class="bar-outer">
+          <div class="bar-inner" style="width:37.5%;background:#1a7c4f;">12 years</div>
+          <div class="bar-life" style="left:31.25%;" title="10-year battery life"></div>
+        </div>
+        <div style="font-family:system-ui,sans-serif;font-size:.8rem;font-weight:700;color:#1a7c4f;width:60px;flex-shrink:0;">12 yrs</div>
+      </div>
+      <div class="bar-legend">
+        <span><span class="dot" style="background:#c0392b;"></span> Negative / never pays back</span>
+        <span><span class="dot" style="background:#b45309;"></span> Exceeds battery life</span>
+        <span><span class="dot" style="background:#d97706;"></span> Marginally beyond life</span>
+        <span><span class="dot" style="background:#1a7c4f;"></span> Within battery life (best case only)</span>
+        <span><span style="border-left:2px dashed #1a7c4f;display:inline-block;width:14px;height:12px;"></span> 10-yr warranted battery life</span>
+      </div>
+    </div>
+    <p style="font-family:system-ui,sans-serif;font-size:.78rem;color:var(--muted);">
+      Best case (12 years) requires: installation cost ≤ £3,500, daily cycle rate 0.90, and savings of ~£292/yr — a combination of conditions not reliably available for this household.
+      <sup><a href="https://www.depthoflight.co.uk/blog/givenergy-alternatives-uk/" target="_blank" rel="noopener noreferrer">S27</a></sup>
+      <sup><a href="https://alpselectrical.com/blog/tesla-powerwall-3-review-uk/" target="_blank" rel="noopener noreferrer">S28</a></sup>
+    </p>
+  </section>
+
+  <!-- EVIDENCE FOR -->
+  <section class="section" aria-labelledby="for-heading">
+    <p class="section-label">The Case For a Battery</p>
+    <h2 id="for-heading">Arguments Supporting Battery Installation</h2>
+
+    <div class="evidence-block">
+      <div class="eb-head">
+        <h3>1. The Tariff Spread Is Real and Meaningful</h3>
+        <span class="ev-tag ev-moderate">Moderate Evidence</span>
+      </div>
+      <div class="eb-body">
+        <p>Octopus Go offers a confirmed off-peak rate of <strong>8.5p/kWh</strong> (00:30–05:30) vs <strong>30.1p/kWh</strong> at all other times — a gross spread of 21.6p/kWh.<sup><a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">S22</a></sup> After 92% round-trip efficiency,<sup><a href="https://avebattery.com/blog/best-solar-battery-storage-uk/" target="_blank" rel="noopener noreferrer">S8</a></sup><sup><a href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">S5</a></sup> the net saving per usable kWh delivered is approximately <strong>19.9p</strong>. Anecdotal sources report real-world savings of £620/yr for a Newcastle household with a 10 kWh Powerwall,<sup><a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer">S12</a></sup> and an Essex household with a 16.1 kWh battery saving £1.50–£2.50/day.<sup><a href="https://www.reddit.com/comments/1toxljz/" target="_blank" rel="noopener noreferrer">S21</a></sup> These are plausible in principle but likely reflect more favourable demand profiles.</p>
+      </div>
+    </div>
+
+    <div class="evidence-block">
+      <div class="eb-head">
+        <h3>2. A 10 kWh Battery Generates Positive Annual Savings</h3>
+        <span class="ev-tag ev-moderate">Moderate Evidence</span>
+      </div>
+      <div class="eb-body">
+        <p>With 9.0 kWh usable capacity, 92% round-trip efficiency, and 0.75 average daily cycles (274/yr), the 10 kWh battery delivers ~£490/yr gross arbitrage savings. After the standard-rate penalty on uncovered consumption, the <strong>net saving is ~£170/yr</strong> (central) or ~£292/yr (optimistic at 0.90 cycles/day).<sup><a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">S22</a></sup><sup><a href="https://www.energyplus.co.uk/energy-tariff-calculator" target="_blank" rel="noopener noreferrer">S24</a></sup> This is a genuine benefit — but payback still exceeds the battery's useful life.</p>
+      </div>
+    </div>
+
+    <div class="evidence-block">
+      <div class="eb-head">
+        <h3>3. Temporary 0% VAT Relief Reduces Upfront Cost</h3>
+        <span class="ev-tag ev-moderate">Moderate Evidence</span>
+      </div>
+      <div class="eb-body">
+        <p>Domestic battery installations currently attract <strong>0% VAT</strong> until 31 March 2027 (expected to rise to 5% thereafter).<sup><a href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">S5</a></sup><sup><a href="https://heatable.co.uk/solar/advice/battery-storage-costs" target="_blank" rel="noopener noreferrer">S6</a></sup><sup><a href="https://haboenergy.co.uk/home-battery-storage-cost" target="_blank" rel="noopener noreferrer">S10</a></sup><sup><a href="https://www.depthoflight.co.uk/blog/givenergy-alternatives-uk/" target="_blank" rel="noopener noreferrer">S27</a></sup> On a £5,500 install, this saves ~£275 vs a 5% VAT scenario. <strong>Caveat:</strong> it is unclear whether 0% VAT applies to battery-only installations without solar — verify with HMRC or your installer before purchasing.<sup><a href="https://alpselectrical.com/blog/tesla-powerwall-3-review-uk/" target="_blank" rel="noopener noreferrer">S28</a></sup></p>
+      </div>
+    </div>
+
+    <div class="evidence-block">
+      <div class="eb-head">
+        <h3>4. Installed Prices Have Been Falling</h3>
+        <span class="ev-tag ev-weak">Weak–Moderate Evidence</span>
+      </div>
+      <div class="eb-body">
+        <p>Competitive quotes for a 10 kWh system now start from ~£4,500.<sup><a href="https://www.depthoflight.co.uk/blog/givenergy-alternatives-uk/" target="_blank" rel="noopener noreferrer">S27</a></sup> If prices fall to ~£3,500, payback at £292/yr falls to ~12 years — within the battery's warranted life. The trend is real, but future trajectories are uncertain and the household has no solar plans to benefit from a combined installation discount.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- EVIDENCE AGAINST -->
+  <section class="section" aria-labelledby="against-heading">
+    <p class="section-label">The Case Against a Battery</p>
+    <h2 id="against-heading">Why the Battery Fails for This Household</h2>
+
+    <div class="evidence-block">
+      <div class="eb-head">
+        <h3>1. The Standard-Rate Penalty Is Decisive</h3>
+        <span class="ev-tag ev-strong">Strong Evidence</span>
+      </div>
+      <div class="eb-body">
+        <p>This is the single most important finding. Octopus Go's standard rate of <strong>30.1p/kWh</strong> exceeds the household's current flat rate of <strong>24.7p/kWh</strong> by 5.4p/kWh.<sup><a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">S22</a></sup> The home office consumes 10–20 kWh/day during working hours (08:00–18:00), entirely outside the 00:30–05:30 off-peak window. Manual load-shifting can move perhaps 800 kWh/yr to off-peak at best, saving £173 — far less than the £443/yr penalty on the remaining ~8,200 kWh. <strong>Net result: switching tariff alone costs an extra £270/yr.</strong><sup><a href="https://www.energyplus.co.uk/energy-tariff-calculator" target="_blank" rel="noopener noreferrer">S24</a></sup></p>
+      </div>
+    </div>
+
+    <div class="evidence-block">
+      <div class="eb-head">
+        <h3>2. A 5 kWh Battery Never Pays Back</h3>
+        <span class="ev-tag ev-strong">Strong Evidence</span>
+      </div>
+      <div class="eb-body">
+        <p>A 5 kWh battery (4.5 kWh usable, 4.14 kWh net after efficiency) at 0.85 daily cycles covers ~1,283 kWh/yr of standard-rate consumption, generating ~£277/yr gross arbitrage. But ~6,917 kWh/yr remains exposed to the 5.4p penalty — costing £373/yr. <strong>Net annual outcome: −£96/yr</strong>, before any capital cost.<sup><a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">S22</a></sup><sup><a href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">S5</a></sup><sup><a href="https://avebattery.com/blog/best-solar-battery-storage-uk/" target="_blank" rel="noopener noreferrer">S8</a></sup> No realistic scenario produces a positive annual saving at the confirmed 30.1p standard rate.</p>
+      </div>
+    </div>
+
+    <div class="evidence-block">
+      <div class="eb-head">
+        <h3>3. The 10 kWh Battery Does Not Pay Back Within Its Useful Life</h3>
+        <span class="ev-tag ev-strong">Strong Evidence</span>
+      </div>
+      <div class="eb-body">
+        <p>At a central installed cost of £5,500<sup><a href="https://www.greentechrenewables.co.uk/battery-storage/cost-uk" target="_blank" rel="noopener noreferrer">S3</a></sup><sup><a href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">S5</a></sup><sup><a href="https://heatable.co.uk/solar/advice/battery-storage-costs" target="_blank" rel="noopener noreferrer">S6</a></sup><sup><a href="https://www.depthoflight.co.uk/blog/givenergy-alternatives-uk/" target="_blank" rel="noopener noreferrer">S27</a></sup><sup><a href="https://alpselectrical.com/blog/tesla-powerwall-3-review-uk/" target="_blank" rel="noopener noreferrer">S28</a></sup> and £170/yr in savings, simple payback is ~32 years vs a 10–12 year useful life.<sup><a href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">S5</a></sup><sup><a href="https://alpselectrical.com/blog/tesla-powerwall-3-review-uk/" target="_blank" rel="noopener noreferrer">S28</a></sup> The 10-year net outcome is approximately <strong>−£3,936</strong> under central assumptions. Multiple installer sources confirm battery-only installations have the longest payback of any battery use case.<sup><a href="https://www.greentechrenewables.co.uk/battery-storage/cost-uk" target="_blank" rel="noopener noreferrer">S3</a></sup><sup><a href="https://haboenergy.co.uk/home-battery-storage-cost" target="_blank" rel="noopener noreferrer">S10</a></sup><sup><a href="https://comparesolarni.com/guides/best-home-battery-brands-ni/" target="_blank" rel="noopener noreferrer">S30</a></sup></p>
+      </div>
+    </div>
+
+    <div class="evidence-block">
+      <div class="eb-head">
+        <h3>4. The Home-Office Demand Profile Is Structurally Unfavourable</h3>
+        <span class="ev-tag ev-strong">Strong Evidence</span>
+      </div>
+      <div class="eb-body">
+        <p>The home office (10–20 kWh/day, 08:00–18:00) concentrates consumption in the standard-rate window. Only 2–4 kWh of daily load falls within the 16:00–18:00 overlap with the traditional peak window. This limits effective daily discharge and reduces the average cycle rate to 0.75–0.85 vs the 0.90–1.0 achievable by households with large evening loads or an EV.<sup><a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer">S12</a></sup><sup><a href="https://www.reddit.com/comments/1toxljz/" target="_blank" rel="noopener noreferrer">S21</a></sup> One installer explicitly flags "home all day using electricity" with "no solar plans" as the weakest financial case for a battery.<sup><a href="https://www.greentechrenewables.co.uk/battery-storage/cost-uk" target="_blank" rel="noopener noreferrer">S3</a></sup></p>
+      </div>
+    </div>
+
+    <div class="evidence-block">
+      <div class="eb-head">
+        <h3>5. Tariff Uncertainty Over 10+ Years</h3>
+        <span class="ev-tag ev-moderate">Moderate–Strong Evidence</span>
+      </div>
+      <div class="eb-body">
+        <p>The financial case requires the tariff spread to persist for 10–12 years. Octopus Go is currently only available as a fixed-rate product, repriced at renewal.<sup><a href="https://octopus.energy/smart/go/rates/" target="_blank" rel="noopener noreferrer">S25</a></sup> The Ofgem price cap is reviewed quarterly,<sup><a href="https://www.ofgem.gov.uk/information-consumers/energy-advice-households/energy-price-cap-unit-rates-and-standing-charges" target="_blank" rel="noopener noreferrer">S14</a></sup><sup><a href="https://www.ofgem.gov.uk/news/changes-energy-price-cap-between-1-july-and-30-september-2026" target="_blank" rel="noopener noreferrer">S15</a></sup> and time-of-use tariffs are commercial products that can be withdrawn or repriced at any time. A narrowing spread — say, off-peak rising to 12p while standard falls to 26p — would sharply reduce battery savings.</p>
+      </div>
+    </div>
+
+    <div class="evidence-block">
+      <div class="eb-head">
+        <h3>6. No Grants Are Available</h3>
+        <span class="ev-tag ev-strong">Strong Evidence</span>
+      </div>
+      <div class="eb-body">
+        <p>Unlike heat pumps or solar panels, standalone home battery storage attracts no mainstream government grant for typical English homeowners as of July 2026.<sup><a href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">S5</a></sup><sup><a href="https://haboenergy.co.uk/home-battery-storage-cost" target="_blank" rel="noopener noreferrer">S10</a></sup><sup><a href="https://comparesolarni.com/guides/best-home-battery-brands-ni/" target="_blank" rel="noopener noreferrer">S30</a></sup> The Smart Export Guarantee does not apply without solar generation. The only incentive is the temporary 0% VAT relief — worth ~£275 on a £5,500 install at 5% VAT.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SENSITIVITY ANALYSIS -->
+  <section class="section" aria-labelledby="sensitivity-heading">
+    <p class="section-label">Sensitivity Analysis</p>
+    <h2 id="sensitivity-heading">When Does the Conclusion Change?</h2>
+    <p style="font-family:system-ui,sans-serif;font-size:.88rem;color:var(--muted);margin-bottom:1rem;">The following scenarios show what combination of conditions would be needed to make a battery financially worthwhile.</p>
+
+    <div class="scenario-grid">
+      <div class="scenario-card">
+        <div class="sc-head" style="background:#b45309;">Standard Rate Sensitivity</div>
+        <div class="sc-body">
+          <div class="sc-row"><span class="sc-key">Current standard rate</span><span class="sc-val" style="color:#c0392b;">30.1p/kWh</span></div>
+          <div class="sc-row"><span class="sc-key">Tipping point for 5 kWh</span><span class="sc-val" style="color:#b45309;">~27–28p/kWh</span></div>
+          <div class="sc-row"><span class="sc-key">If equal to flat rate (24.7p)</span><span class="sc-val" style="color:#1a7c4f;">5 kWh: +£165/yr</span></div>
+          <div class="sc-row"><span class="sc-key">If equal to flat rate (24.7p)</span><span class="sc-val" style="color:#1a7c4f;">10 kWh: +£360/yr</span></div>
+          <div class="sc-row"><span class="sc-key">Current price cap average</span><span class="sc-val">26.11p/kWh <sup><a href="https://www.ofgem.gov.uk/news/changes-energy-price-cap-between-1-july-and-30-september-2026" target="_blank" rel="noopener noreferrer">S15</a></sup></span></div>
+        </div>
+      </div>
+
+      <div class="scenario-card">
+        <div class="sc-head" style="background:#1d6fce;">Installation Cost Sensitivity</div>
+        <div class="sc-body">
+          <div class="sc-row"><span class="sc-key">Central estimate (10 kWh)</span><span class="sc-val">£5,500 → 32 yr payback</span></div>
+          <div class="sc-row"><span class="sc-key">Competitive quote</span><span class="sc-val">£4,500 → ~15 yr payback</span></div>
+          <div class="sc-row"><span class="sc-key">Future price (est.)</span><span class="sc-val" style="color:#1a7c4f;">£3,500 → ~12 yr payback</span></div>
+          <div class="sc-row"><span class="sc-key">Battery warranted life</span><span class="sc-val">10–12 years <sup><a href="https://www.depthoflight.co.uk/blog/givenergy-alternatives-uk/" target="_blank" rel="noopener noreferrer">S27</a></sup></span></div>
+        </div>
+      </div>
+
+      <div class="scenario-card">
+        <div class="sc-head" style="background:#5a6275;">Annual Consumption Sensitivity</div>
+        <div class="sc-body">
+          <div class="sc-row"><span class="sc-key">At 6,000 kWh/yr</span><span class="sc-val" style="color:#b45309;">10 kWh: +£130/yr</span></div>
+          <div class="sc-row"><span class="sc-key">At 9,000 kWh/yr (this HH)</span><span class="sc-val" style="color:#b45309;">10 kWh: +£170/yr</span></div>
+          <div class="sc-row"><span class="sc-key">At 11,000 kWh/yr</span><span class="sc-val" style="color:#b45309;">10 kWh: +£200/yr</span></div>
+          <div class="sc-row"><span class="sc-key">5 kWh at all levels</span><span class="sc-val" style="color:#c0392b;">Negative at 30.1p</span></div>
+        </div>
+      </div>
+
+      <div class="scenario-card">
+        <div class="sc-head" style="background:#065f46;">Peak-Hour Share Sensitivity</div>
+        <div class="sc-body">
+          <div class="sc-row"><span class="sc-key">35% load 14:00–18:00</span><span class="sc-val">10 kWh: ~£170/yr</span></div>
+          <div class="sc-row"><span class="sc-key">25% load 14:00–18:00</span><span class="sc-val">10 kWh: ~£130/yr</span></div>
+          <div class="sc-row"><span class="sc-key">15% load 14:00–18:00</span><span class="sc-val">10 kWh: ~£60/yr</span></div>
+          <div class="sc-row"><span class="sc-key">Key action</span><span class="sc-val">Get half-hourly smart meter data first</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <strong>🔑 The Trigger Conditions for a Battery to Make Sense</strong>
+      All three of the following must be true simultaneously: (1) installed cost ≤ £3,500–£4,000 for a 10 kWh system; (2) a time-of-use tariff with standard rate ≤ 27p/kWh becomes available; and (3) the household's actual peak-hour consumption share is ≥ 30%. Currently, none of these conditions is reliably met.
+    </div>
+  </section>
+
+  <!-- WHAT TO DO NEXT -->
+  <section class="section" aria-labelledby="action-heading">
+    <p class="section-label">Action Plan</p>
+    <h2 id="action-heading">What the Homeowner Should Do Before Deciding</h2>
+
+    <ul class="checklist">
+      <li>
+        <span class="ci">📊</span>
+        <div>
+          <strong>Download half-hourly smart meter data.</strong> Analyse what proportion of daily consumption falls within 00:30–05:30 (off-peak), 16:00–19:00 (peak), and standard daytime hours. This is the single most important piece of information — and it cannot be reliably estimated without actual data. Access via your supplier's app or the DCC portal.
+        </div>
+      </li>
+      <li>
+        <span class="ci">📋</span>
+        <div>
+          <strong>Get at least three quotes from MCS-certified installers</strong> for both 5 kWh and 10 kWh battery-only systems. Ask explicitly whether 0% VAT applies to your specific battery-only installation (no solar).<sup><a href="https://alpselectrical.com/blog/tesla-powerwall-3-review-uk/" target="_blank" rel="noopener noreferrer">S28</a></sup>
+        </div>
+      </li>
+      <li>
+        <span class="ci">🔍</span>
+        <div>
+          <strong>Check current Octopus Go rates for your postcode</strong> using the Octopus postcode checker.<sup><a href="https://octopus.energy/smart/go/rates/" target="_blank" rel="noopener noreferrer">S25</a></sup><sup><a href="https://octopus.energy/tariffs/" target="_blank" rel="noopener noreferrer">S23</a></sup> Rates vary by region.<sup><a href="https://www.uswitch.com/gas-electricity/guides/regional-energy-prices/" target="_blank" rel="noopener noreferrer">S19</a></sup> The 30.1p standard rate used in this analysis is a confirmed average — your specific rate may differ.
+        </div>
+      </li>
+      <li>
+        <span class="ci">🔄</span>
+        <div>
+          <strong>Check other suppliers' time-of-use tariffs.</strong> E.ON Next, British Gas, EDF, and others may offer TOU tariffs with a standard rate closer to the current flat rate of 24.7p/kWh, which would materially improve battery economics. A standard rate below 27p/kWh is the key threshold.<sup><a href="https://www.eonnext.com/electricity-and-gas/price-cap" target="_blank" rel="noopener noreferrer">S17</a></sup>
+        </div>
+      </li>
+      <li>
+        <span class="ci">📅</span>
+        <div>
+          <strong>Reassess if circumstances change:</strong> installation costs fall below £4,000 for a 10 kWh system; an EV is added (which dramatically improves battery economics by providing a large, schedulable overnight load); or solar panels become a possibility (which transforms the financial case entirely).<sup><a href="https://www.energyplus.co.uk/solar/add-battery-to-existing-solar-panels-cost-uk" target="_blank" rel="noopener noreferrer">S1</a></sup><sup><a href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">S5</a></sup><sup><a href="https://comparesolarni.com/guides/best-home-battery-brands-ni/" target="_blank" rel="noopener noreferrer">S30</a></sup>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <!-- NUANCE & CAVEATS -->
+  <section class="section" aria-labelledby="nuance-heading">
+    <p class="section-label">Nuance &amp; Caveats</p>
+    <h2 id="nuance-heading">Important Qualifications</h2>
+
+    <div class="callout warn">
+      <strong>The Strongest Counter-Argument: Price Hedging</strong>
+      If wholesale electricity prices rise sharply — as in 2021–2022 — the price cap could increase substantially, widening the off-peak spread and improving battery economics. A battery provides a degree of protection against future price spikes. However, this is a <em>hedging</em> argument, not a <em>savings</em> argument. With financial savings as the primary goal, this does not justify the capital outlay under current conditions.
+    </div>
+
+    <div class="callout info">
+      <strong>Source Reliability Note</strong>
+      Installer marketing sources consistently overstate savings and understate payback periods — typically because they model battery economics against solar self-consumption rather than pure grid arbitrage, and assume favourable demand profiles. The confirmed Octopus Go standard rate of 30.1p/kWh<sup><a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">S22</a></sup> — the critical variable — is drawn from a primary tariff comparison source and is consistent with Octopus's own published rate structure. All financial calculations in this report were derived independently from first principles using confirmed inputs.
+    </div>
+
+    <div class="callout success">
+      <strong>If You Add Solar Later, Reassess from Scratch</strong>
+      The combination of solar self-consumption and tariff arbitrage is the scenario in which batteries most reliably pay for themselves.<sup><a href="https://www.energyplus.co.uk/solar/add-battery-to-existing-solar-panels-cost-uk" target="_blank" rel="noopener noreferrer">S1</a></sup><sup><a href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">S5</a></sup><sup><a href="https://comparesolarni.com/guides/best-home-battery-brands-ni/" target="_blank" rel="noopener noreferrer">S30</a></sup> If solar becomes a possibility, the battery assessment should be revisited entirely with different assumptions.
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- SOURCES -->
+  <section class="section" aria-labelledby="sources-heading">
+    <p class="section-label">References</p>
+    <h2 id="sources-heading">All Sources</h2>
+    <div class="sources-grid">
+      <div class="source-item"><span class="s-num">S1</span><div><a href="https://www.energyplus.co.uk/solar/add-battery-to-existing-solar-panels-cost-uk" target="_blank" rel="noopener noreferrer">Cost to Add Battery to Existing Solar Panels UK 2026 — EnergyPlus</a></div></div>
+      <div class="source-item"><span class="s-num">S2</span><div><a href="https://renewablesexcellence.co.uk/battery-storage-installation-costs-uk/" target="_blank" rel="noopener noreferrer">Battery Storage Installation Costs UK: 2026 Price Guide (0% VAT) — Renewables Excellence</a></div></div>
+      <div class="source-item"><span class="s-num">S3</span><div><a href="https://www.greentechrenewables.co.uk/battery-storage/cost-uk" target="_blank" rel="noopener noreferrer">Battery Storage Cost UK 2026 — GreenTech Renewables</a></div></div>
+      <div class="source-item"><span class="s-num">S4</span><div><a href="https://boxergy.co.uk/home-battery-storage-cost/" target="_blank" rel="noopener noreferrer">Home Battery Storage Cost — BOXERGY</a></div></div>
+      <div class="source-item"><span class="s-num">S5</span><div><a href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">Solar Battery Costs UK: The Expert Guide [2026] — Sunsave</a></div></div>
+      <div class="source-item"><span class="s-num">S6</span><div><a href="https://heatable.co.uk/solar/advice/battery-storage-costs" target="_blank" rel="noopener noreferrer">Home Battery Storage Cost in the UK: 2026 — Heatable</a></div></div>
+      <div class="source-item"><span class="s-num">S7</span><div><a href="https://thegreenhomeco.com/how-much-does-a-solar-battery-installation-cost-in-the-uk-in-2026/" target="_blank" rel="noopener noreferrer">Solar Battery Installation Cost UK 2026 — TheGreenHomeCo</a></div></div>
+      <div class="source-item"><span class="s-num">S8</span><div><a href="https://avebattery.com/blog/best-solar-battery-storage-uk/" target="_blank" rel="noopener noreferrer">Top 10 Best Solar Battery Storage Systems UK (2026) — Avepower</a></div></div>
+      <div class="source-item"><span class="s-num">S9</span><div><a href="https://greatbritishenergy.com/solar-panel-costs/" target="_blank" rel="noopener noreferrer">Solar Panel Costs UK 2026 — Great British Energy</a></div></div>
+      <div class="source-item"><span class="s-num">S10</span><div><a href="https://haboenergy.co.uk/home-battery-storage-cost" target="_blank" rel="noopener noreferrer">Home Battery Storage Cost: UK Price Guide 2026 — Habo Energy</a></div></div>
+      <div class="source-item"><span class="s-num">S11</span><div><a href="https://octopus.energy/agile/" target="_blank" rel="noopener noreferrer">Agile Octopus | Half-hourly UK Wholesale Price Tracker — Octopus Energy</a></div></div>
+      <div class="source-item"><span class="s-num">S12</span><div><a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer">Best Time-of-Use Tariff UK 2026: Octopus Go vs Agile — AMP Renewables</a></div></div>
+      <div class="source-item"><span class="s-num">S13</span><div><a href="https://octopus.energy/blog/energy-prices-from-july-2026-and-what-they-mean-for-you/" target="_blank" rel="noopener noreferrer">Energy Prices from July 2026 — Octopus Energy</a></div></div>
+      <div class="source-item"><span class="s-num">S14</span><div><a href="https://www.ofgem.gov.uk/information-consumers/energy-advice-households/energy-price-cap-unit-rates-and-standing-charges" target="_blank" rel="noopener noreferrer">Energy Price Cap Unit Rates and Standing Charges — Ofgem</a></div></div>
+      <div class="source-item"><span class="s-num">S15</span><div><a href="https://www.ofgem.gov.uk/news/changes-energy-price-cap-between-1-july-and-30-september-2026" target="_blank" rel="noopener noreferrer">Changes to Energy Price Cap Q3 2026 — Ofgem</a></div></div>
+      <div class="source-item"><span class="s-num">S16</span><div><a href="https://octopus.energy/blog/april-2026-price-cap-updates/" target="_blank" rel="noopener noreferrer">Energy Price Cut April 2026 — Octopus Energy</a></div></div>
+      <div class="source-item"><span class="s-num">S17</span><div><a href="https://www.eonnext.com/electricity-and-gas/price-cap" target="_blank" rel="noopener noreferrer">Ofgem's Energy Price Cap Explained — E.ON Next</a></div></div>
+      <div class="source-item"><span class="s-num">S18</span><div><a href="https://octopus.energy/smart/intelligent-octopus-go/" target="_blank" rel="noopener noreferrer">Intelligent Octopus Go — Octopus Energy</a></div></div>
+      <div class="source-item"><span class="s-num">S19</span><div><a href="https://www.uswitch.com/gas-electricity/guides/regional-energy-prices/" target="_blank" rel="noopener noreferrer">Energy Prices by Region July 2026 — Uswitch</a></div></div>
+      <div class="source-item"><span class="s-num">S20</span><div><a href="https://www.moneysavingexpert.com/utilities/what-is-the-energy-price-cap/" target="_blank" rel="noopener noreferrer">What is the Energy Price Cap? — MoneySavingExpert</a></div></div>
+      <div class="source-item"><span class="s-num">S21</span><div><a href="https://www.reddit.com/comments/1toxljz/" target="_blank" rel="noopener noreferrer">Energy Price Cap Rise 13% from July — r/OctopusEnergy (Reddit)</a></div></div>
+      <div class="source-item"><span class="s-num">S22</span><div><a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">Octopus Energy Tariffs July 2026 — EnergyPlus</a></div></div>
+      <div class="source-item"><span class="s-num">S23</span><div><a href="https://octopus.energy/tariffs/" target="_blank" rel="noopener noreferrer">All Our Tariffs — Octopus Energy</a></div></div>
+      <div class="source-item"><span class="s-num">S24</span><div><a href="https://www.energyplus.co.uk/energy-tariff-calculator" target="_blank" rel="noopener noreferrer">Energy Calculator: Bill Estimate July 2026 — EnergyPlus</a></div></div>
+      <div class="source-item"><span class="s-num">S25</span><div><a href="https://octopus.energy/smart/go/rates/" target="_blank" rel="noopener noreferrer">Octopus Go | Find Your Rates — Octopus Energy</a></div></div>
+      <div class="source-item"><span class="s-num">S26</span><div><a href="https://www.glowgreenltd.com/solar-advice/tesla-powerwall-3-cost-uk" target="_blank" rel="noopener noreferrer">Tesla Powerwall 3 Price UK 2026 — Glow Green</a></div></div>
+      <div class="source-item"><span class="s-num">S27</span><div><a href="https://www.depthoflight.co.uk/blog/givenergy-alternatives-uk/" target="_blank" rel="noopener noreferrer">Best GivEnergy Alternatives UK 2026 — Depth of Light</a></div></div>
+      <div class="source-item"><span class="s-num">S28</span><div><a href="https://alpselectrical.com/blog/tesla-powerwall-3-review-uk/" target="_blank" rel="noopener noreferrer">Tesla Powerwall 3 Review UK: Cost, Installation &amp; Verdict — Alps Electrical</a></div></div>
+      <div class="source-item"><span class="s-num">S29</span><div><a href="https://renewablesexcellence.co.uk/best-battery-storage-uk/" target="_blank" rel="noopener noreferrer">Best Battery Storage UK 2026: Tesla vs GivEnergy vs Libbi — Renewables Excellence</a></div></div>
+      <div class="source-item"><span class="s-num">S30</span><div><a href="https://comparesolarni.com/guides/best-home-battery-brands-ni/" target="_blank" rel="noopener noreferrer">Solar Battery Storage NI 2026: Costs, Best Brands &amp; Is It Worth It? — Compare Solar NI</a></div></div>
+    </div>
+  </section>
+
+  <footer style="font-family:system-ui,sans-serif;font-size:.75rem;color:var(--muted);text-align:center;padding-top:1.5rem;border-top:1px solid var(--border);">
+    Financial assessment for a specific household profile (England, July 2026). All figures are estimates based on publicly available tariff and cost data. Verify current rates and obtain professional installer quotes before making any purchasing decision.
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Viability of Home Battery Storage (UK) - Analysis</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #64748b;
+            --accent: #059669;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #475569;
+            --border: #e2e8f0;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-main);
+            background-color: var(--bg);
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            border-bottom: 4px solid var(--primary);
+            padding-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+            line-height: 1.2;
+        }
+
+        .meta-info {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        /* Executive Summary Card */
+        .exec-summary {
+            background: var(--primary);
+            color: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            margin-bottom: 3rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .exec-summary h2 {
+            margin-top: 0;
+            font-size: 1.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+            padding-bottom: 1rem;
+        }
+
+        .highlight-box {
+            background: rgba(255,255,255,0.1);
+            padding: 1rem;
+            border-left: 4px solid white;
+            margin: 1rem 0;
+            font-weight: 500;
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            transition: transform 0.2s;
+        }
+
+        .card:hover { transform: translateY(-2px); }
+        .card h3 { margin-top: 0; color: var(--primary); }
+
+        /* Stats Blocks */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Comparison Table */
+        .table-container {
+            overflow-x: auto;
+            margin: 2rem 0;
+            background: white;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: #f1f5f9;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .highlight-cell {
+            background: #f0fdf4;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        /* Diagrams */
+        .diagram-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .flow-step {
+            background: #f8fafc;
+            border: 2px solid var(--border);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            width: 200px;
+            position: relative;
+        }
+
+        .arrow {
+            font-size: 1.5rem;
+            color: var(--secondary);
+        }
+
+        /* Callouts */
+        .callout {
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            margin: 2rem 0;
+            border-left: 6px solid;
+        }
+
+        .callout-info { background: #e0f2fe; border-color: #0ea5e9; }
+        .callout-warning { background: #fffbeb; border-color: #f59e0b; }
+        .callout-success { background: #f0fdf4; border-color: #10b981; }
+
+        /* Sources */
+        .sources-section {
+            margin-top: 4rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        .sources-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .source-link {
+            color: var(--primary);
+            text-decoration: none;
+            display: block;
+            padding: 0.25rem 0;
+        }
+
+        .source-link:hover { text-decoration: underline; }
+
+        /* Typography */
+        a { color: var(--primary); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8rem; }
+            .flow-diagram { flex-direction: column; }
+            .arrow { transform: rotate(90deg); margin: 1rem 0; }
+        }
+
+        @media print {
+            body { background: white; }
+            .container { max-width: 100%; }
+            .exec-summary { background: #f1f5f9; color: black; border: 1px solid #ccc; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Is a home battery worthwhile without solar panels for my UK home?</h1>
+        <div class="meta-info">
+            <span><strong>Date:</strong> 14 July 2026</span>
+            <span><strong>Location:</strong> England</span>
+            <span><strong>Horizon:</strong> 10 Years</span>
+        </div>
+    </header>
+
+    <section class="exec-summary">
+        <h2>Executive Summary</h2>
+        <p>For a UK household consuming 9,000 kWh/year with high daytime demand (home office), installing a home battery is <strong>financially viable</strong>, provided a 10 kWh system is installed at a competitive price (<£6,000).</p>
+        
+        <div class="highlight-box">
+            <strong>The Verdict:</strong> A 10 kWh system can achieve a positive net financial outcome via "tariff arbitrage," while a 5 kWh system is unlikely to pay for itself within 10 years.
+        </div>
+        
+        <p>The primary driver is charging during low-cost overnight windows and discharging during peak daytime hours <a href="https://www.energyplus.co.uk/costsavingadvice/best-time-of-use-electricity-tariffs-uk-for-households" target="_blank" rel="noopener noreferrer">[S1]</a> <a href="https://www.energyplus.co.uk/solar/home-battery-storage-without-solar-panels-uk" target="_blank" rel="noopener noreferrer">[S5]</a> <a href="https://www.bestbuilders.co.uk/guides/insights/is-a-solar-battery-worth-it-in-2026-uk" target="_blank" rel="noopener noreferrer">[S28]</a>.</p>
+    </section>
+
+    <section>
+        <h2>1. The Mechanics of Grid Arbitrage</h2>
+        <p>Grid arbitrage is the process of "buying low and selling high" to yourself. By switching to Time-of-Use (TOU) tariffs (e.g., <em>Intelligent Octopus Go</em>), homeowners can access cheap overnight rates and avoid expensive peak costs <a href="https://www.energyplus.co.uk/costsavingadvice/best-time-of-use-electricity-tariffs-uk-for-households" target="_blank" rel="noopener noreferrer">[S1]</a> <a href="https://offpeakenergy.co.uk/tariffs" target="_blank" rel="noopener noreferrer">[S2]</a> <a href="https://www.energyplus.co.uk/solar/home-battery-storage-without-solar-panels-uk" target="_blank" rel="noopener noreferrer">[S5]</a>.</p>
+
+        <div class="diagram-container">
+            <h3>How it Works: The Arbitrage Cycle</h3>
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <strong>Step 1: Charge</strong><br>
+                    Grid &rarr; Battery<br>
+                    <small>Off-Peak Rate (~7p-9p/kWh)</small>
+                </div>
+                <div class="arrow">&rarr;</div>
+                <div class="flow-step">
+                    <strong>Step 2: Store</strong><br>
+                    LFP Battery Storage<br>
+                    <small>90% Round-Trip Efficiency</small>
+                </div>
+                <div class="arrow">&rarr;</div>
+                <div class="flow-step">
+                    <strong>Step 3: Discharge</strong><br>
+                    Battery &rarr; Home Office<br>
+                    <small>Avoid Peak Rate (~24p-32p/kWh)</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="callout callout-info">
+            <strong>Technical Note: Round-Trip Efficiency</strong><br>
+            Batteries are not 100% efficient. Modern LFP batteries lose 4-11% of energy during the charge/discharge cycle <a href="https://www.energyplus.co.uk/solar/home-battery-storage-without-solar-panels-uk" target="_blank" rel="noopener noreferrer">[S5]</a> <a href="https://www.sunsave.energy/solar-panels-advice/batteries/without-solar" target="_blank" rel="noopener noreferrer">[S7]</a> <a href="https://www.eerenewables.co.uk/solar-guides/solar-battery-prices/" target="_blank" rel="noopener noreferrer">[S9]</a> <a href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">[S16]</a> <a href="https://avebattery.com/blog/10kw-solar-battery-price-uk/" target="_blank" rel="noopener noreferrer">[S27]</a> <a href="https://qualityheating.co.uk/blogs/learn-more/discover-the-givenergy-all-in-one-2-hybrid-inverter-and-battery-storage-system" target="_blank" rel="noopener noreferrer">[S45]</a>.
+        </div>
+    </section>
+
+    <section>
+        <h2>2. Comparative Analysis of Options</h2>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Criteria</th>
+                        <th>Flat Rate</th>
+                        <th>TOU (No Battery)</th>
+                        <th>5kWh Battery</th>
+                        <th>10kWh Battery</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Upfront Cost</td>
+                        <td>£0</td>
+                        <td>£0</td>
+                        <td>£2,500 – £5,500</td>
+                        <td>£4,000 – £10,000</td>
+                    </tr>
+                    <tr>
+                        <td>Annual Elec. Cost</td>
+                        <td>£2,223</td>
+                        <td>~£1,872</td>
+                        <td>~£1,507</td>
+                        <td class="highlight-cell">~£1,142</td>
+                    </tr>
+                    <tr>
+                        <td>Annual Savings</td>
+                        <td>Baseline</td>
+                        <td>£351</td>
+                        <td>£716</td>
+                        <td class="highlight-cell">£1,081</td>
+                    </tr>
+                    <tr>
+                        <td>Simple Payback</td>
+                        <td>N/A</td>
+                        <td>Immediate</td>
+                        <td>~10.3 Years</td>
+                        <td class="highlight-cell">~8.2 Years</td>
+                    </tr>
+                    <tr>
+                        <td>10-Year Net</td>
+                        <td>-£22,230</td>
+                        <td>-£18,720</td>
+                        <td>Break-even / Loss</td>
+                        <td class="highlight-cell">+£1,300 Profit</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>Flat-Rate Tariff</h3>
+                <p>Zero risk, no upfront cost, but the most expensive annual expenditure. Best for renters or low-usage homes.</p>
+            </div>
+            <div class="card">
+                <h3>TOU (No Battery)</h3>
+                <p>Risky for this user. High daytime demand leads to "peak price spikes" without a buffer <a href="https://www.energyplus.co.uk/costsavingadvice/best-time-of-use-electricity-tariffs-uk-for-households" target="_blank" rel="noopener noreferrer">[S1]</a>.</p>
+            </div>
+            <div class="card">
+                <h3>5 kWh Battery</h3>
+                <p>Insufficient capacity for a home office. Payback exceeds 10 years when accounting for degradation <a href="https://www.greentechrenewables.co.uk/battery-storage/cost-uk" target="_blank" rel="noopener noreferrer">[S8]</a> <a href="https://greatbritishenergy.com/solar-panel-costs/" target="_blank" rel="noopener noreferrer">[S11]</a>.</p>
+            </div>
+            <div class="card" style="border: 2px solid var(--accent);">
+                <h3>10 kWh Battery</h3>
+                <p><strong>Recommended.</strong> Covers a significant portion of daytime load. Positive ROI within 10 years.</p>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>3. Sensitivity Analysis & Variables</h2>
+        
+        <div class="stat-grid">
+            <div class="stat-card">
+                <span class="stat-label">VAT Incentive</span>
+                <span class="stat-value">0% VAT</span>
+                <small>Available until March 31, 2027 <a href="https://ewayenergy.com/uk-home-battery-incentives-2026-2027-capture-the-window/" target="_blank" rel="noopener noreferrer">[S15]</a></small>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Typical Spread</span>
+                <span class="stat-value">15-17p/kWh</span>
+                <small>Required for viability <a href="https://premierelectricalrenewables.co.uk/blog/battery-storage-tariff-guide-2026" target="_blank" rel="noopener noreferrer">[S32]</a></small>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">LFP Degradation</span>
+                <span class="stat-value">70-80%</span>
+                <small>Capacity after 10-15 years <a href="https://www.ukem.co.uk/battery-storage/faqs/" target="_blank" rel="noopener noreferrer">[S12]</a></small>
+            </div>
+        </div>
+
+        <div class="callout callout-success">
+            <strong>The "Wildcard": VPP & DFS Income</strong><br>
+            Joining a Virtual Power Plant (VPP) can add <strong>£120–£250/year</strong> <a href="https://haboenergy.co.uk/virtual-power-plant-uk-home-battery" target="_blank" rel="noopener noreferrer">[S35]</a> <a href="https://www.sunsave.energy/solar-panels-advice/exporting-to-the-grid/virtual-power-plants" target="_blank" rel="noopener noreferrer">[S36]</a> <a href="https://solarus.co.uk/what-is-a-virtual-power-plant-and-can-your-battery-earn-you-money/" target="_blank" rel="noopener noreferrer">[S43]</a>. Participation in the Demand Flexibility Service (DFS) can further reduce the 10kWh payback period from 8 years to approximately 6 years <a href="https://www.macromosaichub.com/post/powering-up-your-home-can-your-uk-battery-become-a-virtual-power-plant-and-what-s-the-payoff" target="_blank" rel="noopener noreferrer">[S37]</a>.
+        </div>
+
+        <div class="callout callout-warning">
+            <strong>The Primary Risk: Tariff Volatility</strong><br>
+            The entire financial case relies on the energy supplier maintaining a wide price spread between peak and off-peak rates. If this narrows, the battery becomes a depreciating asset with no ROI.
+        </div>
+    </section>
+
+    <section>
+        <h2>Final Verdict & Next Steps</h2>
+        <p><strong>Is it worthwhile?</strong> Yes, but only if you install a <strong>10 kWh system</strong> at a competitive price (under £6,000) and pair it with a deep-spread TOU tariff.</p>
+        
+        <div class="grid">
+            <div class="card">
+                <h3>Step 1: Data Audit</h3>
+                <p>Download 12 months of half-hourly smart meter data to confirm exact peak vs. off-peak usage.</p>
+            </div>
+            <div class="card">
+                <h3>Step 2: Bidding</h3>
+                <p>Get three fixed-price quotes for 10 kWh LFP systems. Ensure 0% VAT is applied.</p>
+            </div>
+            <div class="card">
+                <h3>Step 3: Tariff Check</h3>
+                <p>Verify eligibility for "Intelligent Octopus Go" or "Agile" to maximize spreads <a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">[S17]</a> <a href="https://octopus.energy/octopus-smart-tariffs/" target="_blank" rel="noopener noreferrer">[S24]</a>.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer class="sources-section">
+        <h3>Sources</h3>
+        <div class="sources-grid">
+            <a class="source-link" href="https://www.energyplus.co.uk/costsavingadvice/best-time-of-use-electricity-tariffs-uk-for-households" target="_blank" rel="noopener noreferrer">[S1] EnergyPlus - TOU Tariffs</a>
+            <a class="source-link" href="https://offpeakenergy.co.uk/tariffs" target="_blank" rel="noopener noreferrer">[S2] OffPeak Energy</a>
+            <a class="source-link" href="https://haboenergy.co.uk/home-battery-storage-cost-per-kwh" target="_blank" rel="noopener noreferrer">[S3] Habo Energy - Costs</a>
+            <a class="source-link" href="https://iheat.co.uk/solar-help/solar-battery-storage-costs-uk" target="_blank" rel="noopener noreferrer">[S4] iHeat - Price Guide</a>
+            <a class="source-link" href="https://www.energyplus.co.uk/solar/home-battery-storage-without-solar-panels-uk" target="_blank" rel="noopener noreferrer">[S5] EnergyPlus - No Solar Costs</a>
+            <a class="source-link" href="https://www.simplesolarltd.co.uk/news/ofgem-price-cap-rise-july-2026" target="_blank" rel="noopener noreferrer">[S6] Simple Solar - Price Cap</a>
+            <a class="source-link" href="https://www.sunsave.energy/solar-panels-advice/batteries/without-solar" target="_blank" rel="noopener noreferrer">[S7] Sunsave - Worth it?</a>
+            <a class="source-link" href="https://www.greentechrenewables.co.uk/battery-storage/cost-uk" target="_blank" rel="noopener noreferrer">[S8] GreenTech - Cost UK</a>
+            <a class="source-link" href="https://www.eerenewables.co.uk/solar-guides/solar-battery-prices/" target="_blank" rel="noopener noreferrer">[S9] EE Renewables - Cost Guide</a>
+            <a class="source-link" href="https://www.energyplus.co.uk/solar/add-battery-to-existing-solar-panels-cost-uk" target="_blank" rel="noopener noreferrer">[S10] EnergyPlus - Add Battery</a>
+            <a class="source-link" href="https://greatbritishenergy.com/solar-panel-costs/" target="_blank" rel="noopener noreferrer">[S11] Great British Energy</a>
+            <a class="source-link" href="https://www.ukem.co.uk/battery-storage/faqs/" target="_blank" rel="noopener noreferrer">[S12] UKEM Group - FAQ</a>
+            <a class="source-link" href="https://avebattery.com/blog/5kw-solar-battery-price-uk/" target="_blank" rel="noopener noreferrer">[S13] Avepower - 5kW Price</a>
+            <a class="source-link" href="https://uk.jackery.com/blogs/buying-guide/10-kw-solar-battery-price-uk" target="_blank" rel="noopener noreferrer">[S14] Jackery - 10kW Price</a>
+            <a class="source-link" href="https://ewayenergy.com/uk-home-battery-incentives-2026-2027-capture-the-window/" target="_blank" rel="noopener noreferrer">[S15] EasyWay Energy - Incentives</a>
+            <a class="source-link" href="https://www.sunsave.energy/solar-panels-advice/batteries/costs" target="_blank" rel="noopener noreferrer">[S16] Sunsave - Expert Guide</a>
+            <a class="source-link" href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">[S17] EnergyPlus - Octopus Tariffs</a>
+            <a class="source-link" href="https://renewablesexcellence.co.uk/battery-storage-installation-costs-uk/" target="_blank" rel="noopener noreferrer">[S18] Renewables Excellence</a>
+            <a class="source-link" href="https://www.bestbuilders.co.uk/costs/solar-battery-cost-uk" target="_blank" rel="noopener noreferrer">[S19] Best Builders - Costs</a>
+            <a class="source-link" href="https://thegreenhomeco.com/how-much-does-a-solar-battery-installation-cost-in-the-uk-in-2026/" target="_blank" rel="noopener noreferrer">[S20] TheGreenHomeCo</a>
+            <a class="source-link" href="https://heatable.co.uk/solar/advice/battery-storage-costs" target="_blank" rel="noopener noreferrer">[S21] Heatable - Costs</a>
+            <a class="source-link" href="https://greenskyrenewables.co.uk/battery-storage-cost-uk-2026/" target="_blank" rel="noopener noreferrer">[S22] GreenSky Renewables</a>
+            <a class="source-link" href="https://octopus.energy/agile/" target="_blank" rel="noopener noreferrer">[S23] Octopus Agile</a>
+            <a class="source-link" href="https://octopus.energy/octopus-smart-tariffs/" target="_blank" rel="noopener noreferrer">[S24] Octopus Smart Tariffs</a>
+            <a class="source-link" href="https://coolpowerco.co.uk/octopus-energy-tariffs-compared/" target="_blank" rel="noopener noreferrer">[S25] CoolPowerCo - Comparison</a>
+            <a class="source-link" href="https://www.jmegreenenergy.co.uk/octopus-energy-tariffs-guide-solar-battery" target="_blank" rel="noopener noreferrer">[S26] JME Green Energy</a>
+            <a class="source-link" href="https://avebattery.com/blog/10kw-solar-battery-price-uk/" target="_blank" rel="noopener noreferrer">[S27] Avepower - 10kW Price</a>
+            <a class="source-link" href="https://www.bestbuilders.co.uk/guides/insights/is-a-solar-battery-worth-it-in-2026-uk" target="_blank" rel="noopener noreferrer">[S28] Best Builders - ROI</a>
+            <a class="source-link" href="https://sola-uk.com/blog/home-battery-storage-hertfordshire-2026/" target="_blank" rel="noopener noreferrer">[S29] SOLA UK - Buyer's Guide</a>
+            <a class="source-link" href="https://www.glowgreenltd.com/solar-advice/solar-battery-storage-costs-prices" target="_blank" rel="noopener noreferrer">[S30] Glow Green - Prices</a>
+            <a class="source-link" href="https://eastbourne.energy/blog/home-battery-storage-no-solar" target="_blank" rel="noopener noreferrer">[S31] Eastbourne Energy</a>
+            <a class="source-link" href="https://premierelectricalrenewables.co.uk/blog/battery-storage-tariff-guide-2026" target="_blank" rel="noopener noreferrer">[S32] Premiere Electrical - Guide</a>
+            <a class="source-link" href="https://www.solarinfo.uk/octopus-energy-solar-panels" target="_blank" rel="noopener noreferrer">[S33] SolarInfo - Octopus Review</a>
+            <a class="source-link" href="https://octopus.energy/" target="_blank" rel="noopener noreferrer">[S34] Octopus Energy</a>
+            <a class="source-link" href="https://haboenergy.co.uk/virtual-power-plant-uk-home-battery" target="_blank" rel="noopener noreferrer">[S35] Habo Energy - VPP</a>
+            <a class="source-link" href="https://www.sunsave.energy/solar-panels-advice/exporting-to-the-grid/virtual-power-plants" target="_blank" rel="noopener noreferrer">[S36] Sunsave - VPP Explained</a>
+            <a class="source-link" href="https://www.macromosaichub.com/post/powering-up-your-home-can-your-uk-battery-become-a-virtual-power-plant-and-what-s-the-payoff" target="_blank" rel="noopener noreferrer">[S37] MacroMosaic - VPP Payoff</a>
+            <a class="source-link" href="https://theenergyst.com/new-report-shows-untapped-potential-of-battery-storage/" target="_blank" rel="noopener noreferrer">[S38] The Energyst - Report</a>
+            <a class="source-link" href="https://kindenergy.co.uk/blog/solar-panels-battery-storage-uk-2026-costs-savings-guide/" target="_blank" rel="noopener noreferrer">[S39] Kind Energy - Guide</a>
+            <a class="source-link" href="https://www.gridwiseguide.co.uk/home-battery-storage-uk/" target="_blank" rel="noopener noreferrer">[S40] GridWise Guide</a>
+            <a class="source-link" href="https://offgrid.group/solar-panel-and-battery-storage-cost-uk-2026-price-guide-roi-2/" target="_blank" rel="noopener noreferrer">[S41] OffGrid Group - ROI Guide</a>
+            <a class="source-link" href="https://solarpanelsforfactories.co.uk/blog/factory-solar-battery-storage-guide-2026/" target="_blank" rel="noopener noreferrer">[S42] Factory Solar - Guide</a>
+            <a class="source-link" href="https://solarus.co.uk/what-is-a-virtual-power-plant-and-can-your-battery-earn-you-money/" target="_blank" rel="noopener noreferrer">[S43] Solarus - VPP Income</a>
+            <a class="source-link" href="https://heatpumpsandsolar.co.uk/insights/uk-solar-heat-pump-update-july-2026" target="_blank" rel="noopener noreferrer">[S44] HeatPumpsAndSolar</a>
+            <a class="source-link" href="https://qualityheating.co.uk/blogs/learn-more/discover-the-givenergy-all-in-one-2-hybrid-inverter-and-battery-storage-system" target="_blank" rel="noopener noreferrer">[S45] AIZO Quality Heating</a>
+        </div>
+    </footer>
+</div>
+
+</body>
+</html>
