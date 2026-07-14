@@ -88,7 +88,7 @@ model_server = "local"
 # final_reserve_percent = 25  # time and known cost held back from research rounds for final writing
 # max_report_tokens = 8192    # deprecated alias for synthesis_tokens
 # extraction_concurrency = 3  # concurrent URL fetch+extract tasks
-# min_rounds = 2              # stop-check is skipped until this many rounds complete
+# min_rounds = 2              # deprecated compatibility setting; no longer forces extra rounds
 # max_empty_rounds = 2        # consecutive zero-finding rounds before aborting
 # synthesis_window = 10       # only the last N findings are passed to each synthesis call
 

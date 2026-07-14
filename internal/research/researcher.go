@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/stevelittlefish/lemon-chat/internal/redditimport"
 	"github.com/stevelittlefish/lemon-chat/internal/searx"
@@ -82,8 +83,10 @@ type EvidenceClaim struct {
 }
 
 type EvidenceGap struct {
-	Question string `json:"question"`
-	Notes    string `json:"notes,omitempty"`
+	Question       string `json:"question"`
+	Notes          string `json:"notes,omitempty"`
+	WebStatus      string `json:"web_status"`
+	SearchStrategy string `json:"search_strategy,omitempty"`
 }
 
 // AnalyzedURL is any URL the engine attempted to read, whether or not
@@ -250,6 +253,9 @@ type Researcher struct {
 	cfg    Config
 	state  State
 	client *http.Client
+
+	nextGap      string
+	nextStrategy string
 
 	// writer is the strong job model (plan, synthesis, final/deep report);
 	// worker is the cheap/fast model for extraction and the mechanical calls.
@@ -558,6 +564,12 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 		}
 		completedCreativity = r.cfg.RedditResume.Pending.Creativity
 	}
+	// A crash or Reddit handoff can resume immediately after a completed round,
+	// before its marginal-value decision ran. Re-establish that decision before
+	// allowing any new query generation.
+	if continueRounds && !r.brainstorm() && r.state.Round > 0 && r.state.Round < r.cfg.MaxRounds && r.shouldStop(ctx, r.state.Round) {
+		continueRounds = false
+	}
 
 	for round := r.state.Round + 1; continueRounds && round <= r.cfg.MaxRounds; round++ {
 		if ctx.Err() != nil {
@@ -576,9 +588,9 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 			break
 		}
 
-		// No point running the stop-check on the final round — the loop exits
-		// regardless. This keeps the low-effort modes (1–2 rounds) snappy.
-		if round < r.cfg.MaxRounds && round >= r.cfg.MinRounds && r.shouldStop(ctx, round) {
+		// The hard final round exits regardless; extra-effort rounds perform their
+		// own evidence-value check below before exceeding this cap.
+		if round < r.cfg.MaxRounds && r.shouldStop(ctx, round) {
 			break
 		}
 		if ctx.Err() != nil {
@@ -593,10 +605,11 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 			Message: fmt.Sprintf("reached the maximum number of rounds (%d)", r.cfg.MaxRounds)})
 	}
 
-	// Bonus creative rounds (effort 4 → 1, effort 5 → 2). These run past the
-	// normal stopping point, pushing the model to search from fresh angles —
-	// only worth doing when we already have a report to extend.
-	if r.cfg.ExtraRounds > 0 && len(r.state.Findings) > 0 {
+	// Bonus creative rounds (effort 4 → 1, effort 5 → 2). Research mode may
+	// exceed the normal cap only when a fresh evidence-value decision names a
+	// worthwhile gap and strategy; an earlier failure/stop cannot be bypassed.
+	bonusEligible := r.brainstorm() || r.state.Round >= r.cfg.MaxRounds
+	if r.cfg.ExtraRounds > 0 && len(r.state.Findings) > 0 && bonusEligible && (r.brainstorm() || !r.shouldStop(ctx, r.state.Round)) {
 		r.state.EmptyRounds = 0 // give the bonus rounds a fair chance
 		for creativity := completedCreativity + 1; creativity <= r.cfg.ExtraRounds; creativity++ {
 			if ctx.Err() != nil {
@@ -618,6 +631,9 @@ func (r *Researcher) Run(ctx context.Context) (string, error) {
 				return "", err
 			}
 			if !keepGoing {
+				break
+			}
+			if !r.brainstorm() && r.shouldStop(ctx, round) {
 				break
 			}
 		}
@@ -995,6 +1011,50 @@ func (r *Researcher) classifyBrainstorm(ctx context.Context) string {
 
 // ── Phase 3: Think (query generation) ────────────────────────
 
+func queryTerms(query string) map[string]bool {
+	stopWords := map[string]bool{"a": true, "an": true, "and": true, "for": true, "in": true, "of": true, "on": true, "the": true, "to": true, "with": true}
+	terms := make(map[string]bool)
+	for _, term := range strings.FieldsFunc(strings.ToLower(query), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		if len(term) > 1 && !stopWords[term] {
+			terms[term] = true
+		}
+	}
+	return terms
+}
+
+func queriesEquivalent(a, b string) bool {
+	aTerms, bTerms := queryTerms(a), queryTerms(b)
+	if len(aTerms) == 0 || len(bTerms) == 0 {
+		return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
+	}
+	intersection := 0
+	for term := range aTerms {
+		if bTerms[term] {
+			intersection++
+		}
+	}
+	union := len(aTerms) + len(bTerms) - intersection
+	return float64(intersection)/float64(union) >= 0.75
+}
+
+func (r *Researcher) evidenceTarget(round int) (string, string, bool) {
+	if round <= 1 {
+		return "Establish the core facts needed to answer the question.", "Use diverse authoritative and primary public sources across the main facets.", true
+	}
+	if r.nextGap != "" && r.nextStrategy != "" {
+		return r.nextGap, r.nextStrategy, true
+	}
+	var ledger EvidenceLedger
+	if parseJSONObject(r.state.Report, &ledger) == nil {
+		for _, gap := range ledger.Gaps {
+			if gap.WebStatus == "answerable" && strings.TrimSpace(gap.Question) != "" && strings.TrimSpace(gap.SearchStrategy) != "" {
+				return gap.Question, gap.SearchStrategy, true
+			}
+		}
+	}
+	return "", "", false
+}
+
 func (r *Researcher) generateQueries(ctx context.Context, round, creativity int) []string {
 	report := r.state.Report
 
@@ -1023,6 +1083,11 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 		prompt = currentDateContext(r.cfg.Location) +
 			fmt.Sprintf(queryPrompt, r.cfg.Query, r.state.Plan, report, round, instruction)
 	} else {
+		gap, strategy, hasTarget := r.evidenceTarget(round)
+		if !hasTarget {
+			r.progress(Progress{Phase: "note", Round: round, Message: "no publicly answerable evidence gap with a new strategy — stopping"})
+			return nil
+		}
 		numQueries, instruction := 4, queryGenFirstRoundInstruction
 		if round > 1 {
 			numQueries, instruction = 3, queryGenFollowUpInstruction
@@ -1037,7 +1102,7 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 			report = "(No findings yet.)"
 		}
 		prompt = currentDateContext(r.cfg.Location) +
-			fmt.Sprintf(queryGenPrompt, r.cfg.Query, r.state.Plan, report, round, numQueries, instruction)
+			fmt.Sprintf(queryGenPrompt, r.cfg.Query, r.state.Plan, report, gap, strategy, strings.Join(r.state.QueriesUsed, "\n"), round, numQueries, instruction)
 	}
 
 	out, callID, err := r.llmCallWorker(ctx, "query_generation", round, []chatMsg{{Role: "user", Content: prompt}}, 0.5, 4096, queryTimeout)
@@ -1047,24 +1112,27 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 		return nil
 	}
 
-	used := make(map[string]bool, len(r.state.QueriesUsed))
-	for _, q := range r.state.QueriesUsed {
-		used[strings.ToLower(q)] = true
-	}
+	used := append([]string(nil), r.state.QueriesUsed...)
 	var queries []string
 	for _, q := range parseJSONStringArray(out) {
 		q = strings.TrimSpace(q)
-		if q == "" || used[strings.ToLower(q)] {
+		duplicate := q == ""
+		for _, previous := range append(used, queries...) {
+			if queriesEquivalent(q, previous) {
+				duplicate = true
+				break
+			}
+		}
+		if duplicate {
 			continue
 		}
-		used[strings.ToLower(q)] = true
 		queries = append(queries, q)
 	}
 	// With the toggle on, the model occasionally still returns no usable query;
 	// fall back to the brief itself so the promised search always happens.
 	usedFallback := false
 	if forceSearch && len(queries) == 0 {
-		if q := strings.TrimSpace(r.cfg.Query); q != "" && !used[strings.ToLower(q)] {
+		if q := strings.TrimSpace(r.cfg.Query); q != "" {
 			queries = append(queries, q)
 			usedFallback = true
 		}
@@ -1290,6 +1358,16 @@ func (r *Researcher) normalizeEvidenceLedger(raw string) (string, error) {
 	for _, gap := range ledger.Gaps {
 		gap.Question = strings.TrimSpace(gap.Question)
 		gap.Notes = strings.TrimSpace(gap.Notes)
+		gap.WebStatus = strings.ToLower(strings.TrimSpace(gap.WebStatus))
+		gap.SearchStrategy = strings.TrimSpace(gap.SearchStrategy)
+		switch gap.WebStatus {
+		case "answerable", "private", "future", "inherently_uncertain", "unavailable":
+		default:
+			gap.WebStatus = "unavailable"
+		}
+		if gap.WebStatus != "answerable" {
+			gap.SearchStrategy = ""
+		}
 		key := strings.ToLower(gap.Question)
 		if gap.Question != "" && !seenGaps[key] {
 			seenGaps[key] = true
@@ -1398,22 +1476,114 @@ Truncated attempted update:
 
 // ── Phase 7: Decide ──────────────────────────────────────────
 
-func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
-	stop := stopPrompt
-	if r.brainstorm() {
-		stop = brainstormStopPrompt
+type stopDecision struct {
+	Continue      bool   `json:"continue"`
+	Gap           string `json:"gap"`
+	Strategy      string `json:"strategy"`
+	ExpectedValue string `json:"expected_value"`
+	Reason        string `json:"reason"`
+}
+
+func termOverlap(a, b string) float64 {
+	aTerms, bTerms := queryTerms(a), queryTerms(b)
+	if len(aTerms) == 0 || len(bTerms) == 0 {
+		return 0
 	}
-	prompt := fmt.Sprintf(stop, r.cfg.Query, r.state.Report, round, r.cfg.MaxRounds)
-	out, callID, err := r.llmCallWorker(ctx, "stop_decision", round, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 128, stopTimeout)
+	intersection := 0
+	for term := range aTerms {
+		if bTerms[term] {
+			intersection++
+		}
+	}
+	denominator := min(len(aTerms), len(bTerms))
+	return float64(intersection) / float64(denominator)
+}
+
+func (r *Researcher) answerableGaps() []EvidenceGap {
+	var ledger EvidenceLedger
+	if parseJSONObject(r.state.Report, &ledger) != nil {
+		return nil
+	}
+	var gaps []EvidenceGap
+	for _, gap := range ledger.Gaps {
+		if gap.WebStatus == "answerable" && strings.TrimSpace(gap.Question) != "" && strings.TrimSpace(gap.SearchStrategy) != "" {
+			gaps = append(gaps, gap)
+		}
+	}
+	return gaps
+}
+
+func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
+	if r.brainstorm() {
+		prompt := fmt.Sprintf(brainstormStopPrompt, r.cfg.Query, r.state.Report, round, r.cfg.MaxRounds)
+		out, callID, err := r.llmCallWorker(ctx, "stop_decision", round, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 128, stopTimeout)
+		if err != nil {
+			r.setCallDisposition(callID, "fallback")
+			return false
+		}
+		r.setCallDisposition(callID, "accepted")
+		decision := strings.TrimLeft(stripToolCalls(out), "*_`\"'>#- \t\n")
+		shouldStop := strings.HasPrefix(strings.ToUpper(decision), "YES")
+		r.trace("stop_decision", "deciding", round, decision, map[string]any{"stop": shouldStop, "response": out})
+		r.progress(Progress{Phase: "deciding", Round: round, Message: decision})
+		return shouldStop
+	}
+
+	r.nextGap, r.nextStrategy = "", ""
+	gaps := r.answerableGaps()
+	if len(gaps) == 0 {
+		message := "stopping — no important unresolved gap is answerable on the public web with a new strategy"
+		r.trace("stop_decision", "deciding", round, message, map[string]any{"stop": true, "reason": "no_answerable_gap", "model_call": false})
+		r.progress(Progress{Phase: "deciding", Round: round, Message: message})
+		return true
+	}
+	prompt := fmt.Sprintf(stopPrompt, r.cfg.Query, r.state.Report, strings.Join(r.state.QueriesUsed, "\n"))
+	out, callID, err := r.llmCallWorker(ctx, "stop_decision", round, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 384, stopTimeout)
 	if err != nil {
 		r.setCallDisposition(callID, "fallback")
-		return false
+		r.progress(Progress{Phase: "deciding", Round: round, Message: "stopping — unable to justify another research round"})
+		return true
 	}
-	r.setCallDisposition(callID, "accepted")
-	decision := strings.TrimLeft(stripToolCalls(out), "*_`\"'>#- \t\n")
-	shouldStop := strings.HasPrefix(strings.ToUpper(decision), "YES")
-	r.trace("stop_decision", "deciding", round, decision, map[string]any{"stop": shouldStop, "response": out})
-	r.progress(Progress{Phase: "deciding", Round: round, Message: decision})
+	var decision stopDecision
+	parseErr := parseJSONObject(out, &decision)
+	decision.Gap = strings.TrimSpace(decision.Gap)
+	decision.Strategy = strings.TrimSpace(decision.Strategy)
+	decision.ExpectedValue = strings.ToLower(strings.TrimSpace(decision.ExpectedValue))
+	decision.Reason = strings.TrimSpace(decision.Reason)
+	gapMatches := false
+	for _, gap := range gaps {
+		if strings.EqualFold(decision.Gap, gap.Question) || termOverlap(decision.Gap, gap.Question) >= 0.6 {
+			gapMatches = true
+			break
+		}
+	}
+	strategyIsNew := decision.Strategy != ""
+	for _, query := range r.state.QueriesUsed {
+		if queriesEquivalent(decision.Strategy, query) {
+			strategyIsNew = false
+			break
+		}
+	}
+	validContinue := parseErr == nil && decision.Continue && gapMatches && strategyIsNew && (decision.ExpectedValue == "high" || decision.ExpectedValue == "medium")
+	shouldStop := !validContinue
+	if validContinue {
+		r.nextGap, r.nextStrategy = decision.Gap, decision.Strategy
+		r.setCallDisposition(callID, "accepted")
+	} else if parseErr != nil || decision.Continue {
+		r.setCallDisposition(callID, "rejected")
+	} else {
+		r.setCallDisposition(callID, "accepted")
+	}
+	message := decision.Reason
+	if message == "" {
+		if validContinue {
+			message = "continuing for a specific answerable evidence gap"
+		} else {
+			message = "stopping — another round has low or unjustified expected value"
+		}
+	}
+	r.trace("stop_decision", "deciding", round, message, map[string]any{"stop": shouldStop, "response": out, "decision": decision, "gap_matches_ledger": gapMatches, "strategy_is_new": strategyIsNew})
+	r.progress(Progress{Phase: "deciding", Round: round, Message: message})
 	return shouldStop
 }
 

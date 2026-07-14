@@ -146,7 +146,7 @@ func TestSynthesisTruncationCompactsOrStopsRounds(t *testing.T) {
 
 func TestNormalizeEvidenceLedgerKeepsStructuredMemoryAndValidSources(t *testing.T) {
 	r := New(Config{}, State{Findings: []Finding{{URL: "https://one.example"}, {URL: "https://two.example"}}}, nil, nil)
-	raw := `{"claims":[{"claim":"  Battery life varies. ","supporting_sources":["[s1]","S9","S1"],"contradicting_sources":["s2"],"confidence":"HIGH"},{"claim":"battery life varies."}],"assumptions":[" tariff stays fixed ","Tariff stays fixed"],"calculations":["10 kWh * £0.10 = £1"],"unresolved_gaps":[{"question":" What is degradation? ","notes":" needs primary data "}]}`
+	raw := `{"claims":[{"claim":"  Battery life varies. ","supporting_sources":["[s1]","S9","S1"],"contradicting_sources":["s2"],"confidence":"HIGH"},{"claim":"battery life varies."}],"assumptions":[" tariff stays fixed ","Tariff stays fixed"],"calculations":["10 kWh * £0.10 = £1"],"unresolved_gaps":[{"question":" What is degradation? ","notes":" needs primary data ","web_status":"answerable","search_strategy":"manufacturer cycle-life datasets"},{"question":"Future tariff?","web_status":"future","search_strategy":"guess it"}]}`
 	got, err := r.normalizeEvidenceLedger(raw)
 	if err != nil {
 		t.Fatal(err)
@@ -158,8 +158,54 @@ func TestNormalizeEvidenceLedgerKeepsStructuredMemoryAndValidSources(t *testing.
 	if len(ledger.Claims) != 1 || len(ledger.Claims[0].SupportingSources) != 1 || ledger.Claims[0].SupportingSources[0] != "S1" || ledger.Claims[0].ContradictingSources[0] != "S2" || ledger.Claims[0].Confidence != "high" {
 		t.Fatalf("claims were not normalized: %+v", ledger.Claims)
 	}
-	if len(ledger.Assumptions) != 1 || len(ledger.Calculations) != 1 || len(ledger.Gaps) != 1 || ledger.Gaps[0].Question != "What is degradation?" {
+	if len(ledger.Assumptions) != 1 || len(ledger.Calculations) != 1 || len(ledger.Gaps) != 2 || ledger.Gaps[0].Question != "What is degradation?" || ledger.Gaps[0].WebStatus != "answerable" || ledger.Gaps[1].WebStatus != "future" || ledger.Gaps[1].SearchStrategy != "" {
 		t.Fatalf("ledger fields were not compacted: %+v", ledger)
+	}
+}
+
+func TestQueriesEquivalentIgnoresWordOrderButKeepsDifferentStrategies(t *testing.T) {
+	if !queriesEquivalent("UK home battery warranty cycle life data", "cycle life data for UK home battery warranty") {
+		t.Fatal("reordered duplicate query was not recognized")
+	}
+	if queriesEquivalent("UK home battery warranty cycle life data", "Ofgem time of use tariff export rules") {
+		t.Fatal("materially different queries were treated as duplicates")
+	}
+}
+
+func TestEvidenceStopRequiresAnswerableGapStrategyAndValue(t *testing.T) {
+	ledger := `{"claims":[],"assumptions":[],"calculations":[],"unresolved_gaps":[{"question":"What is the measured winter efficiency?","notes":"material to savings","web_status":"answerable","search_strategy":"independent laboratory test datasets"}]}`
+	for _, tc := range []struct {
+		name       string
+		decision   string
+		wantStop   bool
+		wantTarget bool
+	}{
+		{name: "justified continuation", decision: `{"continue":true,"gap":"What is the measured winter efficiency?","strategy":"search independent laboratory test datasets by model number","expected_value":"high","reason":"This could change the savings estimate."}`, wantTarget: true},
+		{name: "low value stops", decision: `{"continue":true,"gap":"What is the measured winter efficiency?","strategy":"search independent laboratory test datasets by model number","expected_value":"low","reason":"The likely value is low."}`, wantStop: true},
+		{name: "missing strategy stops", decision: `{"continue":true,"gap":"What is the measured winter efficiency?","strategy":"","expected_value":"high","reason":"No distinct method."}`, wantStop: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := New(Config{Model: "worker", APIBase: "http://model.test"}, State{Report: ledger, QueriesUsed: []string{"home battery seasonal efficiency review"}}, nil, nil)
+			r.client = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				body, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": tc.decision}}}})
+				return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(string(body)))}, nil
+			})}
+			r.startTime = time.Now()
+			if got := r.shouldStop(context.Background(), 1); got != tc.wantStop {
+				t.Fatalf("shouldStop=%t, want %t", got, tc.wantStop)
+			}
+			if (r.nextGap != "" && r.nextStrategy != "") != tc.wantTarget {
+				t.Fatalf("next target gap=%q strategy=%q", r.nextGap, r.nextStrategy)
+			}
+		})
+	}
+}
+
+func TestEvidenceStopSkipsModelWhenOnlyUnsearchableGapsRemain(t *testing.T) {
+	ledger := `{"claims":[],"assumptions":[],"calculations":[],"unresolved_gaps":[{"question":"What will next year's private tariff be?","web_status":"future"}]}`
+	r := New(Config{}, State{Report: ledger}, nil, nil)
+	if !r.shouldStop(context.Background(), 1) {
+		t.Fatal("unsearchable future evidence should stop research")
 	}
 }
 

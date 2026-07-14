@@ -38,7 +38,7 @@ type Research struct {
 	MaxCostUSD              float64 `toml:"max_cost_usd"`              // default per-job known-cost ceiling; 0 disables
 	FinalReservePercent     int     `toml:"final_reserve_percent"`     // time and known cost held back for final writing
 	ExtractionConcurrency   int     `toml:"extraction_concurrency"`    // concurrent URL fetch+extract tasks
-	MinRounds               int     `toml:"min_rounds"`                // stop-check is skipped until this many rounds complete
+	MinRounds               int     `toml:"min_rounds"`                // deprecated compatibility setting; evidence value now controls stopping
 	MaxEmptyRounds          int     `toml:"max_empty_rounds"`          // consecutive zero-finding rounds before aborting
 	SynthesisWindow         int     `toml:"synthesis_window"`          // only the last N findings are passed to each synthesis call
 }

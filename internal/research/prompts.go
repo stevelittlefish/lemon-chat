@@ -67,6 +67,13 @@ const queryGenPrompt = `You are a research assistant planning web searches.
 **What we know so far:**
 %s
 
+**Specific evidence gap for this round:** %s
+
+**Materially different search/source strategy:** %s
+
+**Queries already used (do not paraphrase or repeat them):**
+%s
+
 **Round:** %d
 
 Generate %d focused search queries that will help answer the question.
@@ -77,7 +84,7 @@ Example: ["query one", "query two", "query three"]`
 
 const queryGenFirstRoundInstruction = "This is the first round — generate broad, diverse queries that explore the key facets of the question."
 
-const queryGenFollowUpInstruction = "We already have partial findings. Generate targeted follow-up queries to fill gaps, verify claims, or explore specific aspects that the report doesn't yet cover well."
+const queryGenFollowUpInstruction = "Generate only queries that address the named evidence gap using the named strategy. Vary the source type or method, not merely the wording."
 
 // Creative instructions are used for the bonus "extra effort" rounds that run
 // after the report would normally be considered complete.
@@ -189,7 +196,7 @@ Consider:
 - Are the key design decisions and trade-offs worked out?
 - Would another round of ideation meaningfully improve the result, or is it diminishing returns?
 
-If rounds completed is well below the target, prefer continuing unless the ideas are already strong and thoroughly developed.
+Stop when another ideation round has low expected value; the number of rounds completed is not a reason to continue.
 
 Reply with ONLY "YES" or "NO" followed by a brief one-sentence reason.
 Example: "YES — There is a strong, fully worked-out concept with trade-offs addressed."
@@ -261,7 +268,12 @@ Return the COMPLETE updated ledger as one JSON object with exactly this shape:
   "assumptions": ["an assumption that materially affects the answer"],
   "calculations": ["formula, inputs, result, units, and source IDs where applicable"],
   "unresolved_gaps": [
-    {"question": "one concrete unanswered question", "notes": "why it matters and what evidence is missing"}
+    {
+      "question": "one concrete unanswered question",
+      "notes": "why it matters and what evidence is missing",
+      "web_status": "answerable|private|future|inherently_uncertain|unavailable",
+      "search_strategy": "for answerable gaps, a source type or method not already tried"
+    }
   ]
 }
 
@@ -272,27 +284,32 @@ Rules:
 - Use only source IDs present in the supplied findings or current ledger. Write IDs as S1, not [S1].
 - Retain still-relevant prior claims, assumptions, calculations, and gaps.
 - Remove a gap only when the evidence now answers it.
+- Classify every remaining gap by whether public-web research can answer it now. Do not call private facts, future outcomes, inherently uncertain predictions, or repeatedly unavailable evidence answerable.
 - Do not include markdown, a preamble, or keys outside the schema.`
 
-const stopPrompt = `You are deciding whether a research report is comprehensive enough.
+const stopPrompt = `Decide whether another web-research round has enough expected value to justify its cost.
 
 **Original question:** %s
 
-**Current report:**
+**Structured evidence ledger:**
 %s
 
-**Rounds completed:** %d of %d
+**Queries already used:**
+%s
 
-Based on the report so far, do we have enough information to answer the question comprehensively?  Consider:
-- Are the key aspects of the question addressed?
-- Are there obvious gaps or unanswered sub-questions?
-- Is the evidence sufficient and from multiple sources?
+Do not judge prose polish, formatting, citation style, or report completeness. Judge only whether one concrete unresolved evidence gap is both important and answerable with public-web evidence.
 
-If rounds completed is well below the target, prefer continuing unless the report is already exhaustive.
+Continue only when ALL are true:
+- You can name one specific gap whose answer could materially change or strengthen the answer.
+- The evidence is likely obtainable on the public web now. Private/internal facts, future outcomes, inherently uncertain predictions, and information already shown unavailable do not qualify.
+- You can name a materially different source/search strategy, not a paraphrase of a previous query.
+- Expected marginal value is high or medium, not low.
 
-Reply with ONLY "YES" or "NO" followed by a brief one-sentence reason.
-Example: "YES — The report covers all major aspects with evidence from multiple sources."
-Example: "NO — We still lack information about the economic impact."`
+Return ONLY one JSON object:
+{"continue":true,"gap":"specific answerable question","strategy":"different source type and search method","expected_value":"high|medium","reason":"brief reason"}
+
+To stop, return:
+{"continue":false,"gap":"","strategy":"","expected_value":"low","reason":"brief reason"}`
 
 const finalReportPrompt = `Write a **long, detailed, comprehensive** research report answering this question:
 
