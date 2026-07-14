@@ -328,4 +328,10 @@ The token log appends to the file on each request and includes a header line:
 
 ## Keeping TODO.md current
 
-Update `TODO.md` as work progresses — mark items `[~]` when started and `[x]` when done. When adding new work that isn't already listed, add it to the relevant section before starting. Don't leave TODO.md stale.
+Use `TODO.md` to track planned work, not as a changelog for every request.
+
+- If the requested work already has a TODO item, mark it `[~]` when started and `[x]` when done.
+- If the user asks to add or track a TODO item, add it without also implementing the work unless they explicitly ask for both.
+- If the user asks to perform a task that is not already listed, just do the task. Do not create a TODO item for it.
+
+Don't leave existing TODO items stale.

@@ -406,10 +406,10 @@ async function showDetail(id) {
             <button type="button" id="research-download-toggle" class="btn btn-sm btn-secondary" aria-haspopup="true" aria-expanded="false">${icon('download', 14)} Download ${icon('chevron-down', 14)}</button>
             <div class="menu research-download-panel" hidden>
               ${job.final_report ? `
-                <a href="/api/research/${id}/bundle" class="menu-item">${icon('download', 14)} Bundle (.zip)</a>
+                <a href="/api/research/${id}/bundle" class="menu-item">${icon('download', 14)} Bundle</a>
                 <button id="research-dl-md" class="menu-item">${icon('download', 14)} Markdown</button>
                 <button id="research-dl-html" class="menu-item">${icon('download', 14)} HTML</button>` : ''}
-              <a href="/api/research/${id}/debug-bundle" class="menu-item" title="Diagnostic run-log (events, per-round snapshots, config, outcome)">${icon('file-text', 14)} Debug bundle (.zip)</a>
+              <a href="/api/research/${id}/debug-bundle" class="menu-item" title="Diagnostic run-log (events, per-round snapshots, config, outcome)">${icon('file-text', 14)} Debug bundle</a>
             </div>
           </div>` : ''}
         ${running || awaitingReddit
