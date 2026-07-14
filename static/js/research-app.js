@@ -581,10 +581,11 @@ async function showReportForm(jobID) {
   main.innerHTML = `<section class="card remix-form">
     <p class="eyebrow">Remix</p>
     <h1>Remix this report</h1>
-    <p class="remix-intro">Create a new remix of <strong>${escapeHtml(job.title || job.query)}</strong>. Regenerating the markdown rewrites it from the raw findings, which can recover detail an earlier pass dropped. Designing an HTML version renders it as a self-contained, visual document.</p>
+    <p class="remix-intro">Create a new remix of <strong>${escapeHtml(job.title || job.query)}</strong>. Regenerating the markdown rewrites it from the raw findings, which can recover detail an earlier pass dropped. Rebuilding the running synthesis goes further, re-folding every finding through the synthesis step from scratch before the write — slower, but it lets a rewrite prompt reshape what the summary keeps. Designing an HTML version renders it as a self-contained, visual document.</p>
     <fieldset class="remix-outputs">
       <label class="research-field research-check"><input type="checkbox" id="remix-markdown" checked> regenerate markdown from findings</label>
       <label class="research-field research-check" id="remix-deep-field"><input type="checkbox" id="remix-deep"> in-depth (section-by-section) report</label>
+      <label class="research-field research-check" id="remix-resynth-field"><input type="checkbox" id="remix-resynth"> rebuild the running synthesis from scratch</label>
       <label class="research-field research-check"><input type="checkbox" id="remix-html"> also design an HTML version</label>
     </fieldset>
     <div class="remix-part" id="remix-markdown-opts">
@@ -611,12 +612,14 @@ async function showReportForm(jobID) {
   const markdownCheck = document.getElementById('remix-markdown');
   const htmlCheck = document.getElementById('remix-html');
   const deepField = document.getElementById('remix-deep-field');
+  const resynthField = document.getElementById('remix-resynth-field');
   const markdownOpts = document.getElementById('remix-markdown-opts');
   const htmlOpts = document.getElementById('remix-html-opts');
   // Each part's model and prompt controls only show when that part is selected;
-  // the deep-report toggle only affects markdown regeneration.
+  // the deep-report and resynthesize toggles only affect markdown regeneration.
   const syncOptions = () => {
     deepField.hidden = !markdownCheck.checked;
+    resynthField.hidden = !markdownCheck.checked;
     markdownOpts.hidden = !markdownCheck.checked;
     htmlOpts.hidden = !htmlCheck.checked;
   };
@@ -632,6 +635,7 @@ async function showReportForm(jobID) {
     const htmlModel = document.getElementById('remix-html-model');
     const direction = document.getElementById('remix-direction');
     const deep = document.getElementById('remix-deep');
+    const resynth = document.getElementById('remix-resynth');
     const progress = document.getElementById('remix-progress');
     const progressLabel = document.getElementById('remix-progress-label');
     const progressCount = document.getElementById('remix-progress-count');
@@ -642,7 +646,7 @@ async function showReportForm(jobID) {
       error.innerHTML = '<div class="research-error">Select at least one output: markdown, HTML, or both.</div>';
       return;
     }
-    const controls = [mdModel, mdDirection, htmlModel, direction, deep, markdownCheck, htmlCheck];
+    const controls = [mdModel, mdDirection, htmlModel, direction, deep, resynth, markdownCheck, htmlCheck];
     btn.setAttribute('disabled', '');
     btn.setAttribute('aria-busy', 'true');
     controls.forEach((c) => { c.disabled = true; });
@@ -660,7 +664,7 @@ async function showReportForm(jobID) {
     research.regenerateReport(jobID, {
       markdownModel: mdModel.value, htmlModel: htmlModel.value,
       markdownDirection: mdDirection.value.trim(), direction: direction.value.trim(),
-      markdown: wantMarkdown, html: wantHTML, deepReport: deep.checked,
+      markdown: wantMarkdown, html: wantHTML, deepReport: deep.checked, resynthesize: resynth.checked,
     }, {
       onEvent: (ev) => {
         if (ev.error) { reset(new Error(ev.error)); return; }

@@ -62,6 +62,9 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 		Markdown          bool   `json:"markdown"`
 		HTML              bool   `json:"html"`
 		DeepReport        bool   `json:"deep_report"`
+		// Resynthesize rebuilds the evolving report from the raw findings before
+		// the final write, instead of reusing the stored synthesis. Markdown only.
+		Resynthesize bool `json:"resynthesize"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -115,19 +118,36 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 	w.Header().Set("X-Accel-Buffering", "no")
 	writeReportEvent(w, flusher, map[string]any{"phase": "connecting", "message": "connecting to model"})
 
+	// One-line summary of what this remix is doing, mirroring the live-run log.
+	log.Printf("Remixing research report job_id=%d user_id=%d markdown=%t html=%t deep=%t resynthesize=%t markdown_model=%q html_model=%q",
+		job.ID, user.ID, req.Markdown, req.HTML, req.DeepReport, req.Resynthesize, markdownModel, htmlModel)
+
 	// Step 1: optionally regenerate the markdown from the raw findings.
 	var freshMarkdown string
 	var markdownCost *float64
 	if req.Markdown {
-		researcher, err := s.newReportRegenerator(job, markdownModel, req.DeepReport, req.MarkdownDirection, func(p research.Progress) {
+		// Milestone log lines only: streaming deltas (Generated > 0) go to the UI
+		// but would drown out the log, so they are kept out of it (as the live run
+		// does). The message-bearing events are the ones worth a stdout line —
+		// resynthesis passes, deep-report sections, warnings.
+		researcher, err := s.newReportRegenerator(job, markdownModel, req.DeepReport, req.Resynthesize, req.MarkdownDirection, func(p research.Progress) {
 			if p.Generated > 0 {
 				writeReportEvent(w, flusher, map[string]any{"phase": "generating-markdown", "generated": p.Generated, "snippet": p.Snippet})
+				return
+			}
+			if p.Message != "" {
+				log.Printf("Remix markdown job_id=%d — %s", job.ID, clipLog(p.Message))
 			}
 		})
 		if err != nil {
 			writeReportEvent(w, flusher, map[string]any{"error": err.Error()})
 			writeReportDone(w, flusher)
 			return
+		}
+		if req.Resynthesize {
+			log.Printf("Remix markdown job_id=%d — rebuilding synthesis from %d findings", job.ID, len(researcher.State().Findings))
+		} else {
+			log.Printf("Remix markdown job_id=%d — regenerating from findings (deep=%t)", job.ID, req.DeepReport)
 		}
 		writeReportEvent(w, flusher, map[string]any{"phase": "generating-markdown", "message": "regenerating the report from raw findings"})
 		md, cost, err := researcher.RegenerateReport(ctx)
@@ -139,6 +159,7 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 		}
 		freshMarkdown = md
 		markdownCost = cost
+		log.Printf("Remix markdown job_id=%d — regenerated %d chars", job.ID, len(freshMarkdown))
 	}
 
 	// The markdown persisted with this variant: the fresh version when
@@ -160,6 +181,7 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 		if freshMarkdown != "" {
 			source = freshMarkdown
 		}
+		log.Printf("Remix HTML job_id=%d — designing document from %d chars", job.ID, len(source))
 		writeReportEvent(w, flusher, map[string]any{"phase": "generating-html", "message": "designing the HTML document"})
 		h, cost, err := s.generateReportHTML(ctx, htmlModel, title, source, req.Direction, func(generated int, tail string) {
 			writeReportEvent(w, flusher, map[string]any{"phase": "generating-html", "generated": generated, "snippet": tail})
@@ -198,7 +220,7 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 // saved state so its report phase can be re-run without searching the web again.
 // Only the writer tier is needed (the report phase never calls the worker model).
 // instruction is an optional extra prompt appended to the report-writing prompts.
-func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deepReport bool, instruction string, onProgress func(research.Progress)) (*research.Researcher, error) {
+func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deepReport, resynthesize bool, instruction string, onProgress func(research.Progress)) (*research.Researcher, error) {
 	modelServer, err := s.cfg.ServerForModel(model)
 	if err != nil {
 		return nil, fmt.Errorf("unknown model %q", model)
@@ -210,10 +232,12 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 		Model:             model,
 		Mode:              job.Mode,
 		DeepReport:        deepReport,
+		Resynthesize:      resynthesize,
 		ReportInstruction: instruction,
 		APIBase:           modelServer.APIBase,
 		APIKey:            modelServer.APIKey,
 		SynthesisTokens:   s.cfg.Research.SynthesisTokens,
+		SynthesisWindow:   s.cfg.Research.SynthesisWindow,
 		FinalReportTokens: s.cfg.Research.FinalReportTokens,
 		Location:          s.researchLocation(),
 	}
