@@ -724,11 +724,21 @@ async function showReport(jobID, reportID) {
   const mdPanel = hasMarkdown
     ? `<div class="research-report" data-panel="markdown">${render(report.markdown)}</div>`
     : '';
-  main.innerHTML = `<div class="remix-view-header">
-    <div class="remix-view-actions">${dlMdBtn}${dlHtmlBtn}${openBtn}</div>
-    <div><p class="eyebrow">Remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</p>${directions ? `<p class="remix-view-directions">${escapeHtml(directions)}</p>` : ''}</div>
-  </div>
-  ${tabs}${htmlPanel}${mdPanel}`;
+  main.innerHTML = `
+    <div class="research-detail-heading">
+      <div class="research-detail-actions">${dlMdBtn}${dlHtmlBtn}${openBtn}</div>
+      <div class="research-detail-copy">
+        <p class="eyebrow">Remix</p>
+        <h1 class="research-detail-query">${escapeHtml(label)}</h1>
+        ${directions ? `<p class="research-detail-prompt">${escapeHtml(directions)}</p>` : ''}
+      </div>
+    </div>
+    <div class="research-detail-meta">
+      <span>${escapeHtml(report.model)}</span>
+      <span>${formatDate(report.created_at)}</span>
+      ${report.price_usd != null ? `<span>${formatPrice(report.price_usd)}</span>` : ''}
+    </div>
+    ${tabs}${htmlPanel}${mdPanel}`;
 
   if (hasMarkdown && hasHTML) {
     const tabEls = main.querySelectorAll('.research-tab');

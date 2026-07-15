@@ -13,6 +13,7 @@
   padding: 9px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
+  text-decoration: none;
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease),
               border-color var(--dur-fast) var(--ease),
