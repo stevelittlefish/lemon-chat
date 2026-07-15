@@ -459,8 +459,19 @@ async function showDetail(id) {
   main.querySelectorAll('.research-remix-item').forEach((el) => {
     el.addEventListener('click', () => { location.hash = `${id}/report/${el.dataset.reportId}`; });
   });
-  document.getElementById('research-dl-html')?.addEventListener('click', () => {
+  document.getElementById('research-dl-html')?.addEventListener('click', async () => {
     const heading = job.title || job.query;
+    // Prefer the designed HTML document when one exists; only fall back to
+    // rendering the markdown when there is no proper HTML report.
+    if (job.report_html) {
+      try {
+        const res = await fetch(`/api/research/${id}/report/document`);
+        if (res.ok) {
+          downloadFile(`${slugify(heading)}.html`, 'text/html', await res.text());
+          return;
+        }
+      } catch { /* fall through to the markdown rendering */ }
+    }
     const headingHtml = job.title && job.query
       ? `<h1>${escapeHtml(job.title)}</h1>\n<p>${escapeHtml(job.query)}</p>\n`
       : `<h1>${escapeHtml(heading)}</h1>\n`;
