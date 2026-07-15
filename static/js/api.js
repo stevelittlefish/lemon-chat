@@ -202,12 +202,12 @@ export const research = {
   defaults: () => request('GET', '/api/research/defaults'),
   get: (id) => request('GET', `/api/research/${id}`),
   debug: (id) => request('GET', `/api/research/${id}/debug`),
-  regenerateReport: (id, { markdownModel, htmlModel, markdownDirection, direction, markdown, html, deepReport }, { onEvent, onDone, onError }) => {
+  regenerateReport: (id, { markdownModel, htmlModel, markdownDirection, direction, markdown, html, deepReport, resynthesize }, { onEvent, onDone, onError }) => {
     const ctrl = new AbortController();
     fetch(`/api/research/${id}/reports`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-      body: JSON.stringify({ markdown_model: markdownModel, html_model: htmlModel, markdown_direction: markdownDirection, direction, markdown, html, deep_report: deepReport }),
+      body: JSON.stringify({ markdown_model: markdownModel, html_model: htmlModel, markdown_direction: markdownDirection, direction, markdown, html, deep_report: deepReport, resynthesize }),
       signal: ctrl.signal,
     }).then(async (res) => {
       if (!res.ok) {

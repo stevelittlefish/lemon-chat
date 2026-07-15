@@ -100,9 +100,15 @@ type Config struct {
 	// pipeline (outline → refine → per-section write from raw findings → glue),
 	// producing a longer, more detailed report. Applies to both modes.
 	DeepReport bool
+	// Resynthesize, when set during report regeneration, discards the stored
+	// evolving report and rebuilds it from scratch by folding the saved findings
+	// back through the synthesis prompt in batches before the final write. See
+	// Researcher.resynthesizeReport.
+	Resynthesize bool
 	// ReportInstruction is an optional extra instruction from the user, appended
 	// to the report-writing prompts (single-pass final report and the deep-report
-	// outline/section writers). Empty means no extra instruction.
+	// outline/section writers), and — when Resynthesize is set — to each
+	// synthesis fold. Empty means no extra instruction.
 	ReportInstruction     string
 	PauseRedditImport     bool
 	OnRedditPause         func(PendingRedditRound) error
@@ -394,6 +400,12 @@ func (r *Researcher) RegenerateReport(ctx context.Context) (string, *float64, er
 	if r.state.Report == "" && len(r.state.Findings) == 0 {
 		return "", nil, fmt.Errorf("job has no findings to regenerate a report from")
 	}
+	if r.cfg.Resynthesize && len(r.state.Findings) > 0 {
+		r.resynthesizeReport(ctx)
+		if ctx.Err() != nil {
+			return "", nil, ctx.Err()
+		}
+	}
 	if r.state.Report == "" {
 		r.state.Report = "## Research Findings\n\nSynthesis was unavailable; the raw findings are listed below.\n\n" + r.formatFindings(r.state.Findings)
 	}
@@ -412,6 +424,53 @@ func (r *Researcher) RegenerateReport(ctx context.Context) (string, *float64, er
 		return "", nil, fmt.Errorf("report regeneration produced no content")
 	}
 	return r.formatCompositeReport(final), r.state.PriceUSD, nil
+}
+
+// resynthesisMaxFolds bounds how many synthesis passes resynthesizeReport makes,
+// so a job with many findings folds them in a handful of large batches rather
+// than one pass per synthesis window (which would be slow and expensive).
+const resynthesisMaxFolds = 6
+
+// resynthesizeReport discards the stored evolving report and rebuilds it from
+// scratch by folding the saved findings back through the synthesis prompt in
+// batches — the same mechanism a live run uses round by round. This recovers a
+// running summary that a first pass may have shaped around early-round framing,
+// and lets the user's rewrite instruction steer what each fold retains (it is
+// applied to every synthesis call, not just the final write). Costs one LLM
+// call per batch; findings are folded in discovery order to mirror a live run.
+func (r *Researcher) resynthesizeReport(ctx context.Context) {
+	findings := r.state.Findings
+	if len(findings) == 0 {
+		return
+	}
+	batch := r.cfg.SynthesisWindow
+	if batch <= 0 {
+		batch = 10
+	}
+	// Grow the batch so a large job folds in at most resynthesisMaxFolds passes.
+	if n := (len(findings) + resynthesisMaxFolds - 1) / resynthesisMaxFolds; n > batch {
+		batch = n
+	}
+	// synthesize caps each call's input to SynthesisWindow; lift it to the batch
+	// size so our (possibly larger) batches pass through intact. Safe to mutate:
+	// no search rounds run after regeneration.
+	r.cfg.SynthesisWindow = batch
+	r.state.Report = ""
+	folds := (len(findings) + batch - 1) / batch
+	round := 0
+	for i := 0; i < len(findings); i += batch {
+		if ctx.Err() != nil {
+			return
+		}
+		end := i + batch
+		if end > len(findings) {
+			end = len(findings)
+		}
+		round++
+		r.progress(Progress{Phase: "writing", TotalFindings: len(findings),
+			Message: fmt.Sprintf("rebuilding synthesis — pass %d of %d", round, folds)})
+		r.synthesize(ctx, round, findings[i:end])
+	}
 }
 
 func (r *Researcher) resumeRedditRound(ctx context.Context, resume RedditResume) (bool, error) {
@@ -975,6 +1034,9 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 	} else {
 		prompt = fmt.Sprintf(synthesizePrompt, r.cfg.Query, report, r.formatFindings(newFindings))
 	}
+	// A no-op during a live run (no report instruction is set); during report
+	// resynthesis it lets the user's rewrite prompt steer what each fold retains.
+	prompt += r.reportInstructionSuffix()
 	out, finish, err := r.llmCallStreamFinish(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.3, r.cfg.SynthesisTokens, synthesisTimeout,
 		func(generated int, tail string) {
 			r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})

@@ -550,7 +550,7 @@ function reportShelf(job) {
   if (!job.reports?.length) return '';
   const items = (job.reports || []).map((report, index) => {
     const kinds = [report.has_markdown ? 'markdown' : '', report.has_html ? 'designed' : ''].filter(Boolean).join(' + ');
-    const label = report.direction || `Remix ${(job.reports.length - index)}`;
+    const label = report.direction || report.markdown_direction || `Remix ${(job.reports.length - index)}`;
     return `<button class="research-remix-item" data-report-id="${report.id}">
       <span>${escapeHtml(label)}${kinds ? ` <span class="research-report-kinds">${kinds}</span>` : ''}</span>
       <small>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</small>
@@ -581,10 +581,11 @@ async function showReportForm(jobID) {
   main.innerHTML = `<section class="card remix-form">
     <p class="eyebrow">Remix</p>
     <h1>Remix this report</h1>
-    <p class="remix-intro">Create a new remix of <strong>${escapeHtml(job.title || job.query)}</strong>. Regenerating the markdown rewrites it from the raw findings, which can recover detail an earlier pass dropped. Designing an HTML version renders it as a self-contained, visual document.</p>
+    <p class="remix-intro">Create a new remix of <strong>${escapeHtml(job.title || job.query)}</strong>. Regenerating the markdown rewrites it from the raw findings, which can recover detail an earlier pass dropped. Rebuilding the running synthesis goes further, re-folding every finding through the synthesis step from scratch before the write — slower, but it lets a rewrite prompt reshape what the summary keeps. Designing an HTML version renders it as a self-contained, visual document.</p>
     <fieldset class="remix-outputs">
       <label class="research-field research-check"><input type="checkbox" id="remix-markdown" checked> regenerate markdown from findings</label>
       <label class="research-field research-check" id="remix-deep-field"><input type="checkbox" id="remix-deep"> in-depth (section-by-section) report</label>
+      <label class="research-field research-check" id="remix-resynth-field"><input type="checkbox" id="remix-resynth"> rebuild the running synthesis from scratch</label>
       <label class="research-field research-check"><input type="checkbox" id="remix-html"> also design an HTML version</label>
     </fieldset>
     <div class="remix-part" id="remix-markdown-opts">
@@ -611,12 +612,14 @@ async function showReportForm(jobID) {
   const markdownCheck = document.getElementById('remix-markdown');
   const htmlCheck = document.getElementById('remix-html');
   const deepField = document.getElementById('remix-deep-field');
+  const resynthField = document.getElementById('remix-resynth-field');
   const markdownOpts = document.getElementById('remix-markdown-opts');
   const htmlOpts = document.getElementById('remix-html-opts');
   // Each part's model and prompt controls only show when that part is selected;
-  // the deep-report toggle only affects markdown regeneration.
+  // the deep-report and resynthesize toggles only affect markdown regeneration.
   const syncOptions = () => {
     deepField.hidden = !markdownCheck.checked;
+    resynthField.hidden = !markdownCheck.checked;
     markdownOpts.hidden = !markdownCheck.checked;
     htmlOpts.hidden = !htmlCheck.checked;
   };
@@ -632,6 +635,7 @@ async function showReportForm(jobID) {
     const htmlModel = document.getElementById('remix-html-model');
     const direction = document.getElementById('remix-direction');
     const deep = document.getElementById('remix-deep');
+    const resynth = document.getElementById('remix-resynth');
     const progress = document.getElementById('remix-progress');
     const progressLabel = document.getElementById('remix-progress-label');
     const progressCount = document.getElementById('remix-progress-count');
@@ -642,7 +646,7 @@ async function showReportForm(jobID) {
       error.innerHTML = '<div class="research-error">Select at least one output: markdown, HTML, or both.</div>';
       return;
     }
-    const controls = [mdModel, mdDirection, htmlModel, direction, deep, markdownCheck, htmlCheck];
+    const controls = [mdModel, mdDirection, htmlModel, direction, deep, resynth, markdownCheck, htmlCheck];
     btn.setAttribute('disabled', '');
     btn.setAttribute('aria-busy', 'true');
     controls.forEach((c) => { c.disabled = true; });
@@ -660,7 +664,7 @@ async function showReportForm(jobID) {
     research.regenerateReport(jobID, {
       markdownModel: mdModel.value, htmlModel: htmlModel.value,
       markdownDirection: mdDirection.value.trim(), direction: direction.value.trim(),
-      markdown: wantMarkdown, html: wantHTML, deepReport: deep.checked,
+      markdown: wantMarkdown, html: wantHTML, deepReport: deep.checked, resynthesize: resynth.checked,
     }, {
       onEvent: (ev) => {
         if (ev.error) { reset(new Error(ev.error)); return; }
@@ -696,29 +700,46 @@ async function showReport(jobID, reportID) {
   try { report = await research.getReport(jobID, reportID); } catch { location.hash = jobID; return; }
   const hasMarkdown = !!(report.markdown && report.markdown.trim());
   const hasHTML = !!report.html;
-  const label = report.direction || 'Remix';
-  const openBtn = hasHTML
-    ? `<a class="btn btn-sm btn-secondary" href="/api/research/${jobID}/reports/${reportID}/document" target="_blank" rel="noopener noreferrer">open HTML in new tab</a>`
+  const label = report.direction || report.markdown_direction || 'Remix';
+  // Show the instructions that produced this variant, labelled by which part
+  // they steered, so a saved remix records what was asked for.
+  const directions = [
+    report.markdown_direction ? `rewrite: ${report.markdown_direction}` : '',
+    report.direction ? `HTML: ${report.direction}` : '',
+  ].filter(Boolean).join(' · ');
+  const dlHtmlBtn = hasHTML ? `<button id="report-dl-html" class="btn btn-sm btn-secondary">${icon('download', 14)} download .html</button>` : '';
+  const dlMdBtn = hasMarkdown ? `<button id="report-dl-md" class="btn btn-sm btn-secondary">${icon('download', 14)} download .md</button>` : '';
+  // "open in new tab" lives on the trailing edge of the tab bar, matching the
+  // main report view. The tab buttons only appear when both renderings exist.
+  const openLink = hasHTML
+    ? `<a class="research-open-html" href="/api/research/${jobID}/reports/${reportID}/document" target="_blank" rel="noopener noreferrer">open in new tab</a>`
     : '';
-  const dlHtmlBtn = hasHTML ? '<button id="report-dl-html" class="btn btn-sm btn-secondary">download .html</button>' : '';
-  const dlMdBtn = hasMarkdown ? '<button id="report-dl-md" class="btn btn-sm btn-secondary">download .md</button>' : '';
-  // Tabs only when both renderings exist; otherwise show whichever one we have.
-  const tabs = (hasMarkdown && hasHTML) ? `
-    <div class="research-report-tabs" role="tablist">
-      <button class="research-tab" role="tab" data-tab="html">designed</button>
-      <button class="research-tab" role="tab" data-tab="markdown">markdown</button>
-    </div>` : '';
+  const tabBtns = (hasMarkdown && hasHTML)
+    ? `<button class="research-tab" role="tab" data-tab="html">designed</button>
+       <button class="research-tab" role="tab" data-tab="markdown">markdown</button>`
+    : '';
+  const tabs = hasHTML ? `<div class="research-report-tabs" role="tablist">${tabBtns}${openLink}</div>` : '';
   const htmlPanel = hasHTML
     ? `<div class="research-html-frame" data-panel="html"><iframe class="research-html-doc" title="${escapeHtml(label)}" sandbox="allow-popups allow-popups-to-escape-sandbox" src="/api/research/${jobID}/reports/${reportID}/document"></iframe></div>`
     : '';
   const mdPanel = hasMarkdown
     ? `<div class="research-report" data-panel="markdown">${render(report.markdown)}</div>`
     : '';
-  main.innerHTML = `<div class="remix-view-header">
-    <div><p class="eyebrow">Remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</p></div>
-    <div class="remix-view-actions">${dlMdBtn}${dlHtmlBtn}${openBtn}</div>
-  </div>
-  ${tabs}${htmlPanel}${mdPanel}`;
+  main.innerHTML = `
+    <div class="research-detail-heading">
+      <div class="research-detail-actions">${dlMdBtn}${dlHtmlBtn}</div>
+      <div class="research-detail-copy">
+        <p class="eyebrow">Remix</p>
+        <h1 class="research-detail-query">${escapeHtml(label)}</h1>
+        ${directions ? `<p class="research-detail-prompt">${escapeHtml(directions)}</p>` : ''}
+      </div>
+    </div>
+    <div class="research-detail-meta">
+      <span>${escapeHtml(report.model)}</span>
+      <span>${formatDate(report.created_at)}</span>
+      ${report.price_usd != null ? `<span>${formatPrice(report.price_usd)}</span>` : ''}
+    </div>
+    ${tabs}${htmlPanel}${mdPanel}`;
 
   if (hasMarkdown && hasHTML) {
     const tabEls = main.querySelectorAll('.research-tab');

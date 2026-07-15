@@ -26,6 +26,8 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 ## Research
 
+- [x] **Report remix: rebuild the running synthesis from scratch.** Add a "resynthesize" option to the report-regeneration flow (`internal/server/research_reports.go`, `internal/research/researcher.go`) that, when regenerating markdown, discards the stored evolving `report` and rebuilds it by folding the saved `findings` back through the `synthesize` prompt in batches — the same mechanism a live run uses round by round — before the final/deep write. Large jobs fold in a bounded number of passes (fewer rounds than a live run). The optional rewrite prompt (`markdown_direction`/`ReportInstruction`) is threaded into each synthesis fold so it shapes what the running summary retains, not just the final phrasing. New `resynthesize` request flag + checkbox in the remix form.
+
 - [x] On the research list page, add a direct "HTML" link for items whose default report has a designed HTML version, opening it in a new tab (`/api/research/{id}/report/document`) without going through the report detail page. Backed by `ListResearchJobsWithDefaultHTML` → `report_html` on the list view.
 
 - [x] Make the backend research log tell the story of a run in ~5-10 always-on stdout lines (start, plan, per-round search + synthesis, stop decision, final write, finish); the high-frequency per-page "reading" line is demoted to `debug.Log`. `logResearchProgress` in `research.go`.
