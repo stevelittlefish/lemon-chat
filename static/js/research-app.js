@@ -863,9 +863,6 @@ async function showExplore(id) {
         <p class="eyebrow">Explore research data</p>
         <h1 class="research-detail-query">${escapeHtml(displayTitle)}</h1>
       </div>
-      <div class="research-detail-actions">
-        <a class="btn btn-sm btn-secondary" href="#${id}">back to report</a>
-      </div>
     </div>
     <div class="explore-stats">${stats}</div>
 
