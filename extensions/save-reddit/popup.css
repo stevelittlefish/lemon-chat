@@ -16,6 +16,7 @@ button:disabled { opacity: .5; cursor: default; }
 .capture-status.complete { border-color: #5c7a3e; background: #edf3e5; }
 .capture-status.complete strong { color: #385120; }
 .controls { display: flex; gap: 8px; }
+.export-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 #status, #error { margin: 0; font-size: 12px; white-space: pre-wrap; }
 #error { color: #7e2310; white-space: pre-wrap; }
 progress { width: 100%; accent-color: #5c7a3e; }

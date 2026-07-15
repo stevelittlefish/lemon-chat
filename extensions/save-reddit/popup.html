@@ -18,7 +18,10 @@
     </section>
     <progress id="progress" value="0" max="1"></progress>
     <div class="controls"><button id="stop">Stop</button><button id="retry">Retry last</button><button id="skip">Skip current</button></div>
-    <button id="export" class="primary" disabled>Export response</button>
+    <div class="export-actions">
+      <button id="export" class="primary" disabled>Export response</button>
+      <button id="copy" disabled>Copy to clipboard</button>
+    </div>
     <pre id="error" aria-live="polite"></pre>
   </main>
   <script type="module" src="popup.js"></script>

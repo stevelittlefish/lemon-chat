@@ -1,7 +1,23 @@
 const $ = (id) => document.getElementById(id);
 const send = (message) => chrome.runtime.sendMessage(message);
 const REDDIT_HOSTS = ['reddit.com', 'www.reddit.com', 'old.reddit.com', 'new.reddit.com', 'redd.it'];
+// Clipboard writes are capped so we never paste an unwieldy payload; larger
+// captures must go through the file download instead.
+const COPY_MAX_BYTES = 1024 * 1024;
 let currentPageResult = null;
+
+function buildResponse(current) {
+  return {
+    version: current.request.version,
+    request_id: current.request.request_id,
+    captured_at: new Date().toISOString(),
+    pages: current.results,
+  };
+}
+
+function formatBytes(bytes) {
+  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
+}
 
 function isRedditURL(raw) {
   try { return REDDIT_HOSTS.includes(new URL(raw).hostname.toLowerCase()); }
@@ -47,9 +63,28 @@ async function refresh() {
   $('capture-status').classList.toggle('complete', complete);
   $('status-heading').textContent = currentPageResult && !current.running ? 'Current page exported' : complete ? 'Capture complete' : current.running ? 'Capture in progress' : current.status === 'stopped' ? 'Capture stopped' : 'Ready to capture';
   $('export').disabled = !current.results?.length;
+  updateCopyState(current);
   $('stop').disabled = !current.running;
   $('skip').disabled = !current.running;
   $('retry').disabled = current.running || !current.results?.length;
+}
+
+// updateCopyState enables the clipboard copy only when there are results and the
+// serialised response fits under COPY_MAX_BYTES; otherwise it disables the button
+// and explains why via hover text.
+function updateCopyState(current) {
+  const button = $('copy');
+  if (!current.results?.length) {
+    button.disabled = true;
+    button.title = '';
+    return;
+  }
+  const bytes = new TextEncoder().encode(JSON.stringify(buildResponse(current), null, 2)).length;
+  const tooBig = bytes > COPY_MAX_BYTES;
+  button.disabled = tooBig;
+  button.title = tooBig
+    ? `Too big to copy (${formatBytes(bytes)}, limit ${formatBytes(COPY_MAX_BYTES)}) — use Export response to download`
+    : 'Copy the response JSON to the clipboard';
 }
 
 $('start').addEventListener('click', async () => {
@@ -69,13 +104,20 @@ $('skip').addEventListener('click', () => send({ type: 'skip' }).then(refresh));
 $('retry').addEventListener('click', () => send({ type: 'retry' }).then(refresh));
 $('export').addEventListener('click', async () => {
   const current = await send({ type: 'getState' });
-  const response = {
-    version: current.request.version,
-    request_id: current.request.request_id,
-    captured_at: new Date().toISOString(),
-    pages: current.results,
-  };
-  await downloadResponse(response, current.request.name);
+  await downloadResponse(buildResponse(current), current.request.name);
+});
+
+$('copy').addEventListener('click', async () => {
+  $('error').textContent = '';
+  try {
+    const current = await send({ type: 'getState' });
+    if (!current.results?.length) return;
+    const json = JSON.stringify(buildResponse(current), null, 2);
+    if (new TextEncoder().encode(json).length > COPY_MAX_BYTES) throw new Error('Response is too big to copy to the clipboard');
+    await navigator.clipboard.writeText(json);
+    $('copy').textContent = 'Copied';
+    setTimeout(() => { $('copy').textContent = 'Copy to clipboard'; }, 1500);
+  } catch (error) { $('error').textContent = error.message; }
 });
 
 $('export-current').addEventListener('click', async () => {
