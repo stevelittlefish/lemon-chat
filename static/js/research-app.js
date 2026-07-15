@@ -707,17 +707,18 @@ async function showReport(jobID, reportID) {
     report.markdown_direction ? `rewrite: ${report.markdown_direction}` : '',
     report.direction ? `HTML: ${report.direction}` : '',
   ].filter(Boolean).join(' · ');
-  const openBtn = hasHTML
-    ? `<a class="btn btn-sm btn-secondary" href="/api/research/${jobID}/reports/${reportID}/document" target="_blank" rel="noopener noreferrer">open HTML in new tab</a>`
+  const dlHtmlBtn = hasHTML ? `<button id="report-dl-html" class="btn btn-sm btn-secondary">${icon('download', 14)} download .html</button>` : '';
+  const dlMdBtn = hasMarkdown ? `<button id="report-dl-md" class="btn btn-sm btn-secondary">${icon('download', 14)} download .md</button>` : '';
+  // "open in new tab" lives on the trailing edge of the tab bar, matching the
+  // main report view. The tab buttons only appear when both renderings exist.
+  const openLink = hasHTML
+    ? `<a class="research-open-html" href="/api/research/${jobID}/reports/${reportID}/document" target="_blank" rel="noopener noreferrer">open in new tab</a>`
     : '';
-  const dlHtmlBtn = hasHTML ? '<button id="report-dl-html" class="btn btn-sm btn-secondary">download .html</button>' : '';
-  const dlMdBtn = hasMarkdown ? '<button id="report-dl-md" class="btn btn-sm btn-secondary">download .md</button>' : '';
-  // Tabs only when both renderings exist; otherwise show whichever one we have.
-  const tabs = (hasMarkdown && hasHTML) ? `
-    <div class="research-report-tabs" role="tablist">
-      <button class="research-tab" role="tab" data-tab="html">designed</button>
-      <button class="research-tab" role="tab" data-tab="markdown">markdown</button>
-    </div>` : '';
+  const tabBtns = (hasMarkdown && hasHTML)
+    ? `<button class="research-tab" role="tab" data-tab="html">designed</button>
+       <button class="research-tab" role="tab" data-tab="markdown">markdown</button>`
+    : '';
+  const tabs = hasHTML ? `<div class="research-report-tabs" role="tablist">${tabBtns}${openLink}</div>` : '';
   const htmlPanel = hasHTML
     ? `<div class="research-html-frame" data-panel="html"><iframe class="research-html-doc" title="${escapeHtml(label)}" sandbox="allow-popups allow-popups-to-escape-sandbox" src="/api/research/${jobID}/reports/${reportID}/document"></iframe></div>`
     : '';
@@ -726,7 +727,7 @@ async function showReport(jobID, reportID) {
     : '';
   main.innerHTML = `
     <div class="research-detail-heading">
-      <div class="research-detail-actions">${dlMdBtn}${dlHtmlBtn}${openBtn}</div>
+      <div class="research-detail-actions">${dlMdBtn}${dlHtmlBtn}</div>
       <div class="research-detail-copy">
         <p class="eyebrow">Remix</p>
         <h1 class="research-detail-query">${escapeHtml(label)}</h1>
