@@ -725,8 +725,8 @@ async function showReport(jobID, reportID) {
     ? `<div class="research-report" data-panel="markdown">${render(report.markdown)}</div>`
     : '';
   main.innerHTML = `<div class="remix-view-header">
-    <div><p class="eyebrow">Remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</p>${directions ? `<p class="remix-view-directions">${escapeHtml(directions)}</p>` : ''}</div>
     <div class="remix-view-actions">${dlMdBtn}${dlHtmlBtn}${openBtn}</div>
+    <div><p class="eyebrow">Remix</p><h1>${escapeHtml(label)}</h1><p>${escapeHtml(report.model)} · ${formatDate(report.created_at)}${report.price_usd != null ? ` · ${formatPrice(report.price_usd)}` : ''}</p>${directions ? `<p class="remix-view-directions">${escapeHtml(directions)}</p>` : ''}</div>
   </div>
   ${tabs}${htmlPanel}${mdPanel}`;
 
