@@ -1,0 +1,250 @@
+{
+  "round": 2,
+  "empty_rounds": 0,
+  "elapsed_ms": 193257,
+  "category": "comparison",
+  "slug": "home_battery_no_solar",
+  "plan": "Sub-questions: What are the current 2026 UK time-of-use (ToU) electricity tariffs, specifically the price spread between off-peak and peak rates?; What is the current average installed cost for 5kWh and 10kWh home battery systems in England as of July 2026?; What are the typical round-trip efficiency losses and annual degradation rates for modern lithium-ion home batteries?; Based on a 9,000 kWh annual load with high daytime office usage, what is the realistic daily cycle capacity for 5kWh vs 10kWh batteries?; Are there any current UK government grants, VAT reductions, or incentives for battery storage installed without solar PV?\nKey topics: Time-of-Use (ToU) Tariff Analysis, Battery CAPEX and Installation Costs, Energy Arbitrage Modeling (Charge/Discharge cycles), Technical Performance (Efficiency, Degradation, Usable Capacity), Financial Metrics (Simple Payback, 10-year NPV, Sensitivity Analysis), Consumption Profiling (Home Office impact vs. Baseline)\nSuccess: A detailed financial model comparing four scenarios with a 10-year net outcome, supported by 2026 pricing and technical data, including a sensitivity analysis for usage and tariff volatility.",
+  "report": "# Research Report: Financial Viability of Standalone Home Batteries in England (July 2026)\n\n## Executive Summary\nFor a UK household consuming 9,000 kWh/year with high daytime demand (home office), installing a standalone battery is **potentially viable but highly dependent on battery size and installation cost**. While a 5 kWh system is unlikely to pay for itself within a 10-year window, a 10 kWh system can offer a net financial gain due to the household's high daytime energy requirements. The primary driver of viability is \"tariff arbitrage\"—charging during low-cost overnight windows and discharging during peak hours. Current 0% VAT incentives for standalone retrofits (available until March/April 2027) significantly improve the initial financial outlook [S10, S12, S14, S17].\n\n---\n\n## 1. Analysis of Options\n\n### Assumptions\n*   **Annual Consumption:** 9,000 kWh.\n*   **Baseline Cost:** Flat rate of £0.247/kWh = **£2,223/year**.\n*   **TOU Tariff (Illustrative):** Off-peak ~£0.07/kWh; Peak ~£0.32/kWh [S1, S5, S7].\n*   **Daily Demand Profile:** 10–20 kWh consumed during daytime working hours.\n*   **Battery Efficiency:** ~90% round-trip efficiency (accounting for losses) [S9, S15].\n*   **Battery Degradation:** 2–3% capacity loss per year; LFP lifespan of 10–15 years [S9, S17].\n*   **Installation Costs (2026, 0% VAT):**\n    *   **5 kWh:** £2,500 – £5,500 [S10, S11, S13].\n    *   **10 kWh:** £4,000 – £9,500 [S10, S13, S17].\n\n### Option 1: Flat-Rate Tariff (No Battery)\n*   **Annual Cost:** 9,000 kWh × £0.247 = **£2,223**.\n*   **10-Year Cost:** £22,230.\n\n### Option 2: TOU Tariff (No Battery)\n*   **Analysis:** Without a battery or the ability to shift \u003e30-50% of load manually, TOU tariffs are typically more expensive than flat rates because peak rates (£0.30–£0.45) significantly exceed the flat rate [S2, S6, S7].\n*   **Outcome:** Likely **higher** than £2,223/year given the home office demand occurs during peak hours.\n\n### Option 3: 5 kWh Battery + TOU Tariff\n*   **Daily Arbitrage:** A 5 kWh battery can shift ~4.5 kWh (after efficiency losses) from off-peak to peak.\n*   **Annual Savings:** 4.5 kWh × 365 days × (£0.32 - £0.07) = **~£410/year**.\n*   **Net Annual Cost:** £2,223 - £410 = **£1,813**.\n*   **Simple Payback:** Using a mid-range cost of £4,000, payback is **~9.7 years**.\n*   **10-Year Net Outcome:** Installation (£4,000) minus savings (£4,100) = **+£100 (Marginal Gain)**.\n*   *Note: High-end installation costs (£5,500) result in a net loss over 10 years.*\n\n### Option 4: 10 kWh Battery + TOU Tariff\n*   **Daily Arbitrage:** A 10 kWh battery can shift ~9 kWh (after efficiency losses).\n*   **Annual Savings:** 9 kWh × 365 days × (£0.32 - £0.07) = **~£820/year**.\n*   **Net Annual Cost:** £2,223 - £820 = **£1,403**.\n*   **Simple Payback:** Using a mid-range cost of £5,500, payback is **~6.7 years** [S17].\n*   **10-Year Net Outcome:** Installation (£5,500) minus savings (£8,200) = **+£2,700 (Net Gain)**.\n*   **Critical Caveat:** This assumes the household consumes at least 9 kWh during peak hours daily. With a home office using 10–20 kWh/day, this is highly plausible.\n\n---\n\n## 2. Sensitivity Analysis\n\n| Variable | Impact on Financial Outcome |\n| :--- | :--- |\n| **Annual Usage** | Higher usage (11,000 kWh) increases the utility of the 10 kWh battery. Lower usage (6,000 kWh) may reduce the daily discharge amount, extending payback. |\n| **Tariff Spread** | If the spread narrows (e.g., to 15p), the 10-year net gain for the 10 kWh battery decreases significantly. |\n| **Installation Cost** | 0% VAT is a major driver [S10, S14]. If costs reach the \"Ultra-Premium\" tier (£8,000+), payback extends to 10+ years [S10]. |\n| **Degradation** | 2-3% annual capacity loss reduces arbitrage potential over time, slightly increasing the payback period [S9]. |\n| **Peak Proportion** | Holidays or sick leave reduce the ability to discharge the full battery capacity during peak hours, lowering annual savings. |\n\n---\n\n## 3. Conclusions\n\n### Financial Verdict\n*   **Will the battery pay for itself?** A 5 kWh battery is a marginal investment and unlikely to provide significant profit. A 10 kWh battery is **likely to pay for itself** and provide a net gain, provided the homeowner secures a high-spread TOU tariff and maintains high daytime consumption.\n*   **Is changing tariff without a battery meaningful?** No. Without a battery to shift load, TOU tariffs are riskier and likely more expensive than flat rates for this specific usage profile [S2, S7].\n*   **Best Financial Outcome:** The **10 kWh battery with a TOU tariff** offers the best potential for a net gain.\n\n### The Strongest Argument Against\n**Tariff and Market Uncertainty.** The financial model relies entirely on the \"spread\" between off-peak and peak rates. If energy providers adjust TOU windows or reduce the price difference, the battery becomes a depreciating asset with no way to recover the initial capital expenditure.\n\n### Recommended Next Steps for Homeowner\nBefore purchasing, the homeowner should obtain:\n1.  **Granular Consumption Data:** Use smart meter data to confirm the exact kWh used during the specific \"peak\" windows of the target TOU tariff.\n2.  **Fixed-Price Quotations:** Obtain three quotes for 10 kWh LFP systems, ensuring they include the cost of a hybrid inverter and confirm the 0% VAT status [S10, S12].\n3.  **Tariff Confirmation:** Verify eligibility for \"Intelligent\" or \"Agile\" tariffs to maximize the off-peak discount (e.g., ~7p/kWh) [S1, S6, S16].",
+  "findings": [
+    {
+      "url": "https://www.energyplus.co.uk/costsavingadvice/best-time-of-use-electricity-tariffs-uk-for-households",
+      "title": "Best Time-of-Use Tariffs UK July 2026 | EnergyPlus",
+      "og_image": "https://www.energyplus.co.uk/images/og-default.png",
+      "rational": "The webpage provides specific 2026 UK electricity tariff data, including the Ofgem price cap, off-peak rates for battery-compatible tariffs (like Intelligent Octopus Go), and the financial logic of battery arbitrage, which are essential for calculating the costs and savings requested in the goal.",
+      "evidence": "Off-peak rates start as low as 6.7p/kWh, while from 1 July 2026 the Ofgem price cap rose to £1,862/yr (+£221 / +13.5%) and the capped single electricity rate climbs to 26.11p/kWh. ... For most households the best time-of-use electricity tariff in July 2026 is Intelligent Octopus Go — a ~7p/kWh off-peak rate across a six-hour overnight window (23:30–05:30) that suits EV owners and home batteries. ... Home-battery owners: A 10kWh home battery charged at ~7p/kWh overnight and discharged against the ~26–32p peak gives a ~20p/kWh arbitrage spread — roughly £500/year on a well-cycled battery. Pair it with Intelligent Octopus Go or Agile. ... TOU only pays if you can move a real chunk of usage off-peak — roughly a third of your annual kWh, or about 60 kWh/week of shiftable load. Do that and you can land well under the capped single rate of 26.11p/kWh... With no shiftable load, a flat fixed tariff is the safer bet because every peak-time unit on TOU costs 30–41p/kWh.",
+      "summary": "As of July 2026, the UK capped single electricity rate is 26.11p/kWh. Time-of-Use (TOU) tariffs, such as Intelligent Octopus Go (~7p/kWh off-peak), can offer significant savings if the household has shiftable load (approx. 60 kWh/week). For home battery owners, a 10kWh battery utilizing a ~20p/kWh arbitrage spread (charging at ~7p and discharging against ~26-32p peaks) can generate approximately £500/year in savings. However, without shiftable load, TOU tariffs are riskier as peak rates (30-41p/kWh) exceed the flat capped rate."
+    },
+    {
+      "url": "https://www.energyplus.co.uk/costsavingadvice/economy-10-tariff",
+      "title": "Economy 10 Tariff Guide: Times, Costs \u0026 Pros (2026)",
+      "og_image": "https://www.energyplus.co.uk/images/og-default.png",
+      "rational": "The webpage provides a detailed explanation of the Economy 10 time-of-use tariff, including illustrative pricing for 2026, the trade-off between peak and off-peak rates, and the specific conditions under which switching from a single-rate tariff is financially beneficial. This is directly relevant to the goal of comparing flat-rate tariffs against time-of-use options for a home battery strategy.",
+      "evidence": "Economy 10 gives you 10 cheaper off-peak hours a day, spread across the night, afternoon and evening... Economy 10 gives 10 hours of cheaper electricity a day in exchange for a higher peak rate. It is worth it only if you can use a large share of your electricity during those off-peak windows — typically homes with storage heaters , electric wet heating or an immersion hot water cylinder . Key takeaway: if more than roughly half your usage can fall in the off-peak hours, Economy 10 is worth comparing against Economy 7 and a low single-rate tariff. If your use is mostly at peak times, a single-rate deal is usually cheaper and far simpler.\n\nCost example: Economy 10 vs single rate\nIllustrative — a storage-heater home using 6,000 kWh/year, with 60% shifted to off-peak.\nTariff: Economy 10\nCalculation (illustrative): Off-peak 0.16 × 3,600 (£576) + peak 0.32 × 2,400 (£768) + 0.60 × 365 standing (£219) ≈ £1,563/yr\nSingle rate: 0.25 × 6,000 (£1,500) + 0.55 × 365 standing (£201) ≈ £1,701/yr\nHere Economy 10 wins by shifting 60% off-peak. Drop that to 30% and the higher peak rate makes single rate cheaper — which is why your real off-peak share is the deciding factor.",
+      "summary": "For a UK home in 2026, switching to a time-of-use tariff like Economy 10 is only financially viable if a significant portion of electricity (roughly \u003e50%) can be shifted to off-peak windows. Using illustrative 2026 rates, off-peak costs approximately £0.16/kWh while peak costs rise to £0.32/kWh (compared to a flat rate of ~£0.25/kWh). If the off-peak shift is low (e.g., 30%), the higher peak rate makes the single-rate tariff cheaper."
+    },
+    {
+      "url": "https://www.gov.uk/government/publications/clean-flexibility-roadmap/clean-flexibility-roadmap",
+      "title": "Clean flexibility roadmap (accessible webpage) - GOV.UK",
+      "og_image": "https://www.gov.uk/assets/frontend/govuk-opengraph-image-4196a4d6333cf92aaf720047f56cfd91b3532d7635fc21ebcf0d5897df6b5f77.png",
+      "rational": "The provided text is a high-level government policy document (Clean Flexibility Roadmap) that discusses the strategic vision for energy flexibility in the UK. While it does not provide the specific financial calculations, pricing, or technical specifications requested in the goal, it confirms the government's and regulator's (Ofgem) support for home batteries and smart tariffs as a means for consumers to save money.",
+      "evidence": "The country needs an energy system that is more flexible as we meet the needs of homes and businesses through harnessing the intermittent nature of renewable energy. Britain is a world leader in a range of exciting new clean flexibility technologies and services that support this ambition, such as consumer-led flexibility and batteries.\n\nIf we can enable households and businesses to use electricity when it is abundant – such as when the sun is shining or the wind is blowing – they will save money because it will be cheaper.\n\nFlexibility will be embedded throughout the system – from households choosing rooftop solar, home batteries and smart tariffs, to businesses earning revenue from small fluctuations in their power use, to large-scale storage and low carbon dispatchable generation responding to system needs in real time. Participation in flexibility will be voluntary and attractive, empowering consumers with greater control over their energy use and unlocking tangible savings without disrupting their everyday lives.",
+      "summary": "The document establishes that the UK government and Ofgem are actively promoting the use of home batteries and smart tariffs to allow consumers to shift electricity usage to times when it is cheaper, thereby reducing energy bills. However, it provides no specific cost-benefit data, installation prices, or tariff rates necessary to perform the requested financial analysis."
+    },
+    {
+      "url": "https://offpeakenergy.co.uk/tariffs",
+      "title": "Time-of-Use Electricity Tariffs UK Explained",
+      "og_image": "https://offpeakenergy.co.uk/og-default.jpg",
+      "rational": "The webpage provides a comprehensive overview of UK time-of-use (ToU) tariffs as of July 2026, specifically explaining how home batteries can be used without solar panels to arbitrage the price difference between off-peak and peak electricity rates.",
+      "evidence": "A battery removes that constraint [of physically moving usage]. It charges from the grid during the cheap off-peak window, then powers the house through the expensive peak period regardless of when you actually use appliances. You get the off-peak rate for effectively all your consumption, not just the bit you can reschedule.\n\nAs an illustrative example only: if a battery cycles 10 kWh a day, charging off-peak at roughly 10p/kWh and displacing peak-rate usage at roughly 28p/kWh, that's an 18p/kWh spread — around £1.80-£2.00 of saved cost per day, or somewhere in the region of £650-£700 a year, before accounting for battery cost, efficiency losses, or tariff and rate changes.\n\nTime-of-use benefits come from when you draw grid electricity, not from generating your own, so a battery-only setup without solar can still exploit the off-peak/peak spread.",
+      "summary": "The source confirms that home batteries without solar panels can be financially viable by charging during cheap off-peak windows (e.g., 7-10p/kWh) and discharging during expensive peak periods (e.g., 28p/kWh). This allows a household to apply off-peak rates to consumption that cannot be manually shifted. An illustrative example suggests a 10 kWh daily cycle could save approximately £650-£700 per year, though this does not account for installation costs, efficiency losses, or degradation."
+    },
+    {
+      "url": "https://www.sunsave.energy/solar-panels-advice/exporting-to-the-grid/time-of-use-tariffs",
+      "title": "Time-of-use tariffs: are they worth it? [UK, 2026]",
+      "og_image": "https://images.prismic.io/sunsave-website/aYIebN0YXLCxVUVL_Time-of-usetariffs_aretheyworthit_.jpg?auto=format,compress",
+      "rational": "The webpage provides critical data on Time-of-Use (TOU) tariffs in the UK for 2026, including specific pricing examples and the mechanism for saving money via load shifting, which is central to determining if a battery is worthwhile for the user's specific demand profile.",
+      "evidence": "A time-of-use (TOU) tariff comes with peak and off-peak periods that change the price of your energy, depending on the time of day. Usually, the off-peak period happens at night, and the peak rate takes place during the day, but can vary depending on the tariff. For example, Good Energy EV Charge costs 8p per kilowatt-hour (kWh) from 12am to 5am, and about 33p per kWh at all other times.\n\nHomes with a solar \u0026 battery system can also benefit hugely from TOU tariffs, because you can charge your battery during off-peak hours, and use it as backup power during the day, if and when your panels aren’t producing enough for your whole home. You can then export the rest of this low-cost electricity for a profit, before repeating this cycle during the next off-peak period.\n\nTOU tariffs may not suit homes that can’t move the times they use their electricity, but in reality most usage can be shifted – particularly with appliances that can be scheduled to turn on at specific times.",
+      "summary": "The source indicates that TOU tariffs can significantly reduce costs by shifting consumption to off-peak windows (e.g., 12am-5am), with some rates as low as 8p/kWh compared to peak rates of 33p/kWh. While the text highlights the benefits for solar-plus-battery systems (charging at night to use during the day), it confirms that TOU tariffs are available via smart meters and can save households 'hundreds of pounds' depending on the percentage of electricity shifted to off-peak periods."
+    },
+    {
+      "url": "https://www.energyplus.co.uk/costsavingadvice/time-of-use-electricity-tariff-for-households-uk",
+      "title": "Time-of-Use Electricity Tariffs for UK Households 2026 | Economy 7, Agile \u0026 Smart Off-Peak Explained",
+      "og_image": "https://www.energyplus.co.uk/images/og-default.png",
+      "rational": "The webpage provides critical data on UK electricity tariffs as of July 2026, specifically comparing flat-rate, Economy 7, smart off-peak, and agile tariffs. This information is essential for evaluating the financial viability of a home battery, as batteries rely on 'arbitrage' (charging at low rates and discharging at high rates) to generate savings.",
+      "evidence": "A time-of-use (TOU) tariff charges different unit rates depending on when you use electricity. Cheap windows — typically overnight or at weekends — can be 7p to 12p/kWh, while peak rates during evenings and weekday mornings are higher than you would pay on a flat-rate deal. ... Smart off-peak tariffs — fixed cheap slots (often overnight plus certain weekend hours) at a guaranteed low rate, with a standard rate the rest of the time. ... Agile / half-hourly tariffs — the unit rate changes every 30 minutes, tracking the wholesale electricity spot price. ... If you have a home battery, programme its charge schedule to fill during the cheap window and discharge during peak hours. ... From 1 July 2026 the Ofgem cap rose to £1,862/yr (+13%). The electricity standing charge rises to 57.19p/day and the unit rate to 26.11p/kWh (SVT rates).",
+      "summary": "As of July 2026, UK households can access time-of-use (TOU) tariffs with off-peak rates between 7p and 12p/kWh, compared to a standard variable tariff (SVT) rate of 26.11p/kWh. Smart off-peak and Agile tariffs are specifically identified as beneficial for home battery users, allowing them to charge during cheap windows and discharge during peak hours to reduce costs. However, the page warns that TOU tariffs can increase bills if the user cannot shift enough consumption to the off-peak window, as peak rates are typically higher than flat-rate deals."
+    },
+    {
+      "url": "https://www.energyplus.co.uk/guidesfaqs/time-of-use-energy-tariffs-uk-are-they-worth-it",
+      "title": "Time-of-Use Energy Tariffs UK 2026: Worth It vs the July Cap?",
+      "og_image": "https://www.energyplus.co.uk/images/og-default.png",
+      "rational": "The provided text contains critical data regarding UK electricity pricing as of July 2026, specifically comparing the price cap to time-of-use (TOU) tariffs, which is essential for calculating the financial viability of a home battery used for load-shifting.",
+      "evidence": "Time-of-use (TOU), agile and Economy 7 tariffs charge different electricity prices through the day. Whether they beat the July 2026 (Q3) price cap of 26.11p/kWh depends on how much of your usage you can shift to cheap off-peak hours... the cheapest off-peak rates (often around 7p–10p/kWh on the best 2026 EV and smart tariffs) sit far below the July 2026 price cap of 26.11p/kWh, so the savings can be substantial.\n\nIt is usually not worth it if your home is busiest in the late-afternoon-to-evening peak (cooking, heating, screens) and you can’t shift much, because peak rates on TOU tariffs commonly run higher than the cap (often 30p–45p/kWh).\n\nA battery lets you import cheap off-peak electricity and discharge it through peak hours, sidestepping the priciest rates. (Note: GivEnergy entered administration in April 2026 — we don’t recommend that hardware; choose a supported brand.)\n\nAs a rough guide, you usually need to move at least 30–40% of your electricity off-peak for a TOU tariff to beat a good single-rate deal.",
+      "summary": "As of July 2026, the UK electricity price cap is 26.11p/kWh. Time-of-Use (TOU) tariffs offer significant savings if 30-40% of usage can be shifted to off-peak windows, where rates are approximately 7p–10p/kWh. However, peak rates on these tariffs are often higher than the cap (30p–45p/kWh). A home battery enables this shift by charging during off-peak hours and discharging during peak hours to avoid high costs."
+    },
+    {
+      "url": "https://www.greentechrenewables.co.uk/battery-storage/cost-uk",
+      "title": "Battery Storage Cost UK 2026 | Is £2,500–£8,000 Worth It?",
+      "og_image": "https://www.greentechrenewables.co.uk/og-default.jpg",
+      "rational": "The user wants to determine if a home battery is financially viable without solar panels for a UK home. The webpage provides specific pricing for standalone batteries, costs for different capacities (5kWh and 9.5kWh), and estimated annual benefits and payback periods for 'tariff arbitrage' (using a battery without solar).",
+      "evidence": "Battery Without Solar (Standalone)\nBatteries can operate without solar panels, charging from cheap overnight grid electricity.\nConfiguration | Price | Use Case\n5kWh standalone | £4,500-£5,500 | Tariff arbitrage, backup power\n9.5kWh standalone | £6,500-£8,000 | Higher capacity arbitrage\nStandalone batteries make financial sense with time-of-use tariffs like Octopus Go or Intelligent, charging at 7-10p/kWh overnight and avoiding 24-34p/kWh peak rates.\n\nPayback Scenarios\nUse Case | Annual Benefit | Payback (5kWh at £4,000)\nTariff arbitrage (no solar) | £250-£400 | 10-16 years",
+      "summary": "For a standalone installation without solar, a 5kWh battery costs between £4,500 and £5,500, while a 9.5kWh system costs £6,500 to £8,000. These systems rely on 'tariff arbitrage'—charging during off-peak hours (7-10p/kWh) and discharging during peak hours (24-34p/kWh). The estimated annual benefit for this use case is £250-£400, leading to a simple payback period of 10-16 years for a 5kWh unit."
+    },
+    {
+      "url": "https://www.eerenewables.co.uk/solar-guides/solar-battery-prices/",
+      "title": "Solar Battery Storage Prices In the UK 2026: Complete Cost Guide",
+      "og_image": "https://www.eerenewables.co.uk/wp-content/uploads/2026/02/solar-battery-prices.jpg",
+      "rational": "The user wants to determine if a home battery is financially viable without solar panels. The provided webpage contains specific 2026 pricing for 5kWh and 10kWh batteries, technical details on LFP chemistry (lifespan and efficiency), and installation costs, which are essential for calculating the financial outcome and payback period.",
+      "evidence": "Right now, most homeowners are looking at somewhere between £3,000 and £10,000 fully installed. Smaller setups, typically around 5kWh, tend to start from the lower end of that range, while larger systems—closer to 15kWh—can reach £10,000 or more... \n\nBattery Capacity (kWh) Avg. Cost Incl Installation Typical Use Case \n5 £3,200 – £4,200 Small households in areas like Brighton or Cardiff with moderate energy needs \n10 £4,600 – £7,100 Medium-sized homes in London or Oxford seeking daily backup \n\nLithium Iron Phosphate (LFP) £4,500 – £ 8,000 10–15+ years / 8,000–10,000+ 92–98% / 90–100% Most UK homes... \n\nIn the UK, solar battery installation usually adds around £800 to £1,500 on top of the battery price. This covers fitting the system, connecting it to your solar setup or grid, and testing everything to make sure it works safely. If a hybrid inverter is needed and not already in place, that can add around £500 more.",
+      "summary": "For 2026, a 5kWh battery costs between £3,200 and £4,200 installed, while a 10kWh battery ranges from £4,600 to £7,100. LFP batteries are recommended for most UK homes due to a 10-15+ year lifespan, high efficiency (92-98%), and high depth of discharge (90-100%). Installation costs typically range from £800 to £1,500, with an additional £500 potentially required for a hybrid inverter."
+    },
+    {
+      "url": "https://renewablesexcellence.co.uk/battery-storage-installation-costs-uk/",
+      "title": "Battery Storage Installation Costs UK: 2026 Price Guide (0% VAT)",
+      "og_image": "https://renewablesexcellence.co.uk/wp-content/uploads/2025/10/Home-Battery-Install-No-Back-768x512.webp",
+      "rational": "The user is seeking to determine if a home battery is financially worthwhile for a UK home without solar panels. The provided webpage contains critical data on installation costs for 'Retrofit / Standalone' systems, specific pricing for different battery capacities (5kWh vs 10kWh), and information on VAT exemptions that directly impact the initial investment cost.",
+      "evidence": "Retrofit / Standalone: £3,500 – £5,500 (For a standard 9.5kWh system added to existing solar). ... The \"VAT Trick\": 0% VAT on Battery Storage applies to standalone battery retrofits until 2027. ... The Saver: Small Top-Up 3kWh - 5kWh Modular Battery Brand: Pylontech or Growatt AC-Coupled Inverter (e.g. Solis) £2,500 – £3,500 ... The UK Standard 9.5kWh - 10kWh Storage Brand: Sunsynk Smart App Control \u0026 12 Yr Warranty £4,500 – £5,500 ... Note: Prices include VAT (0% on Energy Storage).",
+      "summary": "For a UK home in 2026, a small battery (3-5kWh) is estimated to cost between £2,500 and £3,500 fully installed, while a larger system (9.5-10kWh) costs between £4,500 and £5,500. These prices are zero-rated for VAT on standalone retrofits until 2027. Costs vary by brand and tier, with 'Value' options (e.g., Pylontech, Growatt) being the most affordable and 'Ultra-Premium' options (e.g., Tesla) costing £8,000+."
+    },
+    {
+      "url": "https://www.energyplus.co.uk/solar/add-battery-to-existing-solar-panels-cost-uk",
+      "title": "Cost to Add Battery to Existing Solar Panels UK 2026",
+      "og_image": "https://www.energyplus.co.uk/images/og-default.png",
+      "rational": "The user wants to know if a home battery is worthwhile without solar panels. The provided webpage focuses on retrofitting batteries to existing solar systems, but it contains critical data on installation costs, 0% VAT rules, and 'off-peak arbitrage' (charging from the grid at night to avoid daytime rates), which is the only way a battery provides value without solar panels.",
+      "evidence": "Retrofit prices by battery size: 5 kWh, 10 kWh and 13.5 kWh... 5 kWh (AC-coupled) £3,000–£5,500... 10 kWh (AC-coupled) £5,000–£8,500... 0% VAT until March 2027 — Source: EnergyPlus .co.uk\n\nWhat’s the payback on a retrofit battery in 2026? A battery earns its keep three ways: storing surplus solar... charging from cheap off-peak electricity to avoid daytime rates, and — on smart export tariffs — selling stored power back at premium peak rates. Under the July–September 2026 price cap, the average electricity unit rate is 26.11p/kWh (Ofgem), while EV-style off-peak tariffs charge around 7p/kWh overnight — a gap of roughly 19p on every kWh you shift.\n\nScenario (10 kWh retrofit, ~£6,500 installed)... + off-peak arbitrage — charge at ~7p overnight, avoid 26.11p daytime imports £450–£700 [annual benefit], 9–14 years [indicative payback].",
+      "summary": "For a home without solar, the financial viability depends on 'off-peak arbitrage'—charging the battery during cheap overnight windows (approx. 7p/kWh) to avoid peak daytime rates (approx. 26.11p/kWh). Installation costs for 2026 are estimated at £3,000–£5,500 for a 5 kWh battery and £5,000–£8,500 for a 10 kWh battery, benefiting from 0% VAT until March 2027. For a 10 kWh system, the annual savings from grid arbitrage alone are estimated between £450–£700, leading to a simple payback period of 9–14 years."
+    },
+    {
+      "url": "https://www.sunsave.energy/solar-panels-advice/batteries/costs",
+      "title": "Solar battery costs UK: the expert guide [2026]",
+      "og_image": "https://images.prismic.io/sunsave-website/83860de3-482f-438d-bc1d-9c1df015054a_How+much+do+solar+batteries+cost_.jpg?auto=compress,format",
+      "rational": "The webpage provides specific cost estimates for 5kWh and 10kWh batteries, details on VAT exemptions for standalone batteries, and technical information regarding lifespan and efficiency that are essential for calculating the financial viability of a battery installation in the UK.",
+      "evidence": "A 10kWh solar battery typically costs around £4,000-6,000. This price includes the cost of the installation and inverter... A 5kWh [battery] costs £3,000-4,000. \n\nIn February 2024, the government added standalone solar batteries to its list of energy-saving materials that qualify for a 0% VAT rate until 2027. After that point, the government plans to raise this rate to 5% for all solar installations.\n\nLithium-ion batteries are usually more expensive but have a higher average lifespan, at 10-12 years, and very few maintenance needs. Lithium-ion batteries are usually around 96% efficient... Make sure you check your battery’s depth of discharge (DoD), as this will tell you how much of its kWh size you’re able to use without degrading the battery in the long run. This may also be referred to as its ‘usable capacity’. ",
+      "summary": "For a UK home, a 5kWh battery costs approximately £3,000-£4,000 and a 10kWh battery costs £4,000-£6,000 (including installation). Standalone batteries currently benefit from a 0% VAT rate until March 2027. Lithium-ion batteries are recommended for their 10-12 year lifespan and ~96% efficiency, though the user must account for the Depth of Discharge (DoD) to determine actual usable capacity."
+    },
+    {
+      "url": "https://www.bestbuilders.co.uk/costs/solar-battery-cost-uk",
+      "title": "Solar Battery Cost UK 2026: Prices by kWh, Brand \u0026 Payback",
+      "og_image": "https://www.bestbuilders.co.uk/images/og-home.jpg",
+      "rational": "The user wants to determine if a home battery is financially viable without solar panels in the UK. The provided webpage contains specific 2026 pricing for 5kWh and 10kWh batteries, information on VAT relief for standalone batteries, and mentions of 'tariff arbitrage' as a way for grid-only batteries to pay for themselves.",
+      "evidence": "A home solar battery costs around £2,500–£4,000 for 5kWh, £4,000–£6,500 for 10kWh... fully installed. That works out to roughly £500–£900 per usable kWh, and every figure on this page already includes the 0% VAT relief that runs until March 2027.\n\nSince 1 February 2024, domestic battery storage has qualified for 0% VAT under the Energy Saving Materials (ESM) relief... Crucially, this now covers standalone batteries and retrofits, not just batteries bought as part of a new solar package. The relief is scheduled to run until 31 March 2027.\n\nA standalone battery with no solar — charged purely from cheap overnight electricity — is typically AC-coupled and can still pay for itself on tariff arbitrage alone.",
+      "summary": "As of 2026, a 5kWh battery costs £2,500–£4,000 and a 10kWh battery costs £4,000–£6,500 (fully installed). These installations currently benefit from 0% VAT relief until March 2027, which applies to standalone batteries without solar panels. The source indicates that such systems can be financially viable through 'tariff arbitrage' (charging during cheap overnight periods and discharging during peak times)."
+    },
+    {
+      "url": "https://heatable.co.uk/solar/advice/battery-storage-costs",
+      "title": "Home Battery Storage Cost in the UK: 2026 Prices, Installation \u0026 Payback",
+      "og_image": "https://assets.heatable.co.uk/1720786651464_N_vczk4T_.png",
+      "rational": "The user wants to determine if a home battery is financially viable without solar panels in the UK. The provided webpage contains specific sections on 'Home battery without solar', installation costs for different battery sizes, and the mechanism for savings (charging off-peak and using during peak hours), which directly address the goal.",
+      "evidence": "You can install a home battery: ... without solar panels, using cheaper off-peak electricity tariffs. That last point matters. Despite the name, home battery storage is not only for homes with solar panels. More households are now considering battery-only storage to charge from cheaper off-peak electricity and use that stored electricity later when rates are higher.\n\nHome battery setup | Typical installed cost | Best for\nSmall home battery | £4,000-£5,500 | Lower electricity use or smaller storage needs\nMedium home battery | £5,500-£7,000 | Typical homes with solar PV or time-of-use tariffs\nLarger premium battery | £7,000-£8,000+ | Higher usage, larger homes, EVs or premium systems\nHome battery without solar | £4,000-£8,000+ | Charging off-peak and using later\n\nQualifying residential battery installations currently benefit from 0% VAT until 31 March 2027, before reverting to the reduced 5% rate.",
+      "summary": "Installing a home battery without solar panels is possible and relies on using time-of-use tariffs to charge during off-peak periods and discharge during peak periods. Installed costs range from £4,000 to over £8,000 depending on the battery size (Small, Medium, or Large). Currently, these installations benefit from 0% VAT until March 31, 2027."
+    },
+    {
+      "url": "https://www.checkatrade.com/blog/cost-guides/solar-battery-storage-system-cost/",
+      "title": "Solar Battery Storage Costs in 2026 | Checkatrade",
+      "og_image": "https://images.ctfassets.net/5kq8dse7hipf/6stOVpn4KbwDBkrO5LW3tp/18866f1dd769e2baa9d683fd59fe0448/solar-panel-battery-storage-cost.jpg",
+      "rational": "The webpage provides specific cost data for home batteries of 5kWh and 10kWh, discusses the role of time-of-use tariffs (e.g., Octopus Go) for charging batteries without solar, and explains technical factors like depth of discharge and round-trip losses that impact financial calculations.",
+      "evidence": "The cost of a standard battery (10 - 15 year life). Lithium ion, 6000 battery cycles: 5kWh £5,000; 10kWh £8,000. \n\nLow-cost off-peak tariffs – With schemes like Economy 7 or Octopus Go, you can charge your battery during off-peak hours at a fraction of the cost of buying during the daytime. This means you can benefit from cheaper electricity even in the winter when your PV array produces very little export electricity.\n\nAC-coupled battery system... Pros: Can be charged using cheap off-peak electricity – Allows integration with grid charging and time-of-use tariffs for additional savings. Cons: A less efficient method of storing electricity due to higher losses... A 'round trip' on an AC-coupled battery can waste up to 10% of the energy used!\n\nYou can't totally discharge the battery without damaging it, so all systems have a depth of discharge (DoD) limit. This typically ranges from 80%-95%, meaning that there is a lower usable capacity than the quoted maximum storage capacity.",
+      "summary": "For a UK home without solar, the source indicates that AC-coupled batteries can be used with time-of-use tariffs (like Octopus Go) to charge during off-peak hours and discharge during peak times. Installation costs for the requested sizes are approximately £5,000 for 5kWh and £8,000 for 10kWh. Financial viability must account for a 10-15 year lifespan, a depth of discharge of 80-95%, and round-trip energy losses of up to 10%."
+    },
+    {
+      "url": "https://octopus.energy/blog/battery-only-installation/",
+      "title": "Introducing battery-only installation with Octopus | Octopus Energy",
+      "og_image": "https://octoenergy-production-media.s3.amazonaws.com/original_images/battery_installation.png",
+      "rational": "The webpage provides specific pricing for battery-only installations and identifies compatible tariffs for users without solar panels, which directly addresses the user's goal of assessing the financial viability of a home battery in the UK.",
+      "evidence": "At present, our prices start at £3,947 for a smart 5kWh battery, £5,336 for an smart 10kWh battery and £7,999 for a 13.5kWh Tesla Powerwall 3 battery\n\nIf you’d like battery storage without solar panels ✅\n\nYou can take advantage of a battery at home, even without solar panels, by storing energy when it’s cheap, and using it when prices spike.\n\nLoad up on cheaper, greener energy: store energy from off-peak periods to avoid peak-rate prices with a smart tariff like Agile Octopus.",
+      "summary": "For a UK home without solar panels, battery-only installations are available starting at £3,947 for 5kWh and £5,336 for 10kWh. These systems allow users to save money by charging during off-peak periods and discharging during peak price spikes, specifically when paired with smart time-of-use tariffs such as Agile Octopus."
+    },
+    {
+      "url": "https://www.bestbuilders.co.uk/guides/costs/how-much-does-a-solar-battery-cost-in-2026-uk",
+      "title": "Solar Battery Cost UK 2026 (Full Breakdown by kWh)",
+      "og_image": "https://www.bestbuilders.co.uk/images/og-home.jpg",
+      "rational": "The webpage provides specific 2026 UK installation costs for 5kWh and 10kWh batteries, details on battery chemistry (LFP) and lifespan, and directly addresses the viability of installing a battery without solar panels using time-of-use tariffs.",
+      "evidence": "A home solar battery in 2026 UK costs £3,800–£13,500 fully installed, depending on capacity. The headline pricing for the most common sizes: 5kWh at £3,800–£5,500, 10kWh at £6,500–£9,500... Lithium iron phosphate (LFP) is now the dominant chemistry — safer, longer-lived... LFP (lithium iron phosphate) is now standard — safer, 6,000+ cycles, lasts 12–15 yrs.\n\nShould I get a battery without solar? Only worth it on time-of-use tariffs (Octopus Go, Cosy). Charge cheap overnight, discharge peak. Pays back in 5–8 yrs without solar.\n\nSolar batteries have no direct UK subsidy in 2026, but qualify for 0% VAT until April 2027.",
+      "summary": "For a UK home in 2026, a 5kWh battery costs between £3,800–£5,500 and a 10kWh battery costs £6,500–£9,500 (fully installed). LFP batteries are the standard, offering a 12–15 year lifespan. Installing a battery without solar is considered financially viable only when paired with time-of-use tariffs (e.g., Octopus Go), with an estimated payback period of 5–8 years. Additionally, these installations currently benefit from 0% VAT until April 2027."
+    },
+    {
+      "url": "https://www.energyplus.co.uk/suppliers/energy-price-cap-vs-direct-debit-july-2026",
+      "title": "Price cap vs Direct Debit: July 2026",
+      "og_image": "https://www.energyplus.co.uk/images/og-default.png",
+      "rational": "The user is seeking a financial assessment of installing a home battery in the UK as of July 2026. The provided webpage discusses the Ofgem price cap and Direct Debit mechanisms for July 2026, which is relevant for understanding the baseline electricity costs and tariff structures (standard variable vs. fixed) that would influence the 'no battery' and 'tariff switch' options.",
+      "evidence": "The Ofgem price cap limits the maximum unit rates and standing charges for most standard variable tariffs —it does not cap your monthly Direct Debit. Your Direct Debit is a payment plan based on your estimated annual usage and account balance... The price cap affects what each unit costs. Your Direct Debit affects how you pay for the energy you use (and any previous under/overpayment).\n\nIdentify your tariff: On your bill/online account, look for “tariff name” and whether it’s a standard variable/default tariff or a fixed tariff. Find the rates you’re actually paying: Note your unit rate(s) and standing charge. If you have Economy 7 or similar, record both day/night rates.",
+      "summary": "The webpage provides context on the UK energy market in July 2026, specifically that the Ofgem price cap regulates unit rates for standard variable tariffs but not the monthly payment amounts. It emphasizes that users should check their specific unit rates and standing charges to compare standard variable tariffs against fixed options, which is a necessary first step in calculating the baseline costs for the user's financial comparison."
+    }
+  ],
+  "queries_used": [
+    "UK time-of-use electricity tariffs July 2026 price spread peak vs off-peak",
+    "average installed cost 5kWh and 10kWh home battery England 2026",
+    "home battery round-trip efficiency and annual degradation rates 2026",
+    "UK government grants VAT incentives home battery storage without solar 2026",
+    "UK home battery installation costs 2026 5kWh 10kWh",
+    "UK time-of-use electricity tariffs price spread July 2026",
+    "UK government grants VAT reductions home battery without solar 2026"
+  ],
+  "analyzed_urls": [
+    {
+      "url": "https://www.energyplus.co.uk/costsavingadvice/best-time-of-use-electricity-tariffs-uk-for-households",
+      "title": "Best time-of-use electricity tariffs UK for households — July 2026"
+    },
+    {
+      "url": "https://www.energyplus.co.uk/costsavingadvice/economy-10-tariff",
+      "title": "Economy 10 Tariff Guide: Times, Costs \u0026 Pros (2026) - EnergyPlus"
+    },
+    {
+      "url": "https://www.gov.uk/government/publications/clean-flexibility-roadmap/clean-flexibility-roadmap",
+      "title": "Clean flexibility roadmap (accessible webpage) - GOV.UK"
+    },
+    {
+      "url": "https://offpeakenergy.co.uk/tariffs",
+      "title": "Time-of-Use Electricity Tariffs UK Explained - OffPeak Energy"
+    },
+    {
+      "url": "https://www.sunsave.energy/solar-panels-advice/exporting-to-the-grid/time-of-use-tariffs",
+      "title": "Time-of-use tariffs: are they worth it? [UK, 2026] - Sunsave"
+    },
+    {
+      "url": "https://commonslibrary.parliament.uk/research-briefings/cbp-9714/",
+      "title": "Gas and electricity prices during the 'energy crisis' and beyond"
+    },
+    {
+      "url": "https://www.energyplus.co.uk/costsavingadvice/time-of-use-electricity-tariff-for-households-uk",
+      "title": "Time-of-Use Electricity Tariffs for UK Households 2026"
+    },
+    {
+      "url": "https://utilitiesdeals.co.uk/blogs/peak-vs-off-peak-energy",
+      "title": "Peak vs. Off-Peak Energy: Smart Usage Tips for Businesses"
+    },
+    {
+      "url": "https://www.moneysupermarket.com/gas-and-electricity/suppliers/fuse-energy/",
+      "title": "Fuse Energy Rates and Tariffs - July 2026 | MoneySuperMarket"
+    },
+    {
+      "url": "https://www.energyplus.co.uk/guidesfaqs/time-of-use-energy-tariffs-uk-are-they-worth-it",
+      "title": "Time-of-Use Energy Tariffs UK 2026: Worth It vs the July Cap?"
+    },
+    {
+      "url": "https://www.greentechrenewables.co.uk/battery-storage/cost-uk",
+      "title": "Battery Storage Cost UK 2026: Prices, Sizes and What to Expect"
+    },
+    {
+      "url": "https://www.eerenewables.co.uk/solar-guides/solar-battery-prices/",
+      "title": "Solar Battery Storage Prices In the UK 2026: Complete Cost Guide"
+    },
+    {
+      "url": "https://renewablesexcellence.co.uk/battery-storage-installation-costs-uk/",
+      "title": "Battery Storage Installation Costs UK: 2026 Price Guide (0% VAT)"
+    },
+    {
+      "url": "https://www.energyplus.co.uk/solar/add-battery-to-existing-solar-panels-cost-uk",
+      "title": "Cost to Add Battery to Existing Solar Panels UK 2026 - EnergyPlus"
+    },
+    {
+      "url": "https://www.sunsave.energy/solar-panels-advice/batteries/costs",
+      "title": "Solar battery costs UK: the expert guide [2026] - Sunsave"
+    },
+    {
+      "url": "https://www.bestbuilders.co.uk/costs/solar-battery-cost-uk",
+      "title": "Solar Battery Cost UK 2026: Storage by Size, Brand + Retrofit vs New"
+    },
+    {
+      "url": "https://heatable.co.uk/solar/advice/battery-storage-costs",
+      "title": "Home Battery Storage Cost in the UK: 2026 Prices, Installation \u0026 Payback"
+    },
+    {
+      "url": "https://www.checkatrade.com/blog/cost-guides/solar-battery-storage-system-cost/",
+      "title": "Solar Battery Storage Costs in 2026 | Checkatrade"
+    },
+    {
+      "url": "https://octopus.energy/blog/battery-only-installation/",
+      "title": "Introducing battery-only installation with Octopus"
+    },
+    {
+      "url": "https://www.bestbuilders.co.uk/guides/costs/how-much-does-a-solar-battery-cost-in-2026-uk",
+      "title": "Solar Battery Cost UK 2026 (Full Breakdown by kWh)"
+    },
+    {
+      "url": "https://www.energyplus.co.uk/suppliers/energy-price-cap-vs-direct-debit-july-2026",
+      "title": "Price cap vs Direct Debit: July 2026 - EnergyPlus"
+    }
+  ]
+}

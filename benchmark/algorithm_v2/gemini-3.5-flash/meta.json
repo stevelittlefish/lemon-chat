@@ -1,0 +1,21 @@
+{
+  "job_id": 32,
+  "model": "google/gemini-3.5-flash",
+  "mode": "research",
+  "effort": 3,
+  "synthesis_tokens": 8192,
+  "final_report_tokens": 32768,
+  "min_rounds": 2,
+  "max_rounds": 8,
+  "max_time_seconds": 600,
+  "locale": "Europe/London",
+  "git_commit": "unknown",
+  "started_at": "2026-07-15T01:03:15Z",
+  "status": "done",
+  "stop_reason": "YES — Every sub-question and success criterion has been thoroughly addressed with robust 2026 UK tariff data, battery specifications, load profiling, and detailed 10-year financial modeling, including the required sensitivity analyses.",
+  "rounds_completed": 2,
+  "elapsed_ms": 109447,
+  "findings_count": 18,
+  "price_usd": 0.3493275,
+  "ended_at": "2026-07-15T01:05:54Z"
+}

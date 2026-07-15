@@ -1,0 +1,38 @@
+{"ts":"2026-07-15T01:07:21.257492978Z","phase":"planning"}
+{"ts":"2026-07-15T01:07:38.744035596Z","phase":"planning","message":"plan ready — Sub-questions: What are current UK home battery installed prices (5 kWh and 10 kWh systems) from reputable suppliers as of mid-2026, including VAT, installation, and any ongoing costs?; What time-of-use electricity tariffs are available in the UK in mid-2026 (e.g., Octopus Flux, Agile, Go, OVO, E.ON), and what are their current off-peak, peak, and shoulder rates, standing charges, and eligibility requirements?; What is the realistic daily usable energy arbitrage a 5 kWh or 10 kWh battery can achieve given this household's demand profile — specifically high daytime consumption of 10–20 kWh, overnight base load, charge/discharge rate limits, round-trip efficiency losses, and degradation over 10 years?; What are the financial outcomes (annual savings, simple payback, 10-year net position) for each of the four options under base-case and sensitivity scenarios (6,000 / 9,000 / 11,000 kWh usage; varying tariff spreads; varying installation costs; varying peak-consumption proportions)?; What UK tax treatment, VAT rules, government incentives, grid export rules, and Ofgem regulatory considerations apply to standalone home batteries as of 2026?; What are the key risks and uncertainties — tariff availability changes, battery warranty and degradation reality vs. marketing claims, installer quote variability, and smart meter compatibility — that could materially alter the financial case?\nKey topics: Current installed costs for 5 kWh and 10 kWh home batteries in the UK (hardware + labour + VAT), Available time-of-use tariffs in mid-2026: off-peak rates, peak rates, standing charges, slot windows, and smart meter requirements, Household demand profile analysis: daytime home-office load vs. overnight load, proportion shiftable vs. unshiftable, battery fill feasibility each night, Battery technical parameters: usable capacity, C-rate limits, round-trip efficiency (~85–90%), degradation curve, warranty terms (cycles and years), Annual electricity cost modelling for all four options with clearly stated assumptions, Sensitivity analysis across usage levels (6k/9k/11k kWh), tariff spreads, installation costs, degradation rates, and peak-consumption share, Simple payback period and 10-year net financial outcome per option, VAT on battery installations (0% since 2022 Energy Security Bill provisions), any available grants or incentives, Tariff-only switching benefit (Option 2 vs Option 1) as a standalone financial decision, Risks: tariff discontinuation, regulatory change, battery replacement costs, installer quality, smart meter compatibility, What data and quotes the homeowner should gather before deciding\nSuccess: A complete answer provides a fully worked, assumption-transparent financial model comparing all four options across three usage scenarios and multiple sensitivity dimensions, grounded in verified mid-2026 UK tariff rates and battery prices, and concludes with a clear ranked recommendation, the conditions under which it reverses, and a practical pre-purchase checklist."}
+{"ts":"2026-07-15T01:07:40.143792801Z","phase":"planning","message":"report category: factcheck"}
+{"ts":"2026-07-15T01:07:42.857245465Z","phase":"searching","round":1}
+{"ts":"2026-07-15T01:07:45.476228503Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:07:45.476441414Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:07:45.476654719Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:07:55.875210475Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:08:03.577708562Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:08:03.947461265Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:08:18.0606274Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:08:21.382062121Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:08:22.032887939Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:08:37.021066288Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:08:39.832086194Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:08:40.75240276Z","phase":"reading","round":1}
+{"ts":"2026-07-15T01:09:00.407403977Z","phase":"analyzing","round":1}
+{"ts":"2026-07-15T01:10:27.432605006Z","phase":"searching","round":2}
+{"ts":"2026-07-15T01:16:47.852677465Z","phase":"reading","round":2}
+{"ts":"2026-07-15T01:16:47.852775325Z","phase":"reading","round":2}
+{"ts":"2026-07-15T01:16:47.852812517Z","phase":"reading","round":2}
+{"ts":"2026-07-15T01:16:59.537869441Z","phase":"reading","round":2}
+{"ts":"2026-07-15T01:17:08.635696287Z","phase":"reading","round":2}
+{"ts":"2026-07-15T01:17:09.651292462Z","phase":"reading","round":2}
+{"ts":"2026-07-15T01:17:18.98287467Z","phase":"reading","round":2}
+{"ts":"2026-07-15T01:17:22.238608761Z","phase":"reading","round":2}
+{"ts":"2026-07-15T01:17:35.594282579Z","phase":"reading","round":2}
+{"ts":"2026-07-15T01:17:57.076916818Z","phase":"analyzing","round":2}
+{"ts":"2026-07-15T01:19:46.083050474Z","phase":"searching","round":3}
+{"ts":"2026-07-15T01:19:47.591766606Z","phase":"reading","round":3}
+{"ts":"2026-07-15T01:19:47.591930359Z","phase":"reading","round":3}
+{"ts":"2026-07-15T01:19:47.592092168Z","phase":"reading","round":3}
+{"ts":"2026-07-15T01:20:06.6957655Z","phase":"reading","round":3}
+{"ts":"2026-07-15T01:20:09.588992166Z","phase":"reading","round":3}
+{"ts":"2026-07-15T01:20:11.872198174Z","phase":"reading","round":3}
+{"ts":"2026-07-15T01:20:38.487455386Z","phase":"analyzing","round":3}
+{"ts":"2026-07-15T01:22:29.412879064Z","phase":"deciding","round":3,"message":"YES — Every sub-question in the research plan has supporting evidence in the working summary; remaining gaps (live installer quotes, real-time tariff rates, personal half-hourly consumption data) are private or proprietary facts that web search cannot resolve."}
+{"ts":"2026-07-15T01:22:29.423015673Z","phase":"writing"}

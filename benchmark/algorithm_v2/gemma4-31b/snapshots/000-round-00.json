@@ -1,0 +1,12 @@
+{
+  "round": 0,
+  "empty_rounds": 0,
+  "elapsed_ms": 6938,
+  "category": "comparison",
+  "slug": "home_battery_no_solar",
+  "plan": "Sub-questions: What are the current 2026 UK time-of-use (ToU) electricity tariffs, specifically the price spread between off-peak and peak rates?; What is the current average installed cost for 5kWh and 10kWh home battery systems in England as of July 2026?; What are the typical round-trip efficiency losses and annual degradation rates for modern lithium-ion home batteries?; Based on a 9,000 kWh annual load with high daytime office usage, what is the realistic daily cycle capacity for 5kWh vs 10kWh batteries?; Are there any current UK government grants, VAT reductions, or incentives for battery storage installed without solar PV?\nKey topics: Time-of-Use (ToU) Tariff Analysis, Battery CAPEX and Installation Costs, Energy Arbitrage Modeling (Charge/Discharge cycles), Technical Performance (Efficiency, Degradation, Usable Capacity), Financial Metrics (Simple Payback, 10-year NPV, Sensitivity Analysis), Consumption Profiling (Home Office impact vs. Baseline)\nSuccess: A detailed financial model comparing four scenarios with a 10-year net outcome, supported by 2026 pricing and technical data, including a sensitivity analysis for usage and tariff volatility.",
+  "report": "",
+  "findings": null,
+  "queries_used": null,
+  "analyzed_urls": null
+}

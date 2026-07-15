@@ -1,0 +1,57 @@
+{"ts":"2026-07-15T02:07:29.940991362Z","phase":"planning"}
+{"ts":"2026-07-15T02:07:39.768622458Z","phase":"planning","message":"plan ready — Sub-questions: What competitive flat-rate and time-of-use (ToU) electricity tariffs are available in England as of 14 July 2026 for a smart-meter household, including unit rates, standing charges, off-peak windows, peak periods, export requirements (if any), and tariff volatility or eligibility restrictions?; Using a realistic hourly demand profile for a 9,000 kWh/year gas-heated home with a 10–20 kWh/day predominantly daytime home-office load, how much consumption can be shifted to cheap periods directly through tariff choice, and how much additional peak-period demand could a 5 kWh or 10 kWh battery actually cover?; What are the installed UK costs, usable capacities, charge/discharge power limits, round-trip efficiencies, warranty terms, cycle-throughput limits, expected degradation, maintenance needs, and likely replacement costs for representative 5 kWh and 10 kWh home battery systems suitable for England?; For each of the four options, what are the indicative annual electricity bill, annual saving versus the competitive flat-rate baseline, simple payback period, and 10-year net financial outcome after charging losses, degradation, standing charges, battery capital cost, and plausible tariff changes?; How do the results change at 6,000, 9,000, and 11,000 kWh annual consumption and under different tariff spreads, battery installation prices, peak-demand shares, battery utilisation levels, and degradation assumptions—and what conditions are required for either battery to become financially attractive?; What UK-specific regulatory, tax, consumer-protection, and practical considerations apply to batteries without solar, including VAT treatment, electricity-market rules, smart-meter/data requirements, DNO notification or connection issues, incentives, insurance, backup-power capability, and the risks of relying on a particular tariff?\nKey topics: England electricity pricing as of 14 July 2026, distinguishing Ofgem-regulated default/price-cap tariffs from supplier-specific fixed, agile, and time-of-use tariffs, Direct load shifting without a battery, especially whether overnight or flexible loads can use cheap electricity without incurring battery losses, Realistic half-hourly or hourly consumption profiling for a high daytime-load home office, rather than assuming one full battery cycle each day, Battery dispatch modelling: usable capacity, depth of discharge, minimum reserve, charge and discharge power, tariff windows, round-trip efficiency, and the proportion of cheap electricity consumed directly, Comparison of representative approximately 5 kWh and 10 kWh systems, including installed—not equipment-only—costs and whether larger capacity is usable given the demand profile, Battery lifetime economics: calendar and cycle degradation, warranty duration and throughput, retained capacity, inverter/battery replacement risk, maintenance, financing if relevant, and residual value, Annual bill and 10-year cash-flow modelling for: flat tariff/no battery; ToU/no battery; ToU plus 5 kWh battery; and ToU plus 10 kWh battery, Sensitivity testing for annual use, peak-period load share, tariff price spreads, tariff standing charges, installation cost, battery efficiency, degradation, and actual cycles per year, UK taxes, incentives, grid/DNO requirements, installation standards, insurance implications, and whether backup operation requires additional hardware or is available during a grid outage, Evidence quality: prioritising supplier tariff documents, Ofgem and government sources, manufacturer datasheets and warranty documents, and independent field trials; treating installer calculators and affiliate claims as secondary evidence, Decision framework identifying the best financial option, the strongest counterargument, and the household-specific consumption data and installer quotations needed before committing\nSuccess: A complete answer uses current, cited UK primary-source tariff and product evidence to build transparent, realistic 2026–2036 cash-flow comparisons for all four options, avoids unsupported daily-cycling assumptions, quantifies sensitivity to the household’s daytime demand and key uncertainties, and gives a clear, conditional recommendation plus the data and quotations needed to validate it."}
+{"ts":"2026-07-15T02:07:40.463823937Z","phase":"planning","message":"report category: comparison"}
+{"ts":"2026-07-15T02:07:44.014808Z","phase":"searching","round":1}
+{"ts":"2026-07-15T02:07:45.666185631Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:07:45.666444601Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:07:45.666701499Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:07:51.435669042Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:07:52.158287561Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:07:56.491116585Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:07:56.711341529Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:07:58.963754425Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:08:01.205108419Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:08:01.36427371Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:08:05.036641197Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:08:05.830600888Z","phase":"reading","round":1}
+{"ts":"2026-07-15T02:08:12.663640097Z","phase":"analyzing","round":1}
+{"ts":"2026-07-15T02:09:11.618070885Z","phase":"searching","round":2}
+{"ts":"2026-07-15T02:09:14.227462216Z","phase":"reading","round":2}
+{"ts":"2026-07-15T02:09:14.227663029Z","phase":"reading","round":2}
+{"ts":"2026-07-15T02:09:14.227891165Z","phase":"reading","round":2}
+{"ts":"2026-07-15T02:09:19.230477998Z","phase":"reading","round":2}
+{"ts":"2026-07-15T02:09:20.138821852Z","phase":"reading","round":2}
+{"ts":"2026-07-15T02:09:21.612853949Z","phase":"reading","round":2}
+{"ts":"2026-07-15T02:09:27.566279136Z","phase":"reading","round":2}
+{"ts":"2026-07-15T02:09:28.088020141Z","phase":"reading","round":2}
+{"ts":"2026-07-15T02:09:28.379369192Z","phase":"reading","round":2}
+{"ts":"2026-07-15T02:09:36.320999611Z","phase":"analyzing","round":2}
+{"ts":"2026-07-15T02:10:18.85851156Z","phase":"deciding","round":2,"message":"NO — Primary-source evidence for representative battery warranties/specifications, UK VAT/DNO rules, and independently grounded installed-cost/longevity assumptions is still not demonstrated."}
+{"ts":"2026-07-15T02:10:21.870984352Z","phase":"searching","round":3}
+{"ts":"2026-07-15T02:10:24.519356254Z","phase":"reading","round":3}
+{"ts":"2026-07-15T02:10:24.519564892Z","phase":"reading","round":3}
+{"ts":"2026-07-15T02:10:24.519695985Z","phase":"reading","round":3}
+{"ts":"2026-07-15T02:10:24.559700147Z","phase":"reading","round":3}
+{"ts":"2026-07-15T02:10:30.203094482Z","phase":"reading","round":3}
+{"ts":"2026-07-15T02:10:31.730165416Z","phase":"reading","round":3}
+{"ts":"2026-07-15T02:10:33.941083067Z","phase":"reading","round":3}
+{"ts":"2026-07-15T02:10:34.623402876Z","phase":"reading","round":3}
+{"ts":"2026-07-15T02:10:34.642217304Z","phase":"reading","round":3}
+{"ts":"2026-07-15T02:10:41.794082882Z","phase":"analyzing","round":3}
+{"ts":"2026-07-15T02:11:21.651874403Z","phase":"deciding","round":3,"message":"NO — Representative battery technical/warranty evidence and definitive UK VAT/DNO regulatory sources remain materially under-evidenced and can be obtained through targeted manufacturer, HMRC and ENA searches."}
+{"ts":"2026-07-15T02:11:23.14421626Z","phase":"searching","round":4}
+{"ts":"2026-07-15T02:11:24.086963276Z","phase":"reading","round":4}
+{"ts":"2026-07-15T02:11:24.087094017Z","phase":"reading","round":4}
+{"ts":"2026-07-15T02:11:24.087208608Z","phase":"reading","round":4}
+{"ts":"2026-07-15T02:11:29.464754955Z","phase":"reading","round":4}
+{"ts":"2026-07-15T02:11:30.142241054Z","phase":"reading","round":4}
+{"ts":"2026-07-15T02:11:31.461023853Z","phase":"reading","round":4}
+{"ts":"2026-07-15T02:11:36.382124748Z","phase":"reading","round":4}
+{"ts":"2026-07-15T02:11:36.521314258Z","phase":"reading","round":4}
+{"ts":"2026-07-15T02:11:42.917251947Z","phase":"analyzing","round":4}
+{"ts":"2026-07-15T02:12:20.70258642Z","phase":"deciding","round":4,"message":"NO — The UK-specific VAT treatment for standalone batteries and the precise DNO/G98–G99 connection requirements still need primary-source evidence, and targeted HMRC and ENA/DNO searches could materially resolve them."}
+{"ts":"2026-07-15T02:12:25.125104417Z","phase":"searching","round":5}
+{"ts":"2026-07-15T02:12:30.575521362Z","phase":"deciding","round":5,"message":"NO — The plan still needs primary manufacturer warranty/throughput/degradation evidence and HMRC confirmation of VAT treatment for standalone batteries."}
+{"ts":"2026-07-15T02:12:32.449050089Z","phase":"searching","round":6}
+{"ts":"2026-07-15T02:12:32.9636994Z","phase":"warning","round":6,"message":"consecutive empty rounds — writing report with findings so far"}
+{"ts":"2026-07-15T02:12:32.977366117Z","phase":"writing"}

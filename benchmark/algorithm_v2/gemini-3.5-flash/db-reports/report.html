@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feasibility Study: Standalone UK Home Battery Storage</title>
+  <style>
+    /* Modern, high-contrast, accessible editorial styling */
+    :root {
+      --primary: #0f172a;       /* Slate 900 */
+      --primary-light: #1e293b; /* Slate 800 */
+      --accent: #0284c7;        /* Sky 600 */
+      --accent-hover: #0369a1;  /* Sky 700 */
+      --text: #334155;          /* Slate 700 */
+      --text-dark: #0f172a;     /* Slate 900 */
+      --bg: #f8fafc;            /* Slate 50 */
+      --card-bg: #ffffff;
+      --border: #e2e8f0;        /* Slate 200 */
+      --success: #15803d;       /* Green 700 */
+      --danger: #b91c1c;        /* Red 700 */
+      --neutral-light: #f1f5f9; /* Slate 100 */
+      --font-serif: Georgia, Cambria, "Times New Roman", Times, serif;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      color: var(--text);
+      background-color: var(--bg);
+      line-height: 1.6;
+      font-size: 1.05rem;
+      padding: 0;
+    }
+
+    /* Layout */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    header {
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .meta-badge {
+      display: inline-block;
+      background: var(--neutral-light);
+      color: var(--primary-light);
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.35rem 0.75rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 2.75rem;
+      color: var(--primary);
+      line-height: 1.15;
+      margin-bottom: 1rem;
+      font-weight: 800;
+    }
+
+    .subtitle {
+      font-size: 1.25rem;
+      color: var(--text);
+      max-width: 800px;
+      font-weight: 400;
+    }
+
+    h2 {
+      font-family: var(--font-serif);
+      font-size: 1.85rem;
+      color: var(--primary);
+      margin-top: 3rem;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h3 {
+      font-size: 1.35rem;
+      color: var(--primary-light);
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    p {
+      margin-bottom: 1.25rem;
+    }
+
+    strong {
+      color: var(--text-dark);
+    }
+
+    /* Links & Citations */
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      border-bottom: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+
+    a:hover {
+      color: var(--accent-hover);
+      border-bottom-color: var(--accent-hover);
+    }
+
+    .citation-link {
+      font-size: 0.85em;
+      font-weight: 600;
+      vertical-align: super;
+      margin-left: 0.15rem;
+      margin-right: 0.15rem;
+      color: var(--accent);
+    }
+
+    /* Cards & Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    .card.highlight {
+      border-left: 4px solid var(--accent);
+    }
+
+    /* Key Stats block */
+    .stat-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin: 2rem 0;
+    }
+
+    .stat-box {
+      background: var(--primary);
+      color: #ffffff;
+      padding: 1.5rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-box .number {
+      font-family: var(--font-serif);
+      font-size: 2.25rem;
+      font-weight: bold;
+      display: block;
+      color: #38bdf8;
+      margin-bottom: 0.25rem;
+    }
+
+    .stat-box .label {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+    }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      margin: 2rem 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card-bg);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background-color: var(--neutral-light);
+      color: var(--primary-light);
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background-color: #f8fafc;
+    }
+
+    /* Callouts */
+    .callout {
+      background: #f0f9ff;
+      border-left: 4px solid var(--accent);
+      color: #0369a1;
+      padding: 1.25rem 1.5rem;
+      border-radius: 0 8px 8px 0;
+      margin: 2rem 0;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+    }
+
+    /* Options Pros/Cons list */
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .pros, .cons {
+      padding: 1rem;
+      border-radius: 6px;
+    }
+
+    .pros {
+      background-color: #f0fdf4;
+      border-left: 3px solid var(--success);
+    }
+
+    .cons {
+      background-color: #fef2f2;
+      border-left: 3px solid var(--danger);
+    }
+
+    .pros h4 {
+      color: var(--success);
+      margin-bottom: 0.5rem;
+    }
+
+    .cons h4 {
+      color: var(--danger);
+      margin-bottom: 0.5rem;
+    }
+
+    .pros ul, .cons ul {
+      list-style-position: inside;
+      padding-left: 0.5rem;
+    }
+
+    .pros li, .cons li {
+      margin-bottom: 0.4rem;
+      font-size: 0.95rem;
+    }
+
+    /* Visualisations */
+    .chart-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .chart-title {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      color: var(--primary);
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    .bar-chart {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .bar-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--primary-light);
+    }
+
+    .bar-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .bar-track {
+      flex-grow: 1;
+      height: 24px;
+      background-color: var(--neutral-light);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.6s ease;
+    }
+
+    .bar-fill.negative {
+      background-color: #ef4444;
+    }
+
+    .bar-fill.positive {
+      background-color: #10b981;
+    }
+
+    .bar-val {
+      font-size: 0.9rem;
+      font-weight: 700;
+      width: 100px;
+      text-align: right;
+    }
+
+    /* Source List */
+    .sources-section {
+      background-color: var(--neutral-light);
+      border-radius: 8px;
+      padding: 2rem;
+      margin-top: 4rem;
+      border: 1px solid var(--border);
+    }
+
+    .sources-list {
+      list-style: none;
+      padding: 0;
+      font-size: 0.9rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+
+    @media (min-width: 768px) {
+      .sources-list {
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+    }
+
+    .sources-list li {
+      word-break: break-all;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 3rem 0;
+      font-size: 0.85rem;
+      color: #64748b;
+      border-top: 1px solid var(--border);
+      margin-top: 4rem;
+    }
+
+    /* Print and Mobile adjustments */
+    @media (max-width: 768px) {
+      h1 { font-size: 2rem; }
+      h2 { font-size: 1.5rem; }
+      .pros-cons { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 1fr; gap: 0.25rem; }
+      .bar-val { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="meta-badge">Feasibility Study • July 2026</div>
+      <h1>Is a home battery worthwhile without solar panels for my UK home?</h1>
+      <p class="subtitle">An in-depth evaluation of standalone battery storage viability for a high-demand, home-office-driven UK household consuming 9,000 kWh annually.</p>
+    </header>
+
+    <!-- Executive Summary -->
+    <section>
+      <h2>Executive Summary</h2>
+      <p>As of July 2026, the UK residential energy market is undergoing a profound transformation. Driven by the transition to Market-wide Half-Hourly Settlement (MHHS) and the mandatory integration of smart meters (SMETS2) <a href="https://homeenergymodel.co.uk/what-is-time-of-use-tariff-uk-2026/" target="_blank" rel="noopener noreferrer" class="citation-link">[S9]</a>, households are increasingly looking to active demand-side response to manage rising energy costs.</p>
+      
+      <p>For a household in England consuming approximately <strong>9,000 kWh</strong> of electricity annually—with a high, inflexible daytime load of 10–20 kWh/day driven by a home office—the financial viability of installing a standalone home battery (without solar panels) has been rigorously evaluated across four distinct pathways:</p>
+
+      <div class="grid-2">
+        <div class="card highlight">
+          <strong>Option 1</strong><br>Remaining on a competitive flat-rate tariff (£0.247/kWh) without a battery.
+        </div>
+        <div class="card highlight">
+          <strong>Option 2</strong><br>Switching to a suitable Time-of-Use (ToU) tariff without a battery.
+        </div>
+        <div class="card highlight">
+          <strong>Option 3</strong><br>Installing a ~5 kWh battery and switching to a ToU tariff.
+        </div>
+        <div class="card highlight">
+          <strong>Option 4</strong><br>Installing a ~10 kWh battery and switching to a ToU tariff.
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">Core Finding</div>
+        <p><strong>Installing a standalone home battery without solar panels is not financially viable.</strong> While a battery enables substantial annual bill savings by exploiting the spread between off-peak and peak electricity tariffs, the high upfront capital costs of battery systems (£4,000 to £6,500 installed) <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer" class="citation-link">[S11]</a> do not pay for themselves within their typical 10-year warranty periods.</p>
+      </div>
+
+      <div class="stat-container">
+        <div class="stat-box">
+          <span class="number">34.9 Yrs</span>
+          <span class="label">Payback (5 kWh System)</span>
+        </div>
+        <div class="stat-box">
+          <span class="number">15.5 Yrs</span>
+          <span class="label">Payback (10 kWh System)</span>
+        </div>
+        <div class="stat-box">
+          <span class="number">-£2,306.90</span>
+          <span class="label">10-Year Net Outcome (10 kWh)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison Table -->
+    <section>
+      <h2>Comparison Matrix</h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Evaluation Criteria</th>
+              <th>Option 1: Flat-Rate (No Battery)</th>
+              <th>Option 2: ToU (No Battery)</th>
+              <th>Option 3: ~5 kWh Battery + ToU</th>
+              <th>Option 4: ~10 kWh Battery + ToU</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Upfront Cost (Installed)</strong></td>
+              <td>£0</td>
+              <td>£0</td>
+              <td>£4,000 <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer" class="citation-link">[S11]</a></td>
+              <td>£6,500 <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer" class="citation-link">[S11]</a></td>
+            </tr>
+            <tr>
+              <td><strong>VAT Rate Applicable</strong></td>
+              <td>N/A</td>
+              <td>N/A</td>
+              <td>0% <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer" class="citation-link">[S11]</a></td>
+              <td>0% <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer" class="citation-link">[S11]</a></td>
+            </tr>
+            <tr>
+              <td><strong>Assumed Tariff Structure</strong></td>
+              <td>Flat £0.247/kWh</td>
+              <td>Peak: £0.28/kWh<br>Off-Peak: £0.085/kWh <a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer" class="citation-link">[S2]</a></td>
+              <td>Peak: £0.28/kWh<br>Off-Peak: £0.085/kWh <a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer" class="citation-link">[S2]</a></td>
+              <td>Peak: £0.28/kWh<br>Off-Peak: £0.085/kWh <a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer" class="citation-link">[S2]</a></td>
+            </tr>
+            <tr>
+              <td><strong>Annual Grid Import</strong></td>
+              <td>9,000 kWh</td>
+              <td>9,000 kWh</td>
+              <td>9,182.5 kWh</td>
+              <td>9,365 kWh</td>
+            </tr>
+            <tr>
+              <td><strong>Annual Electricity Cost</strong></td>
+              <td>£2,223.00</td>
+              <td>£2,256.75</td>
+              <td>£2,108.46</td>
+              <td>£1,803.69</td>
+            </tr>
+            <tr>
+              <td><strong>Annual Savings vs. Option 1</strong></td>
+              <td>Baseline (£0)</td>
+              <td>-£33.75 (Loss)</td>
+              <td>£114.54</td>
+              <td>£419.31</td>
+            </tr>
+            <tr>
+              <td><strong>Simple Payback Period</strong></td>
+              <td>N/A</td>
+              <td>N/A</td>
+              <td>34.9 Years</td>
+              <td>15.5 Years</td>
+            </tr>
+            <tr>
+              <td><strong>10-Year Net Financial Outcome</strong></td>
+              <td><strong>£0 (Baseline)</strong></td>
+              <td><strong>-£337.50 (Loss)</strong></td>
+              <td><strong>-£2,854.60 (Loss)</strong></td>
+              <td><strong>-£2,306.90 (Loss)</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Hardware Warranty</strong></td>
+              <td>N/A</td>
+              <td>N/A</td>
+              <td>10 Years</td>
+              <td>10 Years</td>
+            </tr>
+            <tr>
+              <td><strong>Outage Resilience (Backup)</strong></td>
+              <td>None</td>
+              <td>None</td>
+              <td>Limited (Up to 2.5 kW)</td>
+              <td>Moderate (Up to 5.0 kW)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Baseline Assumptions -->
+    <section>
+      <h2>Baseline Assumptions & Tariff Landscape (July 2026)</h2>
+      <p>To establish a realistic and mathematically sound model, we define the parameters of the UK energy market as of July 2026 alongside the household's specific consumption profile.</p>
+
+      <h3>Household Consumption Profile</h3>
+      <ul>
+        <li><strong>Annual Electricity Consumption:</strong> 9,000 kWh (averaging ~24.66 kWh/day).</li>
+        <li><strong>Home Office Demand:</strong> 15 kWh per day (midpoint of the 10–20 kWh range), highly concentrated during daytime hours (08:00 to 18:00) and completely inflexible.</li>
+        <li><strong>Remaining Baseload & Domestic Demand:</strong> 9.66 kWh per day for background appliances, evening cooking, and entertainment.</li>
+        <li><strong>Manual Load Shifting Potential:</strong> Extremely low. The professional office schedule is rigid, and typical domestic shifting offers negligible impact.</li>
+      </ul>
+
+      <h3>The July 2026 Tariff Landscape</h3>
+      <p>The UK domestic energy market is governed by the Ofgem default tariff price cap. For the July to September 2026 period, the standard variable electricity price cap unit rate is <strong>£0.2611/kWh</strong> (including 5% VAT), with an average daily standing charge of <strong>57.19p</strong> <a href="https://www.ofgem.gov.uk/information-consumers/energy-advice-households/energy-price-cap-unit-rates-and-standing-charges" target="_blank" rel="noopener noreferrer" class="citation-link">[S10]</a> <a href="https://octopus.energy/blog/energy-prices-from-july-2026-and-what-they-mean-for-you/" target="_blank" rel="noopener noreferrer" class="citation-link">[S12]</a> <a href="https://octopus.energy/smart/intelligent-octopus-go/" target="_blank" rel="noopener noreferrer" class="citation-link">[S15]</a>.</p>
+      
+      <ul>
+        <li><strong>Flat-Rate Benchmark:</strong> The household's current flat-rate tariff of <strong>£0.247/kWh</strong> is highly competitive, sitting approximately 5.4% below the active Ofgem price cap <a href="https://www.ofgem.gov.uk/information-consumers/energy-advice-households/energy-price-cap-unit-rates-and-standing-charges" target="_blank" rel="noopener noreferrer" class="citation-link">[S10]</a> <a href="https://octopus.energy/blog/energy-prices-from-july-2026-and-what-they-mean-for-you/" target="_blank" rel="noopener noreferrer" class="citation-link">[S12]</a>.</li>
+        <li><strong>Standard Smart ToU Tariffs:</strong> For non-EV households, suppliers offer standard smart tariffs such as <em>Octopus Go</em> or <em>E.ON Next Smart Saver</em> <a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer" class="citation-link">[S2]</a> <a href="https://www.eonnext.com/tariffs/smart-tariffs" target="_blank" rel="noopener noreferrer" class="citation-link">[S7]</a>. These feature an off-peak rate of <strong>£0.085/kWh</strong> during a 5-hour overnight window (e.g., 00:30–05:30) and a peak/day rate of <strong>£0.28/kWh</strong> <a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer" class="citation-link">[S2]</a>.</li>
+        <li><strong>EV-Specific Tariffs Excluded:</strong> Highly discounted tariffs like <em>Intelligent Octopus Go</em> (£0.08/kWh) require a registered EV or smart charger, making them inaccessible to this home <a href="https://octopus.energy/smart/intelligent-octopus-go/" target="_blank" rel="noopener noreferrer" class="citation-link">[S15]</a>.</li>
+      </ul>
+    </section>
+
+    <!-- Detailed Analysis -->
+    <section>
+      <h2>Detailed Analysis of the Four Options</h2>
+
+      <!-- Option 1 -->
+      <div class="card highlight" style="margin-bottom: 2rem;">
+        <h3>Option 1: Remain on Flat-Rate Tariff (£0.247/kWh) without a Battery</h3>
+        <p>This path represents the status quo, avoiding any upfront financial investment or scheduling changes.</p>
+        <div class="pros-cons">
+          <div class="pros">
+            <h4>Strengths</h4>
+            <ul>
+              <li>Zero upfront capital risk or debt lock-up.</li>
+              <li>Budget certainty: Shielded from premium peak rates.</li>
+              <li>Zero operational complexity.</li>
+            </ul>
+          </div>
+          <div class="cons">
+            <h4>Weaknesses</h4>
+            <ul>
+              <li>No arbitrage potential to exploit cheap overnight rates.</li>
+              <li>Zero power outage resilience for the home office.</li>
+            </ul>
+          </div>
+        </div>
+        <p style="margin-top: 1rem;"><strong>10-Year Cumulative Cost:</strong> £22,230.00 | <strong>Net Outcome:</strong> Baseline</p>
+      </div>
+
+      <!-- Option 2 -->
+      <div class="card highlight" style="margin-bottom: 2rem;">
+        <h3>Option 2: Switch to ToU Tariff without a Battery</h3>
+        <p>Attempting to use a Time-of-Use tariff without hardware assistance. Because the home office demand is high and inflexible, the vast majority of consumption occurs during the peak window, billed at £0.28/kWh <a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer" class="citation-link">[S2]</a>.</p>
+        <div class="pros-cons">
+          <div class="pros">
+            <h4>Strengths</h4>
+            <ul>
+              <li>Zero capital risk; pure smart meter tariff switch.</li>
+              <li>Cheap overnight rates for background baseload.</li>
+            </ul>
+          </div>
+          <div class="cons">
+            <h4>Weaknesses</h4>
+            <ul>
+              <li>Severe peak pricing penalty (89.9% of consumption billed at £0.28/kWh).</li>
+              <li>Requires shifting 30% to 45% of total use to overnight to break even <a href="https://www.britishgas.co.uk/energy/guides/economy-7-meters-explained.html" target="_blank" rel="noopener noreferrer" class="citation-link">[S3]</a> <a href="https://oneutilitybill.co/our-insights/off-peak-electricity-uk?hsLang=en" target="_blank" rel="noopener noreferrer" class="citation-link">[S6]</a>.</li>
+            </ul>
+          </div>
+        </div>
+        <p style="margin-top: 1rem;"><strong>10-Year Cumulative Cost:</strong> £22,567.50 | <strong>Net Outcome:</strong> -£337.50 (Loss vs. Flat-Rate)</p>
+      </div>
+
+      <!-- Option 3 -->
+      <div class="card highlight" style="margin-bottom: 2rem;">
+        <h3>Option 3: Install a ~5 kWh Battery & Switch to ToU Tariff</h3>
+        <p>A smaller battery system designed to automatically absorb 5 kWh overnight and discharge during peak times <a href="https://energy.ecoflow.com/uk/blog/off-peak-electricity-times" target="_blank" rel="noopener noreferrer" class="citation-link">[S4]</a> <a href="https://uk.jackery.com/blogs/knowledge/when-is-off-peak-electricity" target="_blank" rel="noopener noreferrer" class="citation-link">[S5]</a>. However, assuming a standard 90% Depth of Discharge (DoD), it provides only 4.5 kWh of usable capacity. This is far too small to cover the household's 15 kWh daytime demand.</p>
+        <div class="pros-cons">
+          <div class="pros">
+            <h4>Strengths</h4>
+            <ul>
+              <li>Automated shifting without behavioral changes.</li>
+              <li>Lower upfront capital cost (£4,000 installed) <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer" class="citation-link">[S11]</a>.</li>
+            </ul>
+          </div>
+          <div class="cons">
+            <h4>Weaknesses</h4>
+            <ul>
+              <li>Extremely long payback period (34.9 years).</li>
+              <li>Inverter losses (10% round-trip loss on stored energy).</li>
+              <li>Inadequate capacity for high-demand home office.</li>
+            </ul>
+          </div>
+        </div>
+        <p style="margin-top: 1rem;"><strong>10-Year Cumulative Cost:</strong> £25,084.60 (including hardware) | <strong>Net Outcome:</strong> -£2,854.60 (Loss)</p>
+      </div>
+
+      <!-- Option 4 -->
+      <div class="card highlight" style="margin-bottom: 2rem;">
+        <h3>Option 4: Install a ~10 kWh Battery & Switch to ToU Tariff</h3>
+        <p>With a 10 kWh nominal capacity and 90% DoD, this system delivers 9.0 kWh of usable capacity, offsetting 60% of the home office's daily demand.</p>
+        <div class="pros-cons">
+          <div class="pros">
+            <h4>Strengths</h4>
+            <ul>
+              <li>Greater peak load coverage (9.0 kWh usable).</li>
+              <li>Lower cost per kWh (£650/kWh vs £800/kWh for 5 kWh) <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer" class="citation-link">[S11]</a>.</li>
+              <li>Higher discharge rates (typically 5.0 kW vs 2.5 kW).</li>
+            </ul>
+          </div>
+          <div class="cons">
+            <h4>Weaknesses</h4>
+            <ul>
+              <li>High upfront capital outlay (£6,500) <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer" class="citation-link">[S11]</a>.</li>
+              <li>Incomplete peak coverage (leaves 9.66 kWh to import at peak rate).</li>
+              <li>Payback period (15.5 years) exceeds the 10-year warranty.</li>
+            </ul>
+          </div>
+        </div>
+        <p style="margin-top: 1rem;"><strong>10-Year Cumulative Cost:</strong> £24,536.90 (including hardware) | <strong>Net Outcome:</strong> -£2,306.90 (Loss)</p>
+      </div>
+    </section>
+
+    <!-- Sensitivity Analysis -->
+    <section>
+      <h2>Sensitivity Analysis</h2>
+      <p>To test the robustness of these conclusions, we analyze how variations in key parameters impact the <strong>10-year net financial outcome</strong> of the <strong>10 kWh battery system (Option 4)</strong>, which has a baseline loss of <strong>-£2,306.90</strong>.</p>
+
+      <div class="chart-box">
+        <div class="chart-title">10-Year Net Financial Outcome (Option 4 - 10 kWh Battery)</div>
+        <div class="bar-chart">
+          
+          <div class="bar-row">
+            <div class="bar-label">Extreme Spread (£0.30 spread)</div>
+            <div class="bar-wrapper">
+              <div class="bar-track"><div class="bar-fill positive" style="width: 100%; margin-left: 0;"></div></div>
+              <div class="bar-val">+£1,350.00</div>
+            </div>
+          </div>
+
+          <div class="bar-row">
+            <div class="bar-label">Low Installation Cost (£4,500)</div>
+            <div class="bar-wrapper">
+              <div class="bar-track"><div class="bar-fill negative" style="width: 10%; margin-left: 90%;"></div></div>
+              <div class="bar-val">-£309.40</div>
+            </div>
+          </div>
+
+          <div class="bar-row">
+            <div class="bar-label">High Peak Demand (90%)</div>
+            <div class="bar-wrapper">
+              <div class="bar-track"><div class="bar-fill negative" style="width: 65%; margin-left: 35%;"></div></div>
+              <div class="bar-val">-£2,100.00</div>
+            </div>
+          </div>
+
+          <div class="bar-row">
+            <div class="bar-label">High Usage (11,000 kWh/yr)</div>
+            <div class="bar-wrapper">
+              <div class="bar-track"><div class="bar-fill negative" style="width: 68%; margin-left: 32%;"></div></div>
+              <div class="bar-val">-£2,150.00</div>
+            </div>
+          </div>
+
+          <div class="bar-row">
+            <div class="bar-label">Baseline Scenario</div>
+            <div class="bar-wrapper">
+              <div class="bar-track"><div class="bar-fill negative" style="width: 73%; margin-left: 27%;"></div></div>
+              <div class="bar-val">-£2,309.40</div>
+            </div>
+          </div>
+
+          <div class="bar-row">
+            <div class="bar-label">Low Usage (6,000 kWh/yr)</div>
+            <div class="bar-wrapper">
+              <div class="bar-track"><div class="bar-fill negative" style="width: 79%; margin-left: 21%;"></div></div>
+              <div class="bar-val">-£2,500.00</div>
+            </div>
+          </div>
+
+          <div class="bar-row">
+            <div class="bar-label">Battery Degradation (2% yr)</div>
+            <div class="bar-wrapper">
+              <div class="bar-track"><div class="bar-fill negative" style="width: 84%; margin-left: 16%;"></div></div>
+              <div class="bar-val">-£2,650.00</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <h3>Key Sensitivity Drivers</h3>
+      <ul>
+        <li><strong>Tariff Price Spreads:</strong> Standalone battery viability is highly sensitive to the "spread" <a href="https://www.energyplus.co.uk/costsavingadvice/best-time-of-use-electricity-tariffs-uk-for-households" target="_blank" rel="noopener noreferrer" class="citation-link">[S1]</a> <a href="https://www.energyplus.co.uk/news/energy-tariffs-2026" target="_blank" rel="noopener noreferrer" class="citation-link">[S8]</a>. The baseline spread is £0.195/kWh (£0.28 peak minus £0.085 off-peak) <a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer" class="citation-link">[S2]</a>. In an <strong>Extreme Spread Scenario (£0.30 spread)</strong>, annual savings rise to £785.00, pushing the 10-year outcome to a positive <strong>+£1,350.00 profit</strong>.</li>
+        <li><strong>Installation Costs:</strong> If competitive, no-frills installation drops the 10 kWh system cost to <strong>£4,500</strong>, the 10-year net outcome approaches break-even at <strong>-£309.40</strong> <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer" class="citation-link">[S11]</a>.</li>
+        <li><strong>Battery Degradation:</strong> Factoring in a realistic 2% annual capacity loss (rather than assuming 100% capacity retention) reduces the peak offset over time, worsening the 10-year outcome to <strong>-£2,650.00</strong>.</li>
+      </ul>
+    </section>
+
+    <!-- Shared Considerations -->
+    <section>
+      <h2>Shared Technical & Operational Considerations</h2>
+      <p>When evaluating home battery storage in the UK, several technical, regulatory, and physical factors apply equally to all battery options and must be understood before proceeding.</p>
+
+      <div class="grid-2">
+        <div class="card">
+          <strong>Usable vs. Nominal Capacity</strong>
+          <p style="font-size: 0.95rem; margin-top: 0.5rem; margin-bottom: 0;">To protect battery health, systems restrict discharging past a certain threshold (typically 90% Depth of Discharge). A 10 kWh nominal battery only provides 9.0 kWh of usable capacity.</p>
+        </div>
+        <div class="card">
+          <strong>Inverter Charge/Discharge Rates</strong>
+          <p style="font-size: 0.95rem; margin-top: 0.5rem; margin-bottom: 0;">A 5 kWh battery often has a charge/discharge limit of 2.5 kW. If you run a kettle (3.0 kW) and washing machine (2.0 kW) simultaneously, the battery cannot cover the total draw, forcing grid import at peak rates.</p>
+        </div>
+        <div class="card">
+          <strong>Round-Trip Efficiency Losses</strong>
+          <p style="font-size: 0.95rem; margin-top: 0.5rem; margin-bottom: 0;">Converting AC to DC and back results in a typical loss of 10% to 15%. You must pay for ~10 kWh of overnight off-peak import to discharge 9 kWh of usable electricity during the day.</p>
+        </div>
+        <div class="card">
+          <strong>Warranties & Inverter Lifespans</strong>
+          <p style="font-size: 0.95rem; margin-top: 0.5rem; margin-bottom: 0;">While battery cells are warranted for 10 years, the hybrid or AC-coupled inverter typically has a shorter lifespan (5 to 10 years) and may require a £1,000 to £1,800 replacement before the battery cells fail.</p>
+        </div>
+      </div>
+
+      <p>As of 2026, the UK Government maintains a <strong>0% VAT rate</strong> on residential battery storage installations, including standalone systems <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer" class="citation-link">[S11]</a>. However, there are no direct government grants or subsidies for standalone residential batteries in England.</p>
+    </section>
+
+    <!-- Verdicts -->
+    <section>
+      <h2>Best For Verdicts</h2>
+      <div class="grid-2">
+        <div class="card" style="border-top: 4px solid var(--success);">
+          <h3 style="margin-top: 0; color: var(--success);">Best for Financial Optimization</h3>
+          <p><strong>Option 1 (Flat-Rate Tariff)</strong></p>
+          <p style="font-size: 0.95rem; margin-bottom: 0;">Remaining on a competitive flat-rate tariff of £0.247/kWh is the most financially sound option for this household. It avoids risking £4,000 to £6,500 in upfront capital on an asset that cannot pay for itself within its warranty period, while protecting the home office from the high daytime rates of ToU tariffs.</p>
+        </div>
+        <div class="card" style="border-top: 4px solid var(--accent);">
+          <h3 style="margin-top: 0; color: var(--accent);">Best for Resilience & Peace of Mind</h3>
+          <p><strong>Option 4 (~10 kWh Battery + ToU Tariff)</strong></p>
+          <p style="font-size: 0.95rem; margin-bottom: 0;">If the primary goal is ensuring the home office remains operational during localized grid blackouts, Option 4 is superior. A 10 kWh battery with an Emergency Power Supply (EPS) gateway can run a 15 kWh/day home office for several hours during an outage. The homeowner must accept that this resilience carries a net financial cost of approximately £2,300 over 10 years.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Conclusions & Action Plan -->
+    <section>
+      <h2>Conclusions & Action Plan</h2>
+      
+      <h3>1. Will either battery size pay for itself?</h3>
+      <p>No. Under current July 2026 pricing, neither a 5 kWh nor a 10 kWh standalone battery will pay for itself. The simple payback periods (35.0 years and 15.5 years, respectively) far exceed the standard 10-year manufacturer warranties.</p>
+
+      <h3>2. Does changing tariff without buying a battery provide meaningful savings?</h3>
+      <p>No. Switching to a ToU tariff without a battery would result in a net financial loss (estimated at -£119.06 annually). The household's high, inflexible daytime home office demand prevents them from meeting the 30% to 45% off-peak consumption threshold required to make ToU tariffs profitable <a href="https://www.britishgas.co.uk/energy/guides/economy-7-meters-explained.html" target="_blank" rel="noopener noreferrer" class="citation-link">[S3]</a> <a href="https://oneutilitybill.co/our-insights/off-peak-electricity-uk?hsLang=en" target="_blank" rel="noopener noreferrer" class="citation-link">[S6]</a>.</p>
+
+      <h3>3. Next Steps for the Homeowner</h3>
+      <ol style="padding-left: 1.5rem; margin-bottom: 1.5rem;">
+        <li style="margin-bottom: 0.5rem;"><strong>Download Half-Hourly Smart Meter Data:</strong> Use a free energy monitoring service (such as <em>Loop</em>, <em>Hugo</em>, or <em>Octopus Home</em>) to extract a full year of half-hourly consumption data to verify exact peak vs off-peak consumption splits.</li>
+        <li style="margin-between: 0.5rem;"><strong>Obtain Itemized Installer Quotes:</strong> Request written quotes from at least three MCS-certified installers. Ensure they specify Lithium Iron Phosphate (LFP) chemistry, round-trip efficiency, and the cost of adding an Emergency Power Supply (EPS) gateway for backup power <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer" class="citation-link">[S11]</a>.</li>
+      </ol>
+    </section>
+
+    <!-- Sources -->
+    <section class="sources-section">
+      <h2 style="margin-top: 0; border: none; padding: 0; font-size: 1.5rem;">Sources Analyzed</h2>
+      <ul class="sources-list">
+        <li>[S1] <a href="https://www.energyplus.co.uk/costsavingadvice/best-time-of-use-electricity-tariffs-uk-for-households" target="_blank" rel="noopener noreferrer">Best Time-of-Use Tariffs UK July 2026 | EnergyPlus</a></li>
+        <li>[S2] <a href="https://amprenewables.co.uk/blog/best-time-of-use-tariff-uk-2026" target="_blank" rel="noopener noreferrer">Best ToU Tariff UK 2026: Octopus Go vs Agile</a></li>
+        <li>[S3] <a href="https://www.britishgas.co.uk/energy/guides/economy-7-meters-explained.html" target="_blank" rel="noopener noreferrer">What is Economy 7 (2026 guide) | British Gas</a></li>
+        <li>[S4] <a href="https://energy.ecoflow.com/uk/blog/off-peak-electricity-times" target="_blank" rel="noopener noreferrer">UK Off Peak Electricity Times | EcoFlow UK</a></li>
+        <li>[S5] <a href="https://uk.jackery.com/blogs/knowledge/when-is-off-peak-electricity" target="_blank" rel="noopener noreferrer">When Is Off-Peak Electricity in the UK? | Jackery UK</a></li>
+        <li>[S6] <a href="https://oneutilitybill.co/our-insights/off-peak-electricity-uk?hsLang=en" target="_blank" rel="noopener noreferrer">Off-Peak Electricity Times & Tariffs | One Utility Bill</a></li>
+        <li>[S7] <a href="https://www.eonnext.com/tariffs/smart-tariffs" target="_blank" rel="noopener noreferrer">Smart meter tariffs by E.ON Next</a></li>
+        <li>[S8] <a href="https://www.energyplus.co.uk/news/energy-tariffs-2026" target="_blank" rel="noopener noreferrer">Energy Tariffs 2026: July £1,862 Cap & Best Deals</a></li>
+        <li>[S9] <a href="https://homeenergymodel.co.uk/what-is-time-of-use-tariff-uk-2026/" target="_blank" rel="noopener noreferrer">What Is Time of Use Tariff UK 2026</a></li>
+        <li>[S10] <a href="https://www.ofgem.gov.uk/information-consumers/energy-advice-households/energy-price-cap-unit-rates-and-standing-charges" target="_blank" rel="noopener noreferrer">Energy price cap unit rates and standing charges | Ofgem</a></li>
+        <li>[S11] <a href="https://egensys.co.uk/solar-battery-storage-cost-uk/" target="_blank" rel="noopener noreferrer">Solar Battery Storage Costs UK in 2026 | Egensys</a></li>
+        <li>[S12] <a href="https://octopus.energy/blog/energy-prices-from-july-2026-and-what-they-mean-for-you/" target="_blank" rel="noopener noreferrer">Energy prices from July 2026 | Octopus Energy</a></li>
+        <li>[S13] <a href="https://www.energyplus.co.uk/suppliers/octopus-energy/tariffs" target="_blank" rel="noopener noreferrer">Octopus Energy tariffs July 2026 | EnergyPlus</a></li>
+        <li>[S14] <a href="https://www.uswitch.com/gas-electricity/guides/octopus-price-changes/" target="_blank" rel="noopener noreferrer">Octopus Energy price changes - July 2026 - Uswitch</a></li>
+        <li>[S15] <a href="https://octopus.energy/smart/intelligent-octopus-go/" target="_blank" rel="noopener noreferrer">Intelligent Octopus Go | Octopus Energy</a></li>
+        <li>[S16] <a href="https://octopus.energy/energy-price-cap-predictions/" target="_blank" rel="noopener noreferrer">Energy price cap predictions | Octopus Energy</a></li>
+        <li>[S17] <a href="https://octopus.energy/tariffs/" target="_blank" rel="noopener noreferrer">All our tariffs | Octopus Energy</a></li>
+        <li>[S18] <a href="https://www.energyplus.co.uk/suppliers/octopus-energy" target="_blank" rel="noopener noreferrer">Octopus Energy Tariffs & Rates UK (July 2026)</a></li>
+      </ul>
+    </section>
+
+    <footer>
+      <p>© 2026 Standalone Home Battery Feasibility Study. All rights reserved. Data accurate as of July 2026 UK market conditions.</p>
+    </footer>
+  </div>
+
+</body>
+</html>

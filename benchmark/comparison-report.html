@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research benchmark — home battery without solar</title>
+<style>
+  :root {
+    --bg: #f4f1ea;
+    --card: #fbfaf6;
+    --ink: #23201a;
+    --muted: #6b6459;
+    --line: #e0dace;
+    --accent: #b58b00;
+    --good: #2f7d4f;
+    --bad: #b23b3b;
+    --warn: #b57a12;
+    --v1: #8a7f6a;
+    --v2: #3a6ea5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 24px 96px; }
+  header.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 20px; margin-bottom: 8px; }
+  .eyebrow { font: 600 12px/1.4 ui-monospace, "SFMono-Regular", Menlo, monospace; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-size: 30px; line-height: 1.2; margin: 8px 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 22px; margin: 48px 0 14px; padding-top: 8px; border-top: 1px solid var(--line); letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 28px 0 8px; }
+  p { margin: 12px 0; }
+  .lede { font-size: 18px; color: var(--muted); max-width: 70ch; }
+  .muted { color: var(--muted); }
+  a { color: var(--accent); }
+
+  .grid { display: grid; gap: 16px; }
+  .cards3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 720px) { .cards3 { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .card .big { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+  .card .lbl { font: 600 11px/1.3 ui-monospace, Menlo, monospace; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14.5px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #efe9dc; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.total td { font-weight: 700; background: #f3eede; }
+  .model { font-weight: 600; white-space: nowrap; }
+
+  .tag { display: inline-block; font: 600 11px/1 ui-monospace, Menlo, monospace; padding: 3px 7px; border-radius: 5px; letter-spacing: 0.03em; vertical-align: middle; }
+  .tag.v1 { background: #ece6d8; color: var(--v1); border: 1px solid #d9d1bf; }
+  .tag.v2 { background: #e2ecf6; color: var(--v2); border: 1px solid #c6d9ec; }
+  .good { color: var(--good); font-weight: 600; }
+  .bad { color: var(--bad); font-weight: 600; }
+  .warn { color: var(--warn); font-weight: 600; }
+  .delta-good { color: var(--good); }
+  .delta-bad { color: var(--bad); }
+
+  .callout { background: #fff8e2; border: 1px solid #ecd98c; border-left: 4px solid var(--accent); border-radius: 8px; padding: 14px 18px; margin: 20px 0; }
+  .callout h3 { margin-top: 0; }
+  .note { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin: 14px 0; font-size: 14.5px; }
+
+  ul.tight { margin: 10px 0; padding-left: 22px; }
+  ul.tight li { margin: 5px 0; }
+  .foot { margin-top: 60px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .verdict-row td:first-child { font-weight: 600; }
+  code { background: #ece6d8; padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <div class="eyebrow">Research engine benchmark · lemon-chat</div>
+  <h1>Home battery without solar — model &amp; algorithm comparison</h1>
+  <p class="lede">The same research prompt was run through five models, on two versions of the research
+  engine. This report compares the models against each other, and the original algorithm against v2.</p>
+</header>
+
+<p class="muted" style="margin-top:20px">
+  <strong>The task.</strong> A UK household using ~9,000 kWh/yr on a flat 24.7p/kWh tariff, with a high
+  daytime home-office load and no plans for solar, asks whether a home battery is financially worthwhile.
+  Compare four options — stay flat-rate, switch to time-of-use (ToU) without a battery, add a ~5&nbsp;kWh
+  battery, add a ~10&nbsp;kWh battery — with payback, 10-year net outcome, and sensitivity analysis.
+  It is a hard, numeric, citation-heavy question with a genuinely non-obvious answer.
+</p>
+
+<div class="callout">
+  <h3>Headline finding</h3>
+  <p style="margin-bottom:6px"><strong>On substance, both algorithm versions agree, and so do 4 of the 5 models:</strong>
+  a battery does <em>not</em> pay back within 10 years; the best financial move is switching tariff, not buying hardware.
+  The answer is robust to the algorithm change.</p>
+  <p style="margin:6px 0 0"><strong>The algorithm change mainly fixed <em>efficiency</em>, not conclusions.</strong>
+  In the old engine the reasoning models (gpt-5.6-luna, gpt-5.6-terra) never self-terminated — they ran to the 8-round
+  ceiling every time. In v2 the stop-check fires, so they stop when the evidence is sufficient. That roughly
+  <strong>halved runtime and cost</strong> for the expensive models with no loss of quality.</p>
+</div>
+
+<h2>1 · Run cost &amp; effort — old vs v2</h2>
+<p>Same models, same prompt, effort 3, 600&nbsp;s / 8-round ceiling in both. The old figures come from each run's
+<code>info.json</code>; the v2 figures from <code>meta.json</code>.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Model</th>
+      <th class="num">Rounds<br>old → v2</th>
+      <th class="num">Time (s)<br>old → v2</th>
+      <th class="num">Cost (USD)<br>old → v2</th>
+      <th class="num">URLs read<br>old → v2</th>
+      <th class="num">Findings<br>old → v2</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="model">claude-sonnet-4.6</td>
+      <td class="num">3 → 3</td>
+      <td class="num">827 → 665 <span class="delta-good">−20%</span></td>
+      <td class="num">1.39 → 1.17 <span class="delta-good">−16%</span></td>
+      <td class="num">30 → 27</td>
+      <td class="num">30 → 26</td>
+    </tr>
+    <tr>
+      <td class="model">gemini-3.5-flash</td>
+      <td class="num">2 → 2</td>
+      <td class="num">106 → 109</td>
+      <td class="num">0.44 → 0.35 <span class="delta-good">−20%</span></td>
+      <td class="num">21 → 21</td>
+      <td class="num">18 → 18</td>
+    </tr>
+    <tr>
+      <td class="model">gemma4-31b <span class="muted">(local)</span></td>
+      <td class="num">6 → 2 <span class="delta-good">◀</span></td>
+      <td class="num">717 → 257 <span class="delta-good">−64%</span></td>
+      <td class="num">— (local)</td>
+      <td class="num">57 → 21</td>
+      <td class="num">47 → 18</td>
+    </tr>
+    <tr>
+      <td class="model">gpt-5.6-luna</td>
+      <td class="num">8 → 7</td>
+      <td class="num">661 → 445 <span class="delta-good">−33%</span></td>
+      <td class="num">1.60 → 0.90 <span class="delta-good">−44%</span></td>
+      <td class="num">69 → 66</td>
+      <td class="num">61 → 56</td>
+    </tr>
+    <tr>
+      <td class="model">gpt-5.6-terra</td>
+      <td class="num">8 → 6 <span class="delta-good">◀</span></td>
+      <td class="num">714 → 373 <span class="delta-good">−48%</span></td>
+      <td class="num">3.76 → 1.44 <span class="delta-good">−62%</span></td>
+      <td class="num">75 → 38</td>
+      <td class="num">69 → 33</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Reading the table.</strong> The old engine's two heaviest runs — gpt-5.6-terra at $3.76 and gpt-5.6-luna
+at $1.60 — both hit the <strong>8-round maximum</strong>, meaning they never decided they were done; they were cut
+off by the ceiling. gemma likewise ran 6 rounds. In v2 every model stops on its own terms
+(<code>meta.json → stop_reason</code>), and terra's run even ended on <em>"consecutive empty rounds — writing
+report with findings so far"</em>, the exact safety-valve the stop-check provides. The result is a 33–64% cut in
+wall-clock time and up to 62% cut in cost for the reasoning models, while the cheap/fast models (gemini, claude)
+were already terminating early and barely moved.</p>
+
+<div class="note">
+  <strong>Why this maps to a real fix.</strong> The v2 runs were produced after the commit
+  <em>"Fix research stop-check never firing with reasoning worker models."</em> gpt-5.6-luna and gpt-5.6-terra are
+  reasoning models; in the old engine they exhibit exactly the broken-stop-check symptom (always run to the round
+  ceiling). In v2 they stop early. This is the single clearest behavioural difference between the two datasets.
+</div>
+
+<h2>2 · What each model concluded</h2>
+<p>Despite the numbers moving around, the qualitative verdict is stable across both versions for four of the five
+models. The recommended action and the "does a battery pay back?" answer are shown below.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Model</th>
+      <th>Version</th>
+      <th>Battery pays back in 10y?</th>
+      <th>Best financial option</th>
+      <th class="num">10&nbsp;kWh payback</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="model" rowspan="2">claude-sonnet-4.6</td>
+      <td><span class="tag v1">old</span></td><td><span class="bad">No</span></td><td>Stay on flat rate (ToU alone <em>costs</em> +£270/yr)</td><td class="num">~32 yr</td></tr>
+    <tr><td><span class="tag v2">v2</span></td><td><span class="bad">No</span></td><td>Switch to ToU tariff (saves £100–320/yr)</td><td class="num">~19 yr</td></tr>
+
+    <tr><td class="model" rowspan="2">gemini-3.5-flash</td>
+      <td><span class="tag v1">old</span></td><td><span class="bad">No</span></td><td>Stay on flat rate (ToU alone −£295/yr)</td><td class="num">27.6 yr</td></tr>
+    <tr><td><span class="tag v2">v2</span></td><td><span class="bad">No</span></td><td>Stay on flat rate (ToU alone −£34 to −£119/yr)</td><td class="num">15.5 yr</td></tr>
+
+    <tr><td class="model" rowspan="2">gemma4-31b</td>
+      <td><span class="tag v1">old</span></td><td class="warn">Yes — 10&nbsp;kWh (outlier)</td><td>Install 10&nbsp;kWh battery (+£1,300 / 10&nbsp;yr)</td><td class="num">8.2 yr</td></tr>
+    <tr><td><span class="tag v2">v2</span></td><td class="warn">Yes — 10&nbsp;kWh (outlier)</td><td>Install 10&nbsp;kWh battery (+£2,700 / 10&nbsp;yr)</td><td class="num">6.7 yr</td></tr>
+
+    <tr><td class="model" rowspan="2">gpt-5.6-luna</td>
+      <td><span class="tag v1">old</span></td><td><span class="bad">No</span></td><td>Switch tariff first; 5&nbsp;kWh is the better battery</td><td class="num">21.3 yr</td></tr>
+    <tr><td><span class="tag v2">v2</span></td><td><span class="bad">No</span></td><td>Switch tariff first (saves ~£198/yr)</td><td class="num">~long</td></tr>
+
+    <tr><td class="model" rowspan="2">gpt-5.6-terra</td>
+      <td><span class="tag v1">old</span></td><td><span class="bad">No</span></td><td>Switch tariff first (saves £150–290/yr) ★★★★★</td><td class="num">~20 yr</td></tr>
+    <tr><td><span class="tag v2">v2</span></td><td><span class="bad">No</span></td><td>Switch tariff first (saves ~£330/yr)</td><td class="num">~30 yr</td></tr>
+  </tbody>
+</table>
+
+<h3>The consensus (8 of 10 runs)</h3>
+<ul class="tight">
+  <li>A standalone battery <strong>does not repay its capital within 10 years</strong> through tariff arbitrage at
+  realistic installed prices (£4k for 5&nbsp;kWh, £5.5–6.5k for 10&nbsp;kWh). Paybacks cluster at 15–32 years.</li>
+  <li>The <strong>highest-value action is a tariff change</strong>, which is free and reversible. The battery is a
+  secondary, contingent decision that only works with unusually low install quotes and/or a wide, durable price spread.</li>
+  <li>The household's <strong>daytime-heavy, inflexible load is a structural disadvantage</strong> — a point every
+  capable model raised: a battery earns most when it displaces expensive <em>evening peak</em> imports, and this
+  household's demand is midday.</li>
+</ul>
+
+<div class="callout">
+  <h3>The two genuine divergences</h3>
+  <p style="margin-bottom:8px"><strong>1. gemma4-31b is the persistent outlier — in both versions.</strong> It alone
+  concludes the 10&nbsp;kWh battery is a clear winner (+£1,300 old, +£2,700 v2, 6.7–8.2&nbsp;yr payback). The error is
+  the same in both runs: it credits the battery with a near-daily full cycle at the full peak-to-offpeak spread
+  (~£730–820/yr) while under-charging the household for the large daytime load the battery <em>cannot</em> buffer.
+  The algorithm change did not fix this — it's a model-reasoning limitation, and v2 gemma is actually
+  <em>more</em> over-optimistic than old gemma.</p>
+  <p style="margin:0"><strong>2. "Does switching tariff alone save money?" is the real point of contention</strong> — and
+  it is driven by a modelling <em>assumption</em>, not the engine. Models that assume a 2-tier ToU tariff with a
+  punitive ~30p daytime rate (old claude, both geminis) find switching <em>costs</em> this daytime-heavy household
+  money. Models that assume a 3-tier tariff with a benign ~24.5p shoulder rate and a narrow evening peak (both GPTs,
+  and v2 claude) find switching <em>saves</em> £150–330/yr. This is the single largest sensitivity in the whole
+  question, and the better reports (gpt-terra, v2 claude) call it out explicitly.</p>
+</div>
+
+<h3>Notable old→v2 shift: claude flipped the tariff verdict</h3>
+<p>The clearest content change between versions is claude: the old run modelled Octopus Go at 8.5p/30.1p and concluded
+switching tariff would <em>add</em> £270/yr; the v2 run used the actual price-cap-aligned 7p/26.11p figures and
+concluded switching <em>saves</em> £100–320/yr — moving claude into line with the gpt consensus that "switch tariff
+first" is the answer. This is a swing in the recommended action, though it stems from the tariff data selected in each
+run rather than a proven, deterministic engine change, so treat it as suggestive rather than causal.</p>
+
+<h2>3 · Report quality &amp; length</h2>
+<p>Word counts of the final markdown reports, with a note on structure.</p>
+
+<table>
+  <thead>
+    <tr><th>Model</th><th class="num">Words old → v2</th><th class="num">Citations old → v2</th><th>Structure &amp; notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="model">claude-sonnet-4.6</td><td class="num">9,156 → 8,723</td><td class="num">87 → 71</td><td>Prose-led "evidence for / against / verdict" essay; no comparison table but the most rigorously reasoned arithmetic. Highest-quality analysis of the set.</td></tr>
+    <tr><td class="model">gemini-3.5-flash</td><td class="num">4,309 → 6,416</td><td class="num">54 → 57</td><td>Clean 4-option comparison table + per-option strengths/weaknesses. v2 is notably longer and shows fully-worked LaTeX maths.</td></tr>
+    <tr><td class="model">gemma4-31b</td><td class="num">6,858 → 3,844</td><td class="num">137 → 51</td><td>Well-formatted but numerically unreliable (see divergences). v2 is much shorter (2 rounds vs 6) and no more accurate.</td></tr>
+    <tr><td class="model">gpt-5.6-luna</td><td class="num">17,193 → 14,633</td><td class="num">185 → 169</td><td>Exhaustive, heavily-tabulated, careful about round-trip losses and utilisation. Longest reports; occasionally over-long.</td></tr>
+    <tr><td class="model">gpt-5.6-terra</td><td class="num">16,392 → 10,623</td><td class="num">207 → 101</td><td>Best executive framing (star-rated option table, explicit "£90/yr per 1p/kWh"). v2 is ~35% shorter for the same verdict — a positive of the earlier stop.</td></tr>
+  </tbody>
+</table>
+
+<p>The length reductions in v2 (terra −35%, gemma −44%) track the reduced round counts. Importantly, the shorter v2
+reports do not drop any of the required deliverables — every v2 report still covers all four options, the three usage
+sensitivities, payback, 10-year outcome, and a pre-purchase checklist. Shorter here means less padding, not less
+substance.</p>
+
+<h2>4 · v2 engine also produces far richer telemetry</h2>
+<p>Beyond the conclusions, the v2 runs ship a full audit trail that the old runs lack — consistent with the engine's
+checkpoint-and-resume design:</p>
+<div class="grid cards3">
+  <div class="card"><div class="lbl">Per-round reports</div><div class="big">✓</div><p class="muted" style="margin:4px 0 0;font-size:13px"><code>reports/NNN-round-NN.md</code> — the evolving report after each round, plus <code>plan.txt</code>.</p></div>
+  <div class="card"><div class="lbl">State snapshots</div><div class="big">✓</div><p class="muted" style="margin:4px 0 0;font-size:13px"><code>snapshots/*.json</code> — full checkpoint after planning and every round (crash recovery).</p></div>
+  <div class="card"><div class="lbl">Event stream</div><div class="big">✓</div><p class="muted" style="margin:4px 0 0;font-size:13px"><code>events.jsonl</code> — timestamped phase log: planning → searching → reading → analyzing → deciding → writing.</p></div>
+</div>
+<p style="margin-top:16px">The event logs are what let us confirm the round story precisely: gpt-5.6-luna logged 7 deciding
+phases across 7 rounds, gpt-5.6-terra logged a <code>warning</code> phase (the empty-round trip) before writing, and
+the fast models logged a single decide-then-write. The old runs expose only the final report and an
+<code>info.json</code> summary.</p>
+
+<h2>5 · Verdict on the algorithm change</h2>
+<div class="callout">
+  <p style="margin-top:0"><strong>v2 is a clear improvement, and a low-risk one.</strong> It preserves the substantive
+  answer (battery not worthwhile; switch tariff) while fixing the reasoning-model stop-check that was burning rounds,
+  time and money. For the two most expensive models it cut cost by 44–62% and time by 33–48% with no quality
+  regression, and it adds the checkpoint/telemetry needed for crash recovery and debugging.</p>
+  <p style="margin-bottom:0"><strong>What v2 did <em>not</em> fix, and can't:</strong> gemma4-31b's over-optimistic
+  battery arithmetic is a model limitation, unchanged across versions. And the biggest source of answer-to-answer
+  variation — whether a bare tariff switch helps — comes from the tariff <em>assumptions</em> each run picks up, not
+  from the engine. If more consistency is wanted there, the lever is prompting the model to state and sensitivity-test
+  its assumed peak/shoulder/off-peak structure, which the strongest reports already do voluntarily.</p>
+</div>
+
+<div class="foot">
+  Generated from <code>benchmark/old_algorithm/</code> and <code>benchmark/algorithm_v2/</code>.
+  Old-run metrics from each <code>info.json</code>; v2 metrics from <code>meta.json</code>. Financial figures quoted
+  verbatim from each model's final report. "Best financial option" reflects each report's own stated recommendation.
+</div>
+
+</div>
+</body>
+</html>

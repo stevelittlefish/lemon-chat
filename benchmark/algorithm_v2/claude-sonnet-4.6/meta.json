@@ -1,0 +1,21 @@
+{
+  "job_id": 33,
+  "model": "anthropic/claude-sonnet-4.6",
+  "mode": "research",
+  "effort": 3,
+  "synthesis_tokens": 8192,
+  "final_report_tokens": 32768,
+  "min_rounds": 2,
+  "max_rounds": 8,
+  "max_time_seconds": 600,
+  "locale": "Europe/London",
+  "git_commit": "unknown",
+  "started_at": "2026-07-15T01:07:18Z",
+  "status": "done",
+  "stop_reason": "YES — Every sub-question in the research plan has supporting evidence in the working summary; remaining gaps (live installer quotes, real-time tariff rates, personal half-hourly consumption data) are private or proprietary facts that web search cannot resolve.",
+  "rounds_completed": 3,
+  "elapsed_ms": 665152,
+  "findings_count": 26,
+  "price_usd": 1.1679509999999997,
+  "ended_at": "2026-07-15T01:29:03Z"
+}

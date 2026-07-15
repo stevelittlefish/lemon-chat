@@ -1,0 +1,30 @@
+{"ts":"2026-07-15T00:50:38.172654344Z","phase":"planning"}
+{"ts":"2026-07-15T00:50:44.316755869Z","phase":"planning","message":"plan ready — Sub-questions: What are the current 2026 UK time-of-use (ToU) electricity tariffs, specifically the price spread between off-peak and peak rates?; What is the current average installed cost for 5kWh and 10kWh home battery systems in England as of July 2026?; What are the typical round-trip efficiency losses and annual degradation rates for modern lithium-ion home batteries?; Based on a 9,000 kWh annual load with high daytime office usage, what is the realistic daily cycle capacity for 5kWh vs 10kWh batteries?; Are there any current UK government grants, VAT reductions, or incentives for battery storage installed without solar PV?\nKey topics: Time-of-Use (ToU) Tariff Analysis, Battery CAPEX and Installation Costs, Energy Arbitrage Modeling (Charge/Discharge cycles), Technical Performance (Efficiency, Degradation, Usable Capacity), Financial Metrics (Simple Payback, 10-year NPV, Sensitivity Analysis), Consumption Profiling (Home Office impact vs. Baseline)\nSuccess: A detailed financial model comparing four scenarios with a 10-year net outcome, supported by 2026 pricing and technical data, including a sensitivity analysis for usage and tariff volatility."}
+{"ts":"2026-07-15T00:50:44.847400107Z","phase":"planning","message":"report category: comparison"}
+{"ts":"2026-07-15T00:50:47.227435435Z","phase":"searching","round":1}
+{"ts":"2026-07-15T00:50:50.299364927Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:50:50.299570505Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:50:50.299803238Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:50:50.345733767Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:51:09.495896543Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:51:12.278726312Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:51:15.698608696Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:51:24.373931749Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:51:24.427830579Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:51:28.517109667Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:51:30.067831574Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:51:34.606378219Z","phase":"reading","round":1}
+{"ts":"2026-07-15T00:51:47.223426196Z","phase":"analyzing","round":1}
+{"ts":"2026-07-15T00:52:21.119782094Z","phase":"searching","round":2}
+{"ts":"2026-07-15T00:52:24.156559306Z","phase":"reading","round":2}
+{"ts":"2026-07-15T00:52:24.156779373Z","phase":"reading","round":2}
+{"ts":"2026-07-15T00:52:24.156940695Z","phase":"reading","round":2}
+{"ts":"2026-07-15T00:52:40.357439681Z","phase":"reading","round":2}
+{"ts":"2026-07-15T00:52:45.022985029Z","phase":"reading","round":2}
+{"ts":"2026-07-15T00:52:49.330828323Z","phase":"reading","round":2}
+{"ts":"2026-07-15T00:52:58.82744484Z","phase":"reading","round":2}
+{"ts":"2026-07-15T00:53:02.82255223Z","phase":"reading","round":2}
+{"ts":"2026-07-15T00:53:06.909530257Z","phase":"reading","round":2}
+{"ts":"2026-07-15T00:53:18.028126156Z","phase":"analyzing","round":2}
+{"ts":"2026-07-15T00:53:54.246637795Z","phase":"deciding","round":2,"message":"YES — All sub-questions and success criteria have been addressed with 2026-specific data; remaining gaps (exact quotes/personal data) are explicitly noted as requiring the homeowner's own action."}
+{"ts":"2026-07-15T00:53:54.256047156Z","phase":"writing"}
