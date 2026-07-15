@@ -238,9 +238,13 @@ func writeResearchBundle(dst io.Writer, job *store.ResearchJob, reports []store.
 
 // writeResearchDebugBundle zips the on-disk diagnostic run-log directory for a
 // job (events.jsonl, per-round snapshots and reports, meta.json, and llm.jsonl
-// when captured) under a single root folder. Files are read into memory — a
-// run-log is small — and stored uncompressed via the shared bundle writer.
-func writeResearchDebugBundle(dst io.Writer, root, dir string) (int, error) {
+// when captured) under a single root folder, then appends the persisted DB
+// reports — every report's markdown and HTML, including remixes and alternate
+// directions — under a db-reports/ subfolder. The run-log's reports/ holds the
+// engine's evolving snapshots, so the final rendered reports live separately.
+// Files are read into memory — a run-log is small — and stored uncompressed via
+// the shared bundle writer.
+func writeResearchDebugBundle(dst io.Writer, root, dir string, reports []store.ResearchReport) (int, error) {
 	zw := &bundleZipWriter{dst: dst}
 	count := 0
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
@@ -264,6 +268,34 @@ func writeResearchDebugBundle(dst io.Writer, root, dir string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
+	multiple := len(reports) > 1
+	for i := range reports {
+		report := &reports[i]
+		prefix := root + "/db-reports/"
+		if multiple {
+			label := report.Direction
+			if report.IsDefault {
+				label = "default"
+			} else if label == "" {
+				label = fmt.Sprintf("report-%d", report.ID)
+			}
+			prefix += fmt.Sprintf("%02d-%s/", i+1, bundleSlug(label, fmt.Sprintf("report-%d", report.ID)))
+		}
+		if report.Markdown != nil && *report.Markdown != "" {
+			if err := zw.add(prefix+"report.md", *report.Markdown); err != nil {
+				return 0, err
+			}
+			count++
+		}
+		if report.HTML != "" {
+			if err := zw.add(prefix+"report.html", report.HTML); err != nil {
+				return 0, err
+			}
+			count++
+		}
+	}
+
 	if err := zw.close(); err != nil {
 		return 0, err
 	}
@@ -287,9 +319,15 @@ func (s *Server) handleDownloadResearchDebugBundle(w http.ResponseWriter, r *htt
 		return
 	}
 
+	reports, err := s.store.ListResearchReports(job.ID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+
 	root := fmt.Sprintf("research-%d-debug", job.ID)
 	var bundle bytes.Buffer
-	count, err := writeResearchDebugBundle(&bundle, root, dir)
+	count, err := writeResearchDebugBundle(&bundle, root, dir, reports)
 	if err != nil {
 		internalError(w, err)
 		return
