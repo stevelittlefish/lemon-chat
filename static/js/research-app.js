@@ -337,7 +337,7 @@ function progressLine(ev) {
       const n = ev.total_findings || 0;
       return `round ${ev.round} — synthesizing (${n} finding${n === 1 ? '' : 's'})`;
     }
-    case 'deciding': return `round ${ev.round} — stop check: ${ev.message}`;
+    case 'deciding': return `round ${ev.round} — stop check: ${ev.message || '(no answer)'}`;
     case 'writing': return ev.message || 'writing final report';
     case 'designing': return ev.message || 'designing the HTML report';
     case 'note': return ev.message;

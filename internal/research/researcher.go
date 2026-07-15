@@ -1070,12 +1070,25 @@ func (r *Researcher) shouldStop(ctx context.Context, round int) bool {
 		}
 		prompt = fmt.Sprintf(stopPrompt, r.cfg.Query, plan, r.state.Report, round, r.cfg.MaxRounds)
 	}
-	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 128, stopTimeout)
+	// The visible verdict is one line, but reasoning worker models (e.g. GPT
+	// 5.6-luna) spend most of their budget in a <think> block first. Too small a
+	// cap and the block is cut off before it closes — stripThinking then discards
+	// the whole reply as unterminated reasoning, leaving nothing for the YES/NO.
+	// An empty verdict never matches "YES", so the loop would run to MaxRounds
+	// every time. The cap is a ceiling, not a target — a short answer stops early
+	// and costs nothing extra — so give generous headroom (the working summary is
+	// large by the late rounds, and reasoning grows with it) rather than risk a
+	// cut-off. This call runs at most MaxRounds times per job, so it is cheap.
+	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.1, 16384, stopTimeout)
 	if err != nil {
 		return false
 	}
 	decision := strings.TrimLeft(stripToolCalls(out), "*_`\"'>#- \t\n")
-	r.progress(Progress{Phase: "deciding", Round: round, Message: decision})
+	msg := decision
+	if msg == "" {
+		msg = "(no answer from model — continuing)"
+	}
+	r.progress(Progress{Phase: "deciding", Round: round, Message: msg})
 	return strings.HasPrefix(strings.ToUpper(decision), "YES")
 }
 
