@@ -191,12 +191,18 @@ func (p *httpProvider) ListModels(ctx context.Context) ([]string, error) {
 
 // CodexModels is the built-in roster returned for a Responses/Codex server, which
 // has no enumeration endpoint. It's a curated starter list — edit to taste; the
-// authoritative model IDs are whatever your ChatGPT/Codex plan accepts.
+// authoritative model IDs are whatever your ChatGPT/Codex plan accepts, and the
+// roster here is only a discovery convenience (any ID can be used in a [[model]]
+// entry regardless of whether it appears here).
 var CodexModels = []string{
+	"gpt-5.6-codex",
+	"gpt-5.5-codex",
+	"gpt-5.4-codex",
+	"gpt-5.3-codex",
+	"gpt-5.2-codex",
 	"gpt-5.1-codex",
 	"gpt-5.1-codex-mini",
 	"gpt-5.1-codex-max",
-	"gpt-5-codex",
 }
 
 // readChatCompletionsStreamFull parses a chat-completions SSE body into text,
