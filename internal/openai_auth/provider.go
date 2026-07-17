@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // TokenStore persists the single shared token. internal/store.Store satisfies
@@ -14,6 +15,7 @@ import (
 type TokenStore interface {
 	LoadTokens() (Tokens, bool, error)
 	SaveTokens(Tokens) error
+	DeleteTokens() error
 }
 
 // Provider hands out a live access token, refreshing and persisting it when it
@@ -66,6 +68,29 @@ func (p *Provider) AccountID() (string, error) {
 		return "", err
 	}
 	return p.cached.AccountID, nil
+}
+
+// Status reports whether an account is linked, its account id, and the access
+// token's expiry (for display). A zero expiry means unknown.
+func (p *Provider) Status() (linked bool, accountID string, expiry time.Time, err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if err = p.ensureLoadedLocked(); err != nil {
+		return false, "", time.Time{}, err
+	}
+	return p.cached.AccessToken != "", p.cached.AccountID, p.cached.Expiry, nil
+}
+
+// Unlink deletes the stored token and clears the cache (the "disconnect" action).
+func (p *Provider) Unlink() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if err := p.store.DeleteTokens(); err != nil {
+		return err
+	}
+	p.cached = Tokens{}
+	p.loaded = true
+	return nil
 }
 
 // Token returns a non-expired access token, refreshing if necessary. It returns

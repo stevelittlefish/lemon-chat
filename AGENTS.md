@@ -307,9 +307,15 @@ lemon-chat [flags]
   --debug            enable debug logging (overrides config debug = true)
   --token-log        log raw model SSE tokens to <data_dir>/model_tokens.log (overrides config)
   --list-models      query all configured model servers, print their model lists, then exit
+  --openai-login     run the OpenAI (Codex) account login on this host, store the token, then exit
 ```
 
 `--list-models` is useful for finding exact model ID strings to put in `lemon.toml`.
+
+`--openai-login` runs the local-browser PKCE flow (loopback on `localhost:1455`) and persists a
+single shared OAuth token used by every `auth = "oauth"` model server. For a remote/LAN install
+where no browser runs on the host, use the admin Tools page "Connect OpenAI account" paste-the-code
+flow instead. See `docs/openai_oauth_plan.md` and `docs/provider_abstraction.md`.
 
 ## Debugging flags
 

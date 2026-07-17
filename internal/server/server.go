@@ -16,12 +16,13 @@ import (
 )
 
 type Server struct {
-	cfg         *config.Config
-	store       *store.Store
-	hub         *Hub
-	modelClient *http.Client
-	research    *researchManager
-	oauth       *openai_auth.Provider
+	cfg           *config.Config
+	store         *store.Store
+	hub           *Hub
+	modelClient   *http.Client
+	research      *researchManager
+	oauth         *openai_auth.Provider
+	pendingLogins *pendingLogins
 }
 
 func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
@@ -35,7 +36,7 @@ func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
 	}
 	InitTools(cfg)
 	oauth := openai_auth.NewProvider(openai_auth.NewStoreAdapter(st), client)
-	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client, research: newResearchManager(), oauth: oauth}
+	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client, research: newResearchManager(), oauth: oauth, pendingLogins: newPendingLogins()}
 }
 
 // tokenSource returns a TokenSource that yields the correct bearer token for
@@ -128,6 +129,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/admin/users/{id}", s.requireAdmin(s.handleAdminUpdateUser))
 	mux.HandleFunc("DELETE /api/admin/users/{id}", s.requireAdmin(s.handleAdminDeleteUser))
 	mux.HandleFunc("GET /api/admin/tools/models", s.requireAdmin(s.handleAdminListModels))
+	mux.HandleFunc("GET /api/admin/openai/status", s.requireAdmin(s.handleOpenAIStatus))
+	mux.HandleFunc("POST /api/admin/openai/login/begin", s.requireAdmin(s.handleOpenAILoginBegin))
+	mux.HandleFunc("POST /api/admin/openai/login/complete", s.requireAdmin(s.handleOpenAILoginComplete))
+	mux.HandleFunc("POST /api/admin/openai/disconnect", s.requireAdmin(s.handleOpenAIDisconnect))
 	mux.HandleFunc("POST /api/admin/note-packs/import", s.requireAdmin(s.handleAdminImportNotePack))
 
 	// Research

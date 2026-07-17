@@ -21,6 +21,10 @@ func (m *memStore) SaveTokens(t Tokens) error {
 	m.tok, m.ok, m.saves = t, true, m.saves+1
 	return nil
 }
+func (m *memStore) DeleteTokens() error {
+	m.tok, m.ok = Tokens{}, false
+	return nil
+}
 
 func TestProviderReturnsValidToken(t *testing.T) {
 	store := &memStore{tok: Tokens{AccessToken: "live", Expiry: time.Now().Add(time.Hour)}, ok: true}

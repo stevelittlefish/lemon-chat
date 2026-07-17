@@ -266,4 +266,10 @@ export const admin = {
   notePacks: {
     import: (pack) => request('POST', '/api/admin/note-packs/import', pack),
   },
+  openai: {
+    status: () => request('GET', '/api/admin/openai/status'),
+    begin: () => request('POST', '/api/admin/openai/login/begin'),
+    complete: (pasted) => request('POST', '/api/admin/openai/login/complete', { pasted }),
+    disconnect: () => request('POST', '/api/admin/openai/disconnect'),
+  },
 };

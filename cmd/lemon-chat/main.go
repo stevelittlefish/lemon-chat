@@ -11,6 +11,7 @@ import (
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/debug"
 	"github.com/stevelittlefish/lemon-chat/internal/llm"
+	"github.com/stevelittlefish/lemon-chat/internal/openai_auth"
 	"github.com/stevelittlefish/lemon-chat/internal/server"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"github.com/stevelittlefish/lemon-chat/internal/tasks"
@@ -22,6 +23,7 @@ func main() {
 	debugFlag := flag.Bool("debug", false, "enable debug mode (overrides config)")
 	tokenLogFlag := flag.Bool("token-log", false, "log raw model SSE tokens to <data_dir>/model_tokens.log (overrides config)")
 	listModelsFlag := flag.Bool("list-models", false, "list models from all configured model servers and exit")
+	openaiLoginFlag := flag.Bool("openai-login", false, "run the OpenAI (Codex) account login on this host and exit")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)
@@ -45,6 +47,11 @@ func main() {
 		log.Fatalf("open store: %v", err)
 	}
 	defer st.Close()
+
+	if *openaiLoginFlag {
+		openaiLogin(st)
+		os.Exit(0)
+	}
 
 	if n, err := st.ClearPendingAttachments(); err != nil {
 		log.Printf("Warning: could not clear pending attachments: %v", err)
@@ -85,6 +92,25 @@ func listModels(cfg *config.Config) {
 			fmt.Printf("  - %s\n", model)
 		}
 	}
+}
+
+// openaiLogin runs the local-browser PKCE flow on this host and persists the
+// shared token. Use this when lemon-chat runs where a browser is available; for
+// a remote/LAN install, use the admin "Connect OpenAI account" paste-the-code UI.
+func openaiLogin(st *store.Store) {
+	provider := openai_auth.NewProvider(openai_auth.NewStoreAdapter(st), http.DefaultClient)
+	tokens, err := openai_auth.Login(context.Background(), http.DefaultClient)
+	if err != nil {
+		log.Fatalf("openai-login: %v", err)
+	}
+	if err := provider.SetTokens(tokens); err != nil {
+		log.Fatalf("openai-login: persisting token: %v", err)
+	}
+	acct := tokens.AccountID
+	if acct == "" {
+		acct = "(unknown)"
+	}
+	log.Printf("openai-login: linked OpenAI account %s — token stored", acct)
 }
 
 func bootstrap(st *store.Store, cfg *config.Config) error {

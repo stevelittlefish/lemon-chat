@@ -171,12 +171,23 @@ them after local testing confirms the seam.
 
 **→ User tests on the local server before Phase 6.**
 
-### Phase 6 — Linking UI + CLI
+### Phase 6 — Linking UI + CLI  ✅ done
 
-- `--openai-login` CLI subcommand to run the local-browser flow on the host (headless-friendly).
-- Admin-only "Connect OpenAI account" control that leads with the **paste-the-code** flow (open
-  authorize URL → paste the redirected URL back) for LAN deployments, showing connected state /
-  account / expiry. The server holds the `PendingLogin` in memory between Begin and Complete.
+- `--openai-login` (`cmd/lemon-chat/main.go`) runs the local-browser loopback flow on the host and
+  persists the shared token via the store adapter.
+- Admin handlers (`internal/server/oauth_login.go`): `GET /api/admin/openai/status`,
+  `POST /api/admin/openai/login/begin` (returns authorize URL, stashes `PendingLogin` in a
+  per-admin in-memory map), `POST /api/admin/openai/login/complete` (parses the pasted
+  URL/code, exchanges, persists), `POST /api/admin/openai/disconnect`.
+- UI: an "OpenAI account (Codex)" section on the admin Tools page (`settings-tools.js`) leading
+  with the **paste-the-code** flow — open the authorize link, paste the redirected
+  `localhost:1455` URL back, complete — plus connected-state display and disconnect.
+- `openai_auth.Provider` gained `Status()`, `Unlink()`, and `TokenStore.DeleteTokens`.
+
+**Remaining before the feature is fully closed:** live end-to-end verification against the real
+Codex endpoint (chat + research over an `auth = "oauth"`, `api = "responses"` server), and the
+deferred cleanup (title worker / `summariseHTML` still on static api_key; unused
+`ChatCompleteStream*`/`ResponsesStreamWithUsage` helpers).
 
 ---
 

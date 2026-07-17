@@ -39,3 +39,8 @@ func (a *StoreAdapter) SaveTokens(t Tokens) error {
 		Expiry:       t.Expiry,
 	})
 }
+
+// DeleteTokens implements TokenStore.
+func (a *StoreAdapter) DeleteTokens() error {
+	return a.Store.DeleteOAuthToken()
+}
