@@ -32,6 +32,7 @@ type responsesRequest struct {
 	ToolChoice        string          `json:"tool_choice,omitempty"`
 	ParallelToolCalls bool            `json:"parallel_tool_calls,omitempty"`
 	MaxOutputTokens   int             `json:"max_output_tokens,omitempty"`
+	PromptCacheKey    string          `json:"prompt_cache_key,omitempty"`
 	Include           []string        `json:"include,omitempty"`
 }
 
@@ -65,6 +66,9 @@ func BuildResponsesBody(model string, messages any, tools any, extra map[string]
 	}
 	if mt, ok := intFrom(extra["max_tokens"]); ok {
 		req.MaxOutputTokens = mt
+	}
+	if k, ok := extra["prompt_cache_key"].(string); ok {
+		req.PromptCacheKey = k
 	}
 
 	toolMaps, _ := toMaps(tools)
@@ -175,9 +179,12 @@ type responsesEvent struct {
 	Response    *struct {
 		Status string `json:"status"`
 		Usage  *struct {
-			InputTokens  int64 `json:"input_tokens"`
-			OutputTokens int64 `json:"output_tokens"`
-			TotalTokens  int64 `json:"total_tokens"`
+			InputTokens        int64 `json:"input_tokens"`
+			OutputTokens       int64 `json:"output_tokens"`
+			TotalTokens        int64 `json:"total_tokens"`
+			InputTokensDetails *struct {
+				CachedTokens int64 `json:"cached_tokens"`
+			} `json:"input_tokens_details"`
 		} `json:"usage"`
 	} `json:"response"`
 	Code    string `json:"code"`
@@ -261,11 +268,16 @@ func (c *responsesConverter) finish(ev responsesEvent) error {
 		"choices": []any{map[string]any{"index": 0, "delta": map[string]any{}, "finish_reason": reason}},
 	}
 	if ev.Response != nil && ev.Response.Usage != nil {
-		frame["usage"] = map[string]any{
-			"prompt_tokens":     ev.Response.Usage.InputTokens,
-			"completion_tokens": ev.Response.Usage.OutputTokens,
-			"total_tokens":      ev.Response.Usage.TotalTokens,
+		u := ev.Response.Usage
+		usage := map[string]any{
+			"prompt_tokens":     u.InputTokens,
+			"completion_tokens": u.OutputTokens,
+			"total_tokens":      u.TotalTokens,
 		}
+		if u.InputTokensDetails != nil {
+			usage["prompt_tokens_details"] = map[string]any{"cached_tokens": u.InputTokensDetails.CachedTokens}
+		}
+		frame["usage"] = usage
 	}
 	return c.writeChunk(frame)
 }

@@ -1214,6 +1214,7 @@ function buildInfoPop(msg, onClose, openUp = false) {
   };
 
   if (msg.prompt_tokens != null) addStat('Prompt', msg.prompt_tokens.toLocaleString(), 'tok');
+  if (msg.cached_tokens != null && msg.cached_tokens > 0) addStat('Cached', msg.cached_tokens.toLocaleString(), 'tok');
   if (msg.completion_tokens != null) addStat('Response', msg.completion_tokens.toLocaleString(), 'tok');
   if (msg.prompt_tokens != null && msg.completion_tokens != null) addStat('Total', (msg.prompt_tokens + msg.completion_tokens).toLocaleString(), 'tok');
   if (msg.total_time_ms != null) addStat('Total time', fmtMs(msg.total_time_ms));

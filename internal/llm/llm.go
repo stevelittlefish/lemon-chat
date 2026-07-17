@@ -38,6 +38,19 @@ type Usage struct {
 	CompletionTokens int      `json:"completion_tokens"`
 	TotalTokens      int      `json:"total_tokens"`
 	Cost             *float64 `json:"cost"`
+	// PromptTokensDetails carries the cached-prompt-token count when the provider
+	// reports it (OpenAI/Responses prompt caching). Read via CachedTokens().
+	PromptTokensDetails *struct {
+		CachedTokens int `json:"cached_tokens"`
+	} `json:"prompt_tokens_details,omitempty"`
+}
+
+// CachedTokens returns the number of prompt tokens served from cache, or 0.
+func (u *Usage) CachedTokens() int {
+	if u == nil || u.PromptTokensDetails == nil {
+		return 0
+	}
+	return u.PromptTokensDetails.CachedTokens
 }
 
 type Completion struct {

@@ -157,6 +157,10 @@ type Config struct {
 	// HTTPClient overrides the HTTP client used for model calls (tests inject a
 	// mock transport). Nil uses http.DefaultClient.
 	HTTPClient *http.Client
+
+	// CacheKey is a stable per-job identifier sent as the Responses
+	// prompt_cache_key so a job's repeated prompts route to the same prompt cache.
+	CacheKey string
 }
 
 // PendingRedditRound is the complete durable boundary between search and

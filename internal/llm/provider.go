@@ -34,6 +34,10 @@ type Request struct {
 	MaxTokens       int      // 0 ⇒ omit
 	Temperature     *float64 // nil ⇒ omit (Codex rejects it regardless)
 	ReasoningEffort string   // "", "low", "medium", "high" — reserved; not yet populated
+	// CacheKey is a stable identifier (e.g. per conversation) sent as the
+	// Responses prompt_cache_key so a conversation's requests route to the same
+	// prompt cache. Empty ⇒ omitted. Only used on the Responses surface.
+	CacheKey string
 }
 
 // ToolCall is one completed function call parsed from the stream.
@@ -119,6 +123,9 @@ func (p *httpProvider) Stream(ctx context.Context, req Request, h Handler) (Comp
 		extra := map[string]any{}
 		if req.MaxTokens > 0 {
 			extra["max_tokens"] = req.MaxTokens
+		}
+		if req.CacheKey != "" {
+			extra["prompt_cache_key"] = req.CacheKey
 		}
 		if payload, err = BuildResponsesBody(req.Model, req.Messages, req.Tools, extra, true); err != nil {
 			return Completion{}, err

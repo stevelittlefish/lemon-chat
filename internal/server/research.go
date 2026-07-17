@@ -281,6 +281,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		APIToken:              s.tokenSource(modelServer),
 		APIResponses:          modelServer.UsesResponses(),
 		APIAccountID:          s.oauthAccountID(modelServer),
+		CacheKey:              fmt.Sprintf("lemon-research-%d", job.ID),
 		WorkerModel:           workerModel,
 		WorkerAPIBase:         workerAPIBase,
 		WorkerAPIToken:        workerAPIToken,

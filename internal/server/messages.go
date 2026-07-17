@@ -359,6 +359,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			Model:    modelName,
 			Messages: chatMsgs,
 			Tools:    toolsArg,
+			CacheKey: fmt.Sprintf("lemon-conv-%d", convID),
 		}, h)
 
 		// Failures before the stream committed: a rare user-message persist error,
@@ -384,6 +385,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			usageStats = &store.MessageStats{
 				PromptTokens:     int64(comp.Usage.PromptTokens),
 				CompletionTokens: int64(comp.Usage.CompletionTokens),
+				CachedTokens:     int64(comp.Usage.CachedTokens()),
 				TotalTimeMS:      time.Since(startTime).Milliseconds(),
 			}
 		}
@@ -506,6 +508,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			"stats": map[string]int64{
 				"prompt_tokens":     finalStats.PromptTokens,
 				"completion_tokens": finalStats.CompletionTokens,
+				"cached_tokens":     finalStats.CachedTokens,
 				"total_time_ms":     finalStats.TotalTimeMS,
 			},
 		})
