@@ -324,12 +324,21 @@ Two flags are available for diagnosing runtime issues. Both can be set in `lemon
 | Flag | TOML key | Description |
 |---|---|---|
 | `--debug` | `debug = true` | Enables `debug.Log()` output — title-worker conditions, HTTP details |
-| `--token-log` | `token_log = true` | Writes every raw SSE token from the model to `<data_dir>/model_tokens.log`, prefixed with `[loop=N]`. Useful for diagnosing streaming/rendering inconsistencies. |
+| `--token-log` | `token_log = true` | Writes replay-oriented model HTTP transcripts to `<data_dir>/model_tokens.log`: request URL, safe headers, exact JSON body, response metadata, and raw SSE body. OAuth credentials and account IDs are redacted. Prompt and response content is recorded. |
 
-The token log appends to the file on each request and includes a header line:
+The token log appends to the file on each request and includes a header line followed by the request and response transcript:
 ```
 === conv=42 model=llama3.2 time=2026-01-01T12:00:00+00:00 ===
-[loop=0] data: {"choices":[{"delta":{"content":"Hello"},...}]}
+--- request ---
+POST https://example.test/v1/responses
+Authorization: [redacted]
+
+{"model":"llama3.2",...}
+--- response ---
+200 OK
+Content-Type: text/event-stream
+
+data: {"type":"response.output_text.delta",...}
 ```
 
 ## Keeping TODO.md current

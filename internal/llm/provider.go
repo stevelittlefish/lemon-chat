@@ -60,8 +60,13 @@ type Handler struct {
 	// populates it yet (see the streaming-thinking backlog item).
 	OnThinking func(delta string)
 	// OnRawFrame, if set, receives every raw chat-completions data line (for
-	// Responses servers, the post-conversion frame). Used for token logging.
+	// Responses servers, the post-conversion frame). Useful to consumers that
+	// need the provider-neutral stream; WireLog captures the actual HTTP stream.
 	OnRawFrame func(data string)
+	// WireLog receives a replay-oriented HTTP transcript: the request URL, safe
+	// headers, exact JSON body, response status and headers, and raw response
+	// body. Credential-bearing headers are redacted. Callers own and close it.
+	WireLog io.Writer
 }
 
 // Provider streams one assistant turn and lists reachable models. Concrete
@@ -161,20 +166,27 @@ func (p *httpProvider) Stream(ctx context.Context, req Request, h Handler) (Comp
 	if p.accountID != "" {
 		hreq.Header.Set("chatgpt-account-id", p.accountID)
 	}
-	// The Codex backend only engages prompt caching when a stable session-id
+	// The Codex backend only engages prompt caching when a stable session_id
 	// header is present (the body prompt_cache_key alone is not enough — verified
 	// against the live endpoint). Send the request's cache key as the session id.
 	if p.responses && req.CacheKey != "" {
-		hreq.Header.Set("session-id", req.CacheKey)
+		hreq.Header.Set("session_id", req.CacheKey)
 	}
+	writeWireRequest(h.WireLog, hreq, payload)
 
 	resp, err := p.client.Do(hreq)
 	if err != nil {
+		writeWireError(h.WireLog, err)
 		return Completion{}, fmt.Errorf("model request failed: %w", err)
 	}
 	defer resp.Body.Close()
+	writeWireResponse(h.WireLog, resp)
+	if h.WireLog != nil {
+		resp.Body = io.NopCloser(io.TeeReader(resp.Body, h.WireLog))
+	}
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		writeWireEnd(h.WireLog)
 		return Completion{}, fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
 	}
 	if h.OnStart != nil {
@@ -185,7 +197,65 @@ func (p *httpProvider) Stream(ctx context.Context, req Request, h Handler) (Comp
 	if p.responses {
 		body = ResponsesToChatSSE(resp.Body)
 	}
-	return readChatCompletionsStreamFull(body, h)
+	completion, err := readChatCompletionsStreamFull(body, h)
+	writeWireEnd(h.WireLog)
+	return completion, err
+}
+
+func writeWireRequest(w io.Writer, req *http.Request, payload []byte) {
+	if w == nil {
+		return
+	}
+	fmt.Fprintf(w, "\n--- request ---\n%s %s\n", req.Method, req.URL.String())
+	writeWireHeaders(w, req.Header)
+	fmt.Fprintf(w, "\n%s\n", payload)
+}
+
+func writeWireResponse(w io.Writer, resp *http.Response) {
+	if w == nil {
+		return
+	}
+	fmt.Fprintf(w, "\n--- response ---\n%s\n", resp.Status)
+	writeWireHeaders(w, resp.Header)
+	fmt.Fprintln(w)
+}
+
+func writeWireHeaders(w io.Writer, headers http.Header) {
+	keys := make([]string, 0, len(headers))
+	for key := range headers {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		values := headers.Values(key)
+		if sensitiveWireHeader(key) {
+			values = []string{"[redacted]"}
+		}
+		for _, value := range values {
+			fmt.Fprintf(w, "%s: %s\n", key, value)
+		}
+	}
+}
+
+func sensitiveWireHeader(key string) bool {
+	switch strings.ToLower(key) {
+	case "authorization", "proxy-authorization", "cookie", "set-cookie", "x-api-key", "chatgpt-account-id":
+		return true
+	default:
+		return false
+	}
+}
+
+func writeWireError(w io.Writer, err error) {
+	if w != nil {
+		fmt.Fprintf(w, "\n--- transport error ---\n%s\n", err)
+	}
+}
+
+func writeWireEnd(w io.Writer) {
+	if w != nil {
+		fmt.Fprintln(w, "\n--- end response ---")
+	}
 }
 
 func (p *httpProvider) ListModels(ctx context.Context) ([]string, error) {

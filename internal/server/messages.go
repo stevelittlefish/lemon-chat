@@ -337,8 +337,8 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	var finalStats *store.MessageStats
 
 	for loop := 0; loop < maxToolLoops; loop++ {
-		loopN := loop
 		h := llm.Handler{
+			WireLog: tokenLog,
 			OnStart: commit,
 			OnText: func(delta string) {
 				if !committed {
@@ -347,11 +347,6 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				b, _ := json.Marshal(map[string]string{"delta": delta})
 				fmt.Fprintf(w, "data: %s\n\n", b)
 				flusher.Flush()
-			},
-			OnRawFrame: func(data string) {
-				if tokenLog != nil {
-					fmt.Fprintf(tokenLog, "[loop=%d] data: %s\n", loopN, data)
-				}
 			},
 		}
 
