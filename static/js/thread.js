@@ -373,6 +373,7 @@ export function showPicker(models, characters, onSelect) {
       <span class="picker-card-icon">${icon('cpu', 22)}</span>
       <span class="picker-card-name">${escapeHtml(m.display_name)}</span>
       ${rate ? `<span class="picker-card-price" title="per 1M tokens (input / output)">${rate}</span>` : ''}
+      ${m.oauth ? `<span class="picker-card-oauth" title="Authenticated via connected OpenAI account">oauth</span>` : ''}
     </button>
   `;
   }).join('');

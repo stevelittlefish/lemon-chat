@@ -158,6 +158,7 @@ function toggleDropdown() {
         <span class="model-picker-option-text">
           <span class="model-picker-option-name">${escapeHtml(m.display_name)}</span>
           ${rate ? `<span class="model-picker-option-price">${rate}</span>` : ''}
+          ${m.oauth ? `<span class="model-picker-option-oauth" title="Authenticated via connected OpenAI account">oauth</span>` : ''}
         </span>
       </div>`;
   }).join('');

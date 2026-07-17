@@ -56,7 +56,8 @@ function formatPrice(value) {
 function modelOptionLabel(m) {
   const name = escapeHtml(m.display_name || m.name);
   const rate = formatModelRate(m);
-  return rate ? `${name} — ${rate}` : name;
+  const label = rate ? `${name} — ${rate}` : name;
+  return m.oauth ? `${label} · oauth` : label;
 }
 
 function formatDate(iso) {

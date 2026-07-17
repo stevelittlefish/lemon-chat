@@ -677,6 +677,19 @@ html, body {
   color: var(--fg-faint);
 }
 
+.model-picker-option-oauth {
+  align-self: flex-start;
+  margin-top: 1px;
+  padding: 1px 5px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
 .model-picker-divider {
   height: 1px;
   background: var(--border-soft);
@@ -885,6 +898,7 @@ html, body {
 }
 
 .picker-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -950,6 +964,20 @@ html, body {
   letter-spacing: 0.02em;
   color: var(--fg-faint);
   line-height: 1.2;
+}
+
+.picker-card-oauth {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  padding: 1px 5px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
 }
 
 .picker-card--default {
