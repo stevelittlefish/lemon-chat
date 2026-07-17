@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,17 @@ import (
 
 	"github.com/BurntSushi/toml"
 )
+
+// TokenSource resolves a bearer token at call time. It lets call sites obtain a
+// (possibly refreshed) OAuth token or a static api_key through one seam without
+// depending on the auth implementation. It returns "" (no error) when the
+// request should be sent without an Authorization header.
+type TokenSource func(context.Context) (string, error)
+
+// StaticToken returns a TokenSource that always yields key (which may be empty).
+func StaticToken(key string) TokenSource {
+	return func(context.Context) (string, error) { return key, nil }
+}
 
 type Config struct {
 	Server       Server        `toml:"server"`
@@ -66,10 +78,49 @@ type Bootstrap struct {
 	AdminPassword string `toml:"admin_password"`
 }
 
+// API surface constants for ModelServer.API.
+const (
+	APIChatCompletions = "chat_completions" // OpenAI-compatible /chat/completions (default)
+	APIResponses       = "responses"        // OpenAI Responses API (/responses)
+)
+
+// Auth mode constants for ModelServer.Auth.
+const (
+	AuthAPIKey = "api_key" // static api_key from config (default)
+	AuthOAuth  = "oauth"   // shared OAuth token from the token store (OpenAI login)
+)
+
 type ModelServer struct {
 	Name    string `toml:"name"`
 	APIBase string `toml:"api_base"`
 	APIKey  string `toml:"api_key"`
+	// API selects the request/response surface. Empty defaults to
+	// chat_completions; set to "responses" for OpenAI's Responses API.
+	API string `toml:"api"`
+	// Auth selects how requests are authenticated. Empty defaults to api_key;
+	// set to "oauth" to use the shared OpenAI login token instead of api_key.
+	Auth string `toml:"auth"`
+}
+
+// UsesResponses reports whether this server speaks the OpenAI Responses API
+// rather than the chat-completions surface.
+func (s *ModelServer) UsesResponses() bool {
+	return s.API == APIResponses
+}
+
+// UsesOAuth reports whether requests to this server should authenticate with
+// the shared OAuth token rather than a static api_key.
+func (s *ModelServer) UsesOAuth() bool {
+	return s.Auth == AuthOAuth
+}
+
+// Endpoint returns the full URL for a chat/generation request against this
+// server, selecting the path from the configured API surface.
+func (s *ModelServer) Endpoint() string {
+	if s.UsesResponses() {
+		return s.APIBase + "/responses"
+	}
+	return s.APIBase + "/chat/completions"
 }
 
 // IsOpenRouter reports whether this server is OpenRouter, which publishes a
@@ -164,6 +215,16 @@ func (c *Config) Validate() error {
 	for _, s := range c.ModelServers {
 		if s.Name == "" {
 			return fmt.Errorf("config: model_server missing name field")
+		}
+		switch s.API {
+		case "", APIChatCompletions, APIResponses:
+		default:
+			return fmt.Errorf("config: model_server %q has invalid api %q (want %q or %q)", s.Name, s.API, APIChatCompletions, APIResponses)
+		}
+		switch s.Auth {
+		case "", AuthAPIKey, AuthOAuth:
+		default:
+			return fmt.Errorf("config: model_server %q has invalid auth %q (want %q or %q)", s.Name, s.Auth, AuthAPIKey, AuthOAuth)
 		}
 		serverNames[s.Name] = struct{}{}
 	}

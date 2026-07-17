@@ -7,14 +7,14 @@ import (
 )
 
 type Conversation struct {
-	ID                   int64   `json:"id"`
-	UserID               int64   `json:"user_id"`
-	Model                *string `json:"model"`
-	CharacterID          *int64  `json:"character_id"`
-	Title                *string `json:"title"`
-	BackgroundAttachmentID *int64 `json:"background_attachment_id"`
-	CreatedAt            string  `json:"created_at"`
-	UpdatedAt            string  `json:"updated_at"`
+	ID                     int64   `json:"id"`
+	UserID                 int64   `json:"user_id"`
+	Model                  *string `json:"model"`
+	CharacterID            *int64  `json:"character_id"`
+	Title                  *string `json:"title"`
+	BackgroundAttachmentID *int64  `json:"background_attachment_id"`
+	CreatedAt              string  `json:"created_at"`
+	UpdatedAt              string  `json:"updated_at"`
 }
 
 func (s *Store) ListConversations(userID int64, limit, offset int) ([]Conversation, error) {

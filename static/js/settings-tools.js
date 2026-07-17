@@ -82,6 +82,18 @@ function renderPage() {
       <div id="provider-models-result" class="provider-models hidden"></div>
     </div>
     <div class="section">
+      <h2>OpenAI account (Codex)</h2>
+      <div class="tool-row">
+        <div class="tool-row-info">
+          <div class="tool-row-name">Connect OpenAI account</div>
+          <div class="tool-row-desc">Sign in with a ChatGPT/OpenAI account to authorise <code>auth = "oauth"</code> model servers. One shared login is used for everyone on this network.</div>
+        </div>
+        <div id="openai-status" class="openai-status">Checking…</div>
+      </div>
+      <div id="openai-connect" class="openai-connect hidden"></div>
+      <div id="openai-result" class="tool-result hidden"></div>
+    </div>
+    <div class="section">
       <h2>Conversations</h2>
       <div class="tool-row">
         <div class="tool-row-info">
@@ -112,6 +124,101 @@ function renderPage() {
   });
   document.getElementById('note-pack-file').addEventListener('change', runImportNotePack);
   document.getElementById('btn-list-models').addEventListener('click', runListModels);
+  refreshOpenAIStatus();
+}
+
+// ── OpenAI account (Codex OAuth) ──────────────────────────────────────
+
+async function refreshOpenAIStatus() {
+  const statusEl = document.getElementById('openai-status');
+  const connectEl = document.getElementById('openai-connect');
+  try {
+    const s = await admin.openai.status();
+    if (s.linked) {
+      const acct = s.account_id ? ` (${escapeHtml(s.account_id)})` : '';
+      statusEl.innerHTML = `<span class="openai-badge openai-badge--on">Connected${acct}</span>
+        <button class="btn btn-ghost btn-sm" id="btn-openai-disconnect">Disconnect</button>`;
+      connectEl.className = 'openai-connect hidden';
+      connectEl.innerHTML = '';
+      document.getElementById('btn-openai-disconnect').addEventListener('click', disconnectOpenAI);
+    } else {
+      statusEl.innerHTML = `<button class="btn btn-secondary btn-sm" id="btn-openai-connect">Connect</button>`;
+      document.getElementById('btn-openai-connect').addEventListener('click', beginOpenAI);
+    }
+  } catch (err) {
+    statusEl.innerHTML = `<span class="openai-badge">Unavailable</span>`;
+    showOpenAIResult('error', err.message || 'could not read status');
+  }
+}
+
+async function beginOpenAI() {
+  const connectEl = document.getElementById('openai-connect');
+  hideOpenAIResult();
+  try {
+    const { authorize_url } = await admin.openai.begin();
+    connectEl.className = 'openai-connect';
+    connectEl.innerHTML = `
+      <ol class="openai-steps">
+        <li><a href="${escapeHtml(authorize_url)}" target="_blank" rel="noopener">Open the OpenAI sign-in page</a> and authorise. Your browser will land on a <code>localhost:1455</code> page that won't load — that's expected.</li>
+        <li>Copy the full address from that page's address bar (or just the <code>code</code> value) and paste it below.</li>
+      </ol>
+      <textarea id="openai-pasted" class="openai-paste" rows="3" placeholder="http://localhost:1455/auth/callback?code=…"></textarea>
+      <div class="openai-actions">
+        <button class="btn btn-primary btn-sm" id="btn-openai-complete">Complete sign-in</button>
+        <button class="btn btn-ghost btn-sm" id="btn-openai-cancel">Cancel</button>
+      </div>`;
+    document.getElementById('btn-openai-complete').addEventListener('click', completeOpenAI);
+    document.getElementById('btn-openai-cancel').addEventListener('click', () => {
+      connectEl.className = 'openai-connect hidden';
+      connectEl.innerHTML = '';
+    });
+    document.getElementById('openai-pasted').focus();
+  } catch (err) {
+    showOpenAIResult('error', err.message || 'could not start sign-in');
+  }
+}
+
+async function completeOpenAI() {
+  const btn = document.getElementById('btn-openai-complete');
+  const pasted = document.getElementById('openai-pasted').value.trim();
+  if (!pasted) {
+    showOpenAIResult('error', 'Paste the redirected URL or code first.');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  hideOpenAIResult();
+  try {
+    const s = await admin.openai.complete(pasted);
+    showOpenAIResult('ok', `Connected${s.account_id ? ` as ${s.account_id}` : ''}.`);
+    await refreshOpenAIStatus();
+  } catch (err) {
+    showOpenAIResult('error', err.message || 'sign-in failed');
+    btn.disabled = false;
+    btn.textContent = 'Complete sign-in';
+  }
+}
+
+async function disconnectOpenAI() {
+  if (!window.confirm('Disconnect the OpenAI account? Model servers using it will stop working until reconnected.')) return;
+  hideOpenAIResult();
+  try {
+    await admin.openai.disconnect();
+    await refreshOpenAIStatus();
+  } catch (err) {
+    showOpenAIResult('error', err.message || 'could not disconnect');
+  }
+}
+
+function showOpenAIResult(kind, msg) {
+  const el = document.getElementById('openai-result');
+  el.className = `tool-result tool-result--${kind === 'ok' ? 'ok' : 'error'}`;
+  el.textContent = (kind === 'ok' ? '' : 'Failed: ') + msg;
+  el.classList.remove('hidden');
+}
+
+function hideOpenAIResult() {
+  document.getElementById('openai-result').classList.add('hidden');
 }
 
 async function runListModels() {

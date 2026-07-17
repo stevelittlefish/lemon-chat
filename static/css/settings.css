@@ -838,6 +838,66 @@ a.snav-item { text-decoration: none; }
   border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
 }
 
+.openai-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.openai-badge {
+  font-size: var(--fs-13);
+  color: var(--fg-muted);
+}
+
+.openai-badge--on {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.openai-connect {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--paper-100);
+}
+
+.openai-connect.hidden {
+  display: none;
+}
+
+.openai-steps {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: var(--fs-13);
+  color: var(--fg-muted);
+  line-height: 1.5;
+}
+
+.openai-steps li:not(:last-child) {
+  margin-bottom: 6px;
+}
+
+.openai-paste {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--fs-13);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.openai-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .provider-models {
   display: flex;
   flex-direction: column;

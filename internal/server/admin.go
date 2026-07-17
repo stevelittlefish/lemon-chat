@@ -140,23 +140,25 @@ func (s *Server) handleAdminListModels(w http.ResponseWriter, r *http.Request) {
 	log.Printf("server: handleAdminListModels — querying %d provider(s) user_id=%d username=%q", len(s.cfg.ModelServers), user.ID, user.Username)
 	providers := make([]providerResponse, len(s.cfg.ModelServers))
 	var wg sync.WaitGroup
-	for i, provider := range s.cfg.ModelServers {
+	for i := range s.cfg.ModelServers {
+		srv := &s.cfg.ModelServers[i]
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			log.Printf("server: handleAdminListModels — querying provider=%q api_base=%q", provider.Name, provider.APIBase)
-			models, err := llm.ListModels(r.Context(), s.modelClient, provider.APIBase, provider.APIKey)
+			log.Printf("server: handleAdminListModels — querying provider=%q api_base=%q", srv.Name, srv.APIBase)
+			prov := llm.NewProvider(s.modelClient, srv, s.tokenSource(srv), s.oauthAccountID(srv))
+			models, err := prov.ListModels(r.Context())
 			result := providerResponse{
-				Name:    provider.Name,
-				APIBase: provider.APIBase,
+				Name:    srv.Name,
+				APIBase: srv.APIBase,
 				Models:  models,
 			}
 			if err != nil {
 				result.Models = []string{}
 				result.Error = err.Error()
-				log.Printf("server: handleAdminListModels — provider=%q failed: %v", provider.Name, err)
+				log.Printf("server: handleAdminListModels — provider=%q failed: %v", srv.Name, err)
 			} else {
-				log.Printf("server: handleAdminListModels — provider=%q returned %d model(s)", provider.Name, len(models))
+				log.Printf("server: handleAdminListModels — provider=%q returned %d model(s)", srv.Name, len(models))
 			}
 			providers[i] = result
 		}()

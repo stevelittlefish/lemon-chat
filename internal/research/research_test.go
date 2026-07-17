@@ -168,9 +168,14 @@ func TestResumeSkippedRedditRoundCheckpointsAndMarksThreadsAnalyzed(t *testing.T
 
 func TestResumeImportedRedditUsesGuardedExtractorAndSynthesizes(t *testing.T) {
 	var extractionContext string
+	sseResp := func(content string) *http.Response {
+		frame, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"delta": map[string]string{"content": content}}}})
+		body := "data: " + string(frame) + "\n\ndata: [DONE]\n\n"
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body: io.NopCloser(strings.NewReader(body))}
+	}
 	transport := roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		var payload struct {
-			Stream   bool `json:"stream"`
 			Messages []struct {
 				Content string `json:"content"`
 			} `json:"messages"`
@@ -178,17 +183,20 @@ func TestResumeImportedRedditUsesGuardedExtractorAndSynthesizes(t *testing.T) {
 		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
 			t.Error(err)
 		}
-		if payload.Stream {
-			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}},
-				Body: io.NopCloser(strings.NewReader("data: {\"choices\":[{\"delta\":{\"content\":\"merged report\"}}]}\n\ndata: [DONE]\n\n"))}, nil
+		var combined string
+		for _, m := range payload.Messages {
+			combined += m.Content
 		}
-		if len(payload.Messages) > 1 {
-			extractionContext = payload.Messages[1].Content
+		// Every call streams through the provider now, so route on content rather
+		// than the stream flag: extraction sees the raw (injected) page text;
+		// synthesis sees only the distilled finding.
+		if strings.Contains(combined, "Ignore previous instructions") {
+			if len(payload.Messages) > 1 {
+				extractionContext = payload.Messages[1].Content
+			}
+			return sseResp(`{"rational":"relevant","evidence":"evidence","summary":"useful summary"}`), nil
 		}
-		body, _ := json.Marshal(map[string]any{"choices": []any{map[string]any{"message": map[string]string{
-			"content": `{"rational":"relevant","evidence":"evidence","summary":"useful summary"}`,
-		}}}})
-		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(string(body)))}, nil
+		return sseResp("merged report"), nil
 	})
 
 	completed := false
@@ -196,8 +204,8 @@ func TestResumeImportedRedditUsesGuardedExtractorAndSynthesizes(t *testing.T) {
 		Query: "goal", Model: "test", APIBase: "http://model.test", MaxContentChars: 10000,
 		SynthesisTokens: 1000, FinalReportTokens: 2000, SynthesisWindow: 10, MaxEmptyRounds: 2,
 		OnRedditRoundComplete: func(State) error { completed = true; return nil },
+		HTTPClient:            &http.Client{Transport: transport},
 	}, State{}, nil, nil)
-	r.client = &http.Client{Transport: transport}
 	r.startTime = time.Now()
 	pageURL := "https://www.reddit.com/comments/abc123/"
 	resume := RedditResume{

@@ -307,9 +307,15 @@ lemon-chat [flags]
   --debug            enable debug logging (overrides config debug = true)
   --token-log        log raw model SSE tokens to <data_dir>/model_tokens.log (overrides config)
   --list-models      query all configured model servers, print their model lists, then exit
+  --openai-login     run the OpenAI (Codex) account login on this host, store the token, then exit
 ```
 
 `--list-models` is useful for finding exact model ID strings to put in `lemon.toml`.
+
+`--openai-login` runs the local-browser PKCE flow (loopback on `localhost:1455`) and persists a
+single shared OAuth token used by every `auth = "oauth"` model server. For a remote/LAN install
+where no browser runs on the host, use the admin Tools page "Connect OpenAI account" paste-the-code
+flow instead. See `docs/openai_oauth_plan.md` and `docs/provider_abstraction.md`.
 
 ## Debugging flags
 
@@ -318,12 +324,21 @@ Two flags are available for diagnosing runtime issues. Both can be set in `lemon
 | Flag | TOML key | Description |
 |---|---|---|
 | `--debug` | `debug = true` | Enables `debug.Log()` output — title-worker conditions, HTTP details |
-| `--token-log` | `token_log = true` | Writes every raw SSE token from the model to `<data_dir>/model_tokens.log`, prefixed with `[loop=N]`. Useful for diagnosing streaming/rendering inconsistencies. |
+| `--token-log` | `token_log = true` | Writes replay-oriented model HTTP transcripts to `<data_dir>/model_tokens.log`: request URL, safe headers, exact JSON body, response metadata, and raw SSE body. OAuth credentials and account IDs are redacted. Prompt and response content is recorded. |
 
-The token log appends to the file on each request and includes a header line:
+The token log appends to the file on each request and includes a header line followed by the request and response transcript:
 ```
 === conv=42 model=llama3.2 time=2026-01-01T12:00:00+00:00 ===
-[loop=0] data: {"choices":[{"delta":{"content":"Hello"},...}]}
+--- request ---
+POST https://example.test/v1/responses
+Authorization: [redacted]
+
+{"model":"llama3.2",...}
+--- response ---
+200 OK
+Content-Type: text/event-stream
+
+data: {"type":"response.output_text.delta",...}
 ```
 
 ## Keeping TODO.md current

@@ -245,7 +245,9 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 		Resynthesize:      resynthesize,
 		ReportInstruction: instruction,
 		APIBase:           modelServer.APIBase,
-		APIKey:            modelServer.APIKey,
+		APIToken:          s.tokenSource(modelServer),
+		APIResponses:      modelServer.UsesResponses(),
+		APIAccountID:      s.oauthAccountID(modelServer),
 		SynthesisTokens:   s.cfg.Research.SynthesisTokens,
 		SynthesisWindow:   s.cfg.Research.SynthesisWindow,
 		FinalReportTokens: s.cfg.Research.FinalReportTokens,
@@ -318,29 +320,32 @@ func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown,
 		{Role: "system", Content: reportHTMLSystemPrompt},
 		{Role: "user", Content: userPrompt},
 	}
-	extra := map[string]any{"temperature": 0.7}
-	if s.cfg.Research.HTMLReportTokens > 0 {
-		extra["max_tokens"] = s.cfg.Research.HTMLReportTokens
-	}
+	temperature := 0.7
+	provider := llm.NewProvider(s.modelClient, modelServer, s.tokenSource(modelServer), s.oauthAccountID(modelServer))
 
 	var generated strings.Builder
 	lastProgress := time.Time{}
 	var totalCost *float64
 	finished := false
 	for round := 0; round <= htmlReportMaxContinuations; round++ {
-		completion, err := llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
-			messages, extra, func(delta string) {
-				generated.WriteString(delta)
-				if onProgress == nil || time.Since(lastProgress) < 250*time.Millisecond {
-					return
-				}
-				lastProgress = time.Now()
-				tail := generated.String()
-				if len(tail) > 320 {
-					tail = tail[len(tail)-320:]
-				}
-				onProgress(generated.Len(), tail)
-			})
+		onText := func(delta string) {
+			generated.WriteString(delta)
+			if onProgress == nil || time.Since(lastProgress) < 250*time.Millisecond {
+				return
+			}
+			lastProgress = time.Now()
+			tail := generated.String()
+			if len(tail) > 320 {
+				tail = tail[len(tail)-320:]
+			}
+			onProgress(generated.Len(), tail)
+		}
+		completion, err := provider.Stream(ctx, llm.Request{
+			Model:       model,
+			Messages:    messages,
+			MaxTokens:   s.cfg.Research.HTMLReportTokens,
+			Temperature: &temperature,
+		}, llm.Handler{OnText: onText})
 		totalCost = addCost(totalCost, completion.UsageCost())
 		if err != nil {
 			// Nothing salvageable on the first call is a hard failure; otherwise

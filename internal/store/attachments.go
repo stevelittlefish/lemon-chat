@@ -8,7 +8,7 @@ type Attachment struct {
 	Filename       string `json:"filename"`
 	MimeType       string `json:"mime_type"`
 	DiskPath       string `json:"disk_path"`
-	Status         string `json:"status"`        // "pending" | "ready" | "error"
+	Status         string `json:"status"` // "pending" | "ready" | "error"
 	Error          string `json:"error,omitempty"`
 	CreatedAt      string `json:"created_at"`
 }

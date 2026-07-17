@@ -8,6 +8,17 @@ Status markers: `[ ]` not started · `[~]` in progress · `[x]` done
 
 - [x] **Research engine rework — diagnostic logging + algorithm fixes.** Full plan in [`RESEARCH_TODO.md`](RESEARCH_TODO.md). Discards the oversized structured-ledger / JSON-contract / new-DB-tables approach in favour of a token-budget split, two free-text prompt rewrites, and a disk-based downloadable debug bundle — ~90% of the value at a fraction of the complexity, and no small-model (Gemma) regression. Delivered: Part 1a/1b (disk run-log + debug bundle), Part 2 (token-budget split, synthesis memory bound, stop-check rewrite), and Part 3b (fuzzy query dedup). Validated on Gemma 4B and Grok 4.5 — original runaway/truncation bug gone. Part 1c and Part 3a/3c deliberately left unbuilt (validation showed no need).
 
+## Provider abstraction & OAuth (backlog)
+
+Design docs: [`docs/provider_abstraction.md`](docs/provider_abstraction.md),
+[`docs/openai_oauth_plan.md`](docs/openai_oauth_plan.md). Work is on the `openai-oauth` branch.
+
+- [ ] **Streaming thinking: persist reasoning to the chat log, show on reload, exclude from model input.** Add a `reasoning TEXT` column to the `message` table (`internal/store/messages.go`, new migration), populate on assistant rows via the provider `Handler.OnThinking`/`Completion.Thinking`, return it from `handleListMessages`, render a collapsible thinking block in the frontend, and stream it live over a new SSE event. The outbound lowering must never include it. Also drop `include:["reasoning.encrypted_content"]` from `BuildResponsesBody` since reasoning is not replayed. See `docs/provider_abstraction.md` → Reasoning.
+
+- [ ] **Ollama native-API provider.** New provider package implementing the `Provider` seam against Ollama's native `/api/chat` (its own request/response + NDJSON streaming), selected by `api = "ollama"`. Additive once the provider seam exists.
+
+- [ ] **Anthropic provider.** New provider package implementing the `Provider` seam against the Anthropic Messages API (typed content blocks, top-level system, tool_result as user block, cache breakpoints, its own SSE grammar), selected by `api = "anthropic"`. Additive once the provider seam exists.
+
 ## Manually Added by User
 
 - [x] Add a benchmark folder with the home-battery-without-solar research prompt.

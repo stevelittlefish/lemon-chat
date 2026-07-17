@@ -11,6 +11,7 @@ import (
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/debug"
 	"github.com/stevelittlefish/lemon-chat/internal/llm"
+	"github.com/stevelittlefish/lemon-chat/internal/openai_auth"
 	"github.com/stevelittlefish/lemon-chat/internal/server"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"github.com/stevelittlefish/lemon-chat/internal/tasks"
@@ -20,8 +21,9 @@ import (
 func main() {
 	cfgPath := flag.String("config", "lemon.toml", "path to config file")
 	debugFlag := flag.Bool("debug", false, "enable debug mode (overrides config)")
-	tokenLogFlag := flag.Bool("token-log", false, "log raw model SSE tokens to <data_dir>/model_tokens.log (overrides config)")
+	tokenLogFlag := flag.Bool("token-log", false, "log replay-oriented model HTTP transcripts to <data_dir>/model_tokens.log (overrides config)")
 	listModelsFlag := flag.Bool("list-models", false, "list models from all configured model servers and exit")
+	openaiLoginFlag := flag.Bool("openai-login", false, "run the OpenAI (Codex) account login on this host and exit")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)
@@ -32,7 +34,7 @@ func main() {
 	debug.Enabled = cfg.Server.Debug || *debugFlag
 	cfg.Server.TokenLog = cfg.Server.TokenLog || *tokenLogFlag
 	if cfg.Server.TokenLog {
-		log.Printf("token log enabled — writing to %s/model_tokens.log", cfg.Server.DataDir)
+		log.Printf("model wire log enabled — writing redacted transcripts to %s/model_tokens.log", cfg.Server.DataDir)
 	}
 
 	if *listModelsFlag {
@@ -45,6 +47,11 @@ func main() {
 		log.Fatalf("open store: %v", err)
 	}
 	defer st.Close()
+
+	if *openaiLoginFlag {
+		openaiLogin(st)
+		os.Exit(0)
+	}
 
 	if n, err := st.ClearPendingAttachments(); err != nil {
 		log.Printf("Warning: could not clear pending attachments: %v", err)
@@ -71,9 +78,27 @@ func main() {
 }
 
 func listModels(cfg *config.Config) {
-	for _, srv := range cfg.ModelServers {
+	// Open the store so oauth servers can resolve their shared token (the Codex
+	// /models catalog needs it); non-oauth servers use their static api_key.
+	var oauthProv *openai_auth.Provider
+	if st, err := store.Open(cfg.Server.DBPath); err == nil {
+		defer st.Close()
+		oauthProv = openai_auth.NewProvider(openai_auth.NewStoreAdapter(st), http.DefaultClient)
+	} else {
+		fmt.Fprintf(os.Stderr, "warning: could not open store for oauth token: %v\n", err)
+	}
+
+	for i := range cfg.ModelServers {
+		srv := &cfg.ModelServers[i]
 		fmt.Printf("Model server: %s (%s)\n", srv.Name, srv.APIBase)
-		models, err := llm.ListModels(context.Background(), http.DefaultClient, srv.APIBase, srv.APIKey)
+		token := config.StaticToken(srv.APIKey)
+		accountID := ""
+		if srv.UsesOAuth() && oauthProv != nil {
+			token = oauthProv.Token
+			accountID, _ = oauthProv.AccountID()
+		}
+		provider := llm.NewProvider(http.DefaultClient, srv, token, accountID)
+		models, err := provider.ListModels(context.Background())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  error: %v\n", err)
 			continue
@@ -85,6 +110,25 @@ func listModels(cfg *config.Config) {
 			fmt.Printf("  - %s\n", model)
 		}
 	}
+}
+
+// openaiLogin runs the local-browser PKCE flow on this host and persists the
+// shared token. Use this when lemon-chat runs where a browser is available; for
+// a remote/LAN install, use the admin "Connect OpenAI account" paste-the-code UI.
+func openaiLogin(st *store.Store) {
+	provider := openai_auth.NewProvider(openai_auth.NewStoreAdapter(st), http.DefaultClient)
+	tokens, err := openai_auth.Login(context.Background(), http.DefaultClient)
+	if err != nil {
+		log.Fatalf("openai-login: %v", err)
+	}
+	if err := provider.SetTokens(tokens); err != nil {
+		log.Fatalf("openai-login: persisting token: %v", err)
+	}
+	acct := tokens.AccountID
+	if acct == "" {
+		acct = "(unknown)"
+	}
+	log.Printf("openai-login: linked OpenAI account %s — token stored", acct)
 }
 
 func bootstrap(st *store.Store, cfg *config.Config) error {

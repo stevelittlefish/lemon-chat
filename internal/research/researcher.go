@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stevelittlefish/lemon-chat/internal/config"
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"github.com/stevelittlefish/lemon-chat/internal/redditimport"
 	"github.com/stevelittlefish/lemon-chat/internal/searx"
 )
@@ -115,16 +117,25 @@ type Config struct {
 	RedditResume          *RedditResume
 	OnRedditRoundComplete func(State) error
 	APIBase               string
-	APIKey                string
-	// WorkerModel, WorkerAPIBase, and WorkerAPIKey optionally point the worker
+	// APIToken resolves the bearer token for the job (writer) model at call
+	// time, so a long-running job picks up refreshed OAuth tokens. A nil source
+	// means no Authorization header.
+	APIToken config.TokenSource
+	// APIResponses selects the OpenAI Responses API surface for the writer model;
+	// APIAccountID is the chatgpt-account-id header sent with it.
+	APIResponses bool
+	APIAccountID string
+	// WorkerModel, WorkerAPIBase, and WorkerAPIToken optionally point the worker
 	// tier (extraction + the mechanical slug/classify/query-gen/decide calls) at
 	// a separate, cheaper model. When WorkerModel is empty the worker tier reuses
-	// the job model (Model/APIBase/APIKey).
-	WorkerModel   string
-	WorkerAPIBase string
-	WorkerAPIKey  string
-	SearXNGURL    string
-	Location      *time.Location
+	// the job model (Model/APIBase/APIToken).
+	WorkerModel     string
+	WorkerAPIBase   string
+	WorkerAPIToken  config.TokenSource
+	WorkerResponses bool
+	WorkerAccountID string
+	SearXNGURL      string
+	Location        *time.Location
 
 	MaxRounds       int
 	MaxTime         time.Duration
@@ -142,6 +153,14 @@ type Config struct {
 	// ExtraRounds is the number of bonus "creative" rounds to run after the
 	// report would normally be considered complete (effort 4 → 1, effort 5 → 2).
 	ExtraRounds int
+
+	// HTTPClient overrides the HTTP client used for model calls (tests inject a
+	// mock transport). Nil uses http.DefaultClient.
+	HTTPClient *http.Client
+
+	// CacheKey is a stable per-job identifier sent as the Responses
+	// prompt_cache_key so a job's repeated prompts route to the same prompt cache.
+	CacheKey string
 }
 
 // PendingRedditRound is the complete durable boundary between search and
@@ -178,9 +197,8 @@ type Progress struct {
 }
 
 type Researcher struct {
-	cfg    Config
-	state  State
-	client *http.Client
+	cfg   Config
+	state State
 
 	// writer is the strong job model (plan, synthesis, final/deep report);
 	// worker is the cheap/fast model for extraction and the mechanical calls.
@@ -207,12 +225,22 @@ func New(cfg Config, state State, onProgress func(Progress), onCheckpoint func(S
 	if cfg.Mode == "" {
 		cfg.Mode = ModeResearch
 	}
-	writer := modelEndpoint{Model: cfg.Model, APIBase: cfg.APIBase, APIKey: cfg.APIKey}
+	client := cfg.HTTPClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	writer := modelEndpoint{
+		Model:    cfg.Model,
+		Provider: llm.NewOpenAIProvider(client, cfg.APIBase, cfg.APIResponses, cfg.APIToken, cfg.APIAccountID),
+	}
 	worker := writer
 	if cfg.WorkerModel != "" {
-		worker = modelEndpoint{Model: cfg.WorkerModel, APIBase: cfg.WorkerAPIBase, APIKey: cfg.WorkerAPIKey}
+		worker = modelEndpoint{
+			Model:    cfg.WorkerModel,
+			Provider: llm.NewOpenAIProvider(client, cfg.WorkerAPIBase, cfg.WorkerResponses, cfg.WorkerAPIToken, cfg.WorkerAccountID),
+		}
 	}
-	return &Researcher{cfg: cfg, state: state, client: http.DefaultClient, writer: writer, worker: worker, onProgress: onProgress, onCheckpoint: onCheckpoint}
+	return &Researcher{cfg: cfg, state: state, writer: writer, worker: worker, onProgress: onProgress, onCheckpoint: onCheckpoint}
 }
 
 // brainstorm reports whether this is an ideation run rather than a

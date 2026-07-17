@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -10,15 +11,18 @@ import (
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
+	"github.com/stevelittlefish/lemon-chat/internal/openai_auth"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
 type Server struct {
-	cfg         *config.Config
-	store       *store.Store
-	hub         *Hub
-	modelClient *http.Client
-	research    *researchManager
+	cfg           *config.Config
+	store         *store.Store
+	hub           *Hub
+	modelClient   *http.Client
+	research      *researchManager
+	oauth         *openai_auth.Provider
+	pendingLogins *pendingLogins
 }
 
 func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
@@ -31,7 +35,34 @@ func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
 		},
 	}
 	InitTools(cfg)
-	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client, research: newResearchManager()}
+	oauth := openai_auth.NewProvider(openai_auth.NewStoreAdapter(st), client)
+	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client, research: newResearchManager(), oauth: oauth, pendingLogins: newPendingLogins()}
+}
+
+// tokenSource returns a TokenSource that yields the correct bearer token for
+// srv: the shared OAuth token when the server uses oauth, otherwise its static
+// api_key. Resolving lazily (rather than baking in a string) lets long-running
+// and detached work pick up refreshed OAuth tokens.
+func (s *Server) tokenSource(srv *config.ModelServer) config.TokenSource {
+	if srv.UsesOAuth() {
+		return s.oauth.Token
+	}
+	return config.StaticToken(srv.APIKey)
+}
+
+// bearerToken resolves the current bearer token for srv.
+func (s *Server) bearerToken(ctx context.Context, srv *config.ModelServer) (string, error) {
+	return s.tokenSource(srv)(ctx)
+}
+
+// oauthAccountID returns the linked ChatGPT account id for oauth servers (the
+// chatgpt-account-id header), or "" for non-oauth servers or when unlinked.
+func (s *Server) oauthAccountID(srv *config.ModelServer) string {
+	if !srv.UsesOAuth() {
+		return ""
+	}
+	id, _ := s.oauth.AccountID()
+	return id
 }
 
 func (s *Server) Handler() http.Handler {
@@ -98,6 +129,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/admin/users/{id}", s.requireAdmin(s.handleAdminUpdateUser))
 	mux.HandleFunc("DELETE /api/admin/users/{id}", s.requireAdmin(s.handleAdminDeleteUser))
 	mux.HandleFunc("GET /api/admin/tools/models", s.requireAdmin(s.handleAdminListModels))
+	mux.HandleFunc("GET /api/admin/openai/status", s.requireAdmin(s.handleOpenAIStatus))
+	mux.HandleFunc("POST /api/admin/openai/login/begin", s.requireAdmin(s.handleOpenAILoginBegin))
+	mux.HandleFunc("POST /api/admin/openai/login/complete", s.requireAdmin(s.handleOpenAILoginComplete))
+	mux.HandleFunc("POST /api/admin/openai/disconnect", s.requireAdmin(s.handleOpenAIDisconnect))
 	mux.HandleFunc("POST /api/admin/note-packs/import", s.requireAdmin(s.handleAdminImportNotePack))
 
 	// Research

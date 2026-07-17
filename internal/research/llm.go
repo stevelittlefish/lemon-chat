@@ -22,9 +22,8 @@ type chatMsg struct {
 // "worker" endpoint (the high-volume extraction plus the mechanical calls);
 // worker defaults to writer when no separate worker model is configured.
 type modelEndpoint struct {
-	Model   string
-	APIBase string
-	APIKey  string
+	Model    string
+	Provider llm.Provider
 }
 
 // llmCall makes a non-streaming chat completion request on the writer endpoint
@@ -44,10 +43,10 @@ func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []cha
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	result, err := llm.ChatCompleteWithUsage(callCtx, r.client, ep.APIBase+"/chat/completions", ep.APIKey, ep.Model, msgs, map[string]any{
-		"temperature": temperature,
-		"max_tokens":  maxTokens,
-	})
+	temp := temperature
+	result, err := ep.Provider.Stream(callCtx, llm.Request{
+		Model: ep.Model, Messages: msgs, MaxTokens: maxTokens, Temperature: &temp, CacheKey: r.cfg.CacheKey,
+	}, llm.Handler{})
 	if err != nil {
 		return "", err
 	}
@@ -73,14 +72,18 @@ func (r *Researcher) llmCallStreamFinish(ctx context.Context, msgs []chatMsg, te
 
 	var full strings.Builder
 	var lastEmit time.Time
-	result, err := llm.ChatCompleteStreamWithUsage(callCtx, r.client, r.writer.APIBase+"/chat/completions", r.writer.APIKey, r.writer.Model, msgs,
-		map[string]any{"temperature": temperature, "max_tokens": maxTokens}, func(text string) {
-			full.WriteString(text)
-			if onDelta != nil && time.Since(lastEmit) >= 250*time.Millisecond {
-				lastEmit = time.Now()
-				onDelta(full.Len(), tailOf(full.String(), 300))
-			}
-		})
+	ep := r.writer
+	onText := func(text string) {
+		full.WriteString(text)
+		if onDelta != nil && time.Since(lastEmit) >= 250*time.Millisecond {
+			lastEmit = time.Now()
+			onDelta(full.Len(), tailOf(full.String(), 300))
+		}
+	}
+	temp := temperature
+	result, err := ep.Provider.Stream(callCtx, llm.Request{
+		Model: ep.Model, Messages: msgs, MaxTokens: maxTokens, Temperature: &temp, CacheKey: r.cfg.CacheKey,
+	}, llm.Handler{OnText: onText})
 	if err != nil {
 		return "", "", err
 	}
