@@ -436,7 +436,7 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 	}
 	genCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	html, cost, err := s.generateReportHTML(genCtx, htmlModel, title, markdown, direction, func(generated int, tail string) {
+	html, complete, cost, err := s.generateReportHTML(genCtx, htmlModel, title, markdown, direction, func(generated int, tail string) {
 		data, _ := json.Marshal(research.Progress{Phase: "designing", Generated: generated, Snippet: tail})
 		run.broadcast(data)
 	})
@@ -444,11 +444,14 @@ func (s *Server) autoGenerateHTMLReport(ctx context.Context, run *researchRun, j
 		log.Printf("research: job %d: auto HTML report: %v", job.ID, err)
 		return price
 	}
+	if !complete {
+		log.Printf("research: job %d: auto HTML report incomplete (%d chars); saving partial for recovery", job.ID, len(html))
+	}
 	if err := s.store.SetDefaultResearchReportHTML(job.ID, html, direction, cost); err != nil {
 		log.Printf("research: job %d: save auto HTML report: %v", job.ID, err)
 		return price
 	}
-	log.Printf("Generated HTML report id=%d model=%q chars=%d", job.ID, htmlModel, len(html))
+	log.Printf("Generated HTML report id=%d model=%q chars=%d complete=%t", job.ID, htmlModel, len(html), complete)
 	return addResearchPrice(price, cost)
 }
 

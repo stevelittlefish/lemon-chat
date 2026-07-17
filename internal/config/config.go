@@ -31,6 +31,7 @@ type Research struct {
 	MaxReportTokens       int    `toml:"max_report_tokens"`      // backward-compat alias — seeds synthesis_tokens when that key is unset
 	SynthesisTokens       int    `toml:"synthesis_tokens"`       // max_tokens for the per-round synthesis call
 	FinalReportTokens     int    `toml:"final_report_tokens"`    // max_tokens for the final report (and deep-report section) writes
+	HTMLReportTokens      int    `toml:"html_report_tokens"`     // max_tokens per call for the designed HTML report step (truncated calls are auto-continued)
 	ExtractionConcurrency int    `toml:"extraction_concurrency"` // concurrent URL fetch+extract tasks
 	MinRounds             int    `toml:"min_rounds"`             // stop-check is skipped until this many rounds complete
 	MaxEmptyRounds        int    `toml:"max_empty_rounds"`       // consecutive zero-finding rounds before aborting
@@ -121,6 +122,7 @@ func Load(path string) (*Config, error) {
 			MaxContentChars:       15000,
 			MaxReportTokens:       8192,
 			FinalReportTokens:     32768,
+			HTMLReportTokens:      16384,
 			ExtractionConcurrency: 3,
 			MinRounds:             2,
 			MaxEmptyRounds:        2,

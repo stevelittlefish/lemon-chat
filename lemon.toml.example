@@ -80,6 +80,7 @@ model_server = "local"
 # synthesis_tokens = 8192     # max_tokens for the per-round synthesis (working summary)
 # final_report_tokens = 32768 # max_tokens for the final report (and deep-report section) writes — separate from synthesis so the report is not capped at the smaller synthesis budget
 # max_report_tokens = 8192    # deprecated alias — seeds synthesis_tokens when that key is unset
+# html_report_tokens = 16384  # max_tokens per call for the designed HTML report step; if a call is truncated it is auto-continued (up to 4 times) so large documents still finish
 # extraction_concurrency = 3  # concurrent URL fetch+extract tasks
 # min_rounds = 2              # stop-check is skipped until this many rounds complete
 # max_empty_rounds = 2        # consecutive zero-finding rounds before aborting

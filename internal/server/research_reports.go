@@ -183,7 +183,7 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 		}
 		log.Printf("Remix HTML job_id=%d — designing document from %d chars", job.ID, len(source))
 		writeReportEvent(w, flusher, map[string]any{"phase": "generating-html", "message": "designing the HTML document"})
-		h, cost, err := s.generateReportHTML(ctx, htmlModel, title, source, req.Direction, func(generated int, tail string) {
+		h, complete, cost, err := s.generateReportHTML(ctx, htmlModel, title, source, req.Direction, func(generated int, tail string) {
 			writeReportEvent(w, flusher, map[string]any{"phase": "generating-html", "generated": generated, "snippet": tail})
 		})
 		if err != nil {
@@ -191,6 +191,10 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 			writeReportEvent(w, flusher, map[string]any{"error": err.Error()})
 			writeReportDone(w, flusher)
 			return
+		}
+		if !complete {
+			log.Printf("Remix HTML job_id=%d — document incomplete (%d chars); saving partial for recovery", job.ID, len(h))
+			writeReportEvent(w, flusher, map[string]any{"phase": "generating-html", "message": "the HTML document was truncated; saving the partial result"})
 		}
 		html = h
 		htmlCost = cost
@@ -283,43 +287,84 @@ func remixModelLabel(markdownModel, htmlModel string) string {
 	}
 }
 
+// htmlReportContinuePrompt is sent after a truncated HTML generation to resume
+// it. The output cap is per-call, so continuing gives a fresh token budget
+// without trimming any of the prompt, keeping the result accurate.
+const htmlReportContinuePrompt = `The HTML document was cut off before it finished. Continue it from exactly where it stopped, picking up mid-token if necessary. Output only the raw continuation — no repetition of what you already wrote, no commentary, no Markdown fences.`
+
+// htmlReportMaxContinuations bounds how many times a truncated HTML generation
+// is resumed before we give up and save whatever was produced.
+const htmlReportMaxContinuations = 4
+
 // generateReportHTML renders report markdown as a self-contained HTML document
 // using the editorial-design prompt shared by the interactive regenerate flow
 // and the auto-generated report step. onProgress, if non-nil, receives throttled
 // updates carrying the characters generated so far and the tail of the output.
-func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown, direction string, onProgress func(generated int, tail string)) (string, *float64, error) {
+//
+// The returned bool reports whether a complete document (<!doctype … </html>)
+// was produced. When it is false the returned string still holds the best-effort
+// partial output so callers can persist it for recovery. A non-nil error means
+// the very first call failed with nothing generated.
+func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown, direction string, onProgress func(generated int, tail string)) (string, bool, *float64, error) {
 	modelServer, err := s.cfg.ServerForModel(model)
 	if err != nil {
-		return "", nil, fmt.Errorf("unknown model %q", model)
+		return "", false, nil, fmt.Errorf("unknown model %q", model)
 	}
 	userPrompt := fmt.Sprintf("Document title: %s\n\nResearch report:\n%s", title, markdown)
 	if direction != "" {
 		userPrompt += "\n\nAdditional art direction from the user:\n" + direction
 	}
+	messages := []llm.Message{
+		{Role: "system", Content: reportHTMLSystemPrompt},
+		{Role: "user", Content: userPrompt},
+	}
+	extra := map[string]any{"temperature": 0.7}
+	if s.cfg.Research.HTMLReportTokens > 0 {
+		extra["max_tokens"] = s.cfg.Research.HTMLReportTokens
+	}
+
 	var generated strings.Builder
 	lastProgress := time.Time{}
-	completion, err := llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
-		[]llm.Message{{Role: "system", Content: reportHTMLSystemPrompt}, {Role: "user", Content: userPrompt}},
-		map[string]any{"temperature": 0.7}, func(delta string) {
-			generated.WriteString(delta)
-			if onProgress == nil || time.Since(lastProgress) < 250*time.Millisecond {
-				return
+	var totalCost *float64
+	finished := false
+	for round := 0; round <= htmlReportMaxContinuations; round++ {
+		completion, err := llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
+			messages, extra, func(delta string) {
+				generated.WriteString(delta)
+				if onProgress == nil || time.Since(lastProgress) < 250*time.Millisecond {
+					return
+				}
+				lastProgress = time.Now()
+				tail := generated.String()
+				if len(tail) > 320 {
+					tail = tail[len(tail)-320:]
+				}
+				onProgress(generated.Len(), tail)
+			})
+		totalCost = addCost(totalCost, completion.UsageCost())
+		if err != nil {
+			// Nothing salvageable on the first call is a hard failure; otherwise
+			// keep whatever streamed and stop continuing.
+			if generated.Len() == 0 {
+				return "", false, totalCost, fmt.Errorf("HTML generation failed: %w", err)
 			}
-			lastProgress = time.Now()
-			tail := generated.String()
-			if len(tail) > 320 {
-				tail = tail[len(tail)-320:]
-			}
-			onProgress(generated.Len(), tail)
-		})
-	if err != nil {
-		return "", nil, fmt.Errorf("HTML generation failed: %w", err)
+			log.Printf("research report: HTML continuation failed after %d chars: %v", generated.Len(), err)
+			break
+		}
+		if completion.FinishReason != "length" {
+			finished = true
+			break
+		}
+		if round < htmlReportMaxContinuations {
+			log.Printf("research report: HTML output truncated at %d chars, continuing (round %d)", generated.Len(), round+1)
+		}
+		messages = append(messages,
+			llm.Message{Role: "assistant", Content: completion.Content},
+			llm.Message{Role: "user", Content: htmlReportContinuePrompt},
+		)
 	}
-	html, err := normalizeReportHTML(completion.Content)
-	if err != nil {
-		return "", nil, err
-	}
-	return html, completion.UsageCost(), nil
+	html, complete := normalizeReportHTML(generated.String())
+	return html, finished && complete, totalCost, nil
 }
 
 // addCost sums two optional costs; nil is treated as zero, and the result is nil
@@ -346,7 +391,11 @@ func writeReportDone(w http.ResponseWriter, flusher http.Flusher) {
 	flusher.Flush()
 }
 
-func normalizeReportHTML(content string) (string, error) {
+// normalizeReportHTML trims fences/prose around the document and reports whether
+// the result is a complete HTML document. When it is not (e.g. the model was
+// truncated), the best-effort partial is still returned so it can be saved for
+// recovery rather than discarded.
+func normalizeReportHTML(content string) (string, bool) {
 	html := strings.TrimSpace(content)
 	if start := strings.Index(strings.ToLower(html), "<!doctype html"); start >= 0 {
 		html = html[start:]
@@ -355,10 +404,8 @@ func normalizeReportHTML(content string) (string, error) {
 		html = html[:end+len("</html>")]
 	}
 	lower := strings.ToLower(html)
-	if !strings.HasPrefix(lower, "<!doctype html") || !strings.Contains(lower, "<html") || !strings.Contains(lower, "</html>") {
-		return "", fmt.Errorf("model did not return a complete HTML document")
-	}
-	return html, nil
+	complete := strings.HasPrefix(lower, "<!doctype html") && strings.Contains(lower, "<html") && strings.Contains(lower, "</html>")
+	return html, complete
 }
 
 func (s *Server) getOwnedResearchReport(w http.ResponseWriter, r *http.Request) (*store.ResearchReport, bool) {
