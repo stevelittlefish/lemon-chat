@@ -161,6 +161,12 @@ func (p *httpProvider) Stream(ctx context.Context, req Request, h Handler) (Comp
 	if p.accountID != "" {
 		hreq.Header.Set("chatgpt-account-id", p.accountID)
 	}
+	// The Codex backend only engages prompt caching when a stable session-id
+	// header is present (the body prompt_cache_key alone is not enough — verified
+	// against the live endpoint). Send the request's cache key as the session id.
+	if p.responses && req.CacheKey != "" {
+		hreq.Header.Set("session-id", req.CacheKey)
+	}
 
 	resp, err := p.client.Do(hreq)
 	if err != nil {
