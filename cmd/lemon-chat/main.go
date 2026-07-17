@@ -78,10 +78,26 @@ func main() {
 }
 
 func listModels(cfg *config.Config) {
+	// Open the store so oauth servers can resolve their shared token (the Codex
+	// /models catalog needs it); non-oauth servers use their static api_key.
+	var oauthProv *openai_auth.Provider
+	if st, err := store.Open(cfg.Server.DBPath); err == nil {
+		defer st.Close()
+		oauthProv = openai_auth.NewProvider(openai_auth.NewStoreAdapter(st), http.DefaultClient)
+	} else {
+		fmt.Fprintf(os.Stderr, "warning: could not open store for oauth token: %v\n", err)
+	}
+
 	for i := range cfg.ModelServers {
 		srv := &cfg.ModelServers[i]
 		fmt.Printf("Model server: %s (%s)\n", srv.Name, srv.APIBase)
-		provider := llm.NewProvider(http.DefaultClient, srv, config.StaticToken(srv.APIKey), "")
+		token := config.StaticToken(srv.APIKey)
+		accountID := ""
+		if srv.UsesOAuth() && oauthProv != nil {
+			token = oauthProv.Token
+			accountID, _ = oauthProv.AccountID()
+		}
+		provider := llm.NewProvider(http.DefaultClient, srv, token, accountID)
 		models, err := provider.ListModels(context.Background())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  error: %v\n", err)

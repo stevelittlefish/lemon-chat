@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 )
@@ -175,34 +176,66 @@ func (p *httpProvider) Stream(ctx context.Context, req Request, h Handler) (Comp
 }
 
 func (p *httpProvider) ListModels(ctx context.Context) ([]string, error) {
-	// The ChatGPT/Codex Responses backend exposes no model-enumeration endpoint,
-	// so return the built-in roster (no network, no auth needed).
-	if p.responses {
-		out := append([]string(nil), CodexModels...)
-		sort.Strings(out)
-		return out, nil
-	}
 	key, err := p.token(ctx)
 	if err != nil {
 		return nil, err
 	}
+	if p.responses {
+		return listCodexModels(ctx, p.client, p.base, key, p.accountID)
+	}
 	return ListModels(ctx, p.client, p.base, key)
 }
 
-// CodexModels is the built-in roster returned for a Responses/Codex server, which
-// has no enumeration endpoint. It's a curated starter list — edit to taste; the
-// authoritative model IDs are whatever your ChatGPT/Codex plan accepts, and the
-// roster here is only a discovery convenience (any ID can be used in a [[model]]
-// entry regardless of whether it appears here).
-var CodexModels = []string{
-	"gpt-5.6-codex",
-	"gpt-5.5-codex",
-	"gpt-5.4-codex",
-	"gpt-5.3-codex",
-	"gpt-5.2-codex",
-	"gpt-5.1-codex",
-	"gpt-5.1-codex-mini",
-	"gpt-5.1-codex-max",
+// listCodexModels fetches the Codex model catalog (GET {base}/models) using the
+// OAuth token and account header. Unlike the OpenAI-compatible /models
+// ({"data":[{"id":…}]}), the Codex backend returns {"models":[{"slug":…}]}, so
+// it needs its own parse. The list is live and authoritative — the ids depend on
+// the linked account's plan.
+// codexClientVersion is sent as the required client_version query param on the
+// Codex /models catalog request. The backend requires the field; any valid
+// semver is accepted.
+const codexClientVersion = "0.0.0"
+
+func listCodexModels(ctx context.Context, client *http.Client, apiBase, token, accountID string) ([]string, error) {
+	url := strings.TrimRight(apiBase, "/") + "/models?client_version=" + codexClientVersion
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	if accountID != "" {
+		req.Header.Set("chatgpt-account-id", accountID)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("model request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, body)
+	}
+	var result struct {
+		Models []struct {
+			Slug string `json:"slug"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	models := make([]string, 0, len(result.Models))
+	for _, m := range result.Models {
+		if m.Slug != "" {
+			models = append(models, m.Slug)
+		}
+	}
+	sort.Strings(models)
+	return models, nil
 }
 
 // readChatCompletionsStreamFull parses a chat-completions SSE body into text,
