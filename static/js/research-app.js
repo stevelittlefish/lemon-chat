@@ -437,7 +437,7 @@ async function showDetail(id) {
   main.innerHTML = `
     <div class="research-detail-heading">
       <div class="research-detail-actions">
-        <button id="research-reuse" class="btn btn-sm btn-secondary" title="Start a new research job with this one's settings pre-filled">${icon('copy', 14)} Reuse</button>
+        <button id="research-reuse" class="btn btn-sm btn-secondary" title="Start a new research job with this one's settings pre-filled">${icon('copy', 14)} Recreate</button>
         ${!running && hasExploreData(job) ? `<button id="research-explore" class="btn btn-sm btn-secondary">${icon('list', 14)} Explore Data</button>` : ''}
         ${job.final_report ? `<button id="research-remix" class="btn btn-sm btn-secondary">${icon('refresh-cw', 14)} Remix</button>` : ''}
         ${terminal ? `
