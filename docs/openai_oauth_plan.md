@@ -45,6 +45,26 @@ Responses support must therefore cover **both** paths.
 
 ## Phased plan
 
+### LAN hosting and the fixed redirect URI
+
+OpenAI's redirect allow-list pins the OAuth callback to
+`http://localhost:1455/auth/callback` — it **cannot** be changed to lemon-chat's LAN address. So
+when the server runs on a home-network box but the admin's browser is on a different machine, the
+loopback callback can never reach the server. There are therefore two login drivers over the same
+PKCE flow (both already implemented in `internal/openai_auth`):
+
+- **Local browser** (`Login`) — binds the loopback callback server on the same machine and
+  captures the redirect automatically. Only works when the browser and server share a host (or via
+  the `--openai-login` CLI run on the box).
+- **Paste-the-code** (`Begin` / `ParsePasted` / `Complete`) — for LAN hosting. `Begin` returns an
+  authorize URL to open; after sign-in the browser lands on the dead `localhost:1455` URL, whose
+  address bar still carries `?code=…&state=…`; the admin pastes that URL (or the bare code) into
+  lemon-chat, and `Complete` exchanges it. The `PendingLogin` (PKCE verifier + state) is held
+  in-process, keyed to the admin's session, between the two requests.
+
+This makes **paste-the-code the primary flow** for the typical LAN deployment; the Phase 6 UI
+leads with it and offers the local-browser flow as a convenience when co-located.
+
 ### Phase 1 — OAuth login core (`internal/openai_auth`)  ← this PR starts here
 
 Self-contained, standard-library-only package, no wiring into the server yet so it can be
@@ -108,8 +128,10 @@ tests. Not yet persisted or wired to requests.
 
 ### Phase 6 — Linking UI + CLI
 
-- `--openai-login` CLI subcommand to run the flow on the host (headless-friendly).
-- Admin-only "Connect OpenAI account" control showing connected state / plan / expiry.
+- `--openai-login` CLI subcommand to run the local-browser flow on the host (headless-friendly).
+- Admin-only "Connect OpenAI account" control that leads with the **paste-the-code** flow (open
+  authorize URL → paste the redirected URL back) for LAN deployments, showing connected state /
+  account / expiry. The server holds the `PendingLogin` in memory between Begin and Complete.
 
 ---
 

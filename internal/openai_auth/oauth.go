@@ -17,12 +17,17 @@ const (
 	authorizePath = "/oauth/authorize"
 	tokenPath     = "/oauth/token"
 
-	// clientID is OpenAI's public client identifier for the Codex CLI. It is not
+	// clientID is OpenAI's public client identifier that unlocks
+	// ChatGPT-subscription quota — identical in codex-rs, pi, and imp. It is not
 	// a secret; PKCE protects the flow.
 	clientID = "app_EMoamEEZ73f0CkXaXp7hrann"
 
-	// redirectPort is the fixed loopback port the authorize redirect returns to,
-	// matching what the client is registered for.
+	// originator identifies lemon-chat honestly to the backend.
+	originator = "lemon-chat"
+
+	// redirectPort is the primary loopback port the authorize redirect returns
+	// to; it must match OpenAI's redirect allow-list (which cannot be changed to
+	// a LAN address — hence the paste-the-code flow for remote hosting).
 	redirectPort = 1455
 	redirectPath = "/auth/callback"
 
@@ -34,7 +39,9 @@ const (
 	refreshSkew = 60 * time.Second
 )
 
-// redirectURI is the loopback callback URL registered for the client.
+// redirectURI is the loopback callback URL registered for the client. The port
+// is fixed by OpenAI's allow-list, so both the local-browser flow and the
+// paste-the-code flow declare the same value.
 func redirectURI() string {
 	return fmt.Sprintf("http://localhost:%d%s", redirectPort, redirectPath)
 }
@@ -66,7 +73,10 @@ func authorizeURL(challenge, state string) string {
 	q.Set("scope", scope)
 	q.Set("code_challenge", challenge)
 	q.Set("code_challenge_method", "S256")
+	q.Set("id_token_add_organizations", "true")
+	q.Set("codex_cli_simplified_flow", "true")
 	q.Set("state", state)
+	q.Set("originator", originator)
 	return issuer + authorizePath + "?" + q.Encode()
 }
 
