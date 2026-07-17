@@ -142,16 +142,34 @@ tool_calls`) and `BuildResponsesBody` lowers replayed `tool_calls` / tool result
 `messages.go` drives Responses tool calls unchanged. Remaining: live end-to-end verification
 against the real Codex endpoint (multi-round tool loops, reasoning items).
 
-### Phase 5.5 — Provider abstraction (PREREQUISITE, do before Phase 6)
+### Phase 5.5 — Provider abstraction (PREREQUISITE, do before Phase 6)  ✅ done
 
-Before finishing the login UI, refactor the scattered `if UsesResponses()` dispatch into a proper
-provider seam so the target set (openai, openai-oauth/codex, ollama-native, anthropic) is
-supportable. Full design in [`provider_abstraction.md`](provider_abstraction.md). Summary: a neutral
-`Request`/`Handler`/`Completion` + `Provider` interface + a single `NewProvider` factory; wrap
-current chat-completions as `openaichat`, recast Responses as `openaicodex`, migrate the ~4 call
-sites, no behaviour change. `OnThinking`/`Thinking`/`ReasoningEffort` go into the interface now
-(unpopulated) so streaming-thinking (backlog) doesn't require touching every decoder later. User
-tests on the local server after this lands, before Phase 6.
+Refactored the scattered `if UsesResponses()` dispatch into a provider seam. Full design in
+[`provider_abstraction.md`](provider_abstraction.md). Delivered:
+
+- `internal/llm/provider.go`: neutral `Request` + `Handler` (`OnStart`/`OnText`/`OnThinking`/
+  `OnRawFrame`) + `Completion` (now carries `ToolCalls`/`Thinking`) + `Provider` interface, and a
+  single `httpProvider` serving both OpenAI chat-completions and Responses (they share transport,
+  differing only in body + stream shape). `readChatCompletionsStreamFull` is the one parser both
+  surfaces use (Responses is converted to chat-completions frames first).
+- `NewProvider(srv, token, accountID)` / `NewOpenAIProvider(...)` factory — the single dispatch
+  point. Call sites are now protocol-blind.
+- Migrated: chat (`messages.go` — provider drives the tool loop; SSE now committed lazily via
+  `OnStart` so the unreachable-model / no-orphan-message behaviour is preserved), research
+  (`research/llm.go` writer+worker endpoints now hold a `Provider`), and the HTML report writer
+  (`research_reports.go`). Removed the dead scattered branches, duplicate endpoint builders, and
+  the `streamToolCall` type.
+- `OnThinking`/`Thinking`/`ReasoningEffort` present but unpopulated (streaming-thinking backlog).
+- **Behaviour note:** research's mechanical/extraction calls now stream (`stream=true`) like every
+  other call — identical results from a real server; the one affected unit test was updated to
+  route its mock by content instead of the stream flag.
+
+**Deferred cleanup (not blocking):** the title worker (`internal/tasks`) and `summariseHTML`
+(`tools.go`) still call `llm.ChatComplete` directly on static api_key; and the now-unused
+streaming helpers (`ChatCompleteStream*`, `ResponsesStreamWithUsage`) remain. Fold these in / delete
+them after local testing confirms the seam.
+
+**→ User tests on the local server before Phase 6.**
 
 ### Phase 6 — Linking UI + CLI
 

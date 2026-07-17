@@ -44,9 +44,14 @@ type Completion struct {
 	Content string
 	Usage   *Usage
 	// FinishReason is the provider's stop reason for the first choice, e.g.
-	// "stop" (natural end) or "length" (hit max_tokens — output truncated).
-	// Empty when the provider did not report one.
+	// "stop" (natural end), "length" (hit max_tokens — output truncated), or
+	// "tool_calls". Empty when the provider did not report one.
 	FinishReason string
+	// ToolCalls holds any function calls parsed from the stream (provider seam).
+	ToolCalls []ToolCall
+	// Thinking is accumulated reasoning/thinking text. Reserved: persisted for
+	// display but never sent back to the model. Not yet populated.
+	Thinking string
 }
 
 func (c Completion) UsageCost() *float64 {

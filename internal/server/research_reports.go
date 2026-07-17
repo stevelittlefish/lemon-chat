@@ -320,20 +320,14 @@ func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown,
 		{Role: "system", Content: reportHTMLSystemPrompt},
 		{Role: "user", Content: userPrompt},
 	}
-	extra := map[string]any{"temperature": 0.7}
-	if s.cfg.Research.HTMLReportTokens > 0 {
-		extra["max_tokens"] = s.cfg.Research.HTMLReportTokens
-	}
+	temperature := 0.7
+	provider := llm.NewProvider(s.modelClient, modelServer, s.tokenSource(modelServer), s.oauthAccountID(modelServer))
 
 	var generated strings.Builder
 	lastProgress := time.Time{}
 	var totalCost *float64
 	finished := false
 	for round := 0; round <= htmlReportMaxContinuations; round++ {
-		token, err := s.bearerToken(ctx, modelServer)
-		if err != nil {
-			return "", false, nil, err
-		}
 		onText := func(delta string) {
 			generated.WriteString(delta)
 			if onProgress == nil || time.Since(lastProgress) < 250*time.Millisecond {
@@ -346,14 +340,12 @@ func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown,
 			}
 			onProgress(generated.Len(), tail)
 		}
-		var completion llm.Completion
-		if modelServer.UsesResponses() {
-			completion, err = llm.ResponsesStreamWithUsage(ctx, s.modelClient, modelServer.Endpoint(), token, s.oauthAccountID(modelServer), model,
-				messages, nil, extra, onText)
-		} else {
-			completion, err = llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.Endpoint(), token, model,
-				messages, extra, onText)
-		}
+		completion, err := provider.Stream(ctx, llm.Request{
+			Model:       model,
+			Messages:    messages,
+			MaxTokens:   s.cfg.Research.HTMLReportTokens,
+			Temperature: &temperature,
+		}, llm.Handler{OnText: onText})
 		totalCost = addCost(totalCost, completion.UsageCost())
 		if err != nil {
 			// Nothing salvageable on the first call is a hard failure; otherwise

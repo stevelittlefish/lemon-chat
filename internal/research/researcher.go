@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"github.com/stevelittlefish/lemon-chat/internal/redditimport"
 	"github.com/stevelittlefish/lemon-chat/internal/searx"
 )
@@ -152,6 +153,10 @@ type Config struct {
 	// ExtraRounds is the number of bonus "creative" rounds to run after the
 	// report would normally be considered complete (effort 4 → 1, effort 5 → 2).
 	ExtraRounds int
+
+	// HTTPClient overrides the HTTP client used for model calls (tests inject a
+	// mock transport). Nil uses http.DefaultClient.
+	HTTPClient *http.Client
 }
 
 // PendingRedditRound is the complete durable boundary between search and
@@ -188,9 +193,8 @@ type Progress struct {
 }
 
 type Researcher struct {
-	cfg    Config
-	state  State
-	client *http.Client
+	cfg   Config
+	state State
 
 	// writer is the strong job model (plan, synthesis, final/deep report);
 	// worker is the cheap/fast model for extraction and the mechanical calls.
@@ -217,12 +221,22 @@ func New(cfg Config, state State, onProgress func(Progress), onCheckpoint func(S
 	if cfg.Mode == "" {
 		cfg.Mode = ModeResearch
 	}
-	writer := modelEndpoint{Model: cfg.Model, APIBase: cfg.APIBase, Token: cfg.APIToken, Responses: cfg.APIResponses, AccountID: cfg.APIAccountID}
+	client := cfg.HTTPClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	writer := modelEndpoint{
+		Model:    cfg.Model,
+		Provider: llm.NewOpenAIProvider(client, cfg.APIBase, cfg.APIResponses, cfg.APIToken, cfg.APIAccountID),
+	}
 	worker := writer
 	if cfg.WorkerModel != "" {
-		worker = modelEndpoint{Model: cfg.WorkerModel, APIBase: cfg.WorkerAPIBase, Token: cfg.WorkerAPIToken, Responses: cfg.WorkerResponses, AccountID: cfg.WorkerAccountID}
+		worker = modelEndpoint{
+			Model:    cfg.WorkerModel,
+			Provider: llm.NewOpenAIProvider(client, cfg.WorkerAPIBase, cfg.WorkerResponses, cfg.WorkerAPIToken, cfg.WorkerAccountID),
+		}
 	}
-	return &Researcher{cfg: cfg, state: state, client: http.DefaultClient, writer: writer, worker: worker, onProgress: onProgress, onCheckpoint: onCheckpoint}
+	return &Researcher{cfg: cfg, state: state, writer: writer, worker: worker, onProgress: onProgress, onCheckpoint: onCheckpoint}
 }
 
 // brainstorm reports whether this is an ideation run rather than a
