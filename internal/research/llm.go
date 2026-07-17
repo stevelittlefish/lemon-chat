@@ -46,7 +46,7 @@ func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []cha
 	temp := temperature
 	result, err := ep.Provider.Stream(callCtx, llm.Request{
 		Model: ep.Model, Messages: msgs, MaxTokens: maxTokens, Temperature: &temp, CacheKey: r.cfg.CacheKey,
-	}, llm.Handler{})
+	}, llm.Handler{ErrorLog: r.cfg.ErrorLog})
 	if err != nil {
 		return "", err
 	}
@@ -83,7 +83,7 @@ func (r *Researcher) llmCallStreamFinish(ctx context.Context, msgs []chatMsg, te
 	temp := temperature
 	result, err := ep.Provider.Stream(callCtx, llm.Request{
 		Model: ep.Model, Messages: msgs, MaxTokens: maxTokens, Temperature: &temp, CacheKey: r.cfg.CacheKey,
-	}, llm.Handler{OnText: onText})
+	}, llm.Handler{OnText: onText, ErrorLog: r.cfg.ErrorLog})
 	if err != nil {
 		return "", "", err
 	}

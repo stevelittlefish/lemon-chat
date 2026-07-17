@@ -23,6 +23,7 @@ type Server struct {
 	research      *researchManager
 	oauth         *openai_auth.Provider
 	pendingLogins *pendingLogins
+	modelErrors   *modelErrorLog
 }
 
 func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
@@ -36,7 +37,7 @@ func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
 	}
 	InitTools(cfg)
 	oauth := openai_auth.NewProvider(openai_auth.NewStoreAdapter(st), client)
-	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client, research: newResearchManager(), oauth: oauth, pendingLogins: newPendingLogins()}
+	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client, research: newResearchManager(), oauth: oauth, pendingLogins: newPendingLogins(), modelErrors: newModelErrorLog(cfg.Server.DataDir)}
 }
 
 // tokenSource returns a TokenSource that yields the correct bearer token for

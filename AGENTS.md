@@ -341,6 +341,19 @@ Content-Type: text/event-stream
 data: {"type":"response.output_text.delta",...}
 ```
 
+### Model error log (always on)
+
+Separately from the opt-in token log, every model request that **fails** — a
+transport error, a non-2xx response, or a mid-stream error event — has its
+redacted HTTP transcript appended to `<data_dir>/model_errors.log`. No flag
+enables it; successful requests write nothing, so the file only ever contains
+failures. This is what to check first when a chat or research call errors.
+
+The transcript is buffered in memory per request (capped at 1 MiB, keeping the
+tail where the failing frame is) and flushed on failure only. Redaction matches
+the token log. It's wired via `llm.Handler.ErrorLog`; the shared sink lives in
+`internal/server/errorlog.go`.
+
 ## Keeping TODO.md current
 
 Use `TODO.md` to track planned work, not as a changelog for every request.

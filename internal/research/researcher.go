@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"sort"
@@ -161,6 +162,10 @@ type Config struct {
 	// CacheKey is a stable per-job identifier sent as the Responses
 	// prompt_cache_key so a job's repeated prompts route to the same prompt cache.
 	CacheKey string
+
+	// ErrorLog, if set, receives a redacted HTTP transcript for any failed model
+	// call made by the job (see llm.Handler.ErrorLog). Nil disables it.
+	ErrorLog io.Writer
 }
 
 // PendingRedditRound is the complete durable boundary between search and

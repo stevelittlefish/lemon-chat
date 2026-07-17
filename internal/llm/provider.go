@@ -67,7 +67,20 @@ type Handler struct {
 	// headers, exact JSON body, response status and headers, and raw response
 	// body. Credential-bearing headers are redacted. Callers own and close it.
 	WireLog io.Writer
+	// ErrorLog, if set, receives the same redacted transcript as WireLog but only
+	// when the request fails (transport error, non-2xx, or a stream error) — so a
+	// long-lived process can leave it on and only ever write failures to disk.
+	// The transcript is buffered in memory (capped at errorLogCapBytes) and
+	// flushed here in a single Write on failure. Callers own it and must make
+	// concurrent Writes safe. Independent of WireLog; either, both, or neither.
+	ErrorLog io.Writer
 }
+
+// errorLogCapBytes bounds the in-memory transcript buffer kept per request for
+// the on-error dump. Transcripts are normally a few KB; the cap only matters for
+// pathologically long streams, where the most recent bytes (which carry the
+// failing frame) are kept and the head is dropped with a truncation marker.
+const errorLogCapBytes = 1 << 20 // 1 MiB
 
 // Provider streams one assistant turn and lists reachable models. Concrete
 // implementations lower a Request to their wire protocol.
@@ -172,22 +185,43 @@ func (p *httpProvider) Stream(ctx context.Context, req Request, h Handler) (Comp
 	if p.responses && req.CacheKey != "" {
 		hreq.Header.Set("session_id", req.CacheKey)
 	}
-	writeWireRequest(h.WireLog, hreq, payload)
+
+	// transcript is the always-captured sink: WireLog (if any) plus an in-memory
+	// capped buffer that is flushed to ErrorLog only on failure. flushOnError
+	// does that flush; it is a no-op when ErrorLog is nil.
+	transcript, errBuf := h.transcriptSinks()
+	flushOnError := func(cause error) {
+		if h.ErrorLog == nil || errBuf == nil {
+			return
+		}
+		var dump bytes.Buffer
+		fmt.Fprintf(&dump, "\n===== model error model=%s endpoint=%s: %v =====\n",
+			req.Model, p.endpoint(), cause)
+		dump.Write(errBuf.Bytes())
+		fmt.Fprint(&dump, "\n===== end model error =====\n")
+		h.ErrorLog.Write(dump.Bytes())
+	}
+
+	writeWireRequest(transcript, hreq, payload)
 
 	resp, err := p.client.Do(hreq)
 	if err != nil {
-		writeWireError(h.WireLog, err)
-		return Completion{}, fmt.Errorf("model request failed: %w", err)
+		writeWireError(transcript, err)
+		wrapped := fmt.Errorf("model request failed: %w", err)
+		flushOnError(wrapped)
+		return Completion{}, wrapped
 	}
 	defer resp.Body.Close()
-	writeWireResponse(h.WireLog, resp)
-	if h.WireLog != nil {
-		resp.Body = io.NopCloser(io.TeeReader(resp.Body, h.WireLog))
+	writeWireResponse(transcript, resp)
+	if transcript != nil {
+		resp.Body = io.NopCloser(io.TeeReader(resp.Body, transcript))
 	}
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		writeWireEnd(h.WireLog)
-		return Completion{}, fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
+		writeWireEnd(transcript)
+		wrapped := fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
+		flushOnError(wrapped)
+		return Completion{}, wrapped
 	}
 	if h.OnStart != nil {
 		h.OnStart()
@@ -198,8 +232,65 @@ func (p *httpProvider) Stream(ctx context.Context, req Request, h Handler) (Comp
 		body = ResponsesToChatSSE(resp.Body)
 	}
 	completion, err := readChatCompletionsStreamFull(body, h)
-	writeWireEnd(h.WireLog)
+	writeWireEnd(transcript)
+	if err != nil {
+		flushOnError(err)
+	}
 	return completion, err
+}
+
+// transcriptSinks returns the combined writer that the wire-transcript helpers
+// write to, plus the capped buffer feeding ErrorLog (nil when ErrorLog is off).
+// The returned writer is nil when neither WireLog nor ErrorLog is set, so the
+// helpers stay no-ops and no capture happens.
+func (h Handler) transcriptSinks() (io.Writer, *capBuffer) {
+	var sinks []io.Writer
+	var errBuf *capBuffer
+	if h.WireLog != nil {
+		sinks = append(sinks, h.WireLog)
+	}
+	if h.ErrorLog != nil {
+		errBuf = &capBuffer{cap: errorLogCapBytes}
+		sinks = append(sinks, errBuf)
+	}
+	switch len(sinks) {
+	case 0:
+		return nil, nil
+	case 1:
+		return sinks[0], errBuf
+	default:
+		return io.MultiWriter(sinks...), errBuf
+	}
+}
+
+// capBuffer is an io.Writer that retains at most cap bytes, keeping the most
+// recent when it overflows (the failing frame is at the end of a stream). It is
+// written from a single goroutine per request, so it needs no locking.
+type capBuffer struct {
+	buf       []byte
+	cap       int
+	truncated int64
+}
+
+func (c *capBuffer) Write(p []byte) (int, error) {
+	n := len(p)
+	c.buf = append(c.buf, p...)
+	if len(c.buf) > c.cap {
+		drop := len(c.buf) - c.cap
+		c.truncated += int64(drop)
+		c.buf = append(c.buf[:0], c.buf[drop:]...)
+	}
+	return n, nil
+}
+
+// Bytes returns the retained transcript, prefixed with a marker when earlier
+// bytes were dropped to stay under the cap.
+func (c *capBuffer) Bytes() []byte {
+	if c.truncated == 0 {
+		return c.buf
+	}
+	prefix := fmt.Sprintf("[... %d earlier byte(s) truncated to stay under cap ...]\n", c.truncated)
+	return append([]byte(prefix), c.buf...)
 }
 
 func writeWireRequest(w io.Writer, req *http.Request, payload []byte) {

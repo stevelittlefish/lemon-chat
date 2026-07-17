@@ -338,7 +338,8 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 	for loop := 0; loop < maxToolLoops; loop++ {
 		h := llm.Handler{
-			OnStart: commit,
+			ErrorLog: s.modelErrors,
+			OnStart:  commit,
 			OnText: func(delta string) {
 				if !committed {
 					return
