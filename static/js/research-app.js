@@ -10,6 +10,9 @@ const main = document.getElementById('research-main');
 let modelList = [];
 let formDefaults = { effort: 3, max_time_minutes: 10 };
 let abortEvents = null; // aborts the active SSE subscription
+// Set by the "Reuse" button on a job to carry that job's parameters back to the
+// new-research form; consumed (once) by showList to prefill every field.
+let pendingPrefill = null;
 
 // Effort levels — value matches the 1–5 scale the backend expects.
 const EFFORT_LEVELS = [
@@ -245,6 +248,43 @@ async function showList() {
   main.querySelectorAll('.research-item').forEach((el) => {
     el.addEventListener('click', () => { location.hash = el.dataset.id; });
   });
+
+  if (pendingPrefill) {
+    applyPrefill(pendingPrefill, { modeSel, htmlReportCheck, advanced, moreToggle });
+    pendingPrefill = null;
+  }
+}
+
+// applyPrefill populates every field of the new-research form from a saved job's
+// parameters (see the "Reuse" button). It dispatches change events so dependent
+// UI (mode relabelling, HTML-style visibility) updates, and opens the advanced
+// section so the carried-over settings are all visible.
+function applyPrefill(p, { modeSel, htmlReportCheck, advanced, moreToggle }) {
+  const set = (elId, value) => { const el = document.getElementById(elId); if (el) el.value = value; };
+  const check = (elId, value) => { const el = document.getElementById(elId); if (el) el.checked = value; };
+
+  set('research-title', p.title);
+  set('research-query', p.query);
+  set('research-model', p.model);
+  set('research-effort', String(p.effort));
+  set('research-worker-model', p.worker_model);
+  set('research-time', String(p.max_time_minutes));
+  set('research-html-model', p.html_report_model);
+  set('research-html-style', p.html_report_direction);
+  check('research-deep-report', p.deep_report);
+  check('research-pause-reddit', p.pause_reddit_import);
+  check('research-force-search', p.force_search);
+
+  // Set values that drive dependent UI, then fire change so their handlers run.
+  modeSel.value = p.mode;
+  modeSel.dispatchEvent(new Event('change'));
+  htmlReportCheck.checked = p.auto_html_report;
+  htmlReportCheck.dispatchEvent(new Event('change'));
+
+  // Reveal the advanced tier so nothing carried over is hidden.
+  advanced.hidden = false;
+  moreToggle.setAttribute('aria-expanded', 'true');
+  moreToggle.classList.add('open');
 }
 
 async function startResearch() {
@@ -397,6 +437,7 @@ async function showDetail(id) {
   main.innerHTML = `
     <div class="research-detail-heading">
       <div class="research-detail-actions">
+        <button id="research-reuse" class="btn btn-sm btn-secondary" title="Start a new research job with this one's settings pre-filled">${icon('copy', 14)} Reuse</button>
         ${!running && hasExploreData(job) ? `<button id="research-explore" class="btn btn-sm btn-secondary">${icon('list', 14)} Explore Data</button>` : ''}
         ${job.final_report ? `<button id="research-remix" class="btn btn-sm btn-secondary">${icon('refresh-cw', 14)} Remix</button>` : ''}
         ${terminal ? `
@@ -450,6 +491,24 @@ async function showDetail(id) {
     const heading = job.title || job.query;
     const preamble = job.title && job.query ? `# ${job.title}\n\n${job.query}\n\n` : `# ${heading}\n\n`;
     downloadFile(`${slugify(heading)}.md`, 'text/markdown', preamble + job.final_report);
+  });
+  document.getElementById('research-reuse')?.addEventListener('click', () => {
+    pendingPrefill = {
+      title: job.title || '',
+      query: job.query || '',
+      model: job.model || '',
+      mode: job.mode || 'research',
+      force_search: !!job.force_search,
+      deep_report: !!job.deep_report,
+      auto_html_report: !!job.auto_html_report,
+      html_report_direction: job.html_report_direction || '',
+      html_report_model: job.html_report_model || '',
+      worker_model: job.worker_model || '',
+      pause_reddit_import: !!job.pause_reddit_import,
+      effort: job.effort || formDefaults.effort,
+      max_time_minutes: job.max_time_seconds ? Math.round(job.max_time_seconds / 60) : formDefaults.max_time_minutes,
+    };
+    location.hash = '';
   });
   document.getElementById('research-explore')?.addEventListener('click', () => {
     location.hash = `${id}/explore`;
