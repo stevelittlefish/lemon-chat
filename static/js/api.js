@@ -198,7 +198,7 @@ export const completions = {
 
 // Research
 export const research = {
-  list: () => request('GET', '/api/research'),
+  list: (page = 1) => request('GET', `/api/research?page=${page}`),
   defaults: () => request('GET', '/api/research/defaults'),
   get: (id) => request('GET', `/api/research/${id}`),
   debug: (id) => request('GET', `/api/research/${id}/debug`),

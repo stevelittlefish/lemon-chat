@@ -13,6 +13,9 @@ let abortEvents = null; // aborts the active SSE subscription
 // Set by the "Reuse" button on a job to carry that job's parameters back to the
 // new-research form; consumed (once) by showList to prefill every field.
 let pendingPrefill = null;
+// Current page of the past-research list (1-based). Retained across navigation
+// so returning from a job lands back on the same page.
+let listPage = 1;
 
 // Effort levels — value matches the 1–5 scale the backend expects.
 const EFFORT_LEVELS = [
@@ -113,7 +116,14 @@ function statusBadge(status) {
 async function showList() {
   stopEvents();
   setBackBtn(false);
-  const jobs = await research.list();
+  const listResult = await research.list(listPage);
+  const jobs = listResult.jobs || [];
+  const total = listResult.total || 0;
+  const pageSize = listResult.page_size || jobs.length || 1;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  // The server clamps out-of-range pages; mirror its answer so prev/next math
+  // and the indicator stay correct.
+  listPage = listResult.page || 1;
 
   const options = ['<option value="">default model</option>']
     .concat(modelList.map((m) =>
@@ -205,7 +215,13 @@ async function showList() {
     <p class="research-section-label">past research</p>
     <div class="research-list">
       ${items || '<p class="research-empty">no research yet — ask a question above to get started</p>'}
-    </div>`;
+    </div>
+    ${pageCount > 1 ? `
+      <div class="research-pagination">
+        <button type="button" id="research-prev" class="btn btn-sm btn-secondary" ${listPage <= 1 ? 'disabled' : ''}>${icon('chevron-left', 14)} Previous</button>
+        <span class="research-pagination-status">page ${listPage} of ${pageCount}</span>
+        <button type="button" id="research-next" class="btn btn-sm btn-secondary" ${listPage >= pageCount ? 'disabled' : ''}>Next ${icon('chevron-right', 14)}</button>
+      </div>` : ''}`;
 
   // Relabel the prompt and action when switching to brainstorm mode, which is
   // about inventing/designing rather than searching the web.
@@ -247,6 +263,13 @@ async function showList() {
   });
   main.querySelectorAll('.research-item').forEach((el) => {
     el.addEventListener('click', () => { location.hash = el.dataset.id; });
+  });
+
+  document.getElementById('research-prev')?.addEventListener('click', () => {
+    if (listPage > 1) { listPage -= 1; showList(); }
+  });
+  document.getElementById('research-next')?.addEventListener('click', () => {
+    if (listPage < pageCount) { listPage += 1; showList(); }
   });
 
   if (pendingPrefill) {

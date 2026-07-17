@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -712,9 +713,30 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, researchView(job))
 }
 
+// researchListPageSize is the number of jobs returned per page of the list.
+const researchListPageSize = 20
+
 func (s *Server) handleListResearch(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
-	jobs, err := s.store.ListResearchJobs(user.ID)
+
+	total, err := s.store.CountResearchJobs(user.ID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	// page is 1-based; clamp to a valid range so an out-of-bounds request just
+	// returns the nearest real page instead of an empty list or an error.
+	pageCount := (total + researchListPageSize - 1) / researchListPageSize
+	page := 1
+	if v, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && v > 0 {
+		page = v
+	}
+	if pageCount > 0 && page > pageCount {
+		page = pageCount
+	}
+	offset := (page - 1) * researchListPageSize
+
+	jobs, err := s.store.ListResearchJobs(user.ID, researchListPageSize, offset)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -736,7 +758,12 @@ func (s *Server) handleListResearch(w http.ResponseWriter, r *http.Request) {
 		view.ReportHTML = htmlReports[jobs[i].ID]
 		views = append(views, view)
 	}
-	writeJSON(w, http.StatusOK, views)
+	writeJSON(w, http.StatusOK, struct {
+		Jobs     []researchJobView `json:"jobs"`
+		Total    int               `json:"total"`
+		Page     int               `json:"page"`
+		PageSize int               `json:"page_size"`
+	}{Jobs: views, Total: total, Page: page, PageSize: researchListPageSize})
 }
 
 func (s *Server) handleGetResearch(w http.ResponseWriter, r *http.Request) {

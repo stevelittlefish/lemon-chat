@@ -134,9 +134,19 @@ func (s *Store) GetResearchJob(id, userID int64) (*ResearchJob, error) {
 		`SELECT `+researchJobCols+` FROM research_job WHERE id = ? AND user_id = ?`, id, userID))
 }
 
-func (s *Store) ListResearchJobs(userID int64) ([]ResearchJob, error) {
-	rows, err := s.db.Query(
-		`SELECT `+researchJobCols+` FROM research_job WHERE user_id = ? ORDER BY created_at DESC`, userID)
+// ListResearchJobs returns one page of a user's jobs, newest first. limit caps
+// the page size; offset skips earlier rows. A non-positive limit returns all
+// jobs (no pagination).
+func (s *Store) ListResearchJobs(userID int64, limit, offset int) ([]ResearchJob, error) {
+	// id DESC is a deterministic tiebreaker: without it, jobs sharing a created_at
+	// order arbitrarily, so a row could repeat or be skipped across page bounds.
+	query := `SELECT ` + researchJobCols + ` FROM research_job WHERE user_id = ? ORDER BY created_at DESC, id DESC`
+	args := []any{userID}
+	if limit > 0 {
+		query += ` LIMIT ? OFFSET ?`
+		args = append(args, limit, offset)
+	}
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +160,14 @@ func (s *Store) ListResearchJobs(userID int64) ([]ResearchJob, error) {
 		items = append(items, *j)
 	}
 	return items, rows.Err()
+}
+
+// CountResearchJobs returns the total number of research jobs for a user, used
+// to compute the page count for the list view.
+func (s *Store) CountResearchJobs(userID int64) (int, error) {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM research_job WHERE user_id = ?`, userID).Scan(&n)
+	return n, err
 }
 
 // ListResumableResearchJobs returns jobs that were in flight when the server

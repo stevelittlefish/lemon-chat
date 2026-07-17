@@ -232,3 +232,49 @@ func TestMigrationsV31AndV32PreserveExistingResearchData(t *testing.T) {
 		t.Fatalf("default report not back-filled: %+v, err=%v", def, err)
 	}
 }
+
+func TestListResearchJobsPagination(t *testing.T) {
+	s := newTestStore(t)
+	user, err := s.CreateUser("paginator", nil, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const n = 5
+	for i := 0; i < n; i++ {
+		if _, err := s.CreateResearchJob(user.ID, "Title", "Query", "model", "research", false, false, false, false, "", "", "", 3, 600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	total, err := s.CountResearchJobs(user.ID)
+	if err != nil || total != n {
+		t.Fatalf("CountResearchJobs = %d, %v; want %d", total, err, n)
+	}
+
+	// First page of 2, then the remainder; pages must not overlap and must be
+	// newest-first.
+	page1, err := s.ListResearchJobs(user.ID, 2, 0)
+	if err != nil || len(page1) != 2 {
+		t.Fatalf("page1 len = %d, %v; want 2", len(page1), err)
+	}
+	page2, err := s.ListResearchJobs(user.ID, 2, 2)
+	if err != nil || len(page2) != 2 {
+		t.Fatalf("page2 len = %d, %v; want 2", len(page2), err)
+	}
+	page3, err := s.ListResearchJobs(user.ID, 2, 4)
+	if err != nil || len(page3) != 1 {
+		t.Fatalf("page3 len = %d, %v; want 1", len(page3), err)
+	}
+	if page1[0].ID <= page1[1].ID {
+		t.Errorf("page not newest-first: %d then %d", page1[0].ID, page1[1].ID)
+	}
+	if page1[1].ID == page2[0].ID {
+		t.Errorf("pages overlap at id=%d", page2[0].ID)
+	}
+
+	// A non-positive limit returns everything (no pagination).
+	all, err := s.ListResearchJobs(user.ID, 0, 0)
+	if err != nil || len(all) != n {
+		t.Fatalf("unpaged len = %d, %v; want %d", len(all), err, n)
+	}
+}
