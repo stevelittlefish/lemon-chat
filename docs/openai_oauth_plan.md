@@ -142,6 +142,17 @@ tool_calls`) and `BuildResponsesBody` lowers replayed `tool_calls` / tool result
 `messages.go` drives Responses tool calls unchanged. Remaining: live end-to-end verification
 against the real Codex endpoint (multi-round tool loops, reasoning items).
 
+### Phase 5.5 — Provider abstraction (PREREQUISITE, do before Phase 6)
+
+Before finishing the login UI, refactor the scattered `if UsesResponses()` dispatch into a proper
+provider seam so the target set (openai, openai-oauth/codex, ollama-native, anthropic) is
+supportable. Full design in [`provider_abstraction.md`](provider_abstraction.md). Summary: a neutral
+`Request`/`Handler`/`Completion` + `Provider` interface + a single `NewProvider` factory; wrap
+current chat-completions as `openaichat`, recast Responses as `openaicodex`, migrate the ~4 call
+sites, no behaviour change. `OnThinking`/`Thinking`/`ReasoningEffort` go into the interface now
+(unpopulated) so streaming-thinking (backlog) doesn't require touching every decoder later. User
+tests on the local server after this lands, before Phase 6.
+
 ### Phase 6 — Linking UI + CLI
 
 - `--openai-login` CLI subcommand to run the local-browser flow on the host (headless-friendly).
