@@ -825,6 +825,28 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v39 → v40 complete")
 	}
 
+	if version < 41 {
+		log.Println("store: migrating v40 → v41 (oauth_token single-row table)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE oauth_token (
+				id            INTEGER PRIMARY KEY CHECK (id = 1),
+				provider      TEXT    NOT NULL DEFAULT 'openai',
+				access_token  TEXT    NOT NULL,
+				refresh_token TEXT    NOT NULL,
+				id_token      TEXT    NOT NULL DEFAULT '',
+				account_id    TEXT    NOT NULL DEFAULT '',
+				expiry        TEXT    NOT NULL,
+				updated_at    TEXT    NOT NULL
+			)`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (41, ?)`, now()); err != nil {
+			return err
+		}
+		version = 41
+		log.Println("store: migration v40 → v41 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

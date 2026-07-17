@@ -108,8 +108,9 @@ tests. Not yet persisted or wired to requests.
   exercise it.
 - Loopback redirect assumes the browser and server share a host; the `--openai-login` CLI path
   covers headless installs.
-- Whether to target the ChatGPT-subscription Responses surface directly or token-exchange for an
-  API key — a terms/entitlement question to confirm before Phase 4.
+- **Resolved:** target the ChatGPT-subscription Responses surface directly (no token-exchange to
+  an API key). This is an accepted, documented pattern used by other tools (e.g. Pi agent,
+  opencode) and confirmed acceptable by OpenAI.
 
 ## Effort estimate
 
