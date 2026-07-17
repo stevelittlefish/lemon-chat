@@ -120,15 +120,21 @@ type Config struct {
 	// time, so a long-running job picks up refreshed OAuth tokens. A nil source
 	// means no Authorization header.
 	APIToken config.TokenSource
+	// APIResponses selects the OpenAI Responses API surface for the writer model;
+	// APIAccountID is the chatgpt-account-id header sent with it.
+	APIResponses bool
+	APIAccountID string
 	// WorkerModel, WorkerAPIBase, and WorkerAPIToken optionally point the worker
 	// tier (extraction + the mechanical slug/classify/query-gen/decide calls) at
 	// a separate, cheaper model. When WorkerModel is empty the worker tier reuses
 	// the job model (Model/APIBase/APIToken).
-	WorkerModel    string
-	WorkerAPIBase  string
-	WorkerAPIToken config.TokenSource
-	SearXNGURL     string
-	Location       *time.Location
+	WorkerModel     string
+	WorkerAPIBase   string
+	WorkerAPIToken  config.TokenSource
+	WorkerResponses bool
+	WorkerAccountID string
+	SearXNGURL      string
+	Location        *time.Location
 
 	MaxRounds       int
 	MaxTime         time.Duration
@@ -211,10 +217,10 @@ func New(cfg Config, state State, onProgress func(Progress), onCheckpoint func(S
 	if cfg.Mode == "" {
 		cfg.Mode = ModeResearch
 	}
-	writer := modelEndpoint{Model: cfg.Model, APIBase: cfg.APIBase, Token: cfg.APIToken}
+	writer := modelEndpoint{Model: cfg.Model, APIBase: cfg.APIBase, Token: cfg.APIToken, Responses: cfg.APIResponses, AccountID: cfg.APIAccountID}
 	worker := writer
 	if cfg.WorkerModel != "" {
-		worker = modelEndpoint{Model: cfg.WorkerModel, APIBase: cfg.WorkerAPIBase, Token: cfg.WorkerAPIToken}
+		worker = modelEndpoint{Model: cfg.WorkerModel, APIBase: cfg.WorkerAPIBase, Token: cfg.WorkerAPIToken, Responses: cfg.WorkerResponses, AccountID: cfg.WorkerAccountID}
 	}
 	return &Researcher{cfg: cfg, state: state, client: http.DefaultClient, writer: writer, worker: worker, onProgress: onProgress, onCheckpoint: onCheckpoint}
 }

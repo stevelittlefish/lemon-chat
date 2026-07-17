@@ -112,19 +112,35 @@ tests. Not yet persisted or wired to requests.
   The actual Responses request/response translation is Phase 4 — until then an `api = "responses"`
   server still receives chat-completions-shaped requests.
 
-### Phase 4 — Responses API translation (the main work)
+### Phase 4 — Responses API translation (the main work)  ✅ done
 
-- `internal/llm/responses.go`: request mapping (`messages[]` → `input[]` + `instructions`,
-  `max_tokens` → `max_output_tokens`, tool-schema shape, `/responses` endpoint) and an SSE event
-  demuxer mapping Responses events (`response.output_text.delta`, `response.completed`,
-  `response.function_call_arguments.delta`, …) onto the existing `onDelta` / usage callbacks.
-- Route `messages.go`'s inline builder through the same abstraction so **chat and research share
-  one implementation**.
+Implemented as **translation at both ends**, so there is no second parser and chat + research
+share one implementation:
 
-### Phase 5 — Tool-call loop adaptation
+- `internal/llm/responses.go`:
+  - `BuildResponsesBody` lowers chat-completions messages + tools into a Responses request body —
+    system prompts → `instructions`, messages → item-oriented `input` (`input_text` /
+    `output_text` / `function_call` / `function_call_output`), tools flattened to
+    `{type,name,description,parameters}`, `max_tokens` → `max_output_tokens`, `temperature`
+    dropped (Codex rejects it), `store:false`, `include:["reasoning.encrypted_content"]`.
+  - `ResponsesToChatSSE` converts the `response.*` SSE grammar back into chat-completions
+    `data:{choices:[{delta}]}` frames (text deltas, tool-call start/args deltas, terminal
+    finish_reason + usage), via an `io.Pipe`. Reasoning deltas are not forwarded as content.
+  - `ResponsesStreamWithUsage` + a shared `readChatCompletionsStream` helper so both surfaces use
+    one parser.
+- **Chat** (`messages.go`): builds the Responses body when the server uses it and wraps the
+  response with `ResponsesToChatSSE` before its existing inline parser — otherwise unchanged.
+- **Research** (`research/llm.go`, `research_reports.go`): `modelEndpoint`/`Config` carry a
+  Responses flag + account id; streaming and non-streaming calls (and the HTML report writer)
+  route through `ResponsesStreamWithUsage` when the endpoint is a Responses server.
 
-- Adapt the `max_tool_loops` loop to the Responses `function_call` output items and feed tool
-  results back as `function_call_output` input items.
+### Phase 5 — Tool-call loop adaptation  ✅ largely covered by Phase 4
+
+Because `ResponsesToChatSSE` emits chat-completions tool-call frames (with `finish_reason:
+tool_calls`) and `BuildResponsesBody` lowers replayed `tool_calls` / tool results into
+`function_call` / `function_call_output` items, the **existing** `max_tool_loops` loop in
+`messages.go` drives Responses tool calls unchanged. Remaining: live end-to-end verification
+against the real Codex endpoint (multi-round tool loops, reasoning items).
 
 ### Phase 6 — Linking UI + CLI
 

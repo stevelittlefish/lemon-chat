@@ -305,8 +305,16 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	defer cancelResp()
 
 	doRequest := func() (*http.Response, error) {
-		payloadMap["messages"] = chatMsgs
-		p, _ := json.Marshal(payloadMap)
+		var p []byte
+		if modelServer.UsesResponses() {
+			var err error
+			if p, err = llm.BuildResponsesBody(modelName, chatMsgs, activeToolDefs, nil, true); err != nil {
+				return nil, err
+			}
+		} else {
+			payloadMap["messages"] = chatMsgs
+			p, _ = json.Marshal(payloadMap)
+		}
 		hreq, err := http.NewRequestWithContext(ctx, "POST", chatURL, bytes.NewReader(p))
 		if err != nil {
 			return nil, err
@@ -382,7 +390,13 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		var pendingCalls []*streamToolCall
 		var finishReason string
 
-		scanErr := llm.ScanSSE(resp.Body, func(data string) error {
+		// Responses-API servers stream a different event grammar; convert it back
+		// to chat-completions frames so the parser below is unchanged.
+		var streamBody io.Reader = resp.Body
+		if modelServer.UsesResponses() {
+			streamBody = llm.ResponsesToChatSSE(resp.Body)
+		}
+		scanErr := llm.ScanSSE(streamBody, func(data string) error {
 			if tokenLog != nil {
 				fmt.Fprintf(tokenLog, "[loop=%d] data: %s\n", loop, data)
 			}

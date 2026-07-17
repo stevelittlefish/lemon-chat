@@ -26,6 +26,18 @@ type modelEndpoint struct {
 	Model   string
 	APIBase string
 	Token   config.TokenSource
+	// Responses selects the OpenAI Responses API surface; AccountID is the
+	// chatgpt-account-id header sent with it.
+	Responses bool
+	AccountID string
+}
+
+// url returns the generation endpoint for this endpoint's API surface.
+func (ep modelEndpoint) url() string {
+	if ep.Responses {
+		return ep.APIBase + "/responses"
+	}
+	return ep.APIBase + "/chat/completions"
 }
 
 // token resolves the endpoint's current bearer token, tolerating a nil source.
@@ -57,10 +69,14 @@ func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []cha
 	if err != nil {
 		return "", err
 	}
-	result, err := llm.ChatCompleteWithUsage(callCtx, r.client, ep.APIBase+"/chat/completions", key, ep.Model, msgs, map[string]any{
-		"temperature": temperature,
-		"max_tokens":  maxTokens,
-	})
+	extra := map[string]any{"temperature": temperature, "max_tokens": maxTokens}
+	var result llm.Completion
+	if ep.Responses {
+		// Responses has no non-streaming helper; stream with no delta callback.
+		result, err = llm.ResponsesStreamWithUsage(callCtx, r.client, ep.url(), key, ep.AccountID, ep.Model, msgs, nil, extra, nil)
+	} else {
+		result, err = llm.ChatCompleteWithUsage(callCtx, r.client, ep.url(), key, ep.Model, msgs, extra)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -86,18 +102,25 @@ func (r *Researcher) llmCallStreamFinish(ctx context.Context, msgs []chatMsg, te
 
 	var full strings.Builder
 	var lastEmit time.Time
-	key, err := r.writer.token(callCtx)
+	ep := r.writer
+	key, err := ep.token(callCtx)
 	if err != nil {
 		return "", "", err
 	}
-	result, err := llm.ChatCompleteStreamWithUsage(callCtx, r.client, r.writer.APIBase+"/chat/completions", key, r.writer.Model, msgs,
-		map[string]any{"temperature": temperature, "max_tokens": maxTokens}, func(text string) {
-			full.WriteString(text)
-			if onDelta != nil && time.Since(lastEmit) >= 250*time.Millisecond {
-				lastEmit = time.Now()
-				onDelta(full.Len(), tailOf(full.String(), 300))
-			}
-		})
+	extra := map[string]any{"temperature": temperature, "max_tokens": maxTokens}
+	onText := func(text string) {
+		full.WriteString(text)
+		if onDelta != nil && time.Since(lastEmit) >= 250*time.Millisecond {
+			lastEmit = time.Now()
+			onDelta(full.Len(), tailOf(full.String(), 300))
+		}
+	}
+	var result llm.Completion
+	if ep.Responses {
+		result, err = llm.ResponsesStreamWithUsage(callCtx, r.client, ep.url(), key, ep.AccountID, ep.Model, msgs, nil, extra, onText)
+	} else {
+		result, err = llm.ChatCompleteStreamWithUsage(callCtx, r.client, ep.url(), key, ep.Model, msgs, extra, onText)
+	}
 	if err != nil {
 		return "", "", err
 	}

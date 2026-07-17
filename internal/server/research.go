@@ -248,9 +248,11 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	// error we fall back to the job model rather than failing the run.
 	workerModel, workerAPIBase := "", ""
 	var workerAPIToken config.TokenSource
+	workerResponses, workerAccountID := false, ""
 	if job.WorkerModel != nil && *job.WorkerModel != "" && *job.WorkerModel != job.Model {
 		if ws, wErr := s.cfg.ServerForModel(*job.WorkerModel); wErr == nil {
 			workerModel, workerAPIBase, workerAPIToken = *job.WorkerModel, ws.APIBase, s.tokenSource(ws)
+			workerResponses, workerAccountID = ws.UsesResponses(), s.oauthAccountID(ws)
 		} else {
 			log.Printf("research: job %d: worker model %q unresolved, using job model: %v", job.ID, *job.WorkerModel, wErr)
 		}
@@ -277,9 +279,13 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		PauseRedditImport:     job.PauseRedditImport,
 		APIBase:               modelServer.APIBase,
 		APIToken:              s.tokenSource(modelServer),
+		APIResponses:          modelServer.UsesResponses(),
+		APIAccountID:          s.oauthAccountID(modelServer),
 		WorkerModel:           workerModel,
 		WorkerAPIBase:         workerAPIBase,
 		WorkerAPIToken:        workerAPIToken,
+		WorkerResponses:       workerResponses,
+		WorkerAccountID:       workerAccountID,
 		SearXNGURL:            s.cfg.SearXNG.URL,
 		Location:              loc,
 		MaxRounds:             maxRounds,

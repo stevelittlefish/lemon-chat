@@ -187,10 +187,18 @@ func ChatCompleteStreamWithUsage(ctx context.Context, client *http.Client, chatU
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return Completion{}, fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
 	}
+	return readChatCompletionsStream(resp.Body, onDelta)
+}
+
+// readChatCompletionsStream parses a chat-completions SSE body, accumulating the
+// text content and capturing usage and finish reason. It is shared by the direct
+// chat-completions path and the Responses path (whose stream is first converted
+// to chat-completions frames), so both use one parser.
+func readChatCompletionsStream(body io.Reader, onDelta func(string)) (Completion, error) {
 	var full strings.Builder
 	var usage *Usage
 	var finishReason string
-	err = ScanSSE(resp.Body, func(data string) error {
+	err := ScanSSE(body, func(data string) error {
 		var chunk struct {
 			Choices []struct {
 				Delta struct {
@@ -225,4 +233,38 @@ func ChatCompleteStreamWithUsage(ctx context.Context, client *http.Client, chatU
 		return Completion{}, fmt.Errorf("stream read failed: %w", err)
 	}
 	return Completion{Content: full.String(), Usage: usage, FinishReason: finishReason}, nil
+}
+
+// ResponsesStreamWithUsage runs a streaming request against an OpenAI Responses
+// endpoint, translating the request from chat-completions messages and the
+// response stream back to chat-completions frames so the result matches
+// ChatCompleteStreamWithUsage. accountID, when set, is sent as the
+// chatgpt-account-id header the ChatGPT-subscription backend requires.
+func ResponsesStreamWithUsage(ctx context.Context, client *http.Client, url, apiKey, accountID, model string, messages any, tools any, extra map[string]any, onDelta func(string)) (Completion, error) {
+	payload, err := BuildResponsesBody(model, messages, tools, extra, true)
+	if err != nil {
+		return Completion{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(payload))
+	if err != nil {
+		return Completion{}, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	if accountID != "" {
+		req.Header.Set("chatgpt-account-id", accountID)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return Completion{}, fmt.Errorf("model request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return Completion{}, fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
+	}
+	return readChatCompletionsStream(ResponsesToChatSSE(resp.Body), onDelta)
 }

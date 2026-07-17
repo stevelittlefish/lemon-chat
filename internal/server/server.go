@@ -54,6 +54,16 @@ func (s *Server) bearerToken(ctx context.Context, srv *config.ModelServer) (stri
 	return s.tokenSource(srv)(ctx)
 }
 
+// oauthAccountID returns the linked ChatGPT account id for oauth servers (the
+// chatgpt-account-id header), or "" for non-oauth servers or when unlinked.
+func (s *Server) oauthAccountID(srv *config.ModelServer) string {
+	if !srv.UsesOAuth() {
+		return ""
+	}
+	id, _ := s.oauth.AccountID()
+	return id
+}
+
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 

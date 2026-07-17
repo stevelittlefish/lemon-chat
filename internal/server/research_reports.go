@@ -246,6 +246,8 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 		ReportInstruction: instruction,
 		APIBase:           modelServer.APIBase,
 		APIToken:          s.tokenSource(modelServer),
+		APIResponses:      modelServer.UsesResponses(),
+		APIAccountID:      s.oauthAccountID(modelServer),
 		SynthesisTokens:   s.cfg.Research.SynthesisTokens,
 		SynthesisWindow:   s.cfg.Research.SynthesisWindow,
 		FinalReportTokens: s.cfg.Research.FinalReportTokens,
@@ -332,19 +334,26 @@ func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown,
 		if err != nil {
 			return "", false, nil, err
 		}
-		completion, err := llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", token, model,
-			messages, extra, func(delta string) {
-				generated.WriteString(delta)
-				if onProgress == nil || time.Since(lastProgress) < 250*time.Millisecond {
-					return
-				}
-				lastProgress = time.Now()
-				tail := generated.String()
-				if len(tail) > 320 {
-					tail = tail[len(tail)-320:]
-				}
-				onProgress(generated.Len(), tail)
-			})
+		onText := func(delta string) {
+			generated.WriteString(delta)
+			if onProgress == nil || time.Since(lastProgress) < 250*time.Millisecond {
+				return
+			}
+			lastProgress = time.Now()
+			tail := generated.String()
+			if len(tail) > 320 {
+				tail = tail[len(tail)-320:]
+			}
+			onProgress(generated.Len(), tail)
+		}
+		var completion llm.Completion
+		if modelServer.UsesResponses() {
+			completion, err = llm.ResponsesStreamWithUsage(ctx, s.modelClient, modelServer.Endpoint(), token, s.oauthAccountID(modelServer), model,
+				messages, nil, extra, onText)
+		} else {
+			completion, err = llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.Endpoint(), token, model,
+				messages, extra, onText)
+		}
 		totalCost = addCost(totalCost, completion.UsageCost())
 		if err != nil {
 			// Nothing salvageable on the first call is a hard failure; otherwise
