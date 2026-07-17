@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/redditimport"
 	"github.com/stevelittlefish/lemon-chat/internal/searx"
 )
@@ -115,16 +116,19 @@ type Config struct {
 	RedditResume          *RedditResume
 	OnRedditRoundComplete func(State) error
 	APIBase               string
-	APIKey                string
-	// WorkerModel, WorkerAPIBase, and WorkerAPIKey optionally point the worker
+	// APIToken resolves the bearer token for the job (writer) model at call
+	// time, so a long-running job picks up refreshed OAuth tokens. A nil source
+	// means no Authorization header.
+	APIToken config.TokenSource
+	// WorkerModel, WorkerAPIBase, and WorkerAPIToken optionally point the worker
 	// tier (extraction + the mechanical slug/classify/query-gen/decide calls) at
 	// a separate, cheaper model. When WorkerModel is empty the worker tier reuses
-	// the job model (Model/APIBase/APIKey).
-	WorkerModel   string
-	WorkerAPIBase string
-	WorkerAPIKey  string
-	SearXNGURL    string
-	Location      *time.Location
+	// the job model (Model/APIBase/APIToken).
+	WorkerModel    string
+	WorkerAPIBase  string
+	WorkerAPIToken config.TokenSource
+	SearXNGURL     string
+	Location       *time.Location
 
 	MaxRounds       int
 	MaxTime         time.Duration
@@ -207,10 +211,10 @@ func New(cfg Config, state State, onProgress func(Progress), onCheckpoint func(S
 	if cfg.Mode == "" {
 		cfg.Mode = ModeResearch
 	}
-	writer := modelEndpoint{Model: cfg.Model, APIBase: cfg.APIBase, APIKey: cfg.APIKey}
+	writer := modelEndpoint{Model: cfg.Model, APIBase: cfg.APIBase, Token: cfg.APIToken}
 	worker := writer
 	if cfg.WorkerModel != "" {
-		worker = modelEndpoint{Model: cfg.WorkerModel, APIBase: cfg.WorkerAPIBase, APIKey: cfg.WorkerAPIKey}
+		worker = modelEndpoint{Model: cfg.WorkerModel, APIBase: cfg.WorkerAPIBase, Token: cfg.WorkerAPIToken}
 	}
 	return &Researcher{cfg: cfg, state: state, client: http.DefaultClient, writer: writer, worker: worker, onProgress: onProgress, onCheckpoint: onCheckpoint}
 }

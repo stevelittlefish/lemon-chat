@@ -245,7 +245,7 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 		Resynthesize:      resynthesize,
 		ReportInstruction: instruction,
 		APIBase:           modelServer.APIBase,
-		APIKey:            modelServer.APIKey,
+		APIToken:          s.tokenSource(modelServer),
 		SynthesisTokens:   s.cfg.Research.SynthesisTokens,
 		SynthesisWindow:   s.cfg.Research.SynthesisWindow,
 		FinalReportTokens: s.cfg.Research.FinalReportTokens,
@@ -328,7 +328,11 @@ func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown,
 	var totalCost *float64
 	finished := false
 	for round := 0; round <= htmlReportMaxContinuations; round++ {
-		completion, err := llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", modelServer.APIKey, model,
+		token, err := s.bearerToken(ctx, modelServer)
+		if err != nil {
+			return "", false, nil, err
+		}
+		completion, err := llm.ChatCompleteStreamWithUsage(ctx, s.modelClient, modelServer.APIBase+"/chat/completions", token, model,
 			messages, extra, func(delta string) {
 				generated.WriteString(delta)
 				if onProgress == nil || time.Since(lastProgress) < 250*time.Millisecond {

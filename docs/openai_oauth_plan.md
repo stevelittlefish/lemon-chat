@@ -74,12 +74,23 @@ tests. Not yet persisted or wired to requests.
   live bearer token, refreshing (refresh-token grant) when within N seconds of expiry and
   persisting the rotated tokens.
 
-### Phase 3 — Config + transport selection
+### Phase 3 — Config + transport selection  ✅ done
 
-- Add `api = "responses"` (default `"chat_completions"`) and an auth-mode notion to `ModelServer`.
-- Introduce a `Transport` seam so call sites obtain a token from a provider rather than reading a
-  static string, and route request-building through either the chat-completions or Responses
-  implementation.
+- `ModelServer` gains `api` (`chat_completions` default | `responses`) and `auth`
+  (`api_key` default | `oauth`), with `UsesResponses()`, `UsesOAuth()`, and `Endpoint()` helpers
+  and validation. Documented in `lemon.toml.example`.
+- `config.TokenSource` (`func(context.Context) (string, error)`) is the seam: `Server.tokenSource`
+  returns the shared OAuth provider's `Token` for oauth servers, else a `StaticToken` of the
+  api_key. `Server.bearerToken` resolves it at call time.
+- Wired into the **chat** path (`messages.go`, incl. the `chatgpt-account-id` header for oauth),
+  **completions**, and **research** — `research.Config` now takes `APIToken`/`WorkerAPIToken`
+  token sources instead of static keys, so detached jobs pick up refreshed tokens. Report
+  generation (`research_reports.go`) and the reddit-import debug extractor resolve the same way.
+- **Deferred to a later phase:** the background title worker (`internal/tasks`) and the
+  `summariseHTML` fetch-url tool helper are free functions without provider access; they stay on
+  static api_key for now (only matters if a default/tool model is pointed at an oauth server).
+  The actual Responses request/response translation is Phase 4 — until then an `api = "responses"`
+  server still receives chat-completions-shaped requests.
 
 ### Phase 4 — Responses API translation (the main work)
 

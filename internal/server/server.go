@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
+	"github.com/stevelittlefish/lemon-chat/internal/openai_auth"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
@@ -19,6 +21,7 @@ type Server struct {
 	hub         *Hub
 	modelClient *http.Client
 	research    *researchManager
+	oauth       *openai_auth.Provider
 }
 
 func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
@@ -31,7 +34,24 @@ func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
 		},
 	}
 	InitTools(cfg)
-	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client, research: newResearchManager()}
+	oauth := openai_auth.NewProvider(openai_auth.NewStoreAdapter(st), client)
+	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client, research: newResearchManager(), oauth: oauth}
+}
+
+// tokenSource returns a TokenSource that yields the correct bearer token for
+// srv: the shared OAuth token when the server uses oauth, otherwise its static
+// api_key. Resolving lazily (rather than baking in a string) lets long-running
+// and detached work pick up refreshed OAuth tokens.
+func (s *Server) tokenSource(srv *config.ModelServer) config.TokenSource {
+	if srv.UsesOAuth() {
+		return s.oauth.Token
+	}
+	return config.StaticToken(srv.APIKey)
+}
+
+// bearerToken resolves the current bearer token for srv.
+func (s *Server) bearerToken(ctx context.Context, srv *config.ModelServer) (string, error) {
+	return s.tokenSource(srv)(ctx)
 }
 
 func (s *Server) Handler() http.Handler {

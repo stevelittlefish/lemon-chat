@@ -50,6 +50,18 @@ api_base = "http://localhost:8000/v1"
 # api_base = "https://openrouter.ai/api/v1"
 # api_key  = "sk-or-..."
 
+# OpenAI via a ChatGPT/OpenAI account login instead of an api_key. Set
+# api = "responses" to use OpenAI's Responses API, and auth = "oauth" to send
+# the shared login token (obtained via the OpenAI account login) rather than a
+# static api_key. A single token is shared by every user on the network.
+#   api:  "chat_completions" (default) | "responses"
+#   auth: "api_key" (default) | "oauth"
+# [[model_server]]
+# name     = "openai"
+# api_base = "https://chatgpt.com/backend-api/codex"
+# api      = "responses"
+# auth     = "oauth"
+
 [[model]]
 name         = "meta-llama/Llama-3.2-8B-Instruct"
 display_name = "Llama 3.2 8B"

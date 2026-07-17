@@ -56,9 +56,9 @@ func (s *Server) handleGetNote(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleUpsertNote(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	var req struct {
-		Key      string  `json:"key"`
-		Value    string  `json:"value"`
-		ReadOnly *bool   `json:"read_only"`
+		Key      string `json:"key"`
+		Value    string `json:"value"`
+		ReadOnly *bool  `json:"read_only"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")

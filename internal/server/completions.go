@@ -234,8 +234,13 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	if modelServer.APIKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+modelServer.APIKey)
+	token, err := s.bearerToken(ctx, modelServer)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "model auth unavailable")
+		return
+	}
+	if token != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+token)
 	}
 
 	resp, err := s.modelClient.Do(httpReq)

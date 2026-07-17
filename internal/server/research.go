@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/debug"
 	"github.com/stevelittlefish/lemon-chat/internal/redditimport"
 	"github.com/stevelittlefish/lemon-chat/internal/research"
@@ -245,10 +246,11 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	// Resolve the optional worker-tier endpoint; a different model may live on a
 	// different server, so we resolve the whole (model, base, key) triple. On any
 	// error we fall back to the job model rather than failing the run.
-	workerModel, workerAPIBase, workerAPIKey := "", "", ""
+	workerModel, workerAPIBase := "", ""
+	var workerAPIToken config.TokenSource
 	if job.WorkerModel != nil && *job.WorkerModel != "" && *job.WorkerModel != job.Model {
 		if ws, wErr := s.cfg.ServerForModel(*job.WorkerModel); wErr == nil {
-			workerModel, workerAPIBase, workerAPIKey = *job.WorkerModel, ws.APIBase, ws.APIKey
+			workerModel, workerAPIBase, workerAPIToken = *job.WorkerModel, ws.APIBase, s.tokenSource(ws)
 		} else {
 			log.Printf("research: job %d: worker model %q unresolved, using job model: %v", job.ID, *job.WorkerModel, wErr)
 		}
@@ -274,10 +276,10 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		DeepReport:            job.DeepReport,
 		PauseRedditImport:     job.PauseRedditImport,
 		APIBase:               modelServer.APIBase,
-		APIKey:                modelServer.APIKey,
+		APIToken:              s.tokenSource(modelServer),
 		WorkerModel:           workerModel,
 		WorkerAPIBase:         workerAPIBase,
-		WorkerAPIKey:          workerAPIKey,
+		WorkerAPIToken:        workerAPIToken,
 		SearXNGURL:            s.cfg.SearXNG.URL,
 		Location:              loc,
 		MaxRounds:             maxRounds,

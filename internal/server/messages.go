@@ -96,7 +96,6 @@ func (s *Server) resolveCharacter(w http.ResponseWriter, user *store.User, charI
 	return char, msgs
 }
 
-
 func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	id, ok := pathID(w, r)
@@ -270,7 +269,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "unknown model")
 		return
 	}
-	chatURL := modelServer.APIBase + "/chat/completions"
+	chatURL := modelServer.Endpoint()
 
 	// Build message history for model (user message not yet persisted).
 	history, err := s.store.ListMessages(convID)
@@ -313,8 +312,17 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 		hreq.Header.Set("Content-Type", "application/json")
-		if modelServer.APIKey != "" {
-			hreq.Header.Set("Authorization", "Bearer "+modelServer.APIKey)
+		token, err := s.bearerToken(ctx, modelServer)
+		if err != nil {
+			return nil, err
+		}
+		if token != "" {
+			hreq.Header.Set("Authorization", "Bearer "+token)
+		}
+		if modelServer.UsesOAuth() {
+			if acct, _ := s.oauth.AccountID(); acct != "" {
+				hreq.Header.Set("chatgpt-account-id", acct)
+			}
 		}
 		return s.modelClient.Do(hreq)
 	}

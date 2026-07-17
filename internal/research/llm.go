@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/llm"
 )
 
@@ -24,7 +25,15 @@ type chatMsg struct {
 type modelEndpoint struct {
 	Model   string
 	APIBase string
-	APIKey  string
+	Token   config.TokenSource
+}
+
+// token resolves the endpoint's current bearer token, tolerating a nil source.
+func (ep modelEndpoint) token(ctx context.Context) (string, error) {
+	if ep.Token == nil {
+		return "", nil
+	}
+	return ep.Token(ctx)
 }
 
 // llmCall makes a non-streaming chat completion request on the writer endpoint
@@ -44,7 +53,11 @@ func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []cha
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	result, err := llm.ChatCompleteWithUsage(callCtx, r.client, ep.APIBase+"/chat/completions", ep.APIKey, ep.Model, msgs, map[string]any{
+	key, err := ep.token(callCtx)
+	if err != nil {
+		return "", err
+	}
+	result, err := llm.ChatCompleteWithUsage(callCtx, r.client, ep.APIBase+"/chat/completions", key, ep.Model, msgs, map[string]any{
 		"temperature": temperature,
 		"max_tokens":  maxTokens,
 	})
@@ -73,7 +86,11 @@ func (r *Researcher) llmCallStreamFinish(ctx context.Context, msgs []chatMsg, te
 
 	var full strings.Builder
 	var lastEmit time.Time
-	result, err := llm.ChatCompleteStreamWithUsage(callCtx, r.client, r.writer.APIBase+"/chat/completions", r.writer.APIKey, r.writer.Model, msgs,
+	key, err := r.writer.token(callCtx)
+	if err != nil {
+		return "", "", err
+	}
+	result, err := llm.ChatCompleteStreamWithUsage(callCtx, r.client, r.writer.APIBase+"/chat/completions", key, r.writer.Model, msgs,
 		map[string]any{"temperature": temperature, "max_tokens": maxTokens}, func(text string) {
 			full.WriteString(text)
 			if onDelta != nil && time.Since(lastEmit) >= 250*time.Millisecond {
