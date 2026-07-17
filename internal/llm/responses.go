@@ -153,7 +153,14 @@ func ResponsesToChatSSE(r io.Reader) io.Reader {
 	go func() {
 		conv := &responsesConverter{w: pw}
 		err := ScanSSE(r, conv.onEvent)
-		if err == nil {
+		switch {
+		case err != nil:
+			// Reading/decoding the upstream Responses stream failed. Name it so a
+			// bare transport error (e.g. "invalid argument") is traceable to the
+			// Responses upstream rather than the chat-completions parser below it.
+			err = fmt.Errorf("reading responses stream (saw %d event(s), %d byte(s)): %w",
+				conv.events, conv.bytes, err)
+		default:
 			err = conv.finishIfNeeded()
 		}
 		pw.CloseWithError(err)
@@ -168,6 +175,8 @@ type responsesConverter struct {
 	nextTool      int
 	sawToolCall   bool
 	finishWritten bool
+	events        int // upstream events observed (diagnostics)
+	bytes         int // upstream data bytes observed (diagnostics)
 }
 
 type responsesEvent struct {
@@ -192,6 +201,8 @@ type responsesEvent struct {
 }
 
 func (c *responsesConverter) onEvent(data string) error {
+	c.events++
+	c.bytes += len(data)
 	if data == "[DONE]" {
 		return nil
 	}

@@ -98,7 +98,13 @@ func ScanSSE(body io.Reader, onData func(data string) error) error {
 			return err
 		}
 	}
-	return scanner.Err()
+	if err := scanner.Err(); err != nil {
+		// Include the concrete error type: transport failures surface here as
+		// opaque strings ("invalid argument", "unexpected EOF") and the type is
+		// often the only thing that distinguishes them.
+		return fmt.Errorf("sse scan: %w (%T)", err, err)
+	}
+	return nil
 }
 
 // ChatComplete makes a non-streaming POST to a /chat/completions endpoint and

@@ -369,7 +369,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			log.Printf("messages: stream error for conv %d: %v", convID, err)
+			log.Printf("messages: stream error for conv %d model=%q: %v", convID, modelName, err)
 			writeSSEError(w, "model error")
 			flusher.Flush()
 			break
