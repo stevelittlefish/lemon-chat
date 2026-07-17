@@ -31,7 +31,6 @@ type responsesRequest struct {
 	Tools             []responsesTool `json:"tools,omitempty"`
 	ToolChoice        string          `json:"tool_choice,omitempty"`
 	ParallelToolCalls bool            `json:"parallel_tool_calls,omitempty"`
-	MaxOutputTokens   int             `json:"max_output_tokens,omitempty"`
 	PromptCacheKey    string          `json:"prompt_cache_key,omitempty"`
 	Include           []string        `json:"include,omitempty"`
 }
@@ -46,9 +45,9 @@ type responsesTool struct {
 // BuildResponsesBody lowers chat-completions messages and tools into a Responses
 // request body. messages and tools are any value that marshals to the OpenAI
 // chat-completions JSON shape (e.g. a []chatMsg or []map[string]any), so callers
-// need not change how they assemble them. extra may carry "max_tokens" (mapped
-// to max_output_tokens); "temperature" is intentionally dropped — the Codex
-// Responses endpoint rejects it.
+// need not change how they assemble them. Both "temperature" and "max_tokens"
+// are intentionally dropped — the Codex Responses endpoint rejects them (the
+// latter with 400 "Unsupported parameter: max_output_tokens").
 func BuildResponsesBody(model string, messages any, tools any, extra map[string]any, stream bool) ([]byte, error) {
 	msgs, err := toMaps(messages)
 	if err != nil {
@@ -63,9 +62,6 @@ func BuildResponsesBody(model string, messages any, tools any, extra map[string]
 		Instructions: instructions,
 		Input:        input,
 		Include:      []string{"reasoning.encrypted_content"},
-	}
-	if mt, ok := intFrom(extra["max_tokens"]); ok {
-		req.MaxOutputTokens = mt
 	}
 	if k, ok := extra["prompt_cache_key"].(string); ok {
 		req.PromptCacheKey = k
@@ -343,16 +339,4 @@ func toMapSlice(v any) []map[string]any {
 		}
 	}
 	return out
-}
-
-func intFrom(v any) (int, bool) {
-	switch n := v.(type) {
-	case int:
-		return n, true
-	case int64:
-		return int(n), true
-	case float64:
-		return int(n), true
-	}
-	return 0, false
 }

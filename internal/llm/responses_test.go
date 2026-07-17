@@ -33,8 +33,8 @@ func TestBuildResponsesBody(t *testing.T) {
 	if _, ok := req["temperature"]; ok {
 		t.Error("temperature must be dropped for the Responses endpoint")
 	}
-	if req["max_output_tokens"].(float64) != 500 {
-		t.Errorf("max_output_tokens = %v", req["max_output_tokens"])
+	if _, ok := req["max_output_tokens"]; ok {
+		t.Error("max_output_tokens must be dropped for the Responses endpoint")
 	}
 	if req["store"] != false || req["stream"] != true {
 		t.Errorf("store/stream = %v/%v", req["store"], req["stream"])
