@@ -338,7 +338,6 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 	for loop := 0; loop < maxToolLoops; loop++ {
 		h := llm.Handler{
-			WireLog: tokenLog,
 			OnStart: commit,
 			OnText: func(delta string) {
 				if !committed {
@@ -348,6 +347,12 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "data: %s\n\n", b)
 				flusher.Flush()
 			},
+		}
+		// Assign only when open: a nil *os.File in the io.Writer field would be a
+		// non-nil interface, so the provider's nil guards would pass and tee the
+		// stream into a nil file (Write → os.ErrInvalid "invalid argument").
+		if tokenLog != nil {
+			h.WireLog = tokenLog
 		}
 
 		comp, err := provider.Stream(ctx, llm.Request{
