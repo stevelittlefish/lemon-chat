@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 )
@@ -174,11 +175,28 @@ func (p *httpProvider) Stream(ctx context.Context, req Request, h Handler) (Comp
 }
 
 func (p *httpProvider) ListModels(ctx context.Context) ([]string, error) {
+	// The ChatGPT/Codex Responses backend exposes no model-enumeration endpoint,
+	// so return the built-in roster (no network, no auth needed).
+	if p.responses {
+		out := append([]string(nil), CodexModels...)
+		sort.Strings(out)
+		return out, nil
+	}
 	key, err := p.token(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return ListModels(ctx, p.client, p.base, key)
+}
+
+// CodexModels is the built-in roster returned for a Responses/Codex server, which
+// has no enumeration endpoint. It's a curated starter list — edit to taste; the
+// authoritative model IDs are whatever your ChatGPT/Codex plan accepts.
+var CodexModels = []string{
+	"gpt-5.1-codex",
+	"gpt-5.1-codex-mini",
+	"gpt-5.1-codex-max",
+	"gpt-5-codex",
 }
 
 // readChatCompletionsStreamFull parses a chat-completions SSE body into text,

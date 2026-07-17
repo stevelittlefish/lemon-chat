@@ -78,9 +78,11 @@ func main() {
 }
 
 func listModels(cfg *config.Config) {
-	for _, srv := range cfg.ModelServers {
+	for i := range cfg.ModelServers {
+		srv := &cfg.ModelServers[i]
 		fmt.Printf("Model server: %s (%s)\n", srv.Name, srv.APIBase)
-		models, err := llm.ListModels(context.Background(), http.DefaultClient, srv.APIBase, srv.APIKey)
+		provider := llm.NewProvider(http.DefaultClient, srv, config.StaticToken(srv.APIKey), "")
+		models, err := provider.ListModels(context.Background())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  error: %v\n", err)
 			continue
