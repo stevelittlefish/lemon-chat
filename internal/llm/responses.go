@@ -182,8 +182,13 @@ type responsesEvent struct {
 	Arguments   string          `json:"arguments"`
 	Item        json.RawMessage `json:"item"`
 	Response    *struct {
-		Status string `json:"status"`
-		Usage  *struct {
+		Status         string          `json:"status"`
+		IncompleteInfo json.RawMessage `json:"incomplete_details"`
+		Error          *struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+		Usage *struct {
 			InputTokens        int64 `json:"input_tokens"`
 			OutputTokens       int64 `json:"output_tokens"`
 			TotalTokens        int64 `json:"total_tokens"`
@@ -194,6 +199,37 @@ type responsesEvent struct {
 	} `json:"response"`
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+// errorDetail extracts the best human-readable reason from a response.failed or
+// error event. The Codex backend puts the reason in different places depending
+// on the event: top-level code/message for an `error` frame, but nested under
+// response.error (and sometimes response.incomplete_details) for
+// `response.failed`. Falls back to the status so the message is never empty.
+func (ev responsesEvent) errorDetail() string {
+	if ev.Response != nil && ev.Response.Error != nil {
+		if m := ev.Response.Error.Message; m != "" {
+			return m
+		}
+		if c := ev.Response.Error.Code; c != "" {
+			return c
+		}
+	}
+	if ev.Message != "" {
+		return ev.Message
+	}
+	if ev.Code != "" {
+		return ev.Code
+	}
+	if ev.Response != nil {
+		if len(ev.Response.IncompleteInfo) > 0 && string(ev.Response.IncompleteInfo) != "null" {
+			return "incomplete: " + string(ev.Response.IncompleteInfo)
+		}
+		if ev.Response.Status != "" {
+			return "status=" + ev.Response.Status
+		}
+	}
+	return "unknown (no message in " + ev.Type + " event)"
 }
 
 func (c *responsesConverter) onEvent(data string) error {
@@ -252,11 +288,7 @@ func (c *responsesConverter) onEvent(data string) error {
 	case "response.completed", "response.incomplete":
 		return c.finish(ev)
 	case "response.failed", "error":
-		msg := ev.Message
-		if msg == "" {
-			msg = ev.Code
-		}
-		return fmt.Errorf("responses: stream error: %s", msg)
+		return fmt.Errorf("responses: stream error: %s", ev.errorDetail())
 	}
 	return nil
 }
