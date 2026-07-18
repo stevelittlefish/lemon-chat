@@ -15,11 +15,11 @@ import (
 func TestProviderWireLogCapturesRawTranscriptAndRedactsCredentials(t *testing.T) {
 	const rawEvent = `{"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":12,"output_tokens":3,"total_tokens":15,"input_tokens_details":{"cached_tokens":8}}}}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.Header.Get("session_id"); got != "conversation-73" {
-			t.Errorf("session_id = %q", got)
+		if got := r.Header.Get("session-id"); got != "conversation-73" {
+			t.Errorf("session-id = %q", got)
 		}
-		if got := r.Header.Get("session-id"); got != "" {
-			t.Errorf("unexpected session-id header = %q", got)
+		if got := r.Header.Get("session_id"); got != "" {
+			t.Errorf("unexpected session_id header = %q", got)
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		fmt.Fprintf(w, "data: %s\n\n", rawEvent)
@@ -42,7 +42,7 @@ func TestProviderWireLogCapturesRawTranscriptAndRedactsCredentials(t *testing.T)
 		"POST " + server.URL + "/responses",
 		"Authorization: [redacted]",
 		"Chatgpt-Account-Id: [redacted]",
-		"Session_id: conversation-73",
+		"Session-Id: conversation-73",
 		`"prompt_cache_key":"conversation-73"`,
 		`"text":"cache this exact prompt"`,
 		"200 OK",

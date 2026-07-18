@@ -179,11 +179,13 @@ func (p *httpProvider) Stream(ctx context.Context, req Request, h Handler) (Comp
 	if p.accountID != "" {
 		hreq.Header.Set("chatgpt-account-id", p.accountID)
 	}
-	// The Codex backend only engages prompt caching when a stable session_id
+	// The Codex backend only engages prompt caching when a stable session-id
 	// header is present (the body prompt_cache_key alone is not enough — verified
-	// against the live endpoint). Send the request's cache key as the session id.
+	// against the live endpoint). The header name is "session-id" (hyphen), matching
+	// the codex-rs client (codex-api build_session_headers). Send the request's
+	// cache key as the session id.
 	if p.responses && req.CacheKey != "" {
-		hreq.Header.Set("session_id", req.CacheKey)
+		hreq.Header.Set("session-id", req.CacheKey)
 	}
 
 	// transcript is the always-captured sink: WireLog (if any) plus an in-memory
