@@ -213,13 +213,16 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
   1637 lines mixing schemas, executors, three external-service clients, HTML stripping, and image generation. Split into registry / web / image / notes-state files.
 
 - [ ] **Reduce the four hand-synced tool lists** (`internal/server/tools.go:58,627,1595`, `static/js/settings-character-edit.js`)
-  `toolRegistry`, `executors`, `allTools`, and `TOOL_GROUPS` must be kept in sync manually. CLAUDE.md has already drifted (missing `note_to_self`, `state_clear`; wrong `world_state` expansion). Drive them from one declaration and fix the CLAUDE.md tool table.
+  `toolRegistry`, `executors`, `allTools`, and `TOOL_GROUPS` must be kept in sync manually. `AGENTS.md` has already drifted (missing `note_to_self`, `state_clear`; wrong `world_state` expansion). Drive them from one declaration and fix the `AGENTS.md` tool table.
 
 - [ ] **Break up `handleSendMessage`** (`internal/server/messages.go:195`)
   ~430 lines doing model resolution, tool-loop orchestration, SSE framing, persistence, and title triggers. Extract the tool loop and title-trigger block at minimum.
 
-- [ ] **`gofmt` six files and add gofmt/vet to CI** (`internal/server/{admin,avatars,messages,notes,research}.go`, `internal/store/research.go`)
-  Flagged by `gofmt -l` (vet and build are clean). CI should fail on a gofmt diff.
+- [x] **Run `gofmt` on the six flagged files** (`internal/server/{admin,avatars,messages,notes,research}.go`, `internal/store/research.go`)
+  Verified clean with `gofmt -l` on 2026-07-18.
+
+- [ ] **Add `gofmt`/`go vet` checks to CI**
+  No CI workflow currently exists; it should fail on a formatting diff or vet failure.
 
 - [ ] **Periodic expired-session cleanup** (`internal/store/sessions.go:41`)
   Expired sessions are only deleted lazily on access; never-revisited sessions linger forever. Add a sweeper (an index on `expires_at` already exists).
