@@ -716,6 +716,7 @@ select.input option { background: var(--paper-100); color: var(--fg); }
 }
 .research-report a { color: var(--link); text-decoration: none; border-bottom: 1px solid rgba(69, 201, 230, 0.35); }
 .research-report a:hover { border-bottom-color: var(--hm-cyan); }
+.research-report .source-citation + .source-citation { margin-left: 0.3em; }
 .research-report strong { color: var(--fg); }
 .research-report ul { list-style: none; padding-left: 0; }
 .research-report ul li { position: relative; padding-left: var(--space-5); margin: var(--space-2) 0; }

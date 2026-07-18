@@ -42,6 +42,9 @@ export function render(text) {
   div.querySelectorAll('a').forEach((a) => {
     a.setAttribute('target', '_blank');
     a.setAttribute('rel', 'noopener');
+    if (/^S\d+$/.test(a.textContent.trim())) {
+      a.classList.add('source-citation');
+    }
   });
   return div.innerHTML;
 }
