@@ -71,6 +71,11 @@ func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []cha
 			return "", err
 		}
 		log.Printf("Research retrying %s call after error (attempt %d/%d): %v", ep.Model, attempt+1, callAttempts, err)
+		r.progress(Progress{
+			Phase:   "warning",
+			Round:   r.state.Round,
+			Message: fmt.Sprintf("model call failed (attempt %d/%d), retrying: %v", attempt+1, callAttempts, err),
+		})
 	}
 	return "", lastErr
 }
