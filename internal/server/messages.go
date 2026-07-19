@@ -187,6 +187,237 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, views)
 }
 
+type messageToolLoop struct {
+	server          *Server
+	ctx             context.Context
+	writer          http.ResponseWriter
+	flusher         http.Flusher
+	provider        llm.Provider
+	request         llm.Request
+	messages        []chatMsg
+	wireLog         io.Writer
+	onStart         func()
+	committed       func() bool
+	persistError    func() error
+	conversationID  int64
+	assistantName   string
+	characterID     *int64
+	toolContext     ToolContext
+	maxLoops        int
+	responseStarted *time.Time
+}
+
+// run streams model turns and executes requested tools until the model returns
+// a final response or the configured tool-loop limit is reached. The bool is
+// false only when the caller must stop because an HTTP error has been written.
+func (loop *messageToolLoop) run() (string, *store.MessageStats, bool) {
+	var finalContent string
+	var finalStats *store.MessageStats
+
+	for iteration := 0; iteration < loop.maxLoops; iteration++ {
+		h := llm.Handler{
+			ErrorLog: loop.server.modelErrors,
+			OnStart:  loop.onStart,
+			OnText: func(delta string) {
+				if !loop.committed() {
+					return
+				}
+				b, _ := json.Marshal(map[string]string{"delta": delta})
+				fmt.Fprintf(loop.writer, "data: %s\n\n", b)
+				loop.flusher.Flush()
+			},
+		}
+		if loop.wireLog != nil {
+			h.WireLog = loop.wireLog
+		}
+
+		loop.request.Messages = loop.messages
+		comp, err := loop.provider.Stream(loop.ctx, loop.request, h)
+		if persistErr := loop.persistError(); persistErr != nil {
+			internalError(loop.writer, persistErr)
+			return "", nil, false
+		}
+		if !loop.committed() {
+			writeError(loop.writer, http.StatusBadGateway, "model unreachable")
+			return "", nil, false
+		}
+		if err != nil {
+			log.Printf("messages: stream error for conv %d model=%q: %v", loop.conversationID, loop.request.Model, err)
+			writeSSEError(loop.writer, "model error")
+			loop.flusher.Flush()
+			break
+		}
+
+		var usageStats *store.MessageStats
+		if comp.Usage != nil {
+			usageStats = &store.MessageStats{
+				PromptTokens:     int64(comp.Usage.PromptTokens),
+				CompletionTokens: int64(comp.Usage.CompletionTokens),
+				CachedTokens:     int64(comp.Usage.CachedTokens()),
+				TotalTimeMS:      time.Since(*loop.responseStarted).Milliseconds(),
+			}
+		}
+
+		if comp.FinishReason == "tool_calls" && len(comp.ToolCalls) > 0 {
+			loop.persistToolCall(comp.Content, comp.ToolCalls)
+			for _, tc := range comp.ToolCalls {
+				loop.executeTool(tc)
+			}
+
+			newTurnEvt, _ := json.Marshal(map[string]any{"new_turn": map[string]any{"name": loop.assistantName}})
+			fmt.Fprintf(loop.writer, "data: %s\n\n", newTurnEvt)
+			loop.flusher.Flush()
+
+			if iteration < loop.maxLoops-1 {
+				continue
+			}
+			log.Printf("messages: tool call loop limit reached for conv %d", loop.conversationID)
+		}
+
+		finalContent = comp.Content
+		finalStats = usageStats
+		break
+	}
+
+	return finalContent, finalStats, true
+}
+
+func (loop *messageToolLoop) persistToolCall(content string, toolCalls []llm.ToolCall) {
+	type toolCallRecord struct {
+		ID       string `json:"id"`
+		Type     string `json:"type"`
+		Function struct {
+			Name      string `json:"name"`
+			Arguments string `json:"arguments"`
+		} `json:"function"`
+	}
+
+	records := make([]toolCallRecord, len(toolCalls))
+	for i, tc := range toolCalls {
+		records[i].ID = tc.ID
+		records[i].Type = "function"
+		records[i].Function.Name = tc.Name
+		records[i].Function.Arguments = tc.Arguments
+	}
+	toolCallsJSON, _ := json.Marshal(records)
+	toolCallsStr := string(toolCallsJSON)
+	if _, err := loop.server.store.CreateMessage(loop.conversationID, "assistant", content, loop.characterID, &loop.assistantName, nil, &toolCallsStr, ""); err != nil {
+		log.Printf("messages: failed to persist tool-call message for conv %d: %v", loop.conversationID, err)
+	}
+	var calls []any
+	json.Unmarshal(toolCallsJSON, &calls) //nolint:errcheck
+	loop.messages = append(loop.messages, chatMsg{Role: "assistant", Content: content, ToolCalls: calls})
+}
+
+func (loop *messageToolLoop) executeTool(tc llm.ToolCall) {
+	logArgs := tc.Arguments
+	if len(logArgs) > 200 {
+		logArgs = logArgs[:200] + "…"
+	}
+	log.Printf("Calling tool name=%q args=%s conversation_id=%d", tc.Name, logArgs, loop.conversationID)
+
+	var argsValue any
+	json.Unmarshal([]byte(tc.Arguments), &argsValue) //nolint:errcheck
+	callEvent, _ := json.Marshal(map[string]any{"tool_call": map[string]any{
+		"id": tc.ID, "name": tc.Name, "args": argsValue,
+	}})
+	fmt.Fprintf(loop.writer, "data: %s\n\n", callEvent)
+	loop.flusher.Flush()
+
+	toolContext := loop.toolContext
+	toolContext.ToolCallID = tc.ID
+	result, err := ExecuteTool(tc.Name, tc.Arguments, toolContext)
+	if err != nil {
+		result = "error: " + err.Error()
+	}
+	logResult := result
+	if len(logResult) > 200 {
+		logResult = logResult[:200] + "…"
+	}
+	log.Printf("Tool result name=%q conversation_id=%d result=%q", tc.Name, loop.conversationID, logResult)
+
+	resultEvent, _ := json.Marshal(map[string]any{"tool_result": map[string]any{
+		"id": tc.ID, "result": result,
+	}})
+	fmt.Fprintf(loop.writer, "data: %s\n\n", resultEvent)
+	loop.flusher.Flush()
+
+	var attachment AttachmentResult
+	if jsonErr := json.Unmarshal([]byte(result), &attachment); jsonErr == nil && attachment.AttachmentID != 0 {
+		attachmentEvent, _ := json.Marshal(map[string]any{"attachment": map[string]any{
+			"id":           attachment.AttachmentID,
+			"tool_call_id": tc.ID,
+			"title":        attachment.Title,
+			"filename":     attachment.Filename,
+			"mime_type":    attachment.MimeType,
+			"background":   attachment.Background,
+			"status":       attachment.Status,
+		}})
+		fmt.Fprintf(loop.writer, "data: %s\n\n", attachmentEvent)
+		loop.flusher.Flush()
+	}
+
+	if _, err := loop.server.store.CreateMessage(loop.conversationID, "tool", result, nil, nil, nil, nil, tc.ID); err != nil {
+		log.Printf("messages: failed to persist tool result for conv %d: %v", loop.conversationID, err)
+	}
+	loop.messages = append(loop.messages, chatMsg{Role: "tool", Content: result, ToolCallID: tc.ID})
+}
+
+const (
+	titleTriggerNone          = ""
+	titleTriggerCharacterAuto = "character-auto-title"
+	titleTriggerThirdResponse = "third-assistant-response"
+)
+
+func conversationTitleTrigger(conv *store.Conversation, character *store.Character, history []store.Message) string {
+	if conv.Title != nil {
+		return titleTriggerNone
+	}
+
+	userMessages := 1 // Include the user message persisted after history was loaded.
+	assistantMessages := 0
+	for _, message := range history {
+		switch message.Role {
+		case "user":
+			userMessages++
+		case "assistant":
+			assistantMessages++
+		}
+	}
+	if character != nil && character.AutoTitle && userMessages == 1 {
+		return titleTriggerCharacterAuto
+	}
+	if assistantMessages >= 2 {
+		return titleTriggerThirdResponse
+	}
+	return titleTriggerNone
+}
+
+func (s *Server) triggerConversationTitle(conv *store.Conversation, character *store.Character, history []store.Message) {
+	reason := conversationTitleTrigger(conv, character, history)
+	if character != nil && character.AutoTitle && conv.Title == nil {
+		userMessages := 1
+		for _, message := range history {
+			if message.Role == "user" {
+				userMessages++
+			}
+		}
+		debug.Log("title trigger (character auto-title): conv=%d userMsgCount=%d autoTitle=%v titleIsNil=%v", conv.ID, userMessages, character.AutoTitle, conv.Title == nil)
+	}
+	if reason != titleTriggerCharacterAuto && conv.Title == nil {
+		assistantMessages := 0
+		for _, message := range history {
+			if message.Role == "assistant" {
+				assistantMessages++
+			}
+		}
+		debug.Log("title trigger (3rd assistant): conv=%d assistantMsgCount=%d (need >=2 to fire)", conv.ID, assistantMessages)
+	}
+	if reason != titleTriggerNone {
+		tasks.GenerateTitleForConversation(s.store, s.cfg, conv.ID, s.hub.BroadcastTitleUpdate)
+	}
+}
+
 func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	user := currentUser(r)
 	convID, ok := pathID(w, r)
@@ -332,176 +563,39 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
-	maxToolLoops := s.cfg.Server.MaxToolLoops
-	var finalContent string
-	var finalStats *store.MessageStats
-
-	for loop := 0; loop < maxToolLoops; loop++ {
-		h := llm.Handler{
-			ErrorLog: s.modelErrors,
-			OnStart:  commit,
-			OnText: func(delta string) {
-				if !committed {
-					return
-				}
-				b, _ := json.Marshal(map[string]string{"delta": delta})
-				fmt.Fprintf(w, "data: %s\n\n", b)
-				flusher.Flush()
-			},
-		}
-		// Assign only when open: a nil *os.File in the io.Writer field would be a
-		// non-nil interface, so the provider's nil guards would pass and tee the
-		// stream into a nil file (Write → os.ErrInvalid "invalid argument").
-		if tokenLog != nil {
-			h.WireLog = tokenLog
-		}
-
-		comp, err := provider.Stream(ctx, llm.Request{
-			Model:    modelName,
-			Messages: chatMsgs,
-			Tools:    toolsArg,
-			CacheKey: fmt.Sprintf("lemon-conv-%d", convID),
-		}, h)
-
-		// Failures before the stream committed: a rare user-message persist error,
-		// or a model that never responded (unreachable / non-2xx). Both are clean
-		// non-SSE errors, and no assistant/user rows are left behind for the latter.
-		if persistErr != nil {
-			internalError(w, persistErr)
-			return
-		}
-		if !committed {
-			writeError(w, http.StatusBadGateway, "model unreachable")
-			return
-		}
-		if err != nil {
-			log.Printf("messages: stream error for conv %d model=%q: %v", convID, modelName, err)
-			writeSSEError(w, "model error")
-			flusher.Flush()
-			break
-		}
-
-		var usageStats *store.MessageStats
-		if comp.Usage != nil {
-			usageStats = &store.MessageStats{
-				PromptTokens:     int64(comp.Usage.PromptTokens),
-				CompletionTokens: int64(comp.Usage.CompletionTokens),
-				CachedTokens:     int64(comp.Usage.CachedTokens()),
-				TotalTimeMS:      time.Since(startTime).Milliseconds(),
-			}
-		}
-
-		if comp.FinishReason == "tool_calls" && len(comp.ToolCalls) > 0 {
-			// Persist the assistant tool-call message, preserving any text the model
-			// produced before the tool call in the same turn.
-			type tcRecord struct {
-				ID       string `json:"id"`
-				Type     string `json:"type"`
-				Function struct {
-					Name      string `json:"name"`
-					Arguments string `json:"arguments"`
-				} `json:"function"`
-			}
-			records := make([]tcRecord, len(comp.ToolCalls))
-			for i, tc := range comp.ToolCalls {
-				records[i].ID = tc.ID
-				records[i].Type = "function"
-				records[i].Function.Name = tc.Name
-				records[i].Function.Arguments = tc.Arguments
-			}
-			toolCallsJSON, _ := json.Marshal(records)
-			toolCallsStr := string(toolCallsJSON)
-			turnContent := comp.Content
-			if _, err := s.store.CreateMessage(convID, "assistant", turnContent, usedCharacterID, &assistantName, nil, &toolCallsStr, ""); err != nil {
-				log.Printf("messages: failed to persist tool-call message for conv %d: %v", convID, err)
-			}
-			var tc2 []any
-			json.Unmarshal(toolCallsJSON, &tc2) //nolint:errcheck
-			chatMsgs = append(chatMsgs, chatMsg{Role: "assistant", Content: turnContent, ToolCalls: tc2})
-
-			// Execute each tool and persist the result.
-			for _, tc := range comp.ToolCalls {
-				logArgs := tc.Arguments
-				if len(logArgs) > 200 {
-					logArgs = logArgs[:200] + "…"
-				}
-				log.Printf("Calling tool name=%q args=%s conversation_id=%d", tc.Name, logArgs, convID)
-				var argsVal any
-				json.Unmarshal([]byte(tc.Arguments), &argsVal) //nolint:errcheck
-				evtJSON, _ := json.Marshal(map[string]any{"tool_call": map[string]any{
-					"id":   tc.ID,
-					"name": tc.Name,
-					"args": argsVal,
-				}})
-				fmt.Fprintf(w, "data: %s\n\n", evtJSON)
-				flusher.Flush()
-
-				tctx := ToolContext{
-					ModelName:       modelName,
-					ModelServer:     modelServer,
-					ResponseTimeout: responseTimeout,
-					SearXNGURL:      s.cfg.SearXNG.URL,
-					Timezone:        s.cfg.Server.Timezone,
-					ToolCallID:      tc.ID,
-					UserID:          user.ID,
-					ConversationID:  convID,
-					Store:           s.store,
-					DataDir:         s.cfg.Server.DataDir,
-					Hub:             s.hub,
-				}
-				result, execErr := ExecuteTool(tc.Name, tc.Arguments, tctx)
-				if execErr != nil {
-					result = "error: " + execErr.Error()
-				}
-				logResult := result
-				if len(logResult) > 200 {
-					logResult = logResult[:200] + "…"
-				}
-				log.Printf("Tool result name=%q conversation_id=%d result=%q", tc.Name, convID, logResult)
-
-				resultEvt, _ := json.Marshal(map[string]any{"tool_result": map[string]any{
-					"id":     tc.ID,
-					"result": result,
-				}})
-				fmt.Fprintf(w, "data: %s\n\n", resultEvt)
-				flusher.Flush()
-
-				// If the tool produced an attachment, emit a dedicated SSE event.
-				var attResult AttachmentResult
-				if jsonErr := json.Unmarshal([]byte(result), &attResult); jsonErr == nil && attResult.AttachmentID != 0 {
-					attEvt, _ := json.Marshal(map[string]any{"attachment": map[string]any{
-						"id":           attResult.AttachmentID,
-						"tool_call_id": tc.ID,
-						"title":        attResult.Title,
-						"filename":     attResult.Filename,
-						"mime_type":    attResult.MimeType,
-						"background":   attResult.Background,
-						"status":       attResult.Status,
-					}})
-					fmt.Fprintf(w, "data: %s\n\n", attEvt)
-					flusher.Flush()
-				}
-
-				if _, err := s.store.CreateMessage(convID, "tool", result, nil, nil, nil, nil, tc.ID); err != nil {
-					log.Printf("messages: failed to persist tool result for conv %d: %v", convID, err)
-				}
-				chatMsgs = append(chatMsgs, chatMsg{Role: "tool", Content: result, ToolCallID: tc.ID})
-			}
-
-			// Signal the frontend to start a new message bubble for the upcoming response.
-			newTurnEvt, _ := json.Marshal(map[string]any{"new_turn": map[string]any{"name": assistantName}})
-			fmt.Fprintf(w, "data: %s\n\n", newTurnEvt)
-			flusher.Flush()
-
-			if loop < maxToolLoops-1 {
-				continue
-			}
-			log.Printf("messages: tool call loop limit reached for conv %d", convID)
-		}
-
-		finalContent = comp.Content
-		finalStats = usageStats
-		break
+	toolLoop := messageToolLoop{
+		server:          s,
+		ctx:             ctx,
+		writer:          w,
+		flusher:         flusher,
+		provider:        provider,
+		request:         llm.Request{Model: modelName, Tools: toolsArg, CacheKey: fmt.Sprintf("lemon-conv-%d", convID)},
+		messages:        chatMsgs,
+		wireLog:         tokenLog,
+		onStart:         commit,
+		committed:       func() bool { return committed },
+		persistError:    func() error { return persistErr },
+		conversationID:  convID,
+		assistantName:   assistantName,
+		characterID:     usedCharacterID,
+		maxLoops:        s.cfg.Server.MaxToolLoops,
+		responseStarted: &startTime,
+		toolContext: ToolContext{
+			ModelName:       modelName,
+			ModelServer:     modelServer,
+			ResponseTimeout: responseTimeout,
+			SearXNGURL:      s.cfg.SearXNG.URL,
+			Timezone:        s.cfg.Server.Timezone,
+			UserID:          user.ID,
+			ConversationID:  convID,
+			Store:           s.store,
+			DataDir:         s.cfg.Server.DataDir,
+			Hub:             s.hub,
+		},
+	}
+	finalContent, finalStats, ok := toolLoop.run()
+	if !ok {
+		return
 	}
 
 	if finalStats != nil {
@@ -536,36 +630,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		}
 
-		titleTriggered := false
-
-		// Trigger auto-title on the first completed exchange when the character requests it.
-		if usedCharacter != nil && usedCharacter.AutoTitle && conv.Title == nil {
-			userMsgCount := 1 // +1 for the user message just persisted (history was loaded before persist)
-			for _, m := range history {
-				if m.Role == "user" {
-					userMsgCount++
-				}
-			}
-			debug.Log("title trigger (character auto-title): conv=%d userMsgCount=%d autoTitle=%v titleIsNil=%v", convID, userMsgCount, usedCharacter.AutoTitle, conv.Title == nil)
-			if userMsgCount == 1 {
-				tasks.GenerateTitleForConversation(s.store, s.cfg, convID, s.hub.BroadcastTitleUpdate)
-				titleTriggered = true
-			}
-		}
-
-		// Trigger title generation on the third assistant response for any untitled conversation.
-		if !titleTriggered && conv.Title == nil {
-			assistantMsgCount := 0
-			for _, m := range history {
-				if m.Role == "assistant" {
-					assistantMsgCount++
-				}
-			}
-			debug.Log("title trigger (3rd assistant): conv=%d assistantMsgCount=%d (need >=2 to fire)", convID, assistantMsgCount)
-			if assistantMsgCount >= 2 {
-				tasks.GenerateTitleForConversation(s.store, s.cfg, convID, s.hub.BroadcastTitleUpdate)
-			}
-		}
+		s.triggerConversationTitle(conv, usedCharacter, history)
 	}
 
 	fmt.Fprintf(w, "data: [DONE]\n\n")
