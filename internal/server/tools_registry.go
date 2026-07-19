@@ -1,5 +1,7 @@
 package server
 
+import "github.com/stevelittlefish/lemon-chat/internal/config"
+
 type toolParam struct {
 	Type       string         `json:"type"`
 	Properties map[string]any `json:"properties"`
@@ -12,14 +14,30 @@ type toolFunction struct {
 	Parameters  toolParam `json:"parameters"`
 }
 
+type toolExecutor func(string, ToolContext) (string, error)
+type toolConfigurer func(*config.Config) (configured bool, hint string, executor toolExecutor)
+
 type toolDef struct {
 	Type     string       `json:"type"`
 	Function toolFunction `json:"function"`
+
+	DisplayName string         `json:"-"`
+	Summary     string         `json:"-"`
+	Group       string         `json:"-"`
+	Order       int            `json:"-"`
+	Executor    toolExecutor   `json:"-"`
+	Members     []string       `json:"-"`
+	Configure   toolConfigurer `json:"-"`
 }
 
 var toolRegistry = map[string]toolDef{
 	"create_document": {
-		Type: "function",
+		DisplayName: "Create document",
+		Summary:     "Saves a file (report, script, notes, etc.) the user can download.",
+		Group:       "General",
+		Order:       60,
+		Executor:    executeCreateDocument,
+		Type:        "function",
 		Function: toolFunction{
 			Name:        "create_document",
 			Description: "Creates a downloadable file. Use for reports, plans, scripts, code, or any content the user will want to save. Choose the filename extension to match the content type (e.g. report.md, script.py, notes.txt).",
@@ -44,7 +62,13 @@ var toolRegistry = map[string]toolDef{
 		},
 	},
 	"searxng": {
-		Type: "function",
+		DisplayName: "SearXNG",
+		Summary:     "Searches the web via SearXNG and returns the top results.",
+		Group:       "Search & knowledge",
+		Order:       90,
+		Executor:    executeSearXNG,
+		Configure:   configureSearXNG,
+		Type:        "function",
 		Function: toolFunction{
 			Name:        "searxng",
 			Description: "Search the web via SearXNG and return the top results.",
@@ -69,7 +93,12 @@ var toolRegistry = map[string]toolDef{
 		},
 	},
 	"get_time": {
-		Type: "function",
+		DisplayName: "Get current time",
+		Summary:     "Returns the current local date and time.",
+		Group:       "General",
+		Order:       10,
+		Executor:    executeGetTime,
+		Type:        "function",
 		Function: toolFunction{
 			Name:        "get_time",
 			Description: "Returns the current local date and time.",
@@ -77,7 +106,12 @@ var toolRegistry = map[string]toolDef{
 		},
 	},
 	"roll_dice": {
-		Type: "function",
+		DisplayName: "Roll dice",
+		Summary:     "Rolls dice using standard notation (e.g. 2d6, 1d20).",
+		Group:       "General",
+		Order:       20,
+		Executor:    executeRollDice,
+		Type:        "function",
 		Function: toolFunction{
 			Name:        "roll_dice",
 			Description: "Rolls dice using standard notation (e.g. 2d6, d20, 2d6+4, d20-5). Returns each die result and the total.",
@@ -94,7 +128,12 @@ var toolRegistry = map[string]toolDef{
 		},
 	},
 	"pick_random": {
-		Type: "function",
+		DisplayName: "Pick random",
+		Summary:     "Picks one item at random from a list of options.",
+		Group:       "General",
+		Order:       30,
+		Executor:    executePickRandom,
+		Type:        "function",
 		Function: toolFunction{
 			Name:        "pick_random",
 			Description: "Picks one item at random from a list of options. Use when you want a random outcome from a defined set — encounter type, weather, NPC mood, loot, etc. Define all options before calling; the result is server-side random and cannot be influenced.",
@@ -112,7 +151,12 @@ var toolRegistry = map[string]toolDef{
 		},
 	},
 	"random_chance": {
-		Type: "function",
+		DisplayName: "Random chance",
+		Summary:     "Resolves a success/failure check by rolling a die against a threshold.",
+		Group:       "General",
+		Order:       40,
+		Executor:    executeRandomChance,
+		Type:        "function",
 		Function: toolFunction{
 			Name: "random_chance",
 			Description: `Resolves a binary success/failure check by rolling a die and comparing the result to a threshold. Use this whenever an action has an uncertain outcome — picking a lock, landing a hit, resisting a spell, sneaking past a guard.
@@ -149,7 +193,12 @@ Examples:
 		},
 	},
 	"fetch_url": {
-		Type: "function",
+		DisplayName: "Fetch URL",
+		Summary:     "Fetches a URL and returns its content as markdown, or raw HTML if source is true.",
+		Group:       "General",
+		Order:       50,
+		Executor:    executeFetchURL,
+		Type:        "function",
 		Function: toolFunction{
 			Name:        "fetch_url",
 			Description: "Fetches the content of a URL. Returns a clean markdown summary by default. Set source to true to get the raw HTML source instead.",
@@ -170,7 +219,11 @@ Examples:
 		},
 	},
 	"generate_image_sdxl": {
-		Type: "function",
+		DisplayName: "Generate image (SDXL)",
+		Group:       "Image generation",
+		Order:       100,
+		Configure:   configureSDXL,
+		Type:        "function",
 		Function: toolFunction{
 			Name:        "generate_image_sdxl",
 			Description: "Generates an image using Stable Diffusion XL via ComfyUI. Use to illustrate scenes, characters, or objects. Be descriptive — include art style, lighting, and mood. The generated image is automatically displayed in the chat — do not describe or embed it in your text response.",
@@ -219,7 +272,11 @@ Examples:
 		},
 	},
 	"generate_image_flux": {
-		Type: "function",
+		DisplayName: "Generate image (Flux Schnell)",
+		Group:       "Image generation",
+		Order:       110,
+		Configure:   configureFlux,
+		Type:        "function",
 		Function: toolFunction{
 			Name:        "generate_image_flux",
 			Description: "Generates an image using Flux Schnell via ComfyUI. Fast, high-quality image generation. Use 1–4 steps for best results — no negative prompt needed. Be descriptive about subject, art style, lighting, and mood. The generated image is automatically displayed in the chat — do not describe or embed it in your text response.",
@@ -260,7 +317,12 @@ Examples:
 		},
 	},
 	"wikipedia_search": {
-		Type: "function",
+		DisplayName: "Wikipedia search",
+		Summary:     "Searches Wikipedia and returns matching article titles and snippets.",
+		Group:       "Search & knowledge",
+		Order:       70,
+		Executor:    executeWikipediaSearch,
+		Type:        "function",
 		Function: toolFunction{
 			Name:        "wikipedia_search",
 			Description: "Searches Wikipedia and returns matching article titles and snippets. Use this to find the correct article title before calling wikipedia_get_page.",
@@ -285,7 +347,12 @@ Examples:
 		},
 	},
 	"wikipedia_get_page": {
-		Type: "function",
+		DisplayName: "Wikipedia get page",
+		Summary:     "Fetches a Wikipedia article intro + TOC, or a specific section by name.",
+		Group:       "Search & knowledge",
+		Order:       80,
+		Executor:    executeWikipediaGetPage,
+		Type:        "function",
 		Function: toolFunction{
 			Name:        "wikipedia_get_page",
 			Description: "Fetches a Wikipedia article. Without a section argument, returns the intro paragraph and a table of contents listing all sections. With a section argument, returns the full text of that section. Use iteratively to read an article section by section.",
@@ -310,7 +377,8 @@ Examples:
 		},
 	},
 	"state_set": {
-		Type: "function",
+		Executor: executeStateSet,
+		Type:     "function",
 		Function: toolFunction{
 			Name:        "state_set",
 			Description: "Sets one or more named values in the conversation's persistent state. Use this when something is first established: a stat, a condition, an inventory item, or any named fact. Replaces the value if the key already exists.",
@@ -341,7 +409,8 @@ Examples:
 		},
 	},
 	"state_modify": {
-		Type: "function",
+		Executor: executeStateModify,
+		Type:     "function",
 		Function: toolFunction{
 			Name:        "state_modify",
 			Description: "Adds a numeric delta to a stored value. Use this for any numeric change — damage, healing, spending gold, item counts. Never compute the new value yourself; always call this tool so the result is reliable. Errors if the key does not exist or the stored value is not numeric.",
@@ -362,7 +431,8 @@ Examples:
 		},
 	},
 	"state_unset": {
-		Type: "function",
+		Executor: executeStateUnset,
+		Type:     "function",
 		Function: toolFunction{
 			Name:        "state_unset",
 			Description: "Removes a named key from state. Use when a condition ends, an item is fully consumed, or a fact is no longer relevant. Errors if the key is not set.",
@@ -379,7 +449,8 @@ Examples:
 		},
 	},
 	"state_list": {
-		Type: "function",
+		Executor: executeStateList,
+		Type:     "function",
 		Function: toolFunction{
 			Name:        "state_list",
 			Description: "Returns all currently stored key/value pairs for this conversation. Call this at the start of a session or before any check that depends on current state.",
@@ -387,7 +458,8 @@ Examples:
 		},
 	},
 	"state_clear": {
-		Type: "function",
+		Executor: executeStateClear,
+		Type:     "function",
 		Function: toolFunction{
 			Name:        "state_clear",
 			Description: "Deletes all state for this conversation. Use when starting a fresh game or resetting a session. Returns how many keys were removed.",
@@ -395,7 +467,11 @@ Examples:
 		},
 	},
 	"note_to_self": {
-		Type: "function",
+		DisplayName: "Note to self",
+		Group:       "Reasoning",
+		Order:       140,
+		Executor:    executeNoteToSelf,
+		Type:        "function",
 		Function: toolFunction{
 			Name:        "note_to_self",
 			Description: "Records a private thought, plan, or reminder visible only in the model's context — not shown in chat. Use to track intentions, reasoning steps, or reminders without surfacing them to the user.",
@@ -412,7 +488,8 @@ Examples:
 		},
 	},
 	"note_save": {
-		Type: "function",
+		Executor: executeNoteSave,
+		Type:     "function",
 		Function: toolFunction{
 			Name: "note_save",
 			Description: `Saves a note. Creates or replaces the note at the given key. Fails if the note is marked read-only.
@@ -442,7 +519,8 @@ Use notes for long-form prose content: lore entries, NPC descriptions, session b
 		},
 	},
 	"note_load": {
-		Type: "function",
+		Executor: executeNoteLoad,
+		Type:     "function",
 		Function: toolFunction{
 			Name:        "note_load",
 			Description: "Loads a single note by its exact key. Returns the full value, read-only status, and last-updated timestamp. Returns an error if the note does not exist or is not accessible in the current scope.",
@@ -459,7 +537,8 @@ Use notes for long-form prose content: lore entries, NPC descriptions, session b
 		},
 	},
 	"note_list": {
-		Type: "function",
+		Executor: executeNoteList,
+		Type:     "function",
 		Function: toolFunction{
 			Name: "note_list",
 			Description: `Lists accessible notes. Returns {"notes": [...], "message": "..."} where each note has key, excerpt, read_only, and updated_at. Does not return full values — use note_load to retrieve content. At most 50 notes are returned; if the list is truncated a message field explains this — use a more specific prefix to narrow results.
@@ -484,7 +563,8 @@ Call note_list at the start of a session to discover what notes are available, t
 		},
 	},
 	"note_delete": {
-		Type: "function",
+		Executor: executeNoteDelete,
+		Type:     "function",
 		Function: toolFunction{
 			Name:        "note_delete",
 			Description: "Deletes a note by its exact key. Returns an error if the note does not exist, is not accessible, or is marked read-only.",
@@ -501,7 +581,8 @@ Call note_list at the start of a session to discover what notes are available, t
 		},
 	},
 	"note_append": {
-		Type: "function",
+		Executor: executeNoteAppend,
+		Type:     "function",
 		Function: toolFunction{
 			Name:        "note_append",
 			Description: "Appends text to an existing note without overwriting it. A blank line is inserted between the existing content and the new text. If the note does not exist it is created. Fails if the note is marked read-only. Use this to accumulate information incrementally — NPC discoveries, session events, growing lorebook entries — without risking overwriting earlier content.",
@@ -521,32 +602,39 @@ Call note_list at the start of a session to discover what notes are available, t
 			},
 		},
 	},
+	"world_state": {
+		DisplayName: "World state",
+		Summary:     "Session state tools: set, modify, remove, clear, and list named values scoped to this conversation.",
+		Group:       "World state",
+		Order:       120,
+		Members:     []string{"state_set", "state_modify", "state_unset", "state_list", "state_clear"},
+	},
+	"notes": {
+		DisplayName: "Notes",
+		Summary:     "Note store: save, load, list, delete, and append to named notes across global, user, and conversation scopes.",
+		Group:       "Notes",
+		Order:       130,
+		Members:     []string{"note_save", "note_load", "note_list", "note_delete", "note_append"},
+	},
 }
 
-// ToolDefsForCharacter returns tool definitions for the given tool IDs.
-// "world_state" expands to state_set, state_modify, state_unset, state_list.
-// "notes" expands to note_save, note_load, note_list, note_delete, note_append.
+// ToolDefsForCharacter returns model-facing definitions for the selected tools.
+// Compound tools expand to the member definitions declared in toolRegistry.
 func ToolDefsForCharacter(toolIDs []string) []toolDef {
 	var out []toolDef
 	for _, id := range toolIDs {
-		if id == "world_state" {
-			for _, name := range []string{"state_set", "state_modify", "state_unset", "state_list", "state_clear"} {
-				if def, ok := toolRegistry[name]; ok {
-					out = append(out, def)
-				}
-			}
+		tool, ok := toolRegistry[id]
+		if !ok {
 			continue
 		}
-		if id == "notes" {
-			for _, name := range []string{"note_save", "note_load", "note_list", "note_delete", "note_append"} {
-				if def, ok := toolRegistry[name]; ok {
-					out = append(out, def)
-				}
-			}
+		if len(tool.Members) == 0 {
+			out = append(out, tool)
 			continue
 		}
-		if def, ok := toolRegistry[id]; ok {
-			out = append(out, def)
+		for _, memberID := range tool.Members {
+			if member, ok := toolRegistry[memberID]; ok {
+				out = append(out, member)
+			}
 		}
 	}
 	return out

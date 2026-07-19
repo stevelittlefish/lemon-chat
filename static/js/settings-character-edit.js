@@ -117,29 +117,24 @@ function renderError(msg) {
   `;
 }
 
-const TOOL_GROUPS = [
-  { label: 'General',           ids: ['get_time', 'roll_dice', 'pick_random', 'random_chance', 'fetch_url', 'create_document'] },
-  { label: 'Search & Knowledge', ids: ['wikipedia_search', 'wikipedia_get_page', 'searxng'] },
-  { label: 'Image Generation',  ids: ['generate_image_sdxl', 'generate_image_flux'] },
-  { label: 'World State',       ids: ['world_state'] },
-  { label: 'Notes',             ids: ['notes'] },
-  { label: 'Reasoning',         ids: ['note_to_self'] },
-];
-
 function renderToolGroups(tools, enabled) {
-  const byId = Object.fromEntries(tools.map(t => [t.id, t]));
-  return TOOL_GROUPS.map(group => {
-    const groupTools = group.ids.map(id => byId[id]).filter(Boolean);
-    if (groupTools.length === 0) return '';
+  const groups = new Map();
+  tools.forEach(tool => {
+    const label = tool.group || 'Other';
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(tool);
+  });
+
+  return Array.from(groups, ([label, groupTools]) => {
     const allChecked = groupTools.every(t => enabled.includes(t.id));
     const someChecked = groupTools.some(t => enabled.includes(t.id));
     return `
-      <div class="char-tool-group" data-group="${escapeHtml(group.label)}">
+      <div class="char-tool-group" data-group="${escapeHtml(label)}">
         <div class="char-tool-group-header">
           <input type="checkbox" class="char-tool-group-toggle"
             ${allChecked ? 'checked' : ''}
             ${!allChecked && someChecked ? 'data-indeterminate="true"' : ''}>
-          <span class="char-tool-group-label">${escapeHtml(group.label)}</span>
+          <span class="char-tool-group-label">${escapeHtml(label)}</span>
         </div>
         <div class="char-tool-group-items">
           ${groupTools.map(t => `
