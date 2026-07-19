@@ -369,13 +369,8 @@ const (
 	titleTriggerThirdResponse = "third-assistant-response"
 )
 
-func conversationTitleTrigger(conv *store.Conversation, character *store.Character, history []store.Message) string {
-	if conv.Title != nil {
-		return titleTriggerNone
-	}
-
-	userMessages := 1 // Include the user message persisted after history was loaded.
-	assistantMessages := 0
+func conversationTitleTrigger(conv *store.Conversation, character *store.Character, history []store.Message) (reason string, userMessages, assistantMessages int) {
+	userMessages = 1 // Include the user message persisted after history was loaded.
 	for _, message := range history {
 		switch message.Role {
 		case "user":
@@ -384,33 +379,24 @@ func conversationTitleTrigger(conv *store.Conversation, character *store.Charact
 			assistantMessages++
 		}
 	}
+	if conv.Title != nil {
+		return titleTriggerNone, userMessages, assistantMessages
+	}
 	if character != nil && character.AutoTitle && userMessages == 1 {
-		return titleTriggerCharacterAuto
+		return titleTriggerCharacterAuto, userMessages, assistantMessages
 	}
 	if assistantMessages >= 2 {
-		return titleTriggerThirdResponse
+		return titleTriggerThirdResponse, userMessages, assistantMessages
 	}
-	return titleTriggerNone
+	return titleTriggerNone, userMessages, assistantMessages
 }
 
 func (s *Server) triggerConversationTitle(conv *store.Conversation, character *store.Character, history []store.Message) {
-	reason := conversationTitleTrigger(conv, character, history)
+	reason, userMessages, assistantMessages := conversationTitleTrigger(conv, character, history)
 	if character != nil && character.AutoTitle && conv.Title == nil {
-		userMessages := 1
-		for _, message := range history {
-			if message.Role == "user" {
-				userMessages++
-			}
-		}
 		debug.Log("title trigger (character auto-title): conv=%d userMsgCount=%d autoTitle=%v titleIsNil=%v", conv.ID, userMessages, character.AutoTitle, conv.Title == nil)
 	}
 	if reason != titleTriggerCharacterAuto && conv.Title == nil {
-		assistantMessages := 0
-		for _, message := range history {
-			if message.Role == "assistant" {
-				assistantMessages++
-			}
-		}
 		debug.Log("title trigger (3rd assistant): conv=%d assistantMsgCount=%d (need >=2 to fire)", conv.ID, assistantMessages)
 	}
 	if reason != titleTriggerNone {

@@ -65,7 +65,7 @@ func TestConversationTitleTrigger(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := conversationTitleTrigger(tt.conv, tt.character, tt.history); got != tt.want {
+			if got, _, _ := conversationTitleTrigger(tt.conv, tt.character, tt.history); got != tt.want {
 				t.Fatalf("conversationTitleTrigger() = %q, want %q", got, tt.want)
 			}
 		})
