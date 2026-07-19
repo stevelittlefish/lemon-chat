@@ -209,7 +209,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 
 ### Organisation & maintainability
 
-- [ ] **Split `tools.go` by concern** (`internal/server/tools.go`)
+- [x] **Split `tools.go` by concern** (`internal/server/tools.go`)
   1637 lines mixing schemas, executors, three external-service clients, HTML stripping, and image generation. Split into registry / web / image / notes-state files.
 
 - [ ] **Reduce the four hand-synced tool lists** (`internal/server/tools.go:58,627,1595`, `static/js/settings-character-edit.js`)
