@@ -17,6 +17,8 @@ import (
 	"github.com/stevelittlefish/lemon-chat/internal/searx"
 )
 
+const webToolRequestTimeout = 30 * time.Second
+
 func executeFetchURL(argsJSON string, tctx ToolContext) (string, error) {
 	var args struct {
 		URL    string `json:"url"`
@@ -31,7 +33,7 @@ func executeFetchURL(argsJSON string, tctx ToolContext) (string, error) {
 
 	log.Printf("Fetching URL url=%q source=%v", args.URL, args.Source)
 
-	fetchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	fetchCtx, cancel := context.WithTimeout(context.Background(), webToolRequestTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(fetchCtx, "GET", args.URL, nil)
@@ -160,7 +162,7 @@ func executeWikipediaSearch(argsJSON string, _ ToolContext) (string, error) {
 	searchURL := fmt.Sprintf("https://%s.wikipedia.org/w/api.php?action=query&list=search&srsearch=%s&format=json&srlimit=%d",
 		lang, url.QueryEscape(args.Query), n)
 
-	fetchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	fetchCtx, cancel := context.WithTimeout(context.Background(), webToolRequestTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(fetchCtx, "GET", searchURL, nil)
@@ -223,7 +225,7 @@ func executeWikipediaGetPage(argsJSON string, _ ToolContext) (string, error) {
 
 	log.Printf("Fetching Wikipedia page title=%q section=%q lang=%q", args.Title, args.Section, lang)
 
-	fetchCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	fetchCtx, cancel := context.WithTimeout(context.Background(), webToolRequestTimeout)
 	defer cancel()
 
 	doGet := func(u string) ([]byte, int, error) {

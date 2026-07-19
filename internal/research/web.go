@@ -13,6 +13,8 @@ import (
 	"github.com/stevelittlefish/lemon-chat/internal/htmltext"
 )
 
+const webpageFetchTimeout = 10 * time.Second
+
 type webpage struct {
 	Content string
 	Title   string
@@ -27,7 +29,7 @@ var (
 // fetchWebpage fetches a URL and returns cleaned text content, preserving
 // paragraph boundaries as blank lines (the truncation logic relies on them).
 func (r *Researcher) fetchWebpage(ctx context.Context, pageURL string) (*webpage, error) {
-	callCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, webpageFetchTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(callCtx, "GET", pageURL, nil)

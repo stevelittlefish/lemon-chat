@@ -227,8 +227,8 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Periodic expired-session cleanup** (`internal/store/sessions.go:41`)
   The cleanup worker deletes expired sessions at startup and hourly via the indexed `expires_at` column, logging only errors or non-zero deletion counts.
 
-- [ ] **Make tool timeouts named/configurable** (`internal/server/tools.go`, `internal/research/web.go`)
-  Magic literals (120s ComfyUI poll, 30s/15s/5s fetch timeouts) scattered inline; name them or move to config as the research engine already does.
+- [x] **Make tool timeouts named/configurable** (`internal/server/tools_image.go`, `internal/server/tools_web.go`, `internal/research/web.go`)
+  Replaced inline web and ComfyUI durations with concern-specific named constants; model summarisation continues to use its configured response timeout.
 
 - [ ] **Resolve static asset paths absolutely** (`internal/server/server.go:149,169`)
   `serveFile` and the `FileServer` use relative `static/` paths that depend on the process CWD; resolve against an absolute asset dir. Also disable directory listings on the catch-all `FileServer`.
