@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"github.com/stevelittlefish/lemon-chat/internal/redditimport"
 )
 
@@ -480,5 +481,69 @@ func TestNormalizeSlug(t *testing.T) {
 		if got := normalizeSlug(tt.input); got != tt.want {
 			t.Errorf("normalizeSlug(%q) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
+
+// stubProvider returns the queued errors in order, then succeeds.
+type stubProvider struct {
+	errs  []error
+	calls int
+}
+
+func (p *stubProvider) Stream(ctx context.Context, req llm.Request, h llm.Handler) (llm.Completion, error) {
+	p.calls++
+	if p.calls <= len(p.errs) {
+		return llm.Completion{}, p.errs[p.calls-1]
+	}
+	return llm.Completion{Content: "ok"}, nil
+}
+
+func (p *stubProvider) ListModels(ctx context.Context) ([]string, error) { return nil, nil }
+
+func TestLLMCallRetriesTransientErrors(t *testing.T) {
+	// A mid-stream server_error followed by a 503 should both be retried, and
+	// the third attempt's result returned — a single blip must not kill a job.
+	p := &stubProvider{errs: []error{
+		errors.New("responses: stream error: An error occurred while processing your request."),
+		&llm.StatusError{Status: 503, Body: "unavailable"},
+	}}
+	r := &Researcher{}
+	out, err := r.llmCallOn(context.Background(), modelEndpoint{Model: "m", Provider: p}, nil, 0, 10, time.Minute)
+	if err != nil {
+		t.Fatalf("expected success after retries, got %v", err)
+	}
+	if out != "ok" {
+		t.Fatalf("out = %q, want %q", out, "ok")
+	}
+	if p.calls != 3 {
+		t.Fatalf("calls = %d, want 3", p.calls)
+	}
+}
+
+func TestLLMCallDoesNotRetryPermanentErrors(t *testing.T) {
+	// A 400 means the request itself is wrong; retrying only wastes time.
+	p := &stubProvider{errs: []error{
+		&llm.StatusError{Status: 400, Body: "unknown model"},
+		&llm.StatusError{Status: 400, Body: "unknown model"},
+	}}
+	r := &Researcher{}
+	if _, err := r.llmCallOn(context.Background(), modelEndpoint{Model: "m", Provider: p}, nil, 0, 10, time.Minute); err == nil {
+		t.Fatal("expected error")
+	}
+	if p.calls != 1 {
+		t.Fatalf("calls = %d, want 1", p.calls)
+	}
+}
+
+func TestLLMCallStopsWhenContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	p := &stubProvider{errs: []error{errors.New("boom")}}
+	r := &Researcher{}
+	if _, err := r.llmCallOn(ctx, modelEndpoint{Model: "m", Provider: p}, nil, 0, 10, time.Minute); err == nil {
+		t.Fatal("expected error")
+	}
+	if p.calls != 1 {
+		t.Fatalf("calls = %d, want 1", p.calls)
 	}
 }

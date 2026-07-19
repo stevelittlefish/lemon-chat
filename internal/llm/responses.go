@@ -197,15 +197,24 @@ type responsesEvent struct {
 			} `json:"input_tokens_details"`
 		} `json:"usage"`
 	} `json:"response"`
+	// Error is the top-level error object on a bare `error` frame, e.g.
+	// {"type":"error","error":{"type":"server_error","message":"…"}}. This is
+	// distinct from Response.Error, which carries the reason on `response.failed`.
+	Error *struct {
+		Type    string `json:"type"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
 
 // errorDetail extracts the best human-readable reason from a response.failed or
 // error event. The Codex backend puts the reason in different places depending
-// on the event: top-level code/message for an `error` frame, but nested under
-// response.error (and sometimes response.incomplete_details) for
-// `response.failed`. Falls back to the status so the message is never empty.
+// on the event: a nested top-level error object (or, on some servers, flat
+// code/message) for an `error` frame, but under response.error (and sometimes
+// response.incomplete_details) for `response.failed`. Falls back to the status
+// so the message is never empty.
 func (ev responsesEvent) errorDetail() string {
 	if ev.Response != nil && ev.Response.Error != nil {
 		if m := ev.Response.Error.Message; m != "" {
@@ -213,6 +222,17 @@ func (ev responsesEvent) errorDetail() string {
 		}
 		if c := ev.Response.Error.Code; c != "" {
 			return c
+		}
+	}
+	if ev.Error != nil {
+		if m := ev.Error.Message; m != "" {
+			return m
+		}
+		if c := ev.Error.Code; c != "" {
+			return c
+		}
+		if t := ev.Error.Type; t != "" {
+			return t
 		}
 	}
 	if ev.Message != "" {

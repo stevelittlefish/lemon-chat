@@ -590,7 +590,10 @@ func (r *Researcher) runOneRound(ctx context.Context, round, creativity int) (ke
 // — the model can still make progress from its own knowledge — so empty rounds
 // never abort the run.
 func (r *Researcher) runBrainstormRound(ctx context.Context, round, creativity int) (keepGoing bool, err error) {
-	queries := r.generateQueries(ctx, round, creativity)
+	// A failed query-generation call is not fatal here: brainstorm rounds can
+	// make progress from the model's own knowledge, so a round with no queries
+	// — whether by choice or by error — just becomes pure ideation.
+	queries, _ := r.generateQueries(ctx, round, creativity)
 	if ctx.Err() != nil {
 		return false, nil
 	}
@@ -632,9 +635,27 @@ func (r *Researcher) runBrainstormRound(ctx context.Context, round, creativity i
 // false when the loop should stop (no new queries, or too many empty rounds),
 // and a non-nil error only on a fatal condition (no usable results at all).
 func (r *Researcher) runRound(ctx context.Context, round, creativity int) (keepGoing bool, err error) {
-	queries := r.generateQueries(ctx, round, creativity)
+	queries, err := r.generateQueries(ctx, round, creativity)
 	if ctx.Err() != nil {
 		return false, nil
+	}
+	// A failed query-generation call is a transient upstream problem, not a
+	// signal that the research is complete — treat it as an empty round so the
+	// loop can try again, rather than ending the job with no findings.
+	if err != nil {
+		r.state.EmptyRounds++
+		if r.state.EmptyRounds >= r.cfg.MaxEmptyRounds {
+			if len(r.state.Findings) == 0 {
+				return false, fmt.Errorf("query generation failed on %d consecutive round(s): %w", r.state.EmptyRounds, err)
+			}
+			r.progress(Progress{Phase: "warning", Round: round, Message: "query generation keeps failing — writing report with findings so far"})
+			r.state.Round = round
+			r.checkpoint()
+			return false, nil
+		}
+		r.state.Round = round
+		r.checkpoint()
+		return true, nil
 	}
 	if len(queries) == 0 {
 		r.progress(Progress{Phase: "warning", Round: round, Message: "no new search queries generated — stopping"})
@@ -797,7 +818,10 @@ func (r *Researcher) classifyBrainstorm(ctx context.Context) string {
 
 // ── Phase 3: Think (query generation) ────────────────────────
 
-func (r *Researcher) generateQueries(ctx context.Context, round, creativity int) []string {
+// generateQueries returns the round's new search queries. A non-nil error means
+// the model call itself failed, which callers must distinguish from an empty
+// slice: empty is a legitimate "nothing more to search", an error is not.
+func (r *Researcher) generateQueries(ctx context.Context, round, creativity int) ([]string, error) {
 	report := r.state.Report
 
 	// forceSearch makes the first brainstorm round mandatory-search so a run with
@@ -845,7 +869,7 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 	out, err := r.llmCallWorker(ctx, []chatMsg{{Role: "user", Content: prompt}}, 0.5, 4096, queryTimeout)
 	if err != nil {
 		r.progress(Progress{Phase: "warning", Round: round, Message: "query generation failed: " + err.Error()})
-		return nil
+		return nil, err
 	}
 
 	// Dedup on a token-set key rather than the exact lowercase string, so a
@@ -875,7 +899,7 @@ func (r *Researcher) generateQueries(ctx context.Context, round, creativity int)
 			queries = append(queries, q)
 		}
 	}
-	return queries
+	return queries, nil
 }
 
 // queryStopwords are connective/filler tokens dropped when building a query's

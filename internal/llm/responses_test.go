@@ -170,3 +170,17 @@ func TestResponsesToChatSSEError(t *testing.T) {
 		t.Fatal("expected error from failed response")
 	}
 }
+
+// The Codex backend nests the reason under a top-level "error" object on a bare
+// `error` frame. Regression test: this used to surface as "unknown (no message
+// in error event)", hiding the real upstream failure.
+func TestResponsesToChatSSEErrorFrameSurfacesMessage(t *testing.T) {
+	in := sse(`{"type":"error","error":{"type":"server_error","code":"server_error","message":"An error occurred while processing your request."},"sequence_number":3}`)
+	_, err := readChatCompletionsStream(ResponsesToChatSSE(strings.NewReader(in)), nil)
+	if err == nil {
+		t.Fatal("expected error from error frame")
+	}
+	if !strings.Contains(err.Error(), "An error occurred while processing your request.") {
+		t.Fatalf("error message not surfaced, got: %v", err)
+	}
+}

@@ -22,6 +22,24 @@ import (
 //
 // See docs/provider_abstraction.md for the design and rationale.
 
+// StatusError is a non-2xx response from a model server. It is returned instead
+// of a bare fmt.Errorf so callers can distinguish a permanent rejection (a bad
+// model name, a malformed request) from a transient one worth retrying.
+type StatusError struct {
+	Status int
+	Body   string
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("model server returned %d: %s", e.Status, e.Body)
+}
+
+// Transient reports whether the status is worth retrying: any 5xx, plus the two
+// 4xx codes that mean "try again" rather than "this request is wrong".
+func (e *StatusError) Transient() bool {
+	return e.Status >= 500 || e.Status == http.StatusRequestTimeout || e.Status == http.StatusTooManyRequests
+}
+
 // Request is a protocol-neutral generation request. Messages and Tools stay in
 // the OpenAI chat-completions JSON shape (any value that marshals to it), so
 // callers assemble them as they do today; each provider lowers them to its own
@@ -221,7 +239,7 @@ func (p *httpProvider) Stream(ctx context.Context, req Request, h Handler) (Comp
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		writeWireEnd(transcript)
-		wrapped := fmt.Errorf("model server returned %d: %.300s", resp.StatusCode, respBody)
+		wrapped := error(&StatusError{Status: resp.StatusCode, Body: fmt.Sprintf("%.300s", respBody)})
 		flushOnError(wrapped)
 		return Completion{}, wrapped
 	}

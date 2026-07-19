@@ -3,7 +3,9 @@ package research
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -39,7 +41,58 @@ func (r *Researcher) llmCallWorker(ctx context.Context, msgs []chatMsg, temperat
 	return r.llmCallOn(ctx, r.worker, msgs, temperature, maxTokens, timeout)
 }
 
+// callAttempts is how many times a non-streaming research call is tried before
+// giving up, and how long to wait between tries. These calls are short and
+// idempotent, so a transient upstream 5xx (the Codex backend emits mid-stream
+// `server_error` frames under load) should not be allowed to kill a whole job:
+// before this, one blip during query generation ended the run with "no
+// findings". Streaming calls are deliberately excluded — their output has
+// already been shown to the user by the time they fail.
+const callAttempts = 3
+
+var callBackoff = []time.Duration{time.Second, 3 * time.Second}
+
 func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, error) {
+	var lastErr error
+	for attempt := 0; attempt < callAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			case <-time.After(callBackoff[attempt-1]):
+			}
+		}
+		out, err := r.llmCallOnce(ctx, ep, msgs, temperature, maxTokens, timeout)
+		if err == nil {
+			return out, nil
+		}
+		lastErr = err
+		if !retryable(ctx, err) {
+			return "", err
+		}
+		log.Printf("Research retrying %s call after error (attempt %d/%d): %v", ep.Model, attempt+1, callAttempts, err)
+	}
+	return "", lastErr
+}
+
+// retryable reports whether err is worth another attempt. A cancelled or
+// expired parent context never is — that is the job being stopped or out of
+// time, not the model failing. A per-call timeout (which cancels callCtx, not
+// ctx) is retryable: the upstream can stall on one request and answer the next.
+func retryable(ctx context.Context, err error) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	var se *llm.StatusError
+	if errors.As(err, &se) {
+		return se.Transient()
+	}
+	// Transport errors, stream errors and per-call timeouts arrive as plain
+	// wrapped errors. They are all transient in practice, so retry them.
+	return true
+}
+
+func (r *Researcher) llmCallOnce(ctx context.Context, ep modelEndpoint, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, error) {
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
