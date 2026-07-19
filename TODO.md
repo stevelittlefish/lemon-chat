@@ -6,6 +6,12 @@ Completed work is archived in [`docs/archive/TODO-completed.md`](docs/archive/TO
 
 --
 
+## User attachments (backlog)
+
+- [ ] **Image attachments.** Allow users to upload and send image files in chat.
+- [ ] **Text file attachments.** Allow users to upload and send text files in chat.
+- [ ] **Paste images into the chat composer.** Accept image data pasted from the clipboard and attach it to the pending message.
+
 ## Provider abstraction & OAuth (backlog)
 
 Design docs: [`docs/provider_abstraction.md`](docs/provider_abstraction.md),
