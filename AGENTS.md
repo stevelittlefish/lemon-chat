@@ -181,13 +181,13 @@ CLAUDE.md
 
 Characters can have a list of tools enabled. When a message is sent to a character with tools, the model may call tools during the response loop. The server runs up to `max_tool_loops` rounds (default 5, configurable in `lemon.toml`) before cutting off and returning the final response.
 
-Tool definitions and executors live in `internal/server/tools.go`. To add a new tool:
+Tool declarations live in `toolRegistry` in `internal/server/tools_registry.go`; executor implementations are split across the `tools_*.go` files. To add a new selectable tool:
 
-1. Add an entry to `toolRegistry` (the `toolDef` sent to the model).
-2. Add a matching entry to `executors` (the Go function that runs it).
-3. Add the tool to `allTools` in `InitTools` so it appears on `GET /api/tools`.
-4. Add the tool ID to the `TOOL_GROUPS` array in `static/js/settings-character-edit.js` — tools not listed there are silently excluded from the character editor UI even though the API returns them.
-5. Update the table below.
+1. Add one `toolRegistry` entry containing its model-facing schema, executor, display metadata, group, and order. Add a `Configure` hook there if availability depends on config.
+2. Implement the executor in the appropriate concern file.
+3. Update the table below.
+
+`InitTools` derives the executor map and `GET /api/tools` metadata from the registry. The character editor groups the API response by its `group` field, so there are no matching backend/frontend ID lists to maintain.
 
 Available tools and their config requirements:
 
@@ -204,6 +204,14 @@ Available tools and their config requirements:
 | `searxng` | SearXNG | `[searxng] url` in `lemon.toml` |
 | `generate_image_sdxl` | Generate image (SDXL) | `[comfyui] url` + `sdxl_workflow` in `lemon.toml` |
 | `generate_image_flux` | Generate image (Flux Schnell) | `[comfyui] url` + `flux_workflow` in `lemon.toml` |
+| `world_state` | World state (compound) | — |
+| `state_set` | World state: set | — |
+| `state_modify` | World state: modify | — |
+| `state_unset` | World state: unset | — |
+| `state_list` | World state: list | — |
+| `state_clear` | World state: clear | — |
+| `notes` | Notes (compound) | — |
+| `note_to_self` | Note to self | — |
 | `note_save` | Note: save | — |
 | `note_load` | Note: load | — |
 | `note_list` | Note: list | — |
@@ -213,7 +221,7 @@ Available tools and their config requirements:
 `InitTools(cfg)` is called once at startup and sets the `Configured` flag on tools that need external services. The frontend reads `GET /api/tools` and shows a config hint for unconfigured tools.
 
 Compound group IDs expand to multiple tools:
-- `world_state` → `state_set`, `state_modify`, `state_unset`, `state_list`
+- `world_state` → `state_set`, `state_modify`, `state_unset`, `state_list`, `state_clear`
 - `notes` → `note_save`, `note_load`, `note_list`, `note_delete`, `note_append`
 
 ### Attachments

@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 )
@@ -11,53 +12,84 @@ type ToolMeta struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
 	Description string `json:"description"`
+	Group       string `json:"group"`
 	Configured  bool   `json:"configured"`
 	ConfigHint  string `json:"config_hint,omitempty"`
 }
 
-var allTools []ToolMeta
+var (
+	allTools  []ToolMeta
+	executors = staticExecutors(toolRegistry)
+)
 
-// InitTools wires up executors for configured image tools and builds the list
-// returned by GET /api/tools. Call once at server startup.
+func staticExecutors(registry map[string]toolDef) map[string]toolExecutor {
+	out := make(map[string]toolExecutor)
+	for id, tool := range registry {
+		if tool.Executor != nil {
+			out[id] = tool.Executor
+		}
+	}
+	return out
+}
+
+func configureSearXNG(cfg *config.Config) (bool, string, toolExecutor) {
+	if cfg.SearXNG.URL == "" {
+		return false, "Add [searxng] url = \"http://…\" to lemon.toml to enable SearXNG search.", executeSearXNG
+	}
+	return true, "", executeSearXNG
+}
+
+func configureSDXL(cfg *config.Config) (bool, string, toolExecutor) {
+	if cfg.ComfyUI.URL == "" || cfg.ComfyUI.SDXLWorkflow == "" {
+		return false, "Add [comfyui] url and sdxl_workflow to lemon.toml to enable SDXL image generation.", nil
+	}
+	return true, "", makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.SDXLWorkflow, 30, 7.0)
+}
+
+func configureFlux(cfg *config.Config) (bool, string, toolExecutor) {
+	if cfg.ComfyUI.URL == "" || cfg.ComfyUI.FluxWorkflow == "" {
+		return false, "Add [comfyui] url and flux_workflow to lemon.toml to enable Flux Schnell image generation.", nil
+	}
+	return true, "", makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.FluxWorkflow, 4, 1.0)
+}
+
+// InitTools derives executors and frontend metadata from toolRegistry. Call once
+// at server startup after configuration has loaded.
 func InitTools(cfg *config.Config) {
-	allTools = []ToolMeta{
-		{"get_time", "Get current time", "Returns the current local date and time.", true, ""},
-		{"roll_dice", "Roll dice", "Rolls dice using standard notation (e.g. 2d6, 1d20).", true, ""},
-		{"pick_random", "Pick random", "Picks one item at random from a list of options.", true, ""},
-		{"random_chance", "Random chance", "Resolves a success/failure check by rolling a die against a threshold.", true, ""},
-		{"fetch_url", "Fetch URL", "Fetches a URL and returns its content as markdown, or raw HTML if source is true.", true, ""},
-		{"create_document", "Create document", "Saves a file (report, script, notes, etc.) the user can download.", true, ""},
-		{"wikipedia_search", "Wikipedia search", "Searches Wikipedia and returns matching article titles and snippets.", true, ""},
-		{"wikipedia_get_page", "Wikipedia get page", "Fetches a Wikipedia article intro + TOC, or a specific section by name.", true, ""},
-		{"world_state", "World State", "Session state tools: set, modify, remove, and list named values scoped to this conversation.", true, ""},
-		{"notes", "Notes", "Note store: save, load, list, delete, and append to named notes across global, user, and conversation scopes.", true, ""},
-		{"note_to_self", "Note to self", toolRegistry["note_to_self"].Function.Description, true, ""},
+	executors = make(map[string]toolExecutor)
+	allTools = allTools[:0]
+
+	for id, tool := range toolRegistry {
+		configured := true
+		hint := ""
+		executor := tool.Executor
+		if tool.Configure != nil {
+			configured, hint, executor = tool.Configure(cfg)
+		}
+		if executor != nil {
+			executors[id] = executor
+		}
+		if tool.DisplayName == "" {
+			continue
+		}
+
+		description := tool.Summary
+		if description == "" {
+			description = tool.Function.Description
+		}
+		allTools = append(allTools, ToolMeta{
+			ID:          id,
+			DisplayName: tool.DisplayName,
+			Description: description,
+			Group:       tool.Group,
+			Configured:  configured,
+			ConfigHint:  hint,
+		})
 	}
 
-	searxngConfigured := cfg.SearXNG.URL != ""
-	searxngHint := ""
-	if !searxngConfigured {
-		searxngHint = "Add [searxng] url = \"http://…\" to lemon.toml to enable SearXNG search."
-	}
-	allTools = append(allTools, ToolMeta{"searxng", "SearXNG", "Searches the web via SearXNG and returns the top results.", searxngConfigured, searxngHint})
-
-	sdxlConfigured := cfg.ComfyUI.URL != "" && cfg.ComfyUI.SDXLWorkflow != ""
-	sdxlHint := ""
-	if !sdxlConfigured {
-		sdxlHint = "Add [comfyui] url and sdxl_workflow to lemon.toml to enable SDXL image generation."
-	} else {
-		executors["generate_image_sdxl"] = makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.SDXLWorkflow, 30, 7.0)
-	}
-	allTools = append(allTools, ToolMeta{"generate_image_sdxl", "Generate image (SDXL)", toolRegistry["generate_image_sdxl"].Function.Description, sdxlConfigured, sdxlHint})
-
-	fluxConfigured := cfg.ComfyUI.URL != "" && cfg.ComfyUI.FluxWorkflow != ""
-	fluxHint := ""
-	if !fluxConfigured {
-		fluxHint = "Add [comfyui] url and flux_workflow to lemon.toml to enable Flux Schnell image generation."
-	} else {
-		executors["generate_image_flux"] = makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.FluxWorkflow, 4, 1.0)
-	}
-	allTools = append(allTools, ToolMeta{"generate_image_flux", "Generate image (Flux Schnell)", toolRegistry["generate_image_flux"].Function.Description, fluxConfigured, fluxHint})
+	sort.Slice(allTools, func(i, j int) bool {
+		return toolRegistry[allTools[i].ID].Order < toolRegistry[allTools[j].ID].Order
+	})
 }
 
 func (s *Server) handleGetTools(w http.ResponseWriter, r *http.Request) {
