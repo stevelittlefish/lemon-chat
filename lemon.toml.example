@@ -1,7 +1,7 @@
 [server]
 port       = 8080
 data_dir   = "."       # directory for lemon.db, avatars, attachments (relative or absolute)
-static_dir = "static"  # frontend assets; resolved to an absolute path at startup
+static_dir = "static"  # frontend assets; relative paths resolve against the working directory at startup
 
 # The model used for background tasks (e.g. auto-title generation).
 # Must match the name of one of the [[model]] entries below.

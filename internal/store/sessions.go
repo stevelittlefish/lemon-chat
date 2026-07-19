@@ -50,6 +50,11 @@ func (s *Store) DeleteSession(sessionID string) error {
 	return err
 }
 
+// DeleteExpiredSessions removes every session whose expiry has passed. The
+// comparison is lexicographic, which only matches chronological order because
+// expires_at is always written as UTC RFC3339 (fixed width, "Z" suffix) — see
+// CreateSession and now(). Writing an offset like "+01:00" would silently break
+// this sweep.
 func (s *Store) DeleteExpiredSessions() (int64, error) {
 	result, err := s.db.Exec(`DELETE FROM session WHERE expires_at <= ?`, now())
 	if err != nil {

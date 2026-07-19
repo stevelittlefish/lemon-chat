@@ -222,7 +222,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
   Verified clean with `gofmt -l` on 2026-07-18.
 
 - [x] **Add `gofmt`/`go vet` checks to CI**
-  Added `.github/workflows/ci.yml` to check tracked Go files for formatting differences and run `go vet ./...` on pushes and pull requests.
+  Added `.github/workflows/ci.yml` to check tracked Go files for formatting differences and run `go vet ./...` and `go test ./...` on pushes and pull requests, with a concurrency group so a push to a PR branch only runs once.
 
 - [x] **Periodic expired-session cleanup** (`internal/store/sessions.go:41`)
   The cleanup worker deletes expired sessions at startup and hourly via the indexed `expires_at` column, logging only errors or non-zero deletion counts.
@@ -231,7 +231,7 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
   Replaced inline web and ComfyUI durations with concern-specific named constants; model summarisation continues to use its configured response timeout.
 
 - [x] **Resolve static asset paths absolutely** (`internal/config/config.go`, `internal/server/server.go`)
-  Added configurable `server.static_dir`, normalized it to an absolute path at startup, routed all frontend files through it, and made the catch-all file server return 404 for directories.
+  Added configurable `server.static_dir`, normalized it to an absolute path at startup, verified it exists so a typo fails fast, routed all frontend files through it, and made the catch-all file server return 404 for directories.
 
 - [x] **Image generation `background` parameter** (`internal/server/tools.go:210,251`)
   Add an optional `background` boolean parameter (default false) to both image generation tools. When true and the image loads, set it as the chat background (`static/js/thread.js:186`). Apply a legibility treatment (e.g. semi-transparent overlay on the message column) so text remains readable over the image.
