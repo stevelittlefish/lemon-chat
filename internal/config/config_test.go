@@ -2,6 +2,8 @@ package config
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -45,5 +47,35 @@ func TestStaticToken(t *testing.T) {
 	got, err := StaticToken("abc")(context.Background())
 	if err != nil || got != "abc" {
 		t.Errorf("StaticToken = %q, %v", got, err)
+	}
+}
+
+func TestLoadResolvesStaticDirAbsolutely(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lemon.toml")
+	if err := os.WriteFile(path, []byte("[server]\nstatic_dir = \"test-static\"\n"), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	want, err := filepath.Abs("test-static")
+	if err != nil {
+		t.Fatalf("resolve expected path: %v", err)
+	}
+	if cfg.Server.StaticDir != want {
+		t.Fatalf("static dir = %q, want %q", cfg.Server.StaticDir, want)
+	}
+}
+
+func TestLoadRejectsEmptyStaticDir(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "lemon.toml")
+	if err := os.WriteFile(path, []byte("[server]\nstatic_dir = \"\"\n"), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	if _, err := Load(path); err == nil {
+		t.Fatal("load config with empty static_dir: got nil error")
 	}
 }

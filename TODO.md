@@ -230,8 +230,8 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Make tool timeouts named/configurable** (`internal/server/tools_image.go`, `internal/server/tools_web.go`, `internal/research/web.go`)
   Replaced inline web and ComfyUI durations with concern-specific named constants; model summarisation continues to use its configured response timeout.
 
-- [ ] **Resolve static asset paths absolutely** (`internal/server/server.go:149,169`)
-  `serveFile` and the `FileServer` use relative `static/` paths that depend on the process CWD; resolve against an absolute asset dir. Also disable directory listings on the catch-all `FileServer`.
+- [x] **Resolve static asset paths absolutely** (`internal/config/config.go`, `internal/server/server.go`)
+  Added configurable `server.static_dir`, normalized it to an absolute path at startup, routed all frontend files through it, and made the catch-all file server return 404 for directories.
 
 - [x] **Image generation `background` parameter** (`internal/server/tools.go:210,251`)
   Add an optional `background` boolean parameter (default false) to both image generation tools. When true and the image loads, set it as the chat background (`static/js/thread.js:186`). Apply a legibility treatment (e.g. semi-transparent overlay on the message column) so text remains readable over the image.

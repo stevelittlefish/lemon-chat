@@ -64,6 +64,7 @@ type Server struct {
 	Port                   int    `toml:"port"`
 	DataDir                string `toml:"data_dir"`
 	DBPath                 string `toml:"db_path"`
+	StaticDir              string `toml:"static_dir"`
 	Debug                  bool   `toml:"debug"`
 	TokenLog               bool   `toml:"token_log"`
 	DefaultModel           string `toml:"default_model"`
@@ -159,6 +160,7 @@ func Load(path string) (*Config, error) {
 		Server: Server{
 			Port:                   8080,
 			DataDir:                ".",
+			StaticDir:              "static",
 			DialTimeoutSeconds:     10,
 			ResponseTimeoutSeconds: 600,
 			MaxToolLoops:           5,
@@ -201,6 +203,16 @@ func Load(path string) (*Config, error) {
 
 	if cfg.Server.DBPath == "" {
 		cfg.Server.DBPath = filepath.Join(cfg.Server.DataDir, "lemon.db")
+	}
+	if strings.TrimSpace(cfg.Server.StaticDir) == "" {
+		return nil, fmt.Errorf("config: static_dir must not be empty")
+	}
+	if !filepath.IsAbs(cfg.Server.StaticDir) {
+		staticDir, err := filepath.Abs(cfg.Server.StaticDir)
+		if err != nil {
+			return nil, fmt.Errorf("config: resolve static_dir: %w", err)
+		}
+		cfg.Server.StaticDir = staticDir
 	}
 
 	if err := cfg.Validate(); err != nil {
