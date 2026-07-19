@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"github.com/stevelittlefish/lemon-chat/internal/tasks"
@@ -97,6 +98,40 @@ func (s *Server) handleUpdateConversation(w http.ResponseWriter, r *http.Request
 		}
 		s.hub.BroadcastTitleUpdate(id, *req.Title)
 	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleSetConversationBackground(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		AttachmentID int64 `json:"attachment_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.AttachmentID == 0 {
+		writeError(w, http.StatusBadRequest, "attachment_id required")
+		return
+	}
+	if _, err := s.store.GetConversation(id, user.ID); notFoundOr500(w, err) {
+		return
+	}
+	att, err := s.store.GetAttachmentForUser(req.AttachmentID, user.ID)
+	if notFoundOr500(w, err) {
+		return
+	}
+	// Only an image from this conversation makes sense as its backdrop.
+	if att.ConversationID != id || !strings.HasPrefix(att.MimeType, "image/") {
+		writeError(w, http.StatusBadRequest, "attachment is not an image in this conversation")
+		return
+	}
+	log.Printf("Setting conversation background id=%d attachment_id=%d user_id=%d", id, att.ID, user.ID)
+	if err := s.store.SetConversationBackground(id, att.ID); err != nil {
+		internalError(w, err)
+		return
+	}
+	s.hub.BroadcastConversationBackground(id, att.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 

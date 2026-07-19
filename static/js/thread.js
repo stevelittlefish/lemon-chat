@@ -1,6 +1,6 @@
 import { render as renderMarkdown } from './markdown.js';
 import { icon } from './icons.js';
-import { messages as msgApi } from './api.js';
+import { messages as msgApi, conversations as convApi } from './api.js';
 import { copyToClipboard, escapeHtml, formatModelRate } from './utils.js';
 import { createModal } from './modal.js';
 
@@ -243,15 +243,39 @@ function buildInlineImage(att) {
   img.loading = 'lazy';
   img.addEventListener('click', () => openLightbox(img.src));
 
+  const actions = document.createElement('div');
+  actions.className = 'inline-image-actions';
+
+  const bgBtn = document.createElement('button');
+  bgBtn.type = 'button';
+  bgBtn.className = 'inline-image-btn';
+  bgBtn.title = 'Set as background';
+  bgBtn.setAttribute('aria-label', 'Set as background');
+  bgBtn.innerHTML = icon('image', 14);
+  bgBtn.addEventListener('click', async () => {
+    const convId = att.conversation_id ?? currentConvId;
+    if (!convId) return;
+    bgBtn.disabled = true;
+    try {
+      await convApi.setBackground(convId, att.id);
+      setBackground(att.id);
+    } finally {
+      bgBtn.disabled = false;
+    }
+  });
+
   const dlBtn = document.createElement('a');
-  dlBtn.className = 'inline-image-download';
+  dlBtn.className = 'inline-image-btn';
   dlBtn.href = `/api/attachments/${att.id}?download=1`;
   dlBtn.setAttribute('download', att.filename || 'image.png');
+  dlBtn.title = 'Download image';
   dlBtn.setAttribute('aria-label', 'Download image');
   dlBtn.innerHTML = icon('download', 14);
 
+  actions.appendChild(bgBtn);
+  actions.appendChild(dlBtn);
   wrap.appendChild(img);
-  wrap.appendChild(dlBtn);
+  wrap.appendChild(actions);
   return wrap;
 }
 

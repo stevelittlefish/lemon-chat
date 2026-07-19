@@ -96,6 +96,7 @@ export const conversations = {
   update: (id, data) => request('PATCH', `/api/conversations/${id}`, data),
   delete: (id) => request('DELETE', `/api/conversations/${id}`),
   regenerateTitle: (id) => request('POST', `/api/conversations/${id}/regenerate-title`),
+  setBackground: (id, attachmentId) => request('POST', `/api/conversations/${id}/background`, { attachment_id: attachmentId }),
 };
 
 // Messages

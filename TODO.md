@@ -239,10 +239,8 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Async image generation** (`internal/server/tools.go:1400`)
   `makeImageExecutor` blocks the SSE stream for up to 120s while ComfyUI polls. Per `docs/feature-async-image-generation.md`: return a pending attachment immediately after the ComfyUI submit, poll/download in a background goroutine, and push `attachment_ready`/`attachment_error` to the frontend via WebSocket when done.
 
-- [ ] Look into ways to follow Facebook links, if possible
-
-- [ ] **Add "set as background" button to inline images** (`static/js/thread.js:187`)
-  `buildInlineImage` shows only a download button on hover. Add a second hover button (image/wallpaper icon) that calls `setBackground(att.id)` so users can set any generated image as the conversation background without asking the model to use `background: true`.
+- [x] **Add "set as background" button to inline images** (`static/js/thread.js:235`)
+  Inline images now show a hover action row with a "set as background" button alongside the download button. It posts to the new `POST /api/conversations/{id}/background` endpoint, which verifies the attachment is an image belonging to that conversation, persists it, and broadcasts `conversation_background` over the WebSocket so every open client updates.
 
 - [x] **Size image placeholder to match final image dimensions** (`static/js/thread.js:64`)
   `buildImagePlaceholder` used a fixed 320×160 box, but a loaded image can be taller (inline images are capped at 320×240). When an async image resolved it grew past the placeholder, pushing text down and forcing a manual scroll while the content jumped. Fixed by sizing the placeholder to the exact render box from the tool-call `args` width/height (defaulting 1024×1024) against the same max constraints, so the swap is seamless. Also fixed the reload-during-pending path to render a sized placeholder the WS event can resolve in place.

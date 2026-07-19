@@ -108,6 +108,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/conversations/import_chat", s.requireAuth(s.handleImportConversation))
 	mux.HandleFunc("POST /api/conversations/{id}/fork", s.requireAuth(s.handleForkConversation))
 	mux.HandleFunc("POST /api/conversations/{id}/regenerate-title", s.requireAuth(s.handleRegenerateTitle))
+	mux.HandleFunc("POST /api/conversations/{id}/background", s.requireAuth(s.handleSetConversationBackground))
 
 	// Messages
 	mux.HandleFunc("GET /api/conversations/{id}/messages", s.requireAuth(s.handleListMessages))
