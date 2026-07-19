@@ -221,8 +221,8 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Run `gofmt` on the six flagged files** (`internal/server/{admin,avatars,messages,notes,research}.go`, `internal/store/research.go`)
   Verified clean with `gofmt -l` on 2026-07-18.
 
-- [ ] **Add `gofmt`/`go vet` checks to CI**
-  No CI workflow currently exists; it should fail on a formatting diff or vet failure.
+- [x] **Add `gofmt`/`go vet` checks to CI**
+  Added `.github/workflows/ci.yml` to check tracked Go files for formatting differences and run `go vet ./...` on pushes and pull requests.
 
 - [ ] **Periodic expired-session cleanup** (`internal/store/sessions.go:41`)
   Expired sessions are only deleted lazily on access; never-revisited sessions linger forever. Add a sweeper (an index on `expires_at` already exists).
