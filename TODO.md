@@ -221,17 +221,17 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Run `gofmt` on the six flagged files** (`internal/server/{admin,avatars,messages,notes,research}.go`, `internal/store/research.go`)
   Verified clean with `gofmt -l` on 2026-07-18.
 
-- [ ] **Add `gofmt`/`go vet` checks to CI**
-  No CI workflow currently exists; it should fail on a formatting diff or vet failure.
+- [x] **Add `gofmt`/`go vet` checks to CI**
+  Added `.github/workflows/ci.yml` to check tracked Go files for formatting differences and run `go vet ./...` and `go test ./...` on pushes and pull requests, with a concurrency group so a push to a PR branch only runs once.
 
-- [ ] **Periodic expired-session cleanup** (`internal/store/sessions.go:41`)
-  Expired sessions are only deleted lazily on access; never-revisited sessions linger forever. Add a sweeper (an index on `expires_at` already exists).
+- [x] **Periodic expired-session cleanup** (`internal/store/sessions.go:41`)
+  The cleanup worker deletes expired sessions at startup and hourly via the indexed `expires_at` column, logging only errors or non-zero deletion counts.
 
-- [ ] **Make tool timeouts named/configurable** (`internal/server/tools.go`, `internal/research/web.go`)
-  Magic literals (120s ComfyUI poll, 30s/15s/5s fetch timeouts) scattered inline; name them or move to config as the research engine already does.
+- [x] **Make tool timeouts named/configurable** (`internal/server/tools_image.go`, `internal/server/tools_web.go`, `internal/research/web.go`)
+  Replaced inline web and ComfyUI durations with concern-specific named constants; model summarisation continues to use its configured response timeout.
 
-- [ ] **Resolve static asset paths absolutely** (`internal/server/server.go:149,169`)
-  `serveFile` and the `FileServer` use relative `static/` paths that depend on the process CWD; resolve against an absolute asset dir. Also disable directory listings on the catch-all `FileServer`.
+- [x] **Resolve static asset paths absolutely** (`internal/config/config.go`, `internal/server/server.go`)
+  Added configurable `server.static_dir`, normalized it to an absolute path at startup, verified it exists so a typo fails fast, routed all frontend files through it, and made the catch-all file server return 404 for directories.
 
 - [x] **Image generation `background` parameter** (`internal/server/tools.go:210,251`)
   Add an optional `background` boolean parameter (default false) to both image generation tools. When true and the image loads, set it as the chat background (`static/js/thread.js:186`). Apply a legibility treatment (e.g. semi-transparent overlay on the message column) so text remains readable over the image.

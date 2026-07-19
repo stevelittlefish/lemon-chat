@@ -17,6 +17,14 @@ import (
 	"time"
 )
 
+const (
+	comfySubmitTimeout         = 15 * time.Second
+	comfyPollTimeout           = 120 * time.Second
+	comfyPollInterval          = time.Second
+	comfyHistoryRequestTimeout = 5 * time.Second
+	comfyDownloadTimeout       = 30 * time.Second
+)
+
 type comfyImage struct {
 	Filename  string `json:"filename"`
 	Subfolder string `json:"subfolder"`
@@ -24,7 +32,7 @@ type comfyImage struct {
 }
 
 func submitToComfyUI(comfyBase string, promptPayload []byte) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), comfySubmitTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "POST", comfyBase+"/prompt", bytes.NewReader(promptPayload))
 	if err != nil {
@@ -56,10 +64,10 @@ func pollComfyUI(comfyBase, promptID string) (*comfyImage, error) {
 	type comfyJob struct {
 		Outputs map[string]comfyOutput `json:"outputs"`
 	}
-	deadline := time.Now().Add(120 * time.Second)
+	deadline := time.Now().Add(comfyPollTimeout)
 	for time.Now().Before(deadline) {
-		time.Sleep(1 * time.Second)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		time.Sleep(comfyPollInterval)
+		ctx, cancel := context.WithTimeout(context.Background(), comfyHistoryRequestTimeout)
 		req, _ := http.NewRequestWithContext(ctx, "GET", comfyBase+"/history/"+promptID, nil)
 		resp, err := http.DefaultClient.Do(req)
 		cancel()
@@ -81,14 +89,14 @@ func pollComfyUI(comfyBase, promptID string) (*comfyImage, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("image generation timed out after 120 seconds — tell the user the image was not produced in time and suggest checking that ComfyUI is processing jobs correctly")
+	return nil, fmt.Errorf("image generation timed out after %d seconds — tell the user the image was not produced in time and suggest checking that ComfyUI is processing jobs correctly", int(comfyPollTimeout/time.Second))
 }
 
 func downloadAndSaveImage(dataDir, comfyBase string, img *comfyImage) (string, error) {
 	viewURL := comfyBase + "/view?filename=" + url.QueryEscape(img.Filename) +
 		"&subfolder=" + url.QueryEscape(img.Subfolder) +
 		"&type=" + url.QueryEscape(img.Type)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), comfyDownloadTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "GET", viewURL, nil)
 	if err != nil {

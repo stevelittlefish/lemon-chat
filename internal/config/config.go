@@ -64,6 +64,7 @@ type Server struct {
 	Port                   int    `toml:"port"`
 	DataDir                string `toml:"data_dir"`
 	DBPath                 string `toml:"db_path"`
+	StaticDir              string `toml:"static_dir"`
 	Debug                  bool   `toml:"debug"`
 	TokenLog               bool   `toml:"token_log"`
 	DefaultModel           string `toml:"default_model"`
@@ -159,6 +160,7 @@ func Load(path string) (*Config, error) {
 		Server: Server{
 			Port:                   8080,
 			DataDir:                ".",
+			StaticDir:              "static",
 			DialTimeoutSeconds:     10,
 			ResponseTimeoutSeconds: 600,
 			MaxToolLoops:           5,
@@ -202,12 +204,44 @@ func Load(path string) (*Config, error) {
 	if cfg.Server.DBPath == "" {
 		cfg.Server.DBPath = filepath.Join(cfg.Server.DataDir, "lemon.db")
 	}
+	if err := resolveStaticDir(&cfg.Server); err != nil {
+		return nil, err
+	}
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 
 	return cfg, nil
+}
+
+// resolveStaticDir normalises static_dir to an absolute path and checks that it
+// actually exists, so a typo fails at startup rather than turning every page
+// into a silent 404. Relative paths resolve against the working directory at
+// startup, matching how data_dir behaves.
+//
+// This lives here rather than in Validate because it touches the filesystem;
+// Validate stays a pure check over the parsed struct.
+func resolveStaticDir(srv *Server) error {
+	srv.StaticDir = strings.TrimSpace(srv.StaticDir)
+	if srv.StaticDir == "" {
+		return fmt.Errorf("config: static_dir must not be empty")
+	}
+	if !filepath.IsAbs(srv.StaticDir) {
+		abs, err := filepath.Abs(srv.StaticDir)
+		if err != nil {
+			return fmt.Errorf("config: resolve static_dir: %w", err)
+		}
+		srv.StaticDir = abs
+	}
+	info, err := os.Stat(srv.StaticDir)
+	if err != nil {
+		return fmt.Errorf("config: static_dir %q: %w", srv.StaticDir, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("config: static_dir %q is not a directory", srv.StaticDir)
+	}
+	return nil
 }
 
 func (c *Config) Validate() error {

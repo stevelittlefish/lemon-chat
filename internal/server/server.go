@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -68,6 +70,7 @@ func (s *Server) oauthAccountID(srv *config.ModelServer) string {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	staticDir := s.cfg.Server.StaticDir
 
 	// Auth
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
@@ -170,14 +173,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/completions/{id}/regenerate-title", s.requireAuth(s.handleRegenerateCompletionTitle))
 
 	// Root — no-cache so deploys are picked up immediately
-	mux.HandleFunc("GET /{$}", serveFile("static/index.html"))
+	mux.HandleFunc("GET /{$}", serveFile(staticDir, "index.html"))
 
 	// Menu and feature pages
-	mux.HandleFunc("GET /menu", serveFile("static/menu.html"))
-	mux.HandleFunc("GET /complete", serveFile("static/complete.html"))
-	mux.HandleFunc("GET /research", serveFile("static/research.html"))
-	mux.HandleFunc("GET /research/help", serveFile("static/research-help.html"))
-	mux.HandleFunc("GET /debug/reddit-import", s.debugOnly(serveFile("static/reddit-import-debug.html")))
+	mux.HandleFunc("GET /menu", serveFile(staticDir, "menu.html"))
+	mux.HandleFunc("GET /complete", serveFile(staticDir, "complete.html"))
+	mux.HandleFunc("GET /research", serveFile(staticDir, "research.html"))
+	mux.HandleFunc("GET /research/help", serveFile(staticDir, "research-help.html"))
+	mux.HandleFunc("GET /debug/reddit-import", s.debugOnly(serveFile(staticDir, "reddit-import-debug.html")))
 
 	// Settings pages
 	mux.HandleFunc("GET /settings", func(w http.ResponseWriter, r *http.Request) {
@@ -186,17 +189,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings.html", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings/account", http.StatusMovedPermanently)
 	})
-	mux.HandleFunc("GET /settings/account", serveFile("static/settings/account.html"))
-	mux.HandleFunc("GET /settings/characters", serveFile("static/settings/characters.html"))
-	mux.HandleFunc("GET /settings/characters/new", serveFile("static/settings/character-edit.html"))
-	mux.HandleFunc("GET /settings/characters/{id}/edit", serveFile("static/settings/character-edit.html"))
-	mux.HandleFunc("GET /settings/users", serveFile("static/settings/users.html"))
-	mux.HandleFunc("GET /settings/tools", serveFile("static/settings/tools.html"))
-	mux.HandleFunc("GET /settings/notes", serveFile("static/settings/notes.html"))
-	mux.HandleFunc("GET /settings/import_chat", serveFile("static/settings/import_chat.html"))
+	mux.HandleFunc("GET /settings/account", serveFile(staticDir, "settings/account.html"))
+	mux.HandleFunc("GET /settings/characters", serveFile(staticDir, "settings/characters.html"))
+	mux.HandleFunc("GET /settings/characters/new", serveFile(staticDir, "settings/character-edit.html"))
+	mux.HandleFunc("GET /settings/characters/{id}/edit", serveFile(staticDir, "settings/character-edit.html"))
+	mux.HandleFunc("GET /settings/users", serveFile(staticDir, "settings/users.html"))
+	mux.HandleFunc("GET /settings/tools", serveFile(staticDir, "settings/tools.html"))
+	mux.HandleFunc("GET /settings/notes", serveFile(staticDir, "settings/notes.html"))
+	mux.HandleFunc("GET /settings/import_chat", serveFile(staticDir, "settings/import_chat.html"))
 
 	// Static files — no forced no-cache; ETags handle revalidation naturally
-	mux.Handle("/", http.FileServer(http.Dir("static")))
+	mux.Handle("/", http.FileServer(noDirectoryFS{FileSystem: http.Dir(staticDir)}))
 
 	return mux
 }
@@ -253,7 +256,29 @@ func notFoundOr500(w http.ResponseWriter, err error) bool {
 	return true
 }
 
-func serveFile(path string) http.HandlerFunc {
+type noDirectoryFS struct {
+	http.FileSystem
+}
+
+func (fs noDirectoryFS) Open(name string) (http.File, error) {
+	file, err := fs.FileSystem.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, err
+	}
+	if info.IsDir() {
+		file.Close()
+		return nil, os.ErrNotExist
+	}
+	return file, nil
+}
+
+func serveFile(staticDir, name string) http.HandlerFunc {
+	path := filepath.Join(staticDir, name)
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeFile(w, r, path)
