@@ -188,14 +188,18 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 }
 
 type messageToolLoop struct {
-	server          *Server
-	ctx             context.Context
-	writer          http.ResponseWriter
-	flusher         http.Flusher
-	provider        llm.Provider
-	request         llm.Request
-	messages        []chatMsg
-	wireLog         io.Writer
+	server   *Server
+	ctx      context.Context
+	writer   http.ResponseWriter
+	flusher  http.Flusher
+	provider llm.Provider
+	request  llm.Request
+	messages []chatMsg
+	// Concrete *os.File, not io.Writer: token logging is off most of the time,
+	// and a nil *os.File stored in an io.Writer is a non-nil interface whose
+	// writes fail with os.ErrInvalid. The provider tees the response body into
+	// this sink, so those failures surface as stream read errors.
+	wireLog         *os.File
 	onStart         func()
 	committed       func() bool
 	persistError    func() error
