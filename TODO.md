@@ -224,8 +224,8 @@ Findings from `code_review_2026-06-13.md`, in suggested priority order.
 - [x] **Add `gofmt`/`go vet` checks to CI**
   Added `.github/workflows/ci.yml` to check tracked Go files for formatting differences and run `go vet ./...` on pushes and pull requests.
 
-- [ ] **Periodic expired-session cleanup** (`internal/store/sessions.go:41`)
-  Expired sessions are only deleted lazily on access; never-revisited sessions linger forever. Add a sweeper (an index on `expires_at` already exists).
+- [x] **Periodic expired-session cleanup** (`internal/store/sessions.go:41`)
+  The cleanup worker deletes expired sessions at startup and hourly via the indexed `expires_at` column, logging only errors or non-zero deletion counts.
 
 - [ ] **Make tool timeouts named/configurable** (`internal/server/tools.go`, `internal/research/web.go`)
   Magic literals (120s ComfyUI poll, 30s/15s/5s fetch timeouts) scattered inline; name them or move to config as the research engine already does.

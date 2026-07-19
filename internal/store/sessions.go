@@ -49,3 +49,11 @@ func (s *Store) DeleteSession(sessionID string) error {
 	_, err := s.db.Exec(`DELETE FROM session WHERE id = ?`, sessionID)
 	return err
 }
+
+func (s *Store) DeleteExpiredSessions() (int64, error) {
+	result, err := s.db.Exec(`DELETE FROM session WHERE expires_at <= ?`, now())
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
