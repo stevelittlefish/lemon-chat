@@ -46,8 +46,10 @@ func (r *Researcher) llmCallWorker(ctx context.Context, msgs []chatMsg, temperat
 // idempotent, so a transient upstream 5xx (the Codex backend emits mid-stream
 // `server_error` frames under load) should not be allowed to kill a whole job:
 // before this, one blip during query generation ended the run with "no
-// findings". Streaming calls are deliberately excluded — their output has
-// already been shown to the user by the time they fail.
+// findings". Streaming calls retry too (see llmCallStreamFinish): their partial
+// output is only ever shown as an ephemeral progress snippet, never committed,
+// so re-streaming from scratch is safe and stops a single overload frame from
+// silently dropping a whole round's synthesis.
 const callAttempts = 3
 
 var callBackoff = []time.Duration{time.Second, 3 * time.Second}
@@ -125,6 +127,35 @@ func (r *Researcher) llmCallStream(ctx context.Context, msgs []chatMsg, temperat
 // reason, so callers that care about truncation (synthesis) can react to a
 // "length" stop without every other caller having to thread the value through.
 func (r *Researcher) llmCallStreamFinish(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration, onDelta func(generated int, tail string)) (string, string, error) {
+	var lastErr error
+	for attempt := 0; attempt < callAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return "", "", ctx.Err()
+			case <-time.After(callBackoff[attempt-1]):
+			}
+		}
+		out, finish, err := r.streamOnce(ctx, msgs, temperature, maxTokens, timeout, onDelta)
+		if err == nil {
+			return out, finish, nil
+		}
+		lastErr = err
+		if !retryable(ctx, err) {
+			return "", "", err
+		}
+		log.Printf("Research retrying %s stream after error (attempt %d/%d): %v", r.writer.Model, attempt+1, callAttempts, err)
+		r.progress(Progress{
+			Phase:   "warning",
+			Round:   r.state.Round,
+			Message: fmt.Sprintf("model call failed (attempt %d/%d), retrying: %s", attempt+1, callAttempts, synthesisFailureReason(err)),
+		})
+	}
+	return "", "", lastErr
+}
+
+// streamOnce is a single streaming attempt for llmCallStreamFinish.
+func (r *Researcher) streamOnce(ctx context.Context, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration, onDelta func(generated int, tail string)) (string, string, error) {
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -152,6 +183,34 @@ func (r *Researcher) llmCallStreamFinish(ctx context.Context, msgs []chatMsg, te
 		return "", result.FinishReason, fmt.Errorf("empty response from model")
 	}
 	return out, result.FinishReason, nil
+}
+
+// synthesisFailureReason distils a failed synthesis call into a short,
+// user-facing phrase for the progress log, so the reader can tell a transient
+// upstream overload apart from an empty response and decide whether to cancel
+// rather than let the job burn more rounds. It deliberately drops the noisy
+// wrapping ("stream read failed: sse scan: reading responses stream (…)") and
+// keeps the message the provider actually sent.
+func synthesisFailureReason(err error) string {
+	if err == nil {
+		return "empty response"
+	}
+	var se *llm.StatusError
+	if errors.As(err, &se) {
+		return fmt.Sprintf("upstream HTTP %d", se.Status)
+	}
+	msg := err.Error()
+	// Mid-stream provider errors are wrapped like "…: stream error: <message>".
+	// Keep only the final message the provider emitted.
+	if i := strings.LastIndex(msg, "stream error: "); i >= 0 {
+		msg = msg[i+len("stream error: "):]
+	}
+	msg = strings.TrimSpace(msg)
+	const max = 120
+	if len(msg) > max {
+		msg = msg[:max] + "…"
+	}
+	return msg
 }
 
 // isTruncated reports whether a finish reason indicates the output was cut off

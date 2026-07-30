@@ -1099,8 +1099,9 @@ func (r *Researcher) synthesize(ctx context.Context, round int, newFindings []Fi
 			r.progress(Progress{Phase: "analyzing", Round: round, TotalFindings: len(r.state.Findings), Generated: generated, Snippet: tail})
 		})
 	if err != nil || out == "" {
-		// Keep the current report unchanged.
-		r.progress(Progress{Phase: "warning", Message: "synthesis failed — keeping previous report"})
+		// Keep the current report unchanged, but surface why so the user can
+		// decide whether to cancel rather than burn rounds on a dead upstream.
+		r.progress(Progress{Phase: "warning", Round: round, Message: "synthesis failed (" + synthesisFailureReason(err) + ") — keeping previous report"})
 		return
 	}
 	// A truncated synthesis (hit the token limit) is a mangled working summary;
