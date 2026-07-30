@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"regexp"
 	"strings"
 	"time"
@@ -52,7 +53,17 @@ func (r *Researcher) llmCallWorker(ctx context.Context, msgs []chatMsg, temperat
 // silently dropping a whole round's synthesis.
 const callAttempts = 3
 
-var callBackoff = []time.Duration{time.Second, 3 * time.Second}
+// callBackoff returns how long to wait before the (retry+1)th attempt (retry is
+// 1-based). An overloaded backend is the common failure here, and retrying it a
+// second later is pointless — so the wait grows geometrically from a
+// several-second base (≈5s, 10s, 20s, …) to give the upstream real room to
+// recover. A ±20% jitter keeps concurrent research phases from retrying in
+// lockstep and re-synchronising the load spike.
+func callBackoff(retry int) time.Duration {
+	base := (5 * time.Second) << (retry - 1)
+	jitter := time.Duration(rand.Int63n(int64(base)/5+1)) - base/10
+	return base + jitter
+}
 
 func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []chatMsg, temperature float64, maxTokens int, timeout time.Duration) (string, error) {
 	var lastErr error
@@ -61,7 +72,7 @@ func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []cha
 			select {
 			case <-ctx.Done():
 				return "", ctx.Err()
-			case <-time.After(callBackoff[attempt-1]):
+			case <-time.After(callBackoff(attempt)):
 			}
 		}
 		out, err := r.llmCallOnce(ctx, ep, msgs, temperature, maxTokens, timeout)
@@ -72,12 +83,15 @@ func (r *Researcher) llmCallOn(ctx context.Context, ep modelEndpoint, msgs []cha
 		if !retryable(ctx, err) {
 			return "", err
 		}
-		log.Printf("Research retrying %s call after error (attempt %d/%d): %v", ep.Model, attempt+1, callAttempts, err)
-		r.progress(Progress{
-			Phase:   "warning",
-			Round:   r.state.Round,
-			Message: fmt.Sprintf("model call failed (attempt %d/%d), retrying: %v", attempt+1, callAttempts, err),
-		})
+		if attempt+1 < callAttempts {
+			wait := callBackoff(attempt + 1)
+			log.Printf("Research retrying %s call after error (attempt %d/%d, waiting %s): %v", ep.Model, attempt+1, callAttempts, wait.Round(time.Second), err)
+			r.progress(Progress{
+				Phase:   "warning",
+				Round:   r.state.Round,
+				Message: fmt.Sprintf("model call failed (attempt %d/%d), retrying in %s: %s", attempt+1, callAttempts, wait.Round(time.Second), synthesisFailureReason(err)),
+			})
+		}
 	}
 	return "", lastErr
 }
@@ -133,7 +147,7 @@ func (r *Researcher) llmCallStreamFinish(ctx context.Context, msgs []chatMsg, te
 			select {
 			case <-ctx.Done():
 				return "", "", ctx.Err()
-			case <-time.After(callBackoff[attempt-1]):
+			case <-time.After(callBackoff(attempt)):
 			}
 		}
 		out, finish, err := r.streamOnce(ctx, msgs, temperature, maxTokens, timeout, onDelta)
@@ -144,12 +158,15 @@ func (r *Researcher) llmCallStreamFinish(ctx context.Context, msgs []chatMsg, te
 		if !retryable(ctx, err) {
 			return "", "", err
 		}
-		log.Printf("Research retrying %s stream after error (attempt %d/%d): %v", r.writer.Model, attempt+1, callAttempts, err)
-		r.progress(Progress{
-			Phase:   "warning",
-			Round:   r.state.Round,
-			Message: fmt.Sprintf("model call failed (attempt %d/%d), retrying: %s", attempt+1, callAttempts, synthesisFailureReason(err)),
-		})
+		if attempt+1 < callAttempts {
+			wait := callBackoff(attempt + 1)
+			log.Printf("Research retrying %s stream after error (attempt %d/%d, waiting %s): %v", r.writer.Model, attempt+1, callAttempts, wait.Round(time.Second), err)
+			r.progress(Progress{
+				Phase:   "warning",
+				Round:   r.state.Round,
+				Message: fmt.Sprintf("model call failed (attempt %d/%d), retrying in %s: %s", attempt+1, callAttempts, wait.Round(time.Second), synthesisFailureReason(err)),
+			})
+		}
 	}
 	return "", "", lastErr
 }
