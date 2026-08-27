@@ -8,9 +8,10 @@ Completed work is archived in [`docs/archive/TODO-completed.md`](docs/archive/TO
 
 ## User attachments (backlog)
 
-- [ ] **Image attachments.** Allow users to upload and send image files in chat.
+- [x] **Image attachments (vision input).** Users upload an image and send it with text to vision-capable models. Reused the `attachment` table (added `message_id` + `source` columns, migration v43); `POST /api/conversations/{id}/attachments` upload handler; `buildChatMsgs`/`chatMsg.MarshalJSON` lower to chat-completions `image_url` parts and `internal/llm/responses.go` to `input_image`; gated on a `vision` flag on `[[model]]`; composer attach button + paste + thumbnail strip, thread renders sent images. Orphan cleanup for never-sent uploads is still outstanding — see below.
+- [ ] **Clean up orphaned image uploads.** Uploads whose message is never sent (`source='upload'` and `message_id IS NULL`) accumulate on disk and in the DB. Add a background sweep (mirror `internal/tasks/cleanup.go`) that deletes upload attachments older than some threshold with a NULL `message_id`, removing both the row and the `<data_dir>/attachments/<id>/` directory.
 - [ ] **Text file attachments.** Allow users to upload and send text files in chat.
-- [ ] **Paste images into the chat composer.** Accept image data pasted from the clipboard and attach it to the pending message.
+- [x] **Paste images into the chat composer.** Clipboard image paste is handled by the composer's paste listener (`static/js/composer.js`), uploading each pasted image as an attachment.
 
 ## Provider abstraction & OAuth (backlog)
 

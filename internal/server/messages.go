@@ -24,13 +24,54 @@ type chatMsg struct {
 	Content    string `json:"content,omitempty"`
 	ToolCalls  []any  `json:"tool_calls,omitempty"`
 	ToolCallID string `json:"tool_call_id,omitempty"`
+	// ContentParts, when non-nil, replaces Content with a chat-completions
+	// multimodal content array (text + image_url parts). Used for user messages
+	// that carry image attachments (vision input).
+	ContentParts []any `json:"-"`
+}
+
+// MarshalJSON emits content as a multimodal array when ContentParts is set,
+// otherwise as the plain string (omitted when empty). This keeps text-only
+// messages byte-for-byte identical to the old struct-tag encoding.
+func (m chatMsg) MarshalJSON() ([]byte, error) {
+	out := map[string]any{"role": m.Role}
+	switch {
+	case m.ContentParts != nil:
+		out["content"] = m.ContentParts
+	case m.Content != "":
+		out["content"] = m.Content
+	}
+	if len(m.ToolCalls) > 0 {
+		out["tool_calls"] = m.ToolCalls
+	}
+	if m.ToolCallID != "" {
+		out["tool_call_id"] = m.ToolCallID
+	}
+	return json.Marshal(out)
+}
+
+// imagePart returns a chat-completions image_url content part for a data URL.
+func imagePart(dataURL string) any {
+	return map[string]any{"type": "image_url", "image_url": map[string]any{"url": dataURL}}
+}
+
+// userContentParts assembles a multimodal content array: a leading text part
+// (when text is non-empty) followed by one image_url part per image.
+func userContentParts(text string, images []any) []any {
+	var parts []any
+	if text != "" {
+		parts = append(parts, map[string]any{"type": "text", "text": text})
+	}
+	return append(parts, images...)
 }
 
 // buildChatMsgs assembles the LLM message payload from an optional prefix
 // (e.g. character system prompt + hidden messages) and the stored message history.
 // It is the single source of truth used by both the send handler and the context
 // preview endpoint, so the two are guaranteed to produce identical output.
-func buildChatMsgs(prefix []chatMsg, history []store.Message) []chatMsg {
+// imagesFor, when non-nil, returns the image_url content parts for a message id
+// (empty for messages without image attachments).
+func buildChatMsgs(prefix []chatMsg, history []store.Message, imagesFor func(msgID int64) []any) []chatMsg {
 	msgs := append([]chatMsg(nil), prefix...)
 	for _, m := range history {
 		msg := chatMsg{Role: m.Role, Content: m.Content}
@@ -42,6 +83,12 @@ func buildChatMsgs(prefix []chatMsg, history []store.Message) []chatMsg {
 		}
 		if m.ToolCallID != "" {
 			msg.ToolCallID = m.ToolCallID
+		}
+		if imagesFor != nil && m.Role == "user" {
+			if imgs := imagesFor(m.ID); len(imgs) > 0 {
+				msg.ContentParts = userContentParts(m.Content, imgs)
+				msg.Content = ""
+			}
 		}
 		msgs = append(msgs, msg)
 	}
@@ -123,15 +170,19 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	type msgView struct {
 		store.Message
 		ToolInteractions []toolInteraction `json:"tool_interactions,omitempty"`
+		Attachments      []attachmentMeta  `json:"attachments,omitempty"`
 	}
 
-	// Load attachments for this conversation and index by tool_call_id.
+	// Load attachments for this conversation. Tool-produced attachments are
+	// indexed by tool_call_id (rendered as cards on the assistant turn); user
+	// uploads are indexed by message_id (rendered as thumbnails on the user turn).
 	attachments, attErr := s.store.ListAttachmentsByConversation(id)
 	attByCallID := map[string]*attachmentMeta{}
+	uploadsByMsg := map[int64][]attachmentMeta{}
 	if attErr == nil {
 		for i := range attachments {
 			a := &attachments[i]
-			attByCallID[a.ToolCallID] = &attachmentMeta{
+			meta := attachmentMeta{
 				ID:       a.ID,
 				Title:    a.Title,
 				Filename: a.Filename,
@@ -139,6 +190,13 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 				Status:   a.Status,
 				Error:    a.Error,
 			}
+			if a.Source == "upload" {
+				if a.MessageID != nil {
+					uploadsByMsg[*a.MessageID] = append(uploadsByMsg[*a.MessageID], meta)
+				}
+				continue
+			}
+			attByCallID[a.ToolCallID] = &meta
 		}
 	}
 
@@ -158,6 +216,9 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		mv := msgView{Message: m}
+		if imgs := uploadsByMsg[m.ID]; len(imgs) > 0 {
+			mv.Attachments = imgs
+		}
 		if m.ToolCalls != nil {
 			var tc []struct {
 				ID       string `json:"id"`
@@ -421,15 +482,16 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Content     string  `json:"content"`
-		Model       *string `json:"model"`
-		CharacterID *int64  `json:"character_id"`
+		Content       string  `json:"content"`
+		Model         *string `json:"model"`
+		CharacterID   *int64  `json:"character_id"`
+		AttachmentIDs []int64 `json:"attachment_ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	if req.Content == "" {
+	if req.Content == "" && len(req.AttachmentIDs) == 0 {
 		writeError(w, http.StatusBadRequest, "content required")
 		return
 	}
@@ -484,6 +546,34 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate any image attachments and gate them on model vision support.
+	// Attachments were uploaded (unlinked) via POST .../attachments; they are
+	// bound to the user message once it is persisted (see commit below).
+	var newImageParts []any
+	if len(req.AttachmentIDs) > 0 {
+		if m := s.cfg.ModelByName(modelName); m == nil || !m.Vision {
+			writeError(w, http.StatusBadRequest, "selected model does not support image input")
+			return
+		}
+		for _, aid := range req.AttachmentIDs {
+			att, err := s.store.GetAttachmentForUser(aid, user.ID)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "unknown attachment")
+				return
+			}
+			if att.ConversationID != convID || att.Source != "upload" || att.MessageID != nil || !strings.HasPrefix(att.MimeType, "image/") {
+				writeError(w, http.StatusBadRequest, "attachment is not an unsent image in this conversation")
+				return
+			}
+			url, err := s.imageDataURL(att)
+			if err != nil {
+				internalError(w, err)
+				return
+			}
+			newImageParts = append(newImageParts, imagePart(url))
+		}
+	}
+
 	// Build message history for model (user message not yet persisted).
 	history, err := s.store.ListMessages(convID)
 	if err != nil {
@@ -491,8 +581,18 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chatMsgs = buildChatMsgs(chatMsgs, history)
-	chatMsgs = append(chatMsgs, chatMsg{Role: "user", Content: req.Content})
+	imagesByMsg, err := s.uploadImagePartsByMessage(convID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	chatMsgs = buildChatMsgs(chatMsgs, history, func(id int64) []any { return imagesByMsg[id] })
+	userMsg := chatMsg{Role: "user", Content: req.Content}
+	if len(newImageParts) > 0 {
+		userMsg.ContentParts = userContentParts(req.Content, newImageParts)
+		userMsg.Content = ""
+	}
+	chatMsgs = append(chatMsgs, userMsg)
 
 	// Determine tool definitions for this character.
 	var activeToolDefs []toolDef
@@ -539,9 +639,16 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		if committed || persistErr != nil {
 			return
 		}
-		if _, err := s.store.CreateMessage(convID, "user", req.Content, nil, user.DisplayName, nil, nil, ""); err != nil {
+		userRow, err := s.store.CreateMessage(convID, "user", req.Content, nil, user.DisplayName, nil, nil, "")
+		if err != nil {
 			persistErr = err
 			return
+		}
+		if len(req.AttachmentIDs) > 0 {
+			if err := s.store.LinkAttachmentsToMessage(userRow.ID, convID, req.AttachmentIDs); err != nil {
+				persistErr = err
+				return
+			}
 		}
 		committed = true
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -674,7 +781,12 @@ func (s *Server) handleGetMessageContext(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	chatMsgs := buildChatMsgs(prefix, history)
+	imagesByMsg, err := s.uploadImagePartsByMessage(convID)
+	if err != nil {
+		internalError(w, err)
+		return
+	}
+	chatMsgs := buildChatMsgs(prefix, history, func(id int64) []any { return imagesByMsg[id] })
 	if chatMsgs == nil {
 		chatMsgs = []chatMsg{}
 	}

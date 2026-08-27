@@ -142,7 +142,12 @@ async function initApp() {
   composer.init({
     onSend: sendMessage,
     onStop: () => { if (currentAbort) currentAbort(); },
+    onUpload: async (file) => {
+      const convId = await ensureConversation();
+      return msgApi.uploadAttachment(convId, file);
+    },
   });
+  updateCanAttach();
 
   thread.setForkHandler(async (messageId) => {
     if (!activeConversationId) return;
@@ -196,6 +201,7 @@ async function loadConversation(id, { pushHistory = true } = {}) {
     const conv = sidebar.getItem(id);
     header.setConversation(id, conv?.title ?? null);
     if (conv) header.setSelection(conv);
+    updateCanAttach();
     applyAvatarContext(conv?.character_id ?? null);
     setBackground(conv?.background_attachment_id ?? null);
     thread.renderMessages(msgs);
@@ -208,34 +214,56 @@ async function loadConversation(id, { pushHistory = true } = {}) {
   }
 }
 
-async function sendMessage(content) {
+// selectionSupportsVision reports whether the current selection's model accepts
+// image input, gating the composer's attach control.
+function selectionSupportsVision(sel) {
+  if (!sel) return false;
+  let modelName = null;
+  if (sel.type === 'model') modelName = sel.name;
+  else if (sel.type === 'character') modelName = characterList.find(c => c.id === sel.id)?.model ?? null;
+  if (!modelName) return false;
+  return !!modelList.find(m => m.name === modelName)?.vision;
+}
+
+function updateCanAttach() {
+  composer.setCanAttach(selectionSupportsVision(header.getSelection()));
+}
+
+// ensureConversation returns the active conversation id, creating a new
+// conversation (and applying a character's first message) if none is active.
+// Called both when sending and when attaching an image before the first send.
+async function ensureConversation() {
+  if (activeConversationId) return activeConversationId;
   const sel = header.getSelection();
-  if (!activeConversationId) {
-    const model = sel?.type === 'model' ? sel.name : null;
-    const charId = sel?.type === 'character' ? sel.id : null;
-    let conv;
-    try {
-      conv = await convApi.create(null, model, charId);
-    } catch (err) {
-      thread.appendMessage('user', content, currentUser.display_name || 'you');
-      thread.startStreaming().error('could not send — ' + err.message);
-      return;
-    }
-    sidebar.addItem(conv);
-    activeConversationId = conv.id;
-    thread.setConversationId(conv.id);
-    activeHasMessages = false;
-    history.pushState({ conversationId: conv.id }, '', `/?c=${conv.id}`);
-    header.setConversation(conv.id, conv.title ?? null);
-    applyAvatarContext(charId);
-    if (charId !== null) {
-      await applyFirstMessage(conv.id, null);
-    }
+  const model = sel?.type === 'model' ? sel.name : null;
+  const charId = sel?.type === 'character' ? sel.id : null;
+  const conv = await convApi.create(null, model, charId);
+  sidebar.addItem(conv);
+  activeConversationId = conv.id;
+  thread.setConversationId(conv.id);
+  activeHasMessages = false;
+  history.pushState({ conversationId: conv.id }, '', `/?c=${conv.id}`);
+  header.setConversation(conv.id, conv.title ?? null);
+  applyAvatarContext(charId);
+  if (charId !== null) {
+    await applyFirstMessage(conv.id, null);
+  }
+  return conv.id;
+}
+
+async function sendMessage(content, attachments = []) {
+  const sel = header.getSelection();
+  try {
+    await ensureConversation();
+  } catch (err) {
+    thread.appendMessage('user', content, currentUser.display_name || 'you', null, attachments);
+    thread.startStreaming().error('could not send — ' + err.message);
+    return;
   }
 
   const convId = activeConversationId;
   activeHasMessages = true;
-  thread.appendMessage('user', content, currentUser.display_name || 'you');
+  thread.appendMessage('user', content, currentUser.display_name || 'you', null, attachments);
   let stream = thread.startStreaming();
   composer.setStreaming(true);
   let streamHasToolCalls = false;
@@ -288,12 +316,13 @@ async function sendMessage(content) {
       composer.setStreaming(false);
       currentAbort = null;
     },
-  });
+  }, attachments.map(a => a.id));
 }
 
 // Called when the picker selection changes. If the conversation is empty and
 // the new selection is a character, save and show their first message.
 async function handleSelectionChange(sel) {
+  updateCanAttach();
   if (!activeConversationId) return;
   applyAvatarContext(sel?.type === 'character' ? sel.id : null);
   if (activeHasMessages) return;

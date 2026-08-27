@@ -136,6 +136,10 @@ type Model struct {
 	DisplayName string    `toml:"display_name"`
 	ModelServer string    `toml:"model_server"`
 	Modes       *[]string `toml:"modes"`
+	// Vision indicates the model accepts image input. Only vision models may
+	// receive user-uploaded image attachments in the prompt; the frontend hides
+	// the attach control for non-vision models.
+	Vision bool `toml:"vision"`
 }
 
 // AvailableIn reports whether the model is available in the given mode.
@@ -268,6 +272,16 @@ func (c *Config) Validate() error {
 		}
 		if _, ok := serverNames[m.ModelServer]; !ok {
 			return fmt.Errorf("config: model %q references unknown model_server %q", m.Name, m.ModelServer)
+		}
+	}
+	return nil
+}
+
+// ModelByName returns the configured model with the given name, or nil.
+func (c *Config) ModelByName(name string) *Model {
+	for i, m := range c.Models {
+		if m.Name == name {
+			return &c.Models[i]
 		}
 	}
 	return nil
