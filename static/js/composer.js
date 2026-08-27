@@ -111,7 +111,7 @@ function render() {
 
   textarea.addEventListener('paste', (e) => {
     if (!state.canAttach) return;
-    const files = [...(e.clipboardData?.files || [])].filter(f => ACCEPTED_IMAGE_TYPES.includes(f.type));
+    const files = imagesFromClipboard(e.clipboardData);
     if (files.length) {
       e.preventDefault();
       files.forEach(uploadOne);
@@ -128,6 +128,27 @@ function render() {
     [...fileInput.files].forEach(uploadOne);
     fileInput.value = '';
   });
+}
+
+// imagesFromClipboard pulls pasted image files from a clipboard payload,
+// covering both the .files list and the .items path (some sources — notably
+// screenshots — expose the image only as a file-kind item with .files empty).
+function imagesFromClipboard(data) {
+  if (!data) return [];
+  const seen = new Set();
+  const out = [];
+  const add = (file) => {
+    if (!file || !ACCEPTED_IMAGE_TYPES.includes(file.type)) return;
+    const key = `${file.name}:${file.size}:${file.type}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(file);
+  };
+  for (const file of data.files || []) add(file);
+  for (const item of data.items || []) {
+    if (item.kind === 'file') add(item.getAsFile());
+  }
+  return out;
 }
 
 // uploadOne uploads a single file and, on success, adds a thumbnail.
