@@ -859,6 +859,21 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v41 → v42 complete")
 	}
 
+	if version < 43 {
+		log.Println("store: migrating v42 → v43 (attachment.message_id, attachment.source)")
+		if _, err := s.db.Exec(`ALTER TABLE attachment ADD COLUMN message_id INTEGER REFERENCES message(id)`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`ALTER TABLE attachment ADD COLUMN source TEXT NOT NULL DEFAULT 'tool'`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (43, ?)`, now()); err != nil {
+			return err
+		}
+		version = 43
+		log.Println("store: migration v42 → v43 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

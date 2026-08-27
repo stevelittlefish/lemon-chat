@@ -184,3 +184,38 @@ func TestResponsesToChatSSEErrorFrameSurfacesMessage(t *testing.T) {
 		t.Fatalf("error message not surfaced, got: %v", err)
 	}
 }
+
+// A multimodal user message (text + image_url content parts) must lower into
+// Responses input_text / input_image parts, with the data URL passed through.
+func TestBuildResponsesBodyMultimodalUser(t *testing.T) {
+	messages := []map[string]any{
+		{"role": "user", "content": []any{
+			map[string]any{"type": "text", "text": "what is this?"},
+			map[string]any{"type": "image_url", "image_url": map[string]any{"url": "data:image/png;base64,AAAA"}},
+		}},
+	}
+	raw, err := BuildResponsesBody("gpt-x", messages, nil, nil, true)
+	if err != nil {
+		t.Fatalf("BuildResponsesBody: %v", err)
+	}
+	var req map[string]any
+	if err := json.Unmarshal(raw, &req); err != nil {
+		t.Fatal(err)
+	}
+	input := req["input"].([]any)
+	if len(input) != 1 {
+		t.Fatalf("expected 1 input item, got %d", len(input))
+	}
+	content := input[0].(map[string]any)["content"].([]any)
+	if len(content) != 2 {
+		t.Fatalf("expected 2 content parts, got %d: %v", len(content), content)
+	}
+	text := content[0].(map[string]any)
+	if text["type"] != "input_text" || text["text"] != "what is this?" {
+		t.Errorf("text part wrong: %v", text)
+	}
+	img := content[1].(map[string]any)
+	if img["type"] != "input_image" || img["image_url"] != "data:image/png;base64,AAAA" {
+		t.Errorf("image part wrong: %v", img)
+	}
+}

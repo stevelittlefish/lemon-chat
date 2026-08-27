@@ -13,6 +13,7 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 		PromptUSD     *float64 `json:"prompt_usd,omitempty"`     // USD per prompt token
 		CompletionUSD *float64 `json:"completion_usd,omitempty"` // USD per completion token
 		OAuth         bool     `json:"oauth,omitempty"`          // authenticated via shared OAuth login
+		Vision        bool     `json:"vision,omitempty"`         // accepts image input
 	}
 	mode := r.URL.Query().Get("mode")
 	defaultName := s.cfg.Server.DefaultModel
@@ -31,6 +32,7 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 			Name:        m.Name,
 			DisplayName: m.DisplayName,
 			Default:     m.Name == defaultName,
+			Vision:      m.Vision,
 		}
 		if p, ok := prices[m.Name]; ok {
 			prompt, completion := p.PromptUSD, p.CompletionUSD

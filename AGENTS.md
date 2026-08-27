@@ -226,7 +226,12 @@ Compound group IDs expand to multiple tools:
 
 ### Attachments
 
-Tools that produce files (`create_document`, `generate_image_sdxl`, `generate_image_flux`) create an `attachment` DB record and write the file under `<data_dir>/attachments/<random-id>/`. They return an `AttachmentResult` JSON struct; `messages.go` detects this shape and emits an `attachment` SSE event so the frontend can render a download card. Attachments are served by `handleGetAttachment` in `attachments.go` — `?download=1` forces a download, otherwise the file is served inline.
+The `attachment` table backs two kinds of file, distinguished by its `source` column:
+
+- **`source = "tool"` (model output).** Tools that produce files (`create_document`, `generate_image_sdxl`, `generate_image_flux`) create an `attachment` record keyed on `tool_call_id` and write the file under `<data_dir>/attachments/<random-id>/`. They return an `AttachmentResult` JSON struct; `messages.go` detects this shape and emits an `attachment` SSE event so the frontend can render a download card.
+- **`source = "upload"` (user input / vision).** A user uploads an image via `POST /api/conversations/{id}/attachments` (multipart field `file`, image-only, ≤10 MB), handled by `handleUploadAttachment`. The record is created unlinked (`message_id` NULL); when the user sends the message it was attached to, `LinkAttachmentsToMessage` backfills `message_id`. On send and on history reload, upload attachments for a message are lowered into chat-completions multimodal content (a text part plus one `image_url` data-URL part each) by `buildChatMsgs` / `chatMsg.MarshalJSON`; the Responses surface lowers these to `input_image` in `lowerUserContent` (`internal/llm/responses.go`). Image input is gated on the model's `vision = true` flag in `lemon.toml` (exposed via `GET /api/models`); the composer only shows its attach control for vision models.
+
+Both kinds are served by `handleGetAttachment` in `attachments.go` — `?download=1` forces a download, otherwise the file is served inline.
 
 ## Research
 
@@ -242,7 +247,7 @@ The research feature (reachable from `/menu` → research) runs iterative LLM-dr
 The following are not yet built. Stub them out rather than building them:
 
 - User profiles / profile switcher — auth is done; only one active user at a time, no switcher UI
-- User-uploaded file attachments (tool-generated attachments are implemented)
+- User-uploaded *text-file* attachments — image uploads (vision input) and tool-generated attachments are implemented; other file types are not
 - Model management UI — config file only, no settings panel for it
 - Message editing and regeneration
 - Conversation search

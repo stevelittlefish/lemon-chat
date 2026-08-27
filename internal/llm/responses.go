@@ -105,7 +105,7 @@ func lowerMessages(msgs []map[string]any) (instructions string, input []any) {
 		case "user":
 			input = append(input, map[string]any{
 				"role":    "user",
-				"content": []any{map[string]any{"type": "input_text", "text": content}},
+				"content": lowerUserContent(m["content"]),
 			})
 		case "assistant":
 			if content != "" {
@@ -138,6 +138,37 @@ func lowerMessages(msgs []map[string]any) (instructions string, input []any) {
 		}
 	}
 	return strings.Join(sys, "\n\n"), input
+}
+
+// lowerUserContent converts chat-completions user content — a plain string or a
+// multimodal parts array (text + image_url) — into Responses input parts
+// (input_text / input_image). An image_url part's URL (a data: URL in practice)
+// is passed through as the Responses input_image image_url string.
+func lowerUserContent(v any) []any {
+	switch c := v.(type) {
+	case string:
+		return []any{map[string]any{"type": "input_text", "text": c}}
+	case []any:
+		var parts []any
+		for _, p := range c {
+			pm, ok := p.(map[string]any)
+			if !ok {
+				continue
+			}
+			switch pm["type"] {
+			case "text":
+				parts = append(parts, map[string]any{"type": "input_text", "text": pm["text"]})
+			case "image_url":
+				url := ""
+				if iu, ok := pm["image_url"].(map[string]any); ok {
+					url, _ = iu["url"].(string)
+				}
+				parts = append(parts, map[string]any{"type": "input_image", "image_url": url})
+			}
+		}
+		return parts
+	}
+	return []any{map[string]any{"type": "input_text", "text": ""}}
 }
 
 // ResponsesToChatSSE returns a reader that converts a Responses SSE stream into

@@ -45,9 +45,9 @@ async function request(method, path, body) {
   return data;
 }
 
-async function uploadFile(method, path, file) {
+async function uploadFile(method, path, file, field = 'avatar') {
   const form = new FormData();
-  form.append('avatar', file);
+  form.append(field, file);
   const res = await fetch(path, { method, body: form, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
   if (res.status === 204) return null;
   const data = await res.json();
@@ -103,17 +103,19 @@ export const conversations = {
 export const messages = {
   list: (conversationId) => request('GET', `/api/conversations/${conversationId}/messages`),
   context: (conversationId, messageId) => request('GET', `/api/conversations/${conversationId}/messages/${messageId}/context`),
+  uploadAttachment: (conversationId, file) => uploadFile('POST', `/api/conversations/${conversationId}/attachments`, file, 'file'),
   firstMessage: (conversationId, characterId = null) => {
     const body = characterId != null ? { character_id: characterId } : {};
     return request('POST', `/api/conversations/${conversationId}/first-message`, body);
   },
   // selection: { type: 'model', name } | { type: 'character', id } | null
   // Returns an abort() function that cancels the in-flight request.
-  send: (conversationId, content, selection, { onName, onDelta, onDone, onAborted, onError, onStats, onMessageId, onToolCall, onToolResult, onAttachment, onNewTurn }) => {
+  send: (conversationId, content, selection, { onName, onDelta, onDone, onAborted, onError, onStats, onMessageId, onToolCall, onToolResult, onAttachment, onNewTurn }, attachmentIds = []) => {
     const url = `/api/conversations/${conversationId}/messages`;
     const body = { content };
     if (selection?.type === 'model') body.model = selection.name;
     if (selection?.type === 'character') body.character_id = selection.id;
+    if (attachmentIds.length) body.attachment_ids = attachmentIds;
     const ctrl = new AbortController();
     fetch(url, {
       method: 'POST',

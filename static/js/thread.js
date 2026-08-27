@@ -232,6 +232,24 @@ function closeLightbox() {
   }
 }
 
+// buildUserImageStrip renders a row of thumbnails for user-uploaded images
+// attached to a sent message. Clicking a thumbnail opens the lightbox.
+function buildUserImageStrip(atts) {
+  const strip = document.createElement('div');
+  strip.className = 'user-image-strip';
+  for (const att of atts) {
+    if (att.id == null) continue;
+    const img = withRetry(document.createElement('img'));
+    img.className = 'user-image-thumb';
+    img.src = `/api/attachments/${att.id}`;
+    img.alt = att.filename || 'Attached image';
+    img.loading = 'lazy';
+    img.addEventListener('click', () => openLightbox(img.src));
+    strip.appendChild(img);
+  }
+  return strip;
+}
+
 function buildInlineImage(att) {
   const wrap = document.createElement('div');
   wrap.className = 'inline-image-wrap';
@@ -475,11 +493,11 @@ export function renderMessages(msgs) {
   scrollToBottom();
 }
 
-export function appendMessage(role, content, assistantName, characterId = null) {
+export function appendMessage(role, content, assistantName, characterId = null, attachments = []) {
   removeEmpty();
   const key = senderKey(role, characterId);
   const hideAvatar = key === lastThreadSenderKey();
-  const el = buildMessage({ role, content, name: assistantName, character_id: characterId, created_at: new Date().toISOString() }, hideAvatar);
+  const el = buildMessage({ role, content, name: assistantName, character_id: characterId, attachments, created_at: new Date().toISOString() }, hideAvatar);
   threadEl.appendChild(el);
   scrollToBottom();
   return el;
@@ -842,6 +860,10 @@ function buildMessage(msg, hideAvatar = false) {
     roleEl.className = 'message-role';
     roleEl.textContent = msg.role === 'user' ? (msg.name || 'you') : (msg.name || msg.role);
     colEl.appendChild(roleEl);
+  }
+
+  if (msg.role === 'user' && msg.attachments?.length) {
+    colEl.appendChild(buildUserImageStrip(msg.attachments));
   }
 
   if (msg.content) {
