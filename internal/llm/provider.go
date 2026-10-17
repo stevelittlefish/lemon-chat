@@ -386,9 +386,11 @@ func (p *httpProvider) ListModels(ctx context.Context) ([]string, error) {
 // it needs its own parse. The list is live and authoritative — the ids depend on
 // the linked account's plan.
 // codexClientVersion is sent as the required client_version query param on the
-// Codex /models catalog request. The backend requires the field; any valid
-// semver is accepted.
-const codexClientVersion = "0.0.0"
+// Codex /models catalog request. The backend requires the field and hides any
+// model whose minimal_client_version is above it (e.g. gpt-6-sol needs
+// 0.155.0), so send a deliberately high version to see the whole catalog. The
+// responses endpoint itself does not gate on client version.
+const codexClientVersion = "99.0.0"
 
 func listCodexModels(ctx context.Context, client *http.Client, apiBase, token, accountID string) ([]string, error) {
 	url := strings.TrimRight(apiBase, "/") + "/models?client_version=" + codexClientVersion
