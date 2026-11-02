@@ -87,7 +87,7 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	log.Printf("characters: created %q (id=%d) by user %d", char.Name, char.ID, user.ID)
+	log.Printf("Creating character id=%d name=%q user_id=%d", char.ID, char.Name, user.ID)
 	writeJSON(w, http.StatusCreated, char)
 }
 
@@ -233,12 +233,7 @@ func (s *Server) handleUploadCharacterAvatar(w http.ResponseWriter, r *http.Requ
 		internalError(w, err)
 		return
 	}
-	crop := r.URL.Query().Get("crop")
-	if crop != "" {
-		log.Printf("characters: uploaded avatar for id=%d (crop=%s) by user %d", id, crop, user.ID)
-	} else {
-		log.Printf("characters: uploaded avatar for id=%d by user %d", id, user.ID)
-	}
+	log.Printf("Uploading character avatar id=%d crop=%q user_id=%d", id, r.URL.Query().Get("crop"), user.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"has_avatar": true})
 }
 

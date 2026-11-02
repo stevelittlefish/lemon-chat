@@ -17,9 +17,19 @@ async function consumeSSE(res, onEvent, onDone) {
       if (!line.startsWith('data: ')) continue;
       const payload = line.slice(6);
       if (payload === '[DONE]') { onDone?.(); return; }
+      let event;
       try {
-        if (onEvent(JSON.parse(payload)) === false) return;
-      } catch { /* malformed chunk, skip */ }
+        event = JSON.parse(payload);
+      } catch { continue; /* malformed chunk, skip */ }
+      // Handler bugs must surface, but one bad event shouldn't kill the stream.
+      let result;
+      try {
+        result = onEvent(event);
+      } catch (err) {
+        console.error('SSE event handler failed', event, err);
+        continue;
+      }
+      if (result === false) return;
     }
   }
   onDone?.();
@@ -110,7 +120,7 @@ export const messages = {
   },
   // selection: { type: 'model', name } | { type: 'character', id } | null
   // Returns an abort() function that cancels the in-flight request.
-  send: (conversationId, content, selection, { onName, onDelta, onDone, onAborted, onError, onStats, onMessageId, onToolCall, onToolResult, onAttachment, onNewTurn }, attachmentIds = []) => {
+  send: (conversationId, content, selection, { onName, onDelta, onDone, onAborted, onError, onWarning, onStats, onMessageId, onToolCall, onToolResult, onAttachment, onNewTurn }, attachmentIds = []) => {
     const url = `/api/conversations/${conversationId}/messages`;
     const body = { content };
     if (selection?.type === 'model') body.model = selection.name;
@@ -129,8 +139,10 @@ export const messages = {
         return;
       }
       await consumeSSE(res, (ev) => {
-        const { delta, error, name, stats, message_id, tool_call, tool_result, attachment, new_turn } = ev;
+        const { delta, error, warning, name, stats, message_id, tool_call, tool_result, attachment, new_turn } = ev;
         if (error) { onError?.(new Error(error)); return false; }
+        // Non-fatal: the reply was cut off but is still saved, so keep reading.
+        if (warning) onWarning?.(warning);
         if (name) onName?.(name);
         if (delta) onDelta?.(delta);
         if (stats) onStats?.(stats);
@@ -261,7 +273,7 @@ export const admin = {
     list: () => request('GET', '/api/admin/users'),
     create: (data) => request('POST', '/api/admin/users', data),
     update: (id, data) => request('PATCH', `/api/admin/users/${id}`, data),
-    delete: (id) => request('DELETE', `/api/admin/users/${id}`),
+    delete: (id, confirmUsername) => request('DELETE', `/api/admin/users/${id}?confirm=${encodeURIComponent(confirmUsername)}`),
   },
   tools: {
     listModels: () => request('GET', '/api/admin/tools/models'),

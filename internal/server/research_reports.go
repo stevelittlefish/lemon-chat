@@ -252,6 +252,7 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 		SynthesisWindow:   s.cfg.Research.SynthesisWindow,
 		FinalReportTokens: s.cfg.Research.FinalReportTokens,
 		Location:          s.researchLocation(),
+		FetchClient:       s.fetchClient,
 	}
 	state := research.UnmarshalState(job.Round, job.EmptyRounds, job.ElapsedMS,
 		job.Category, job.Slug, job.Plan, job.Report, job.Findings, job.QueriesUsed, job.AnalyzedURLs)

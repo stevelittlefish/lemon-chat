@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,45 +19,116 @@ import (
 
 const wsGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
+// wsSendBuffer is how many frames may queue for one client before it is
+// considered stalled and dropped.
+const wsSendBuffer = 32
+
+// wsClient is one WebSocket connection. All writes go through send and are
+// performed by a single writer goroutine, so frames never interleave and a
+// slow client never blocks the goroutine that triggered the event.
+type wsClient struct {
+	conn   net.Conn
+	userID int64
+	send   chan []byte   // complete, already-framed messages
+	done   chan struct{} // closed when the client is removed
+}
+
 type Hub struct {
 	mu      sync.Mutex
-	clients map[net.Conn]struct{}
+	clients map[*wsClient]struct{}
+	store   *store.Store // resolves conversation/completion owners
 }
 
-func NewHub() *Hub {
-	return &Hub{clients: make(map[net.Conn]struct{})}
+func NewHub(st *store.Store) *Hub {
+	return &Hub{clients: make(map[*wsClient]struct{}), store: st}
 }
 
-func (h *Hub) add(conn net.Conn) {
+func (h *Hub) add(conn net.Conn, userID int64) *wsClient {
+	c := &wsClient{conn: conn, userID: userID, send: make(chan []byte, wsSendBuffer), done: make(chan struct{})}
 	h.mu.Lock()
-	h.clients[conn] = struct{}{}
+	h.clients[c] = struct{}{}
 	h.mu.Unlock()
+	go c.writeLoop(h)
+	return c
 }
 
-func (h *Hub) remove(conn net.Conn) {
+func (h *Hub) remove(c *wsClient) {
 	h.mu.Lock()
-	_, ok := h.clients[conn]
+	_, ok := h.clients[c]
 	if ok {
-		delete(h.clients, conn)
+		delete(h.clients, c)
 	}
 	h.mu.Unlock()
 	if ok {
-		conn.Close()
+		close(c.done)
+		c.conn.Close()
 	}
 }
 
-func (h *Hub) broadcast(msg []byte) {
-	h.mu.Lock()
-	conns := make([]net.Conn, 0, len(h.clients))
-	for c := range h.clients {
-		conns = append(conns, c)
-	}
-	h.mu.Unlock()
-	for _, c := range conns {
-		if err := sendTextFrame(c, msg); err != nil {
-			h.remove(c)
+func (c *wsClient) writeLoop(h *Hub) {
+	for {
+		select {
+		case frame := <-c.send:
+			c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second)) //nolint:errcheck
+			if _, err := c.conn.Write(frame); err != nil {
+				h.remove(c)
+				return
+			}
+		case <-c.done:
+			return
 		}
 	}
+}
+
+// enqueue queues a frame without blocking; a client whose buffer is full is
+// dropped (the frontend reconnects and refetches state).
+func (h *Hub) enqueue(c *wsClient, frame []byte) {
+	select {
+	case c.send <- frame:
+	case <-c.done:
+	default:
+		h.remove(c)
+	}
+}
+
+// sendToUser delivers msg to every connection belonging to userID.
+func (h *Hub) sendToUser(userID int64, msg []byte) {
+	frame := textFrame(msg)
+	h.mu.Lock()
+	var targets []*wsClient
+	for c := range h.clients {
+		if c.userID == userID {
+			targets = append(targets, c)
+		}
+	}
+	h.mu.Unlock()
+	for _, c := range targets {
+		h.enqueue(c, frame)
+	}
+}
+
+// sendToAll delivers msg to every connection. Only use it for events that
+// carry no user data.
+func (h *Hub) sendToAll(msg []byte) {
+	frame := textFrame(msg)
+	h.mu.Lock()
+	targets := make([]*wsClient, 0, len(h.clients))
+	for c := range h.clients {
+		targets = append(targets, c)
+	}
+	h.mu.Unlock()
+	for _, c := range targets {
+		h.enqueue(c, frame)
+	}
+}
+
+func (h *Hub) sendToConversationOwner(convID int64, msg []byte) {
+	userID, err := h.store.ConversationOwner(convID)
+	if err != nil {
+		log.Printf("ws: resolving owner of conversation id=%d: %v", convID, err)
+		return
+	}
+	h.sendToUser(userID, msg)
 }
 
 func (h *Hub) BroadcastTitleUpdate(convID int64, title string) {
@@ -65,7 +137,7 @@ func (h *Hub) BroadcastTitleUpdate(convID int64, title string) {
 		"id":    convID,
 		"title": title,
 	})
-	h.broadcast(data)
+	h.sendToConversationOwner(convID, data)
 }
 
 func (h *Hub) BroadcastCompletionTitleUpdate(compID int64, title string) {
@@ -74,7 +146,12 @@ func (h *Hub) BroadcastCompletionTitleUpdate(compID int64, title string) {
 		"id":    compID,
 		"title": title,
 	})
-	h.broadcast(data)
+	userID, err := h.store.CompletionOwner(compID)
+	if err != nil {
+		log.Printf("ws: resolving owner of completion id=%d: %v", compID, err)
+		return
+	}
+	h.sendToUser(userID, data)
 }
 
 func (h *Hub) BroadcastConversationBackground(convID, attID int64) {
@@ -83,12 +160,22 @@ func (h *Hub) BroadcastConversationBackground(convID, attID int64) {
 		"id":            convID,
 		"attachment_id": attID,
 	})
-	h.broadcast(data)
+	h.sendToConversationOwner(convID, data)
 }
 
-func (h *Hub) BroadcastConversationListChanged() {
+// BroadcastConversationListChanged tells userID's clients to refetch their
+// conversation list.
+func (h *Hub) BroadcastConversationListChanged(userID int64) {
 	data, _ := json.Marshal(map[string]any{"type": "conversations_changed"})
-	h.broadcast(data)
+	h.sendToUser(userID, data)
+}
+
+// BroadcastConversationListChangedAll tells every client to refetch its
+// conversation list. The event carries no data, so it is safe to send to all
+// users when the affected owners aren't tracked (e.g. the cleanup worker).
+func (h *Hub) BroadcastConversationListChangedAll() {
+	data, _ := json.Marshal(map[string]any{"type": "conversations_changed"})
+	h.sendToAll(data)
 }
 
 func (h *Hub) BroadcastAttachmentReady(att *store.Attachment, background bool) {
@@ -101,7 +188,7 @@ func (h *Hub) BroadcastAttachmentReady(att *store.Attachment, background bool) {
 		"mime_type":       att.MimeType,
 		"background":      background,
 	})
-	h.broadcast(data)
+	h.sendToConversationOwner(att.ConversationID, data)
 }
 
 func (h *Hub) BroadcastAttachmentError(convID, attID int64, errMsg string) {
@@ -111,7 +198,7 @@ func (h *Hub) BroadcastAttachmentError(convID, attID int64, errMsg string) {
 		"conversation_id": convID,
 		"error":           errMsg,
 	})
-	h.broadcast(data)
+	h.sendToConversationOwner(convID, data)
 }
 
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
@@ -120,7 +207,8 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if _, err := s.store.SessionUserID(cookie.Value); err != nil {
+	userID, err := s.store.SessionUserID(cookie.Value)
+	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -168,10 +256,10 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.hub.add(conn)
+	client := s.hub.add(conn, userID)
 	go func() {
-		defer s.hub.remove(conn)
-		drainFrames(conn)
+		defer s.hub.remove(client)
+		drainFrames(client, s.hub)
 	}()
 }
 
@@ -181,8 +269,8 @@ func wsAcceptKey(key string) string {
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
-func sendTextFrame(conn net.Conn, payload []byte) error {
-	conn.SetWriteDeadline(time.Now().Add(5 * time.Second)) //nolint:errcheck
+// textFrame builds an unmasked, unfragmented WebSocket text frame.
+func textFrame(payload []byte) []byte {
 	n := len(payload)
 	var header []byte
 	switch {
@@ -194,16 +282,13 @@ func sendTextFrame(conn net.Conn, payload []byte) error {
 		header = []byte{0x81, 127, 0, 0, 0, 0,
 			byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
 	}
-	if _, err := conn.Write(header); err != nil {
-		return err
-	}
-	_, err := conn.Write(payload)
-	return err
+	return append(header, payload...)
 }
 
 // drainFrames reads incoming WebSocket frames and handles control frames until
 // the connection closes or errors. Clients must mask their frames per RFC 6455.
-func drainFrames(conn net.Conn) {
+func drainFrames(c *wsClient, h *Hub) {
+	conn := c.conn
 	for {
 		hdr := make([]byte, 2)
 		if _, err := io.ReadFull(conn, hdr); err != nil {
@@ -255,7 +340,7 @@ func drainFrames(conn net.Conn) {
 				return
 			}
 			pong := append([]byte{0x8A, byte(length)}, payload...)
-			conn.Write(pong) //nolint:errcheck
+			h.enqueue(c, pong)
 		}
 	}
 }

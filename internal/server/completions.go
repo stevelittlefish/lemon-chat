@@ -114,7 +114,7 @@ func (s *Server) handleRegenerateCompletionTitle(w http.ResponseWriter, r *http.
 	if _, err := s.store.GetCompletion(id, user.ID); notFoundOr500(w, err) {
 		return
 	}
-	tasks.GenerateTitleForCompletion(s.store, s.cfg, id, func(compID int64, title string) {
+	s.titler.GenerateForCompletion(id, func(compID int64, title string) {
 		s.hub.BroadcastCompletionTitleUpdate(compID, title)
 	})
 	w.WriteHeader(http.StatusAccepted)
@@ -314,7 +314,7 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 
 	// Auto-title if prompt + completion tokens meet the threshold and no title yet.
 	if comp.Title == nil && (promptTokens+completionTokens) >= tasks.CompletionAutoTitleMinTokens {
-		tasks.GenerateTitleForCompletion(s.store, s.cfg, id, func(compID int64, title string) {
+		s.titler.GenerateForCompletion(id, func(compID int64, title string) {
 			s.hub.BroadcastCompletionTitleUpdate(compID, title)
 		})
 	}

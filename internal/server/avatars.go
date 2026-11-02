@@ -20,6 +20,11 @@ import (
 
 const avatarSize = 256
 
+// maxAvatarPixels caps the declared dimensions of an uploaded avatar. A few KB
+// of PNG or GIF can claim e.g. 30000×30000 and make image.Decode allocate
+// gigabytes, so the header is checked before decoding.
+const maxAvatarPixels = 40_000_000
+
 func (s *Server) avatarDir() string {
 	return filepath.Join(s.cfg.Server.DataDir, "avatars")
 }
@@ -70,6 +75,13 @@ func receiveAvatar(r *http.Request) ([]byte, string, error) {
 // When cropTop is true the square is taken from the top of the image rather
 // than the center — better for full-body portrait images.
 func processAvatar(data []byte, cropTop bool) ([]byte, error) {
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || int64(cfg.Width)*int64(cfg.Height) > maxAvatarPixels {
+		return nil, fmt.Errorf("image dimensions %d×%d are too large", cfg.Width, cfg.Height)
+	}
 	src, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, err

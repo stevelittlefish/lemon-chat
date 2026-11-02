@@ -13,8 +13,14 @@ dial_timeout_seconds = 10
 # Maximum total time allowed for a single model response, streaming or otherwise (seconds).
 response_timeout_seconds = 600
 
-# Maximum number of tool-call rounds per message before the loop is cut off.
+# Maximum number of tool-call rounds per message. After the last round the
+# model gets one more turn without tools, so it has to answer.
 max_tool_loops = 5
+
+# fetch_url and research page fetches refuse loopback, LAN and other
+# non-public addresses, because the URLs are chosen by the model and a
+# malicious web page can steer it. Set true to let them reach your network.
+# allow_private_fetch = true
 
 # Enable verbose debug logging (title worker, trigger conditions, HTTP responses).
 # debug = true

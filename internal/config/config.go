@@ -71,7 +71,11 @@ type Server struct {
 	DialTimeoutSeconds     int    `toml:"dial_timeout_seconds"`
 	ResponseTimeoutSeconds int    `toml:"response_timeout_seconds"`
 	MaxToolLoops           int    `toml:"max_tool_loops"`
-	Timezone               string `toml:"timezone"`
+	// AllowPrivateFetch lets fetch_url and research page fetches reach
+	// loopback/LAN addresses. Off by default: those URLs are chosen by the
+	// model, which a malicious web page can steer.
+	AllowPrivateFetch bool   `toml:"allow_private_fetch"`
+	Timezone          string `toml:"timezone"`
 }
 
 type Bootstrap struct {

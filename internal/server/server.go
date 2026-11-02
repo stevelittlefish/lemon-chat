@@ -10,11 +10,15 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
+	"github.com/stevelittlefish/lemon-chat/internal/netguard"
 	"github.com/stevelittlefish/lemon-chat/internal/openai_auth"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
+	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
 
 type Server struct {
@@ -26,6 +30,8 @@ type Server struct {
 	oauth         *openai_auth.Provider
 	pendingLogins *pendingLogins
 	modelErrors   *modelErrorLog
+	titler        *tasks.Titler
+	fetchClient   *http.Client // for model-chosen URLs; blocks private addresses unless configured
 }
 
 func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
@@ -39,7 +45,23 @@ func New(cfg *config.Config, st *store.Store, hub *Hub) *Server {
 	}
 	InitTools(cfg)
 	oauth := openai_auth.NewProvider(openai_auth.NewStoreAdapter(st), client)
-	return &Server{cfg: cfg, store: st, hub: hub, modelClient: client, research: newResearchManager(), oauth: oauth, pendingLogins: newPendingLogins(), modelErrors: newModelErrorLog(cfg.Server.DataDir)}
+	s := &Server{cfg: cfg, store: st, hub: hub, modelClient: client, research: newResearchManager(), oauth: oauth, pendingLogins: newPendingLogins(), modelErrors: newModelErrorLog(cfg.Server.DataDir)}
+	s.titler = tasks.NewTitler(st, cfg, s.providerFor)
+	s.fetchClient = netguard.NewClient(cfg.Server.AllowPrivateFetch)
+	return s
+}
+
+// StartTitleWorker starts the background worker that titles eligible
+// untitled conversations and completions.
+func (s *Server) StartTitleWorker() {
+	s.titler.Start(s.hub.BroadcastTitleUpdate, s.hub.BroadcastCompletionTitleUpdate)
+}
+
+// providerFor builds the model provider for srv, with the protocol and
+// credentials (static key or shared OAuth token) its config calls for. Every
+// model call should go through this rather than building raw requests.
+func (s *Server) providerFor(srv *config.ModelServer) llm.Provider {
+	return llm.NewProvider(s.modelClient, srv, s.tokenSource(srv), s.oauthAccountID(srv))
 }
 
 // tokenSource returns a TokenSource that yields the correct bearer token for
@@ -203,7 +225,32 @@ func (s *Server) Handler() http.Handler {
 	// Static files — no forced no-cache; ETags handle revalidation naturally
 	mux.Handle("/", http.FileServer(noDirectoryFS{FileSystem: http.Dir(staticDir)}))
 
-	return mux
+	return limitRequestBody(mux)
+}
+
+// Request body caps. Handlers may set a tighter limit of their own.
+const (
+	defaultBodyLimit   = 4 << 20                    // JSON API requests
+	multipartBodyLimit = maxUploadBytes + (1 << 20) // image/avatar uploads plus form overhead
+	importBodyLimit    = 32 << 20                   // whole-conversation and note-pack imports
+)
+
+// limitRequestBody caps every request body so a client can't make a handler
+// buffer an unbounded JSON document or multipart upload.
+func limitRequestBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil && r.Body != http.NoBody {
+			limit := int64(defaultBodyLimit)
+			switch {
+			case r.URL.Path == "/api/conversations/import_chat" || r.URL.Path == "/api/admin/note-packs/import":
+				limit = importBodyLimit
+			case strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data"):
+				limit = multipartBodyLimit
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) debugOnly(next http.HandlerFunc) http.HandlerFunc {

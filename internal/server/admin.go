@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/stevelittlefish/lemon-chat/internal/llm"
+	"github.com/stevelittlefish/lemon-chat/internal/store"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -54,6 +55,7 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		s := string(h)
 		hash = &s
 	}
+	log.Printf("Creating user username=%q is_admin=%t admin_id=%d", req.Username, req.IsAdmin, currentUser(r).ID)
 	user, err := s.store.CreateUser(req.Username, hash, req.IsAdmin, req.DisplayName)
 	if isDuplicateUsername(err) {
 		writeError(w, http.StatusConflict, "username already taken")
@@ -118,6 +120,7 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	log.Printf("Updating user id=%d username=%q is_admin=%t password_changed=%t admin_id=%d", id, username, isAdmin, req.Password != nil, currentUser(r).ID)
 	if err := s.store.UpdateUser(id, username, passwordHash, isAdmin, displayName); isDuplicateUsername(err) {
 		writeError(w, http.StatusConflict, "username already taken")
 		return
@@ -231,12 +234,29 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 	if notFoundOr500(w, err) {
 		return
 	}
-	if target.AvatarFilename != nil {
-		s.deleteAvatarFile(*target.AvatarFilename)
-	}
-	if err := s.store.DeleteUser(id); err != nil {
-		internalError(w, err)
+	// Deleting a user wipes all their data, so the caller must echo the
+	// username back — the UI makes the admin type it.
+	if r.URL.Query().Get("confirm") != target.Username {
+		writeError(w, http.StatusBadRequest, "confirm must match the username")
 		return
+	}
+	log.Printf("Deleting user id=%d username=%q admin_id=%d", id, target.Username, currentUser(r).ID)
+	// Stop any in-flight research for this user; its rows are about to go.
+	if jobs, err := s.store.ListResearchJobs(id, -1, 0); err == nil {
+		for _, j := range jobs {
+			if run := s.research.get(j.ID); run != nil {
+				log.Printf("Cancelling research job id=%d for deleted user id=%d", j.ID, id)
+				run.requestCancel()
+			}
+		}
+	}
+	attPaths, avatars, err := s.store.DeleteUser(id)
+	if notFoundOr500(w, err) {
+		return
+	}
+	store.RemoveAttachmentFiles(s.cfg.Server.DataDir, attPaths)
+	for _, f := range avatars {
+		s.deleteAvatarFile(f)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

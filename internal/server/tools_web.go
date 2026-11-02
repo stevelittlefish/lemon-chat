@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -11,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/htmltext"
 	"github.com/stevelittlefish/lemon-chat/internal/llm"
+	"github.com/stevelittlefish/lemon-chat/internal/netguard"
 	"github.com/stevelittlefish/lemon-chat/internal/searx"
 )
 
@@ -42,7 +43,14 @@ func executeFetchURL(argsJSON string, tctx ToolContext) (string, error) {
 	}
 	req.Header.Set("User-Agent", "lemon-chat/1.0")
 
-	resp, err := http.DefaultClient.Do(req)
+	client := tctx.FetchClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
+	if errors.Is(err, netguard.ErrBlocked) {
+		return "", fmt.Errorf("refused to fetch %q: it points at a private or local network address, which fetch_url is not allowed to reach — tell the user", args.URL)
+	}
 	if err != nil {
 		return "", fmt.Errorf("could not fetch %q: %w — tell the user the page could not be retrieved and suggest checking the URL", args.URL, err)
 	}
@@ -74,10 +82,10 @@ func executeFetchURL(argsJSON string, tctx ToolContext) (string, error) {
 		stripped = stripped[:maxStripped] + "\n\n[truncated — page content exceeded 50,000 characters]"
 	}
 
-	if tctx.ModelServer == nil {
+	if tctx.Provider == nil {
 		return stripped, nil
 	}
-	return summariseHTML(stripped, tctx.ModelName, tctx.ModelServer, tctx.ResponseTimeout)
+	return summariseHTML(stripped, tctx.ModelName, tctx.Provider, tctx.ResponseTimeout)
 }
 
 func executeSearXNG(argsJSON string, tctx ToolContext) (string, error) {
@@ -350,7 +358,7 @@ func executeWikipediaGetPage(argsJSON string, _ ToolContext) (string, error) {
 	return strings.TrimSpace(htmltext.Strip(html)), nil
 }
 
-func summariseHTML(text, modelName string, srv *config.ModelServer, timeout time.Duration) (string, error) {
+func summariseHTML(text, modelName string, provider llm.Provider, timeout time.Duration) (string, error) {
 	msgs := []llm.Message{
 		{Role: "system", Content: "Convert the following web page text to clean, well-structured markdown. Preserve headings, lists, links, and code blocks. Remove navigation, footer, and boilerplate text."},
 		{Role: "user", Content: text},
@@ -358,9 +366,9 @@ func summariseHTML(text, modelName string, srv *config.ModelServer, timeout time
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	content, err := llm.ChatComplete(ctx, http.DefaultClient, srv.APIBase+"/chat/completions", srv.APIKey, modelName, msgs, nil)
+	comp, err := provider.Stream(ctx, llm.Request{Model: modelName, Messages: msgs}, llm.Handler{})
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(content), nil
+	return strings.TrimSpace(comp.Content), nil
 }

@@ -1,9 +1,7 @@
 package server
 
 import (
-	"database/sql"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -142,12 +140,7 @@ func (s *Server) handleGetAttachment(w http.ResponseWriter, r *http.Request) {
 	} else {
 		att, err = s.store.GetAttachmentForUser(id, user.ID)
 	}
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "not found")
-		} else {
-			internalError(w, err)
-		}
+	if notFoundOr500(w, err) {
 		return
 	}
 
@@ -158,5 +151,11 @@ func (s *Server) handleGetAttachment(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": att.Filename}))
 	w.Header().Set("Content-Type", att.MimeType)
+	// Attachments can be model-authored (e.g. create_document with an .html
+	// filename), so navigating to one directly must not run script on our
+	// origin. The sandbox gives the document an opaque origin; nosniff stops
+	// the browser upgrading text/plain etc. to something executable.
+	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeFile(w, r, filepath.Join(s.cfg.Server.DataDir, att.DiskPath))
 }

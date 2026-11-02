@@ -165,6 +165,17 @@ func (s *Store) RedoCompletion(id, userID int64) (string, error) {
 	return s.swapContents(id, userID, false)
 }
 
+// CompletionOwner returns the user_id that owns a completion. Does not
+// enforce ownership — used to route WebSocket events to the right user.
+func (s *Store) CompletionOwner(id int64) (int64, error) {
+	var userID int64
+	err := s.db.QueryRow(`SELECT user_id FROM completion WHERE id = ?`, id).Scan(&userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	return userID, err
+}
+
 // GetCompletionForTitle fetches the fields needed for title generation.
 // Does not enforce user ownership — for use by background workers only.
 func (s *Store) GetCompletionForTitle(id int64) (userID int64, content *string, err error) {

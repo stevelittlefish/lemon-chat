@@ -29,7 +29,7 @@ func (s *Store) ListMessages(conversationID int64) ([]Message, error) {
 	rows, err := s.db.Query(
 		`SELECT id, conversation_id, role, content, name, character_id, created_at,
 		        prompt_tokens, completion_tokens, cached_tokens, total_time_ms, tool_calls, tool_call_id
-		 FROM message WHERE conversation_id = ? ORDER BY created_at ASC`,
+		 FROM message WHERE conversation_id = ? ORDER BY created_at ASC, id ASC`,
 		conversationID,
 	)
 	if err != nil {

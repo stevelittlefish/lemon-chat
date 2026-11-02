@@ -22,8 +22,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Login attempt username=%q", req.Username)
 	user, err := s.store.UserByUsername(req.Username)
 	if errors.Is(err, store.ErrNotFound) {
+		log.Printf("Login failed username=%q (no such user)", req.Username)
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
@@ -34,13 +36,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	if user.PasswordHash != nil {
 		if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password)); err != nil {
-			log.Printf("auth: failed login for user %q", req.Username)
+			log.Printf("Login failed username=%q (wrong password)", req.Username)
 			writeError(w, http.StatusUnauthorized, "invalid credentials")
 			return
 		}
 	}
 
-	log.Printf("auth: user %q logged in", req.Username)
 	sessionID, err := s.store.CreateSession(user.ID)
 	if err != nil {
 		internalError(w, err)

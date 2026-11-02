@@ -2,8 +2,10 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
@@ -61,6 +63,34 @@ func TestNotFoundOr500(t *testing.T) {
 			}
 			if tt.wantWrote && w.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", w.Code, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func TestLimitRequestBody(t *testing.T) {
+	var readErr error
+	h := limitRequestBody(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, readErr = io.Copy(io.Discard, r.Body)
+	}))
+	tests := []struct {
+		name, path, contentType string
+		size                    int
+		wantErr                 bool
+	}{
+		{"json under limit", "/api/notes", "application/json", defaultBodyLimit, false},
+		{"json over limit", "/api/notes", "application/json", defaultBodyLimit + 1, true},
+		{"upload over json limit", "/api/conversations/1/attachments", "multipart/form-data; boundary=x", defaultBodyLimit + 1, false},
+		{"upload over limit", "/api/conversations/1/attachments", "multipart/form-data; boundary=x", multipartBodyLimit + 1, true},
+		{"import over json limit", "/api/conversations/import_chat", "application/json", defaultBodyLimit + 1, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest("POST", tt.path, strings.NewReader(strings.Repeat("x", tt.size)))
+			r.Header.Set("Content-Type", tt.contentType)
+			h.ServeHTTP(httptest.NewRecorder(), r)
+			if (readErr != nil) != tt.wantErr {
+				t.Fatalf("read err = %v, wantErr %v", readErr, tt.wantErr)
 			}
 		})
 	}

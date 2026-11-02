@@ -290,6 +290,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		WorkerResponses:       workerResponses,
 		WorkerAccountID:       workerAccountID,
 		SearXNGURL:            s.cfg.SearXNG.URL,
+		FetchClient:           s.fetchClient,
 		Location:              loc,
 		MaxRounds:             maxRounds,
 		MaxTime:               time.Duration(maxTimeSeconds) * time.Second,

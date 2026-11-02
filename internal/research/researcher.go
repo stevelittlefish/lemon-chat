@@ -158,6 +158,10 @@ type Config struct {
 	// HTTPClient overrides the HTTP client used for model calls (tests inject a
 	// mock transport). Nil uses http.DefaultClient.
 	HTTPClient *http.Client
+	// FetchClient fetches search-result pages, whose URLs are untrusted. The
+	// server passes a client that refuses private addresses. Nil uses
+	// http.DefaultClient.
+	FetchClient *http.Client
 
 	// CacheKey is a stable per-job identifier sent as the Responses
 	// prompt_cache_key so a job's repeated prompts route to the same prompt cache.

@@ -548,6 +548,7 @@ export function startStreaming() {
   const pendingImages = new Map(); // tool call id → placeholder element
   let hasImages = false; // true once any inline image is committed
   let waitingEl = null; // typing indicator shown while a tool call is running after text has streamed
+  let incompleteNote = null; // set when the model failed partway through this reply
 
   function showWaiting() {
     if (waitingEl) return;
@@ -563,6 +564,19 @@ export function startStreaming() {
     waitingEl = null;
   }
 
+  // Re-rendering markdown is O(length), so doing it per token is O(n²) over a
+  // long answer. Coalesce deltas and render at most once per animation frame.
+  let renderFrame = 0;
+  function renderStreaming() {
+    renderFrame = 0;
+    contentEl.innerHTML = renderMarkdown(accumulated) || typingIndicatorHTML();
+    if (!userScrolledDuringStream) scrollToBottom();
+  }
+  function cancelRender() {
+    if (renderFrame) cancelAnimationFrame(renderFrame);
+    renderFrame = 0;
+  }
+
   return {
     setName(name) {
       if (roleEl) roleEl.textContent = name;
@@ -570,11 +584,13 @@ export function startStreaming() {
     append(delta) {
       hideWaiting();
       accumulated += delta;
-      contentEl.innerHTML = renderMarkdown(accumulated) || typingIndicatorHTML();
-      if (!userScrolledDuringStream) scrollToBottom();
+      if (!renderFrame) renderFrame = requestAnimationFrame(renderStreaming);
     },
     setStats(stats) {
       streamStats = stats;
+    },
+    setIncomplete(msg) {
+      incompleteNote = msg;
     },
     setMessageId(id) {
       streamMsgId = id;
@@ -647,6 +663,7 @@ export function startStreaming() {
       if (!userScrolledDuringStream) scrollToBottom();
     },
     finish() {
+      cancelRender();
       hideWaiting();
       const shouldScroll = !userScrolledDuringStream;
       userScrolledDuringStream = false;
@@ -656,6 +673,12 @@ export function startStreaming() {
       }
       if (accumulated) {
         contentEl.innerHTML = renderMarkdown(accumulated);
+        if (incompleteNote) {
+          const note = document.createElement('p');
+          note.className = 'message-stopped message-stopped--error';
+          note.textContent = incompleteNote;
+          colEl.appendChild(note);
+        }
         colEl.appendChild(buildFooter({ ...(streamStats || {}), role: 'assistant', id: streamMsgId, created_at: streamStartedAt }, accumulated));
       } else {
         // Tool calls / images only — remove the empty typing-indicator contentEl.
@@ -664,6 +687,7 @@ export function startStreaming() {
       if (shouldScroll) scrollToBottom();
     },
     truncate() {
+      cancelRender();
       userScrolledDuringStream = false;
       if (!accumulated && !hasImages) {
         wrapper.remove();
@@ -681,6 +705,7 @@ export function startStreaming() {
       }
     },
     error(msg) {
+      cancelRender();
       userScrolledDuringStream = false;
       contentEl.textContent = msg;
       contentEl.style.color = 'var(--danger)';

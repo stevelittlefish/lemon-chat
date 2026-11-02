@@ -38,7 +38,11 @@ func (r *Researcher) fetchWebpage(ctx context.Context, pageURL string) (*webpage
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36 lemon-chat/1.0")
 
-	resp, err := http.DefaultClient.Do(req)
+	client := r.cfg.FetchClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

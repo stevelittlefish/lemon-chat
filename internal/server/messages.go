@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -16,7 +17,6 @@ import (
 	"github.com/stevelittlefish/lemon-chat/internal/debug"
 	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
-	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
 
 type chatMsg struct {
@@ -113,8 +113,7 @@ func substituteVars(s, charName, userName string) string {
 // Returns nil, nil after writing the HTTP error if anything fails.
 func (s *Server) resolveCharacter(w http.ResponseWriter, user *store.User, charID int64, msgs []chatMsg) (*store.Character, []chatMsg) {
 	char, err := s.store.GetCharacter(charID)
-	if err != nil {
-		internalError(w, err)
+	if notFoundOr500(w, err) {
 		return nil, nil
 	}
 	if char.Visibility == "private" && char.CreatedBy != user.ID && !user.IsAdmin {
@@ -273,13 +272,21 @@ type messageToolLoop struct {
 }
 
 // run streams model turns and executes requested tools until the model returns
-// a final response or the configured tool-loop limit is reached. The bool is
-// false only when the caller must stop because an HTTP error has been written.
+// a final response. After maxLoops rounds of tool calls the model gets one
+// more turn with tools withheld, so it has to answer using the results it
+// already has. The bool is false only when the caller must stop because an
+// HTTP error has been written.
 func (loop *messageToolLoop) run() (string, *store.MessageStats, bool) {
 	var finalContent string
 	var finalStats *store.MessageStats
 
-	for iteration := 0; iteration < loop.maxLoops; iteration++ {
+	for iteration := 0; iteration <= loop.maxLoops; iteration++ {
+		lastIteration := iteration == loop.maxLoops
+		if lastIteration && loop.request.Tools != nil {
+			log.Printf("messages: tool call loop limit reached for conv %d, requesting final answer without tools", loop.conversationID)
+			loop.request.Tools = nil
+		}
+
 		h := llm.Handler{
 			ErrorLog: loop.server.modelErrors,
 			OnStart:  loop.onStart,
@@ -306,12 +313,6 @@ func (loop *messageToolLoop) run() (string, *store.MessageStats, bool) {
 			writeError(loop.writer, http.StatusBadGateway, "model unreachable")
 			return "", nil, false
 		}
-		if err != nil {
-			log.Printf("messages: stream error for conv %d model=%q: %v", loop.conversationID, loop.request.Model, err)
-			writeSSEError(loop.writer, "model error")
-			loop.flusher.Flush()
-			break
-		}
 
 		var usageStats *store.MessageStats
 		if comp.Usage != nil {
@@ -323,7 +324,37 @@ func (loop *messageToolLoop) run() (string, *store.MessageStats, bool) {
 			}
 		}
 
-		if comp.FinishReason == "tool_calls" && len(comp.ToolCalls) > 0 {
+		if err != nil {
+			// The user pressed stop (the client went away): keep what was
+			// generated, silently, as a normal stopped message.
+			if errors.Is(loop.ctx.Err(), context.Canceled) {
+				finalContent = comp.Content
+				finalStats = usageStats
+				break
+			}
+			log.Printf("messages: stream error for conv %d model=%q: %v", loop.conversationID, loop.request.Model, err)
+			if comp.Content == "" {
+				writeSSEError(loop.writer, "model error")
+				loop.flusher.Flush()
+				break
+			}
+			// The model failed partway through an answer. Save the partial text
+			// (it is often useful) but tell the user it was cut off. Any tool
+			// calls in a broken stream may have truncated arguments, so they are
+			// not run.
+			warning := "model stopped responding partway through, so this reply is incomplete"
+			if errors.Is(loop.ctx.Err(), context.DeadlineExceeded) {
+				warning = "response timed out, so this reply is incomplete"
+			}
+			warnJSON, _ := json.Marshal(map[string]string{"warning": warning})
+			fmt.Fprintf(loop.writer, "data: %s\n\n", warnJSON)
+			loop.flusher.Flush()
+			finalContent = comp.Content
+			finalStats = usageStats
+			break
+		}
+
+		if !lastIteration && comp.FinishReason == "tool_calls" && len(comp.ToolCalls) > 0 {
 			loop.persistToolCall(comp.Content, comp.ToolCalls)
 			for _, tc := range comp.ToolCalls {
 				loop.executeTool(tc)
@@ -332,11 +363,7 @@ func (loop *messageToolLoop) run() (string, *store.MessageStats, bool) {
 			newTurnEvt, _ := json.Marshal(map[string]any{"new_turn": map[string]any{"name": loop.assistantName}})
 			fmt.Fprintf(loop.writer, "data: %s\n\n", newTurnEvt)
 			loop.flusher.Flush()
-
-			if iteration < loop.maxLoops-1 {
-				continue
-			}
-			log.Printf("messages: tool call loop limit reached for conv %d", loop.conversationID)
+			continue
 		}
 
 		finalContent = comp.Content
@@ -465,7 +492,7 @@ func (s *Server) triggerConversationTitle(conv *store.Conversation, character *s
 		debug.Log("title trigger (3rd assistant): conv=%d assistantMsgCount=%d (need >=2 to fire)", conv.ID, assistantMessages)
 	}
 	if reason != titleTriggerNone {
-		tasks.GenerateTitleForConversation(s.store, s.cfg, conv.ID, s.hub.BroadcastTitleUpdate)
+		s.titler.GenerateForConversation(conv.ID, s.hub.BroadcastTitleUpdate)
 	}
 }
 
@@ -604,7 +631,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 
 	// Provider hides the wire protocol (chat-completions vs Responses) behind one
 	// streaming call, so the tool loop below is protocol-blind.
-	provider := llm.NewProvider(s.modelClient, modelServer, s.tokenSource(modelServer), s.oauthAccountID(modelServer))
+	provider := s.providerFor(modelServer)
 	var toolsArg any
 	if len(activeToolDefs) > 0 {
 		toolsArg = activeToolDefs
@@ -680,6 +707,8 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		toolContext: ToolContext{
 			ModelName:       modelName,
 			ModelServer:     modelServer,
+			Provider:        provider,
+			FetchClient:     s.fetchClient,
 			ResponseTimeout: responseTimeout,
 			SearXNGURL:      s.cfg.SearXNG.URL,
 			Timezone:        s.cfg.Server.Timezone,
@@ -719,7 +748,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			log.Printf("messages: failed to update conversation %d after message: %v", convID, err2)
 		}
 		if time.Since(prevUpdatedAt) > 2*time.Minute {
-			s.hub.BroadcastConversationListChanged()
+			s.hub.BroadcastConversationListChanged(conv.UserID)
 		}
 		if err == nil {
 			idJSON, _ := json.Marshal(map[string]int64{"message_id": msg.ID})

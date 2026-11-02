@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -51,6 +52,17 @@ func (s *Store) GetConversation(id, userID int64) (*Conversation, error) {
 	return c, err
 }
 
+// ConversationOwner returns the user_id that owns a conversation. Does not
+// enforce ownership — used to route WebSocket events to the right user.
+func (s *Store) ConversationOwner(id int64) (int64, error) {
+	var userID int64
+	err := s.db.QueryRow(`SELECT user_id FROM conversation WHERE id = ?`, id).Scan(&userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	return userID, err
+}
+
 func (s *Store) CreateConversation(userID int64, title *string, model *string, characterID *int64) (*Conversation, error) {
 	t := now()
 	res, err := s.db.Exec(
@@ -83,37 +95,8 @@ func (s *Store) DeleteConversation(id, userID int64) (attachmentPaths []string, 
 		return nil, ErrNotFound
 	}
 
-	// Collect attachment disk paths that are not referenced by any other conversation
-	// (forked conversations share the same disk_path, so we must not delete shared files).
-	attRows, err := tx.Query(`
-		SELECT disk_path FROM attachment WHERE conversation_id = ?
-		AND disk_path NOT IN (
-			SELECT disk_path FROM attachment WHERE conversation_id != ?
-		)`, id, id)
+	attachmentPaths, _, err = deleteConversationsTx(tx, []int64{id})
 	if err != nil {
-		return nil, err
-	}
-	for attRows.Next() {
-		var p string
-		if err := attRows.Scan(&p); err != nil {
-			attRows.Close()
-			return nil, err
-		}
-		attachmentPaths = append(attachmentPaths, p)
-	}
-	attRows.Close()
-	if err := attRows.Err(); err != nil {
-		return nil, err
-	}
-
-	if _, err := tx.Exec(`DELETE FROM attachment WHERE conversation_id = ?`, id); err != nil {
-		return nil, err
-	}
-	// Messages must go before the conversation to satisfy the FK constraint.
-	if _, err := tx.Exec(`DELETE FROM message WHERE conversation_id = ?`, id); err != nil {
-		return nil, err
-	}
-	if _, err := tx.Exec(`DELETE FROM conversation WHERE id = ?`, id); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -149,23 +132,100 @@ func (s *Store) SetConversationBackground(convID, attachmentID int64) error {
 	return err
 }
 
-func (s *Store) DeleteStaleConversations() (conversations, messages int64, err error) {
-	threshold := time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339)
-	staleSubquery := `
-		SELECT id FROM conversation
-		WHERE created_at < ?
-		AND (SELECT COUNT(*) FROM message WHERE conversation_id = conversation.id) < 2`
-	res, err := s.db.Exec(`DELETE FROM message WHERE conversation_id IN (`+staleSubquery+`)`, threshold)
+// deleteConversationsTx deletes the given conversations together with their
+// messages and attachment rows. It returns the attachment disk paths (relative
+// to DataDir) that are no longer referenced by any remaining attachment —
+// forks share files by disk_path — so the caller can remove them after commit.
+func deleteConversationsTx(tx *sql.Tx, ids []int64) (attachmentPaths []string, messages int64, err error) {
+	if len(ids) == 0 {
+		return nil, 0, nil
+	}
+	in := "?" + strings.Repeat(",?", len(ids)-1)
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+
+	attRows, err := tx.Query(`
+		SELECT DISTINCT disk_path FROM attachment WHERE conversation_id IN (`+in+`)
+		AND disk_path NOT IN (
+			SELECT disk_path FROM attachment WHERE conversation_id NOT IN (`+in+`)
+		)`, append(append([]any{}, args...), args...)...)
 	if err != nil {
-		return 0, 0, err
+		return nil, 0, err
+	}
+	for attRows.Next() {
+		var p string
+		if err := attRows.Scan(&p); err != nil {
+			attRows.Close()
+			return nil, 0, err
+		}
+		attachmentPaths = append(attachmentPaths, p)
+	}
+	attRows.Close()
+	if err := attRows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	// Order matters for the FKs: attachment references message and
+	// conversation; message references conversation.
+	if _, err := tx.Exec(`DELETE FROM attachment WHERE conversation_id IN (`+in+`)`, args...); err != nil {
+		return nil, 0, err
+	}
+	res, err := tx.Exec(`DELETE FROM message WHERE conversation_id IN (`+in+`)`, args...)
+	if err != nil {
+		return nil, 0, err
 	}
 	messages, _ = res.RowsAffected()
-	res, err = s.db.Exec(`DELETE FROM conversation WHERE id IN (`+staleSubquery+`)`, threshold)
-	if err != nil {
-		return 0, 0, err
+	if _, err := tx.Exec(`DELETE FROM conversation WHERE id IN (`+in+`)`, args...); err != nil {
+		return nil, 0, err
 	}
-	conversations, _ = res.RowsAffected()
-	return conversations, messages, nil
+	return attachmentPaths, messages, nil
+}
+
+// DeleteStaleConversations removes conversations older than 30 minutes that
+// never got a reply (fewer than two messages), including any attachments the
+// user uploaded to them. It returns the attachment disk paths to remove.
+func (s *Store) DeleteStaleConversations() (conversations, messages int64, attachmentPaths []string, err error) {
+	threshold := time.Now().UTC().Add(-30 * time.Minute).Format(time.RFC3339)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.Query(`
+		SELECT id FROM conversation
+		WHERE created_at < ?
+		AND (SELECT COUNT(*) FROM message WHERE conversation_id = conversation.id) < 2`, threshold)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, 0, nil, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, 0, nil, err
+	}
+	if len(ids) == 0 {
+		return 0, 0, nil, nil
+	}
+
+	attachmentPaths, messages, err = deleteConversationsTx(tx, ids)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, 0, nil, err
+	}
+	return int64(len(ids)), messages, attachmentPaths, nil
 }
 
 func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int64) (*Conversation, error) {
@@ -190,6 +250,7 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 	}
 
 	type msgRow struct {
+		id               int64
 		role, content    string
 		name             *string
 		charID           *int64
@@ -201,8 +262,8 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 	}
 
 	rows, err := s.db.Query(
-		`SELECT role, content, name, character_id, prompt_tokens, completion_tokens, total_time_ms, tool_calls, tool_call_id
-		 FROM message WHERE conversation_id = ? AND id <= ? ORDER BY created_at ASC`,
+		`SELECT id, role, content, name, character_id, prompt_tokens, completion_tokens, total_time_ms, tool_calls, tool_call_id
+		 FROM message WHERE conversation_id = ? AND id <= ? ORDER BY created_at ASC, id ASC`,
 		sourceConvID, untilMessageID,
 	)
 	if err != nil {
@@ -211,7 +272,7 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 	var msgRows []msgRow
 	for rows.Next() {
 		var m msgRow
-		if err := rows.Scan(&m.role, &m.content, &m.name, &m.charID, &m.promptTokens, &m.completionTokens, &m.totalTimeMS, &m.toolCalls, &m.toolCallID); err != nil {
+		if err := rows.Scan(&m.id, &m.role, &m.content, &m.name, &m.charID, &m.promptTokens, &m.completionTokens, &m.totalTimeMS, &m.toolCalls, &m.toolCallID); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -222,18 +283,28 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 		return nil, err
 	}
 
+	// Tool attachments are tied to the fork range by tool_call_id; user
+	// uploads by message_id.
 	type attRow struct {
-		toolCallID, title, filename, mimeType, diskPath, createdAt string
+		id                                            int64
+		toolCallID, source, title, filename, mimeType string
+		diskPath, status, createdAt                   string
+		messageID                                     *int64
+		errMsg                                        *string
 	}
 	attRows, err := s.db.Query(
-		`SELECT tool_call_id, title, filename, mime_type, disk_path, created_at
+		`SELECT id, tool_call_id, message_id, source, title, filename, mime_type, disk_path, status, error, created_at
 		 FROM attachment
 		 WHERE conversation_id = ?
-		 AND tool_call_id IN (
-		     SELECT tool_call_id FROM message
-		     WHERE conversation_id = ? AND id <= ? AND tool_call_id IS NOT NULL AND tool_call_id != ''
-		 )`,
-		sourceConvID, sourceConvID, untilMessageID,
+		 AND (
+		     tool_call_id IN (
+		         SELECT tool_call_id FROM message
+		         WHERE conversation_id = ? AND id <= ? AND tool_call_id IS NOT NULL AND tool_call_id != ''
+		     )
+		     OR message_id IN (SELECT id FROM message WHERE conversation_id = ? AND id <= ?)
+		 )
+		 ORDER BY id`,
+		sourceConvID, sourceConvID, untilMessageID, sourceConvID, untilMessageID,
 	)
 	if err != nil {
 		return nil, err
@@ -241,7 +312,7 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 	var atts []attRow
 	for attRows.Next() {
 		var a attRow
-		if err := attRows.Scan(&a.toolCallID, &a.title, &a.filename, &a.mimeType, &a.diskPath, &a.createdAt); err != nil {
+		if err := attRows.Scan(&a.id, &a.toolCallID, &a.messageID, &a.source, &a.title, &a.filename, &a.mimeType, &a.diskPath, &a.status, &a.errMsg, &a.createdAt); err != nil {
 			attRows.Close()
 			return nil, err
 		}
@@ -269,23 +340,52 @@ func (s *Store) ForkConversation(sourceConvID, userID int64, untilMessageID int6
 	newID, _ := res.LastInsertId()
 	newConv := &Conversation{ID: newID, UserID: userID, Model: src.Model, CharacterID: src.CharacterID, Title: &title, CreatedAt: t, UpdatedAt: t}
 
+	newMsgID := make(map[int64]int64, len(msgRows))
 	for _, m := range msgRows {
-		if _, err := tx.Exec(
+		res, err := tx.Exec(
 			`INSERT INTO message (conversation_id, role, content, name, character_id, created_at, prompt_tokens, completion_tokens, total_time_ms, tool_calls, tool_call_id)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			newConv.ID, m.role, m.content, m.name, m.charID, t, m.promptTokens, m.completionTokens, m.totalTimeMS, m.toolCalls, m.toolCallID,
-		); err != nil {
+		)
+		if err != nil {
 			return nil, err
 		}
+		newMsgID[m.id], _ = res.LastInsertId()
 	}
 
+	newAttID := make(map[int64]int64, len(atts))
 	for _, a := range atts {
-		if _, err := tx.Exec(
-			`INSERT INTO attachment (tool_call_id, conversation_id, title, filename, mime_type, disk_path, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			a.toolCallID, newConv.ID, a.title, a.filename, a.mimeType, a.diskPath, a.createdAt,
-		); err != nil {
+		var msgID *int64
+		if a.messageID != nil {
+			if id, ok := newMsgID[*a.messageID]; ok {
+				msgID = &id
+			}
+		}
+		// A pending attachment is finalised by id by the generating goroutine,
+		// which only knows the source row, so the copy would never complete.
+		status, errMsg := a.status, a.errMsg
+		if status == "pending" {
+			status = "error"
+			msg := "Still generating when the conversation was forked"
+			errMsg = &msg
+		}
+		res, err := tx.Exec(
+			`INSERT INTO attachment (tool_call_id, conversation_id, message_id, source, title, filename, mime_type, disk_path, status, error, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			a.toolCallID, newConv.ID, msgID, a.source, a.title, a.filename, a.mimeType, a.diskPath, status, errMsg, a.createdAt,
+		)
+		if err != nil {
 			return nil, err
+		}
+		newAttID[a.id], _ = res.LastInsertId()
+	}
+
+	if src.BackgroundAttachmentID != nil {
+		if id, ok := newAttID[*src.BackgroundAttachmentID]; ok {
+			if _, err := tx.Exec(`UPDATE conversation SET background_attachment_id = ? WHERE id = ?`, id, newConv.ID); err != nil {
+				return nil, err
+			}
+			newConv.BackgroundAttachmentID = &id
 		}
 	}
 

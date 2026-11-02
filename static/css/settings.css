@@ -1197,6 +1197,64 @@ a.snav-item { text-decoration: none; }
   color: var(--fg);
 }
 
+/* ── Typed confirmation modal ───────────────────────────── */
+
+.confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.confirm-modal.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.confirm-modal-dialog {
+  width: min(440px, calc(100vw - 32px));
+  background: var(--paper-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  transform: translateY(8px);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.confirm-modal.open .confirm-modal-dialog {
+  transform: translateY(0);
+}
+.confirm-modal-title {
+  margin: 0;
+  font-size: var(--fs-15);
+  font-weight: 600;
+  color: var(--fg);
+}
+.confirm-modal-body {
+  margin: 0;
+  font-size: var(--fs-14);
+  color: var(--fg-muted);
+  line-height: 1.55;
+}
+.confirm-modal-label {
+  font-size: var(--fs-13);
+  color: var(--fg);
+  padding-top: var(--space-2);
+}
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+
 /* ── Scrollbar ──────────────────────────────────────────── */
 
 .smain::-webkit-scrollbar { width: 10px; }

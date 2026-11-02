@@ -1,5 +1,15 @@
 package store
 
+import (
+	"database/sql"
+	"errors"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
 type Attachment struct {
 	ID             int64  `json:"id"`
 	ToolCallID     string `json:"tool_call_id"`
@@ -159,6 +169,9 @@ func (s *Store) GetAttachment(id int64) (*Attachment, error) {
 		`SELECT id, tool_call_id, conversation_id, message_id, source, title, filename, mime_type, disk_path, status, COALESCE(error, ''), created_at
 		 FROM attachment WHERE id = ?`, id,
 	).Scan(&a.ID, &a.ToolCallID, &a.ConversationID, &a.MessageID, &a.Source, &a.Title, &a.Filename, &a.MimeType, &a.DiskPath, &a.Status, &a.Error, &a.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +179,7 @@ func (s *Store) GetAttachment(id int64) (*Attachment, error) {
 }
 
 // GetAttachmentForUser fetches an attachment only if its conversation is owned
-// by userID. Returns sql.ErrNoRows if the attachment doesn't exist or belongs
+// by userID. Returns ErrNotFound if the attachment doesn't exist or belongs
 // to a different user, so the caller cannot distinguish the two cases.
 func (s *Store) GetAttachmentForUser(id, userID int64) (*Attachment, error) {
 	a := &Attachment{}
@@ -176,6 +189,9 @@ func (s *Store) GetAttachmentForUser(id, userID int64) (*Attachment, error) {
 		JOIN conversation c ON c.id = a.conversation_id
 		WHERE a.id = ? AND c.user_id = ?
 	`, id, userID).Scan(&a.ID, &a.ToolCallID, &a.ConversationID, &a.MessageID, &a.Source, &a.Title, &a.Filename, &a.MimeType, &a.DiskPath, &a.Status, &a.Error, &a.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -201,4 +217,74 @@ func (s *Store) ListAttachmentsByConversation(convID int64) ([]Attachment, error
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// RemoveAttachmentFiles deletes the per-attachment directories for the given
+// disk paths (relative to dataDir, as returned by the Delete* functions).
+// Every attachment lives in its own attachments/<random-id>/ directory; any
+// path that doesn't have that shape is skipped. In particular a pending or
+// failed attachment has an empty disk_path and filepath.Dir("") is ".", which would
+// otherwise resolve to dataDir itself.
+func RemoveAttachmentFiles(dataDir string, paths []string) {
+	for _, p := range paths {
+		dir := filepath.Dir(filepath.Clean(p))
+		parent, name := filepath.Split(dir)
+		if filepath.Clean(parent) != "attachments" || name == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
+			if p != "" {
+				log.Printf("store: RemoveAttachmentFiles — refusing to remove unexpected path %q", p)
+			}
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(dataDir, dir)); err != nil {
+			log.Printf("store: RemoveAttachmentFiles — removing %q: %v", dir, err)
+		}
+	}
+}
+
+// DeleteUnlinkedUploads removes user uploads that were never attached to a
+// sent message (message_id IS NULL) and are older than olderThan — the user
+// pasted an image and then abandoned the draft. It returns the disk paths to
+// remove that no other attachment row still references.
+func (s *Store) DeleteUnlinkedUploads(olderThan time.Duration) (deleted int64, attachmentPaths []string, err error) {
+	cutoff := time.Now().UTC().Add(-olderThan).Format(time.RFC3339)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, nil, err
+	}
+	defer tx.Rollback()
+
+	const stale = `source = 'upload' AND message_id IS NULL AND created_at < ?`
+	rows, err := tx.Query(`
+		SELECT DISTINCT disk_path FROM attachment WHERE `+stale+`
+		AND disk_path NOT IN (SELECT disk_path FROM attachment WHERE NOT (`+stale+`))`, cutoff, cutoff)
+	if err != nil {
+		return 0, nil, err
+	}
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			rows.Close()
+			return 0, nil, err
+		}
+		attachmentPaths = append(attachmentPaths, p)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, nil, err
+	}
+
+	// A conversation may have had one of these set as its background.
+	if _, err := tx.Exec(`UPDATE conversation SET background_attachment_id = NULL
+		WHERE background_attachment_id IN (SELECT id FROM attachment WHERE `+stale+`)`, cutoff); err != nil {
+		return 0, nil, err
+	}
+	res, err := tx.Exec(`DELETE FROM attachment WHERE `+stale, cutoff)
+	if err != nil {
+		return 0, nil, err
+	}
+	deleted, _ = res.RowsAffected()
+	if err := tx.Commit(); err != nil {
+		return 0, nil, err
+	}
+	return deleted, attachmentPaths, nil
 }

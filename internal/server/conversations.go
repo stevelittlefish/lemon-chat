@@ -4,13 +4,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
-	"github.com/stevelittlefish/lemon-chat/internal/tasks"
 )
 
 const defaultConversationPageSize = 30
@@ -145,7 +142,7 @@ func (s *Server) handleRegenerateTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("Regenerating title conversation_id=%d user_id=%d", id, user.ID)
-	tasks.GenerateTitleForConversation(s.store, s.cfg, id, func(convID int64, title string) {
+	s.titler.GenerateForConversation(id, func(convID int64, title string) {
 		s.hub.BroadcastTitleUpdate(convID, title)
 	})
 	w.WriteHeader(http.StatusAccepted)
@@ -169,7 +166,7 @@ func (s *Server) handleForkConversation(w http.ResponseWriter, r *http.Request) 
 	if notFoundOr500(w, err) {
 		return
 	}
-	s.hub.BroadcastConversationListChanged()
+	s.hub.BroadcastConversationListChanged(user.ID)
 	writeJSON(w, http.StatusCreated, conv)
 }
 
@@ -242,7 +239,7 @@ func (s *Server) handleImportConversation(w http.ResponseWriter, r *http.Request
 		internalError(w, err)
 		return
 	}
-	s.hub.BroadcastConversationListChanged()
+	s.hub.BroadcastConversationListChanged(user.ID)
 	writeJSON(w, http.StatusCreated, conv)
 }
 
@@ -257,8 +254,6 @@ func (s *Server) handleDeleteConversation(w http.ResponseWriter, r *http.Request
 	if notFoundOr500(w, err) {
 		return
 	}
-	for _, p := range attPaths {
-		os.RemoveAll(filepath.Join(s.cfg.Server.DataDir, filepath.Dir(p)))
-	}
+	store.RemoveAttachmentFiles(s.cfg.Server.DataDir, attPaths)
 	w.WriteHeader(http.StatusNoContent)
 }

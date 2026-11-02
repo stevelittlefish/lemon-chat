@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/debug"
@@ -63,16 +64,24 @@ func main() {
 		log.Fatalf("bootstrap: %v", err)
 	}
 
-	hub := server.NewHub()
-	tasks.StartTitleWorker(st, cfg, hub.BroadcastTitleUpdate, hub.BroadcastCompletionTitleUpdate)
-	tasks.StartCleanupWorker(st, hub.BroadcastConversationListChanged)
+	hub := server.NewHub(st)
+	tasks.StartCleanupWorker(st, cfg.Server.DataDir, hub.BroadcastConversationListChangedAll)
 	tasks.StartPriceWorker(st, cfg)
 
 	srv := server.New(cfg, st, hub)
+	srv.StartTitleWorker()
 	srv.ResumeResearchJobs()
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("lemon-chat listening on http://localhost%s", addr)
-	if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
+	httpSrv := &http.Server{
+		Addr:    addr,
+		Handler: srv.Handler(),
+		// Bound how long a client may take to send headers (slowloris). No
+		// Read/WriteTimeout: SSE chat and research streams are long-lived.
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+	}
+	if err := httpSrv.ListenAndServe(); err != nil {
 		log.Fatalf("server: %v", err)
 	}
 }

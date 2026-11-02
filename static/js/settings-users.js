@@ -2,6 +2,7 @@ import { admin } from './api.js';
 import { requireAuth } from './settings-auth.js';
 import { preload as preloadIcons, icon } from './icons.js';
 import { escapeHtml } from './utils.js';
+import { createModal } from './modal.js';
 
 let user = null;
 let svgArrowLeft, svgUser, svgUsers, svgCpu, svgPlus, svgPencil, svgTrash;
@@ -275,19 +276,77 @@ async function saveEditUser(id) {
   }
 }
 
-async function deleteUser(id) {
-  const u = usersData.find(u => u.id === id);
-  if (!confirm(`Delete user "${u?.username}"? This cannot be undone.`)) return;
+let deleteModal = null;
 
-  try {
-    await admin.users.delete(id);
-    usersData = usersData.filter(u => u.id !== id);
-    if (editingId === id) editingId = null;
-    renderUsersList();
-  } catch (err) {
-    alert(`Could not delete user: ${err.message}`);
-  }
+function getDeleteModal() {
+  if (deleteModal) return deleteModal;
+
+  const { overlay, dialog, open, close } = createModal('Delete user');
+  overlay.className = 'confirm-modal';
+  dialog.className  = 'confirm-modal-dialog';
+  dialog.innerHTML = `
+    <p class="confirm-modal-title">Delete user</p>
+    <p class="confirm-modal-body"></p>
+    <label class="confirm-modal-label" for="delete-user-confirm"></label>
+    <input class="input" id="delete-user-confirm" autocomplete="off" spellcheck="false">
+    <div class="field-msg field-msg--error" hidden></div>
+    <div class="confirm-modal-actions">
+      <button class="btn btn-secondary btn-sm" data-role="cancel">Cancel</button>
+      <button class="btn btn-danger btn-sm" data-role="confirm" disabled>Delete user</button>
+    </div>`;
+
+  deleteModal = {
+    open, close,
+    body:       dialog.querySelector('.confirm-modal-body'),
+    label:      dialog.querySelector('.confirm-modal-label'),
+    input:      dialog.querySelector('input'),
+    errorEl:    dialog.querySelector('.field-msg'),
+    confirmBtn: dialog.querySelector('[data-role="confirm"]'),
+  };
+  dialog.querySelector('[data-role="cancel"]').addEventListener('click', close);
+  return deleteModal;
 }
 
+function deleteUser(id) {
+  const u = usersData.find(u => u.id === id);
+  if (!u) return;
+  const m = getDeleteModal();
+
+  m.body.textContent = `This permanently deletes ${u.username}, along with all of their conversations, ` +
+    'completions, notes, research, uploaded files, and the characters they created. ' +
+    'Other users\' conversations with those characters will switch to the character\'s model. ' +
+    'This cannot be undone.';
+  m.label.textContent = `Type ${u.username} to confirm`;
+  m.input.value = '';
+  m.errorEl.hidden = true;
+  m.confirmBtn.disabled = true;
+  m.confirmBtn.textContent = 'Delete user';
+
+  const matches = () => m.input.value === u.username;
+  m.input.oninput = () => { m.confirmBtn.disabled = !matches(); };
+
+  const submit = async () => {
+    if (!matches()) return;
+    m.confirmBtn.disabled = true;
+    m.confirmBtn.textContent = 'Deleting…';
+    try {
+      await admin.users.delete(id, m.input.value);
+      usersData = usersData.filter(u => u.id !== id);
+      if (editingId === id) editingId = null;
+      m.close();
+      renderUsersList();
+    } catch (err) {
+      m.confirmBtn.disabled = !matches();
+      m.confirmBtn.textContent = 'Delete user';
+      m.errorEl.hidden = false;
+      m.errorEl.textContent = `Could not delete user: ${err.message}`;
+    }
+  };
+  m.confirmBtn.onclick = submit;
+  m.input.onkeydown = e => { if (e.key === 'Enter') submit(); };
+
+  m.open();
+  m.input.focus();
+}
 
 init();

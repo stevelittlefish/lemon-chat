@@ -1429,6 +1429,10 @@ html, body {
   color: var(--fg-faint);
 }
 
+.message-stopped--error {
+  color: var(--danger);
+}
+
 /* ── Init error ─────────────────────────────────────────────── */
 
 .init-error {

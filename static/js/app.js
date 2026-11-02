@@ -283,6 +283,7 @@ async function sendMessage(content, attachments = []) {
       }
       stream.append(delta);
     },
+    onWarning: (msg) => stream.setIncomplete(msg),
     onStats: (stats) => stream.setStats(stats),
     onMessageId: (id) => stream.setMessageId(id),
     onToolCall: (tc) => {

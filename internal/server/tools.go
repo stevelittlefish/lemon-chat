@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
+	"github.com/stevelittlefish/lemon-chat/internal/llm"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
@@ -24,6 +26,8 @@ import (
 type ToolContext struct {
 	ModelName       string
 	ModelServer     *config.ModelServer
+	Provider        llm.Provider // the chat model's provider, for tools that call the model
+	FetchClient     *http.Client // for model-chosen URLs (fetch_url); nil uses http.DefaultClient
 	ResponseTimeout time.Duration
 	SearXNGURL      string
 	Timezone        string

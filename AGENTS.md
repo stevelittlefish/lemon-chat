@@ -74,58 +74,91 @@ Apply this substitution wherever character text is rendered or sent to the model
 
 ```
 cmd/lemon-chat/
-  main.go              # entry point, config loading, server start
+  main.go              # entry point, config loading, bootstrap, workers, HTTP server
 internal/
   config/
     config.go          # TOML struct definitions and loading
   debug/
     debug.go           # debug logging flag (debug.Enabled, debug.Log)
+  htmltext/
+    htmltext.go        # HTML → plain text (snippet strip + structure-preserving)
+  llm/
+    provider.go        # Provider interface: streaming chat over chat-completions or Responses,
+                       #   wire/error transcripts. All model calls go through this.
+    responses.go       # Responses API body building and stream → chat-frame translation
+    llm.go             # shared types (Usage, Completion), SSE scanner, legacy raw helpers
+    models.go          # /models listing
+  netguard/
+    netguard.go        # HTTP client for model-chosen URLs that refuses private/LAN addresses
+  openai_auth/         # Codex-style OAuth (PKCE) login, token refresh, shared token store
+  redditimport/
+    redditimport.go    # browser-extension interchange format for Reddit captures
   research/
     researcher.go      # research engine: phase loop, state, checkpointing
     prompts.go         # all research prompts (ported from docs/deep_research_spec.html)
     llm.go             # LLM calls, think-tag stripping, robust JSON parsing, injection guard
     web.go             # SearXNG search, page fetch, goal-based extraction
+  searx/
+    searx.go           # small SearXNG client
   server/
-    server.go          # router setup, static serving
+    server.go          # router setup, static serving, body limits, providerFor
     auth.go            # login / logout / me / profile / password handlers
     avatars.go         # avatar upload and serve handlers (users + characters)
-    conversations.go   # conversation CRUD handlers
-    messages.go        # message list + SSE streaming handler
+    conversations.go   # conversation CRUD, fork, import, title, background handlers
+    messages.go        # message list + SSE streaming handler + tool loop
     models.go          # model list handler
     characters.go      # character CRUD handlers
     completions.go     # completions CRUD + streaming handlers
-    research.go        # research job manager, handlers, SSE progress, crash recovery
-    tools.go           # tool registry, executors, attachment helpers
-    attachments.go     # attachment serve handler
-    admin.go           # admin user-management handlers
+    notes.go           # notes API handlers
+    attachments.go     # attachment upload + serve handlers
+    admin.go           # admin user-management, model listing, note-pack import
+    oauth_login.go     # admin "Connect OpenAI account" paste-the-code flow
     middleware.go      # session, auth, admin middleware
-    ws.go              # WebSocket hub, upgrade handler, broadcast
+    errorlog.go        # always-on model_errors.log sink
+    ws.go              # WebSocket hub (per-user routing), upgrade handler
+    research.go        # research job manager, handlers, SSE progress, crash recovery
+    research_reports.go  # report variants (regenerate, HTML report)
+    research_bundle.go   # research download / debug bundles (zip)
+    research_runlog.go   # per-job diagnostic run log
+    reddit_import_debug.go # debug-only Reddit import harness
+    tools.go           # ToolContext, executor dispatch, attachment helpers
+    tools_registry.go  # toolRegistry: every selectable tool's schema + metadata
+    tools_meta.go      # InitTools, GET /api/tools metadata
+    tools_web.go       # fetch_url, SearXNG, Wikipedia tools
+    tools_image.go     # ComfyUI image generation tools
+    tools_state_notes.go # world-state and notes tools
   store/
     store.go           # open DB, run migrations, bootstrap
-    users.go           # user queries
+    users.go           # user queries (incl. full user deletion)
     sessions.go        # session queries
-    conversations.go   # conversation queries
+    conversations.go   # conversation queries (delete, stale cleanup, fork, import)
     messages.go        # message queries
     characters.go      # character queries
     completions.go     # completion queries
+    notes.go           # note queries
+    state.go           # world-state queries
     research.go        # research job queries (incl. resume checkpoints)
-    attachments.go     # attachment queries
+    research_reports.go # research report variant queries
+    attachments.go     # attachment queries, unlinked-upload sweep, safe file removal
+    oauth.go           # shared OAuth token row
     prices.go          # cached model per-token price queries
   tasks/
-    titles.go          # background title-generation worker
-    cleanup.go         # background stale-conversation cleanup worker
+    titles.go          # Titler: conversation/completion titles via the Provider, with retry backoff
+    cleanup.go         # background stale-conversation, session and unsent-upload cleanup
     prices.go          # background daily OpenRouter model-price fetch worker
 static/
   index.html           # main chat app shell
   complete.html        # completions app shell
   research.html        # research page shell
+  research-help.html   # research help page
   menu.html            # mobile/navigation menu shell
+  reddit-import-debug.html # debug-only Reddit import harness
   js/
     app.js             # entry, wires modules together
-    api.js             # fetch wrappers for the REST API
+    api.js             # fetch wrappers for the REST API, SSE consumer
     sidebar.js         # conversation list, navigation
-    thread.js          # message display, SSE streaming
-    composer.js        # text input, send logic
+    thread.js          # message display, SSE streaming, artifact panel, lightbox
+    composer.js        # text input, send logic, image attach/paste
     markdown.js        # lightweight message rendering
     header.js          # chat header: title display + model/character picker
     icons.js           # SVG icon loader/cache (fetches from /assets/icons/)
@@ -134,13 +167,16 @@ static/
     complete-app.js    # completions page entry
     research-app.js    # research page entry (job list, live progress, report view)
     modal.js           # shared modal scaffold utility
+    reddit-import-debug.js    # debug-only Reddit import harness
     settings-auth.js   # auth guard (requireAuth)
     settings-account.js       # account settings page
     settings-avatar.js        # shared avatar upload UI component
     settings-character-edit.js # character edit page
     settings-characters.js    # characters list page
+    settings-import-chat.js   # import chat page
+    settings-notes.js         # notes page
     settings-tools.js         # admin tools page
-    settings-users.js         # user management page
+    settings-users.js         # user management page (typed-confirmation delete)
     vendor/
       marked.esm.js    # marked.js (vendored, no build step)
       katex.esm.js     # KaTeX math rendering (vendored, no build step)
@@ -157,6 +193,8 @@ static/
     account.html          # account settings page
     character-edit.html   # character edit page
     characters.html       # characters list page
+    import_chat.html      # import chat page
+    notes.html            # notes page
     tools.html            # admin tools page
     users.html            # user management page
   assets/
@@ -177,9 +215,15 @@ LICENSE
 CLAUDE.md
 ```
 
+Every model call must go through `llm.Provider` (in `server`, use `s.providerFor(srv)`), so `api = "responses"` and `auth = "oauth"` servers work everywhere. Don't build raw `/chat/completions` requests.
+
+URLs chosen by the model (`fetch_url`, research page fetches) must be fetched with the `netguard` client (`s.fetchClient` / `ToolContext.FetchClient`), which refuses loopback and LAN addresses unless `allow_private_fetch = true` is set in `[server]`. Configured endpoints (model servers, SearXNG, ComfyUI) use ordinary clients.
+
 ## Tool calls
 
-Characters can have a list of tools enabled. When a message is sent to a character with tools, the model may call tools during the response loop. The server runs up to `max_tool_loops` rounds (default 5, configurable in `lemon.toml`) before cutting off and returning the final response.
+Characters can have a list of tools enabled. When a message is sent to a character with tools, the model may call tools during the response loop. The server runs up to `max_tool_loops` rounds of tool calls (default 5, configurable in `lemon.toml`), then makes one more call with tools withheld so the model has to answer with what it has.
+
+If a model stream fails partway through an answer, the partial text is saved and the client gets a non-fatal `warning` SSE event (shown as a note under the reply); tool calls from a broken stream are never run. A stream that fails before producing anything sends an `error` event. A user pressing stop saves the partial text silently.
 
 Tool declarations live in `toolRegistry` in `internal/server/tools_registry.go`; executor implementations are split across the `tools_*.go` files. To add a new selectable tool:
 

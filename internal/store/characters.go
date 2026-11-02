@@ -147,7 +147,13 @@ func (s *Store) DeleteCharacter(id int64) error {
 		return err
 	}
 	defer tx.Rollback()
+	if err := deleteCharacterTx(tx, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
 
+func deleteCharacterTx(tx *sql.Tx, id int64) error {
 	// Conversations that used this character revert to the character's model so
 	// they still satisfy the CHECK (model IS NOT NULL) != (character_id IS NOT NULL).
 	if _, err := tx.Exec(`
@@ -164,11 +170,8 @@ func (s *Store) DeleteCharacter(id int64) error {
 	}
 
 	// character_hidden_message has ON DELETE CASCADE, so it cleans itself up.
-	if _, err := tx.Exec(`DELETE FROM character WHERE id = ?`, id); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	_, err := tx.Exec(`DELETE FROM character WHERE id = ?`, id)
+	return err
 }
 
 func (s *Store) SetCharacterAvatar(id int64, filename string) error {

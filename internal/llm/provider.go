@@ -437,6 +437,9 @@ func listCodexModels(ctx context.Context, client *http.Client, apiBase, token, a
 // readChatCompletionsStreamFull parses a chat-completions SSE body into text,
 // tool calls, usage, and finish reason. It is the single parser both surfaces
 // use — the Responses stream is converted to chat-completions frames first.
+// maxToolCallIndex bounds the tool_calls[].index accepted from a stream.
+const maxToolCallIndex = 128
+
 func readChatCompletionsStreamFull(body io.Reader, h Handler) (Completion, error) {
 	var text []byte
 	var usage *Usage
@@ -488,6 +491,11 @@ func readChatCompletionsStreamFull(body io.Reader, h Handler) (Completion, error
 			}
 		}
 		for _, tc := range choice.Delta.ToolCalls {
+			// The index comes from the server; don't let a bogus one panic
+			// (negative) or force a huge allocation.
+			if tc.Index < 0 || tc.Index >= maxToolCallIndex {
+				continue
+			}
 			for len(calls) <= tc.Index {
 				calls = append(calls, &pendingCall{})
 			}
@@ -507,6 +515,12 @@ func readChatCompletionsStreamFull(body io.Reader, h Handler) (Completion, error
 	comp := Completion{Content: string(text), Usage: usage, FinishReason: finishReason}
 	for _, c := range calls {
 		comp.ToolCalls = append(comp.ToolCalls, ToolCall{ID: c.id, Name: c.name, Arguments: string(c.args)})
+	}
+	if err != nil {
+		// Return the partial output alongside the error: callers decide
+		// whether a truncated answer is worth keeping, but it must not be
+		// mistaken for a complete one.
+		return comp, fmt.Errorf("stream interrupted after partial output: %w", err)
 	}
 	return comp, nil
 }
