@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lemon-chat code review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FBF7EC; --bg-sunken: #F6EFDD; --bg-lifted: #FFFCF4;
+    --fg: #1B1814; --fg-muted: #6B6357; --fg-faint: #8E8576;
+    --border: #D6CDB7; --border-soft: #E7DFC9;
+    --accent: #F5C518; --accent-tint: #FFF8D6; --accent-on: #1B1814;
+    --high: #B3361B; --high-tint: #F3D9CC;
+    --med: #C8951A; --med-tint: #FCEC9A;
+    --low: #5C7A3E; --low-tint: #E2EBCC;
+    --info: #3565A8; --info-tint: #DCE6F3;
+    --code-bg: #F6EFDD;
+    --shadow: 0 1px 2px rgba(60,45,20,.06), 0 2px 6px rgba(60,45,20,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1E1B17; --bg-sunken: #171512; --bg-lifted: #26221D;
+      --fg: #EFE8D8; --fg-muted: #B5AB97; --fg-faint: #8E8576;
+      --border: #3A332A; --border-soft: #2E2923;
+      --accent: #F5C518; --accent-tint: #3A3214; --accent-on: #1B1814;
+      --high: #E0795F; --high-tint: #3D2219;
+      --med: #E3B54A; --med-tint: #3A3214;
+      --low: #9DBB78; --low-tint: #26301C;
+      --info: #82A8DD; --info-tint: #1E2836;
+      --code-bg: #171512;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1E1B17; --bg-sunken: #171512; --bg-lifted: #26221D;
+    --fg: #EFE8D8; --fg-muted: #B5AB97; --fg-faint: #8E8576;
+    --border: #3A332A; --border-soft: #2E2923;
+    --accent: #F5C518; --accent-tint: #3A3214; --accent-on: #1B1814;
+    --high: #E0795F; --high-tint: #3D2219;
+    --med: #E3B54A; --med-tint: #3A3214;
+    --low: #9DBB78; --low-tint: #26301C;
+    --info: #82A8DD; --info-tint: #1E2836;
+    --code-bg: #171512;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.6 "Source Sans 3", system-ui, sans-serif;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 48px 16px 96px; }
+  h1, h2, h3 { font-family: "Source Serif 4", Georgia, serif; font-weight: 600; line-height: 1.25; }
+  h1 { font-size: 2.2rem; margin: 6px 0 8px; }
+  h2 { font-size: 1.5rem; margin: 56px 0 16px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+  h3 { font-size: 1.1rem; margin: 0; }
+  p { margin: 0 0 12px; }
+  a { color: var(--info); }
+  code, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .86em; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+  .eyebrow {
+    font-family: "JetBrains Mono", monospace; font-size: .72rem; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--fg-muted);
+  }
+  .meta { color: var(--fg-muted); font-size: .95rem; }
+
+  .verdict {
+    margin: 32px 0; padding: 24px; border-radius: 14px;
+    background: var(--accent-tint); border: 1px solid var(--border);
+  }
+  .verdict-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  .grade {
+    font-family: "Source Serif 4", serif; font-size: 2.6rem; font-weight: 600; line-height: 1;
+    background: var(--accent); color: var(--accent-on); border-radius: 10px; padding: 8px 16px;
+  }
+  .verdict h2 { border: 0; margin: 0; padding: 0; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 24px 0; }
+  .stat { background: var(--bg-lifted); border: 1px solid var(--border-soft); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .stat b { display: block; font-family: "Source Serif 4", serif; font-size: 1.6rem; font-weight: 600; }
+  .stat span { color: var(--fg-muted); font-size: .9rem; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  th { font-family: "JetBrains Mono", monospace; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-muted); font-weight: 500; }
+  .table-scroll { overflow-x: auto; }
+
+  .themes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .theme { background: var(--bg-lifted); border: 1px solid var(--border-soft); border-radius: 10px; padding: 16px; }
+  .theme h3 { font-size: 1rem; margin-bottom: 6px; }
+  .theme p { color: var(--fg-muted); font-size: .95rem; margin: 0; }
+
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 20px; }
+  .filters button {
+    font: 500 .8rem "JetBrains Mono", monospace; letter-spacing: .04em;
+    border: 1px solid var(--border); background: var(--bg-lifted); color: var(--fg);
+    border-radius: 999px; padding: 6px 14px; cursor: pointer;
+  }
+  .filters button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+  .finding {
+    background: var(--bg-lifted); border: 1px solid var(--border-soft); border-radius: 12px;
+    margin-bottom: 12px; box-shadow: var(--shadow);
+  }
+  .finding summary {
+    list-style: none; cursor: pointer; padding: 14px 16px;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
+  }
+  .finding summary::-webkit-details-marker { display: none; }
+  .finding summary .chev { color: var(--fg-faint); transition: transform .15s; font-family: "JetBrains Mono", monospace; }
+  .finding[open] summary .chev { transform: rotate(90deg); }
+  .finding .body { padding: 0 16px 16px 16px; border-top: 1px solid var(--border-soft); }
+  .finding .body p:first-child { margin-top: 14px; }
+  .finding .label { font-family: "JetBrains Mono", monospace; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-muted); display: block; margin-top: 12px; }
+  .sev {
+    font: 600 .72rem "JetBrains Mono", monospace; letter-spacing: .06em;
+    padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+  }
+  .sev-high { background: var(--high-tint); color: var(--high); }
+  .sev-med  { background: var(--med-tint);  color: var(--fg); }
+  .sev-low  { background: var(--low-tint);  color: var(--low); }
+  .tag { font: 500 .7rem "JetBrains Mono", monospace; color: var(--fg-muted); white-space: nowrap; }
+  .tag.confirmed { color: var(--low); }
+  .title-line { font-weight: 600; }
+  .title-line small { display: block; font-weight: 400; color: var(--fg-muted); font-size: .9rem; }
+
+  ul.clean { padding-left: 20px; margin: 0 0 12px; }
+  ul.clean li { margin-bottom: 6px; }
+  .good li::marker { color: var(--low); }
+  ol.order li { margin-bottom: 8px; }
+  footer { margin-top: 64px; color: var(--fg-faint); font-size: .9rem; }
+
+  @media (max-width: 560px) {
+    .wrap { padding-top: 32px; }
+    h1 { font-size: 1.7rem; }
+    .finding summary { grid-template-columns: auto 1fr; }
+    .finding summary .tag { display: none; }
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <div class="eyebrow">Code review · 2 November 2026 · commit 2a32329</div>
+  <h1>Lemon-chat: full codebase review</h1>
+  <p class="meta">Go backend, vanilla-JS frontend, schema and migrations. The working notes for this review are in <code>docs/code_review_2026-11-02.md</code>, with fix checkboxes.</p>
+
+  <section class="verdict">
+    <div class="verdict-head">
+      <div class="grade">B+</div>
+      <h2>Decent quality. Better than decent, in fact.</h2>
+    </div>
+    <p>The code is idiomatic, well commented, and light on dependencies, and it has real tests that pass cleanly under the race detector. All three high-severity issues from the June review (unsanitised markdown, notes IDOR, attachment IDOR) are fixed, along with most of that review's medium items.</p>
+    <p>The remaining problems are localised, not structural. They cluster around three themes: <strong>keeping users' data apart</strong>, <strong>deleting and copying rows now that uploads exist</strong>, and <strong>a few code paths that skip the model-provider layer</strong>. Three of the bugs below were confirmed with throwaway tests.</p>
+  </section>
+
+  <div class="stats">
+    <div class="stat"><b>2</b><span>High</span></div>
+    <div class="stat"><b>8</b><span>Medium</span></div>
+    <div class="stat"><b>11</b><span>Low</span></div>
+    <div class="stat"><b>3</b><span>Confirmed by test</span></div>
+  </div>
+
+  <h2>Tooling baseline</h2>
+  <div class="table-scroll">
+  <table>
+    <tr><th>Check</th><th>Result</th></tr>
+    <tr><td><code>go vet ./...</code></td><td>Clean</td></tr>
+    <tr><td><code>go test ./...</code></td><td>All 10 packages pass</td></tr>
+    <tr><td><code>go test -race ./...</code></td><td>Clean</td></tr>
+    <tr><td>staticcheck / govulncheck</td><td>Not run: fetching the tools was blocked in this session</td></tr>
+    <tr><td>Direct Go dependencies</td><td>4 (toml, x/crypto, x/image, modernc sqlite)</td></tr>
+    <tr><td>Size</td><td>~21k lines of Go (28 test files), ~7.5k lines of JS</td></tr>
+  </table>
+  </div>
+
+  <h2>The three themes</h2>
+  <div class="themes">
+    <div class="theme">
+      <h3>Multi-user boundaries</h3>
+      <p>The WebSocket hub sends every event to every logged-in user, and model-written HTML files are served from the app's own origin.</p>
+    </div>
+    <div class="theme">
+      <h3>Row lifecycle vs foreign keys</h3>
+      <p>Cleanup, user deletion and forking weren't updated when uploads and sessions gained foreign keys, so they now fail or silently drop data.</p>
+    </div>
+    <div class="theme">
+      <h3>Provider bypass</h3>
+      <p>Title generation and <code>fetch_url</code> summaries call <code>/chat/completions</code> directly, so they break on the OAuth / Responses server.</p>
+    </div>
+  </div>
+
+  <h2>Findings</h2>
+  <div class="filters" role="group" aria-label="Filter by severity">
+    <button type="button" data-f="all" aria-pressed="true">All</button>
+    <button type="button" data-f="high" aria-pressed="false">High</button>
+    <button type="button" data-f="med" aria-pressed="false">Medium</button>
+    <button type="button" data-f="low" aria-pressed="false">Low</button>
+  </div>
+
+  <div id="findings">
+
+    <details class="finding" data-sev="high" open>
+      <summary><span class="sev sev-high">H1</span><span class="title-line">Model-written HTML files run as the logged-in user<small>Stored XSS via <code>create_document</code> plus a link</small></span><span class="tag">read</span></summary>
+      <div class="body">
+        <p><code>tools.go:72</code> stores <code>.html</code> documents as <code>text/html</code>, and <code>attachments.go:132–161</code> serves them inline from the app's origin with no CSP or <code>nosniff</code> header.</p>
+        <span class="label">How it goes wrong</span>
+        <p>A web page the model reads (or a shared character) injects instructions. The model creates <code>x.html</code> containing script, then writes <code>[open](/api/attachments/N)</code> in its reply. DOMPurify keeps relative links, the link opens in a new tab on the same origin, and the script can call the whole API as you. The artifact panel itself is safe; only opening the URL directly is the problem.</p>
+        <span class="label">Fix</span>
+        <p>Send <code>Content-Security-Policy: sandbox; default-src 'none'; …</code> and <code>X-Content-Type-Options: nosniff</code> on attachment responses. The research report endpoint already does this (<code>research_reports.go:455</code>). Alternatively, force a download for anything that isn't an image, plain text or markdown.</p>
+      </div>
+    </details>
+
+    <details class="finding" data-sev="high" open>
+      <summary><span class="sev sev-high">H2</span><span class="title-line">Every WebSocket event goes to every user<small>Conversation titles and attachment names leak between accounts</small></span><span class="tag">read</span></summary>
+      <div class="body">
+        <p><code>ws.go:48</code> <code>broadcast()</code> writes to every connection. The upgrade handler checks the session but throws the user id away, so the hub can't target anyone.</p>
+        <span class="label">How it goes wrong</span>
+        <p>When another user's conversation gets auto-titled, your browser receives <code>{"type":"conversation_titled","title":"…"}</code>. The same goes for completion titles, generated image titles and filenames, and background changes. The README promises each user's conversations are private.</p>
+        <span class="label">Fix</span>
+        <p>Store the user id per connection and give each <code>Broadcast*</code> a target user. Every caller already knows the owner. Do this together with M7.</p>
+      </div>
+    </details>
+
+    <details class="finding" data-sev="med">
+      <summary><span class="sev sev-med">M1</span><span class="title-line">Background cleanup breaks for good after one abandoned image upload</span><span class="tag confirmed">confirmed</span></summary>
+      <div class="body">
+        <p><code>store/conversations.go:152</code> deletes messages and then conversations, but never their <code>attachment</code> rows, which have non-cascading foreign keys.</p>
+        <span class="label">How it goes wrong</span>
+        <p>Start a chat, paste an image, and walk away without sending. Thirty minutes later the cleanup fails with <code>FOREIGN KEY constraint failed</code>. It keeps failing every minute, and because one statement covers all stale chats, none of them is ever cleaned up again. Unsent uploads and their files are never garbage-collected either.</p>
+        <span class="label">Fix</span>
+        <p>Use one transaction: delete attachments, then messages, then conversations, and remove the files after commit (reuse the <code>DeleteConversation</code> logic). Add a sweep for old unlinked uploads.</p>
+      </div>
+    </details>
+
+    <details class="finding" data-sev="med">
+      <summary><span class="sev sev-med">M2</span><span class="title-line">Admin “delete user” fails for anyone who has ever logged in</span><span class="tag confirmed">confirmed</span></summary>
+      <div class="body">
+        <p><code>store/users.go:63</code> runs a bare <code>DELETE FROM user</code>. Sessions, conversations and characters all reference the user without cascade, so the request returns a 500. <code>admin.go:235</code> deletes the avatar file <em>before</em> the failing call, so the account survives without its avatar.</p>
+        <span class="label">Fix</span>
+        <p>Decide the policy (delete their conversations, reassign or delete their characters), do it in a transaction, and delete the avatar after commit. This can be done in application code without a destructive migration.</p>
+      </div>
+    </details>
+
+    <details class="finding" data-sev="med">
+      <summary><span class="sev sev-med">M3</span><span class="title-line">Forking a conversation drops your uploaded images</span><span class="tag confirmed">confirmed</span></summary>
+      <div class="body">
+        <p><code>store/conversations.go:228–235</code> only copies attachments matched by <code>tool_call_id</code>. Uploads are linked by <code>message_id</code> instead, so the fork shows no thumbnails and the model loses the images on the next turn.</p>
+        <span class="label">Fix</span>
+        <p>Build an old-to-new message id map while copying messages, then copy upload attachments with the remapped <code>message_id</code>, <code>source</code> and <code>status</code>.</p>
+      </div>
+    </details>
+
+    <details class="finding" data-sev="med">
+      <summary><span class="sev sev-med">M4</span><span class="title-line">Auto-titles and <code>fetch_url</code> skip the provider layer<small>Broken on <code>auth = "oauth"</code> / <code>api = "responses"</code> servers; failed titles retry every 30 s forever</small></span><span class="tag">read</span></summary>
+      <div class="body">
+        <p><code>tasks/titles.go:53,264</code> and <code>tools_web.go:361</code> POST to <code>APIBase + "/chat/completions"</code> with the static API key. If your default model is on the ChatGPT/Codex server, titles never generate and <code>fetch_url</code> errors out. The title worker has no backoff, so it re-asks for every failing conversation on every 30-second tick.</p>
+        <span class="label">Fix</span>
+        <p>Route both through <code>llm.NewProvider</code> with the server's token source, and remember failed conversations with a backoff.</p>
+      </div>
+    </details>
+
+    <details class="finding" data-sev="med">
+      <summary><span class="sev sev-med">M5</span><span class="title-line">An avatar upload can exhaust server memory</span><span class="tag">read</span></summary>
+      <div class="body">
+        <p><code>avatars.go:73</code> fully decodes any image under 5 MB. A tiny PNG that claims to be 30000×30000 pixels allocates gigabytes. Any logged-in user can trigger it.</p>
+        <span class="label">Fix</span>
+        <p>Call <code>image.DecodeConfig</code> first and reject anything over about 40 megapixels.</p>
+      </div>
+    </details>
+
+    <details class="finding" data-sev="med">
+      <summary><span class="sev sev-med">M6</span><span class="title-line"><code>fetch_url</code> can reach your LAN and localhost<small>Carried over from the June review</small></span><span class="tag">read</span></summary>
+      <div class="body">
+        <p><code>tools_web.go:45</code> and <code>research/web.go:41</code> fetch any URL the model supplies. That includes Home Assistant, the NVR, ComfyUI, router pages and anything on <code>localhost</code>. A prompt-injected page can have the model read an internal URL, then send the contents out in a second fetch's query string.</p>
+        <span class="label">Fix</span>
+        <p>Add a dialer <code>Control</code> hook that refuses private, loopback and link-local addresses after DNS resolution (which also covers redirects), with a config switch to allow them if you want that.</p>
+      </div>
+    </details>
+
+    <details class="finding" data-sev="med">
+      <summary><span class="sev sev-med">M7</span><span class="title-line">WebSocket frames can interleave, and one dead tab slows requests</span><span class="tag">read</span></summary>
+      <div class="body">
+        <p><code>ws.go:184</code> writes each frame as two separate writes, from many goroutines at once, with no lock. Pong replies are written concurrently too. Interleaved frames corrupt the stream and force reconnects. Broadcasts also run synchronously in the request handler, with a 5-second timeout per stalled client.</p>
+        <span class="label">Fix</span>
+        <p>Give each client a writer goroutine with a buffered channel. That fixes both problems, and fits naturally with H2.</p>
+      </div>
+    </details>
+
+    <details class="finding" data-sev="med">
+      <summary><span class="sev sev-med">M8</span><span class="title-line">A model stream that dies halfway counts as a success</span><span class="tag">read</span></summary>
+      <div class="body">
+        <p><code>llm/provider.go:504</code> discards the stream error once any text has arrived. The truncated answer is saved as a complete message, nothing is written to <code>model_errors.log</code> (contrary to AGENTS.md), and the user gets no warning. A mid-answer timeout behaves the same way.</p>
+        <span class="label">Fix</span>
+        <p>Return the partial completion together with the error. Keep the partial text, but send an SSE error event and flush the error log.</p>
+      </div>
+    </details>
+
+    <details class="finding" data-sev="low">
+      <summary><span class="sev sev-low">L1</span><span class="title-line">The last tool-loop round runs tools and then throws the results away</span><span class="tag">read</span></summary>
+      <div class="body"><p><code>messages.go:330–342</code>: when the limit is hit, the tools still execute (images, notes) but the model is never asked to answer. Often nothing is saved and the user sees no reply. On the final round, send the request without tools so the model has to answer.</p></div>
+    </details>
+
+    <details class="finding" data-sev="low">
+      <summary><span class="sev sev-low">L2</span><span class="title-line">Accounts without a password accept any password</span><span class="tag">read</span></summary>
+      <div class="body"><p><code>auth.go:35</code>, and bootstrap creates a passwordless admin if <code>admin_password</code> is unset. That's fine on localhost but risky on a LAN. At least log a loud warning at startup.</p></div>
+    </details>
+
+    <details class="finding" data-sev="low">
+      <summary><span class="sev sev-low">L3</span><span class="title-line"><code>PUT /api/notes</code> overwrites read-only notes</span><span class="tag">read</span></summary>
+      <div class="body"><p>The UI disables editing, but the API path through <code>UpsertNoteAdmin</code> ignores the lock. Require an explicit <code>read_only: false</code> to unlock.</p></div>
+    </details>
+
+    <details class="finding" data-sev="low">
+      <summary><span class="sev sev-low">L4</span><span class="title-line">Message order depends on SQLite's sort being stable</span><span class="tag">tested</span></summary>
+      <div class="body"><p>Messages are ordered by a timestamp with one-second resolution, and fork gives every copied message the same timestamp. It works today (a test with 300 forked messages kept their order), but add <code>, id</code> to the <code>ORDER BY</code>.</p></div>
+    </details>
+
+    <details class="finding" data-sev="low">
+      <summary><span class="sev sev-low">L5</span><span class="title-line">No server timeouts or request body limits</span><span class="tag">read</span></summary>
+      <div class="body"><p><code>main.go:75</code> uses bare <code>ListenAndServe</code>: no header timeout and no graceful shutdown. JSON and multipart bodies have no size cap.</p></div>
+    </details>
+
+    <details class="finding" data-sev="low">
+      <summary><span class="sev sev-low">L6</span><span class="title-line">Some “not found” cases return a 500</span><span class="tag">read</span></summary>
+      <div class="body"><p>Attachment queries return <code>sql.ErrNoRows</code> where the rest of the store uses <code>ErrNotFound</code>. A deleted character also gives a 500 when you send a message.</p></div>
+    </details>
+
+    <details class="finding" data-sev="low">
+      <summary><span class="sev sev-low">L7</span><span class="title-line">Streaming re-renders the whole message on every token</span><span class="tag">read</span></summary>
+      <div class="body"><p><code>thread.js:573</code> runs a full markdown, sanitise and KaTeX pass on every token. Long answers get janky and you can't select text mid-stream. Render at most once per animation frame.</p></div>
+    </details>
+
+    <details class="finding" data-sev="low">
+      <summary><span class="sev sev-low">L8</span><span class="title-line">Client SSE parsing hides UI exceptions</span><span class="tag">read</span></summary>
+      <div class="body"><p><code>api.js:22</code>: the <code>try/catch</code> meant for <code>JSON.parse</code> also swallows errors thrown by event handlers.</p></div>
+    </details>
+
+    <details class="finding" data-sev="low">
+      <summary><span class="sev sev-low">L9</span><span class="title-line">A bad tool-call index from the model server can exhaust memory</span><span class="tag">read</span></summary>
+      <div class="body"><p><code>provider.go:491</code> grows a slice up to whatever <code>index</code> the server sends. Cap it.</p></div>
+    </details>
+
+    <details class="finding" data-sev="low">
+      <summary><span class="sev sev-low">L10</span><span class="title-line">Small authorisation and robustness nits</span><span class="tag">read</span></summary>
+      <div class="body">
+        <ul class="clean">
+          <li>Private characters' avatars are served to anyone who is logged in.</li>
+          <li>Creating or importing a conversation doesn't validate <code>character_id</code> visibility or <code>model</code> up front.</li>
+          <li>Conversation delete calls <code>RemoveAll</code> on a stored path with no check that it's inside <code>attachments/</code>.</li>
+          <li>Unchecked <code>w.(http.Flusher)</code> assertions will panic if middleware ever wraps the writer.</li>
+          <li>Note-pack import isn't transactional.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="finding" data-sev="low">
+      <summary><span class="sev sev-low">L11</span><span class="title-line">Logging has drifted from the project convention</span><span class="tag">read</span></summary>
+      <div class="body"><p>Some lines use <code>auth:</code>, <code>characters:</code> and <code>server:</code> prefixes on handler logs, and admin create, update and delete user log nothing at all.</p></div>
+    </details>
+  </div>
+
+  <h2>Maintainability</h2>
+  <ul class="clean">
+    <li><strong>Two ways to call a model.</strong> <code>llm.ChatComplete(url, key)</code> lives alongside the Provider interface, and it's the root cause of M4. Fold the remaining callers into the Provider.</li>
+    <li><strong><code>http.DefaultClient</code> is used in 8 places</strong>, with no shared transport or timeouts. Inject a client, which is also where the SSRF guard should go.</li>
+    <li><strong>Large mixed-concern files.</strong> <code>thread.js</code> (1302 lines) holds the artifact panel, lightbox, picker, streaming and scroll logic. <code>researcher.go</code> (1604), <code>research-app.js</code> (1179) and <code>research.go</code> (1060) are also big. Splitting <code>thread.js</code> into lightbox, artifact-panel and picker modules would match the project's one-concern-per-file rule.</li>
+    <li><strong>The AGENTS.md code layout is stale.</strong> It's missing <code>internal/llm</code>, <code>openai_auth</code>, <code>searx</code>, <code>redditimport</code>, <code>htmltext</code>, the <code>tools_*.go</code> and <code>research_*.go</code> files, and more. Agents rely on that map.</li>
+    <li><strong>Migrations aren't wrapped in transactions.</strong> If a two-statement step fails halfway, the next start fails with “duplicate column”.</li>
+    <li><strong>Repo weight.</strong> <code>benchmark/</code> (4.4 MB of model output) and the choose-your-own adventure docs aren't source code.</li>
+    <li><strong>Test gaps.</strong> The store, llm and research packages are well tested. The chat send path has only helper-level tests and the frontend has none. A small “create, then delete/fork/clean up” store test would have caught all three confirmed bugs.</li>
+  </ul>
+
+  <h2>What's good</h2>
+  <ul class="clean good">
+    <li>The June review's findings were actually fixed, not just noted.</li>
+    <li>Dependency discipline: 4 direct Go dependencies, a minimal hand-rolled WebSocket, and no frontend build step.</li>
+    <li>Comments explain non-obvious decisions, e.g. the nil <code>*os.File</code> in an interface, lexicographic RFC3339 session sweeps, and the Codex session header.</li>
+    <li>Careful migrations: the <code>research_job</code> rebuild runs in a transaction with a foreign-key check, and FKs, WAL and busy timeout are all on.</li>
+    <li>The research engine checkpoints and resumes after a crash, bounds its concurrency, and serves generated HTML reports under a sandbox CSP.</li>
+    <li>The provider layer writes redacted wire transcripts and keeps an always-on error log.</li>
+    <li>The frontend escapes consistently in template literals, sanitises all markdown with DOMPurify, and writes progress text via <code>textContent</code>.</li>
+  </ul>
+
+  <h2>Suggested order</h2>
+  <ol class="order">
+    <li><strong>H1</strong>: one block of response headers.</li>
+    <li><strong>H2 + M7</strong> together: a per-user hub with a writer goroutine per client.</li>
+    <li><strong>M1, M2, M3</strong>: store fixes, each with a regression test.</li>
+    <li><strong>M4, M8</strong>: provider consolidation, title backoff, honest stream errors.</li>
+    <li><strong>M5, M6, L5</strong>: hardening.</li>
+    <li>The rest as convenient, plus refreshing the AGENTS.md layout.</li>
+  </ol>
+
+  <footer>Reviewed by Claude (Opus 5.5) on 2 November 2026. Findings marked “confirmed” were reproduced with temporary tests that were removed afterwards; “read” findings come from reading the code.</footer>
+</main>
+<script>
+  const buttons = document.querySelectorAll('.filters button');
+  const findings = document.querySelectorAll('.finding');
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      const f = btn.dataset.f;
+      findings.forEach((el) => { el.hidden = f !== 'all' && el.dataset.sev !== f; });
+    });
+  });
+</script>
+</body>
+</html>
