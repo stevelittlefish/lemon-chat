@@ -150,7 +150,9 @@ function lightboxShow(index) {
   lightbox.querySelector('.image-lightbox-counter').textContent = `${index + 1} / ${lightboxImages.length}`;
 }
 
-function openLightbox(clickedSrc) {
+// selector picks the gallery to page through: uploaded images and generated
+// images are separate galleries.
+function openLightbox(clickedSrc, selector) {
   if (!lightbox) {
     lightbox = document.createElement('div');
     lightbox.className = 'image-lightbox';
@@ -213,10 +215,11 @@ function openLightbox(clickedSrc) {
     });
   }
 
-  lightboxImages = Array.from(document.querySelectorAll('.inline-image-img')).map(img => ({
+  lightboxImages = Array.from(document.querySelectorAll(selector)).map(img => ({
     src: img.src,
     alt: img.alt,
   }));
+  if (lightboxImages.length === 0) lightboxImages = [{ src: clickedSrc, alt: '' }];
   const idx = lightboxImages.findIndex(im => im.src === clickedSrc);
   lightboxShow(idx >= 0 ? idx : 0);
   lightbox.classList.add('is-open');
@@ -244,7 +247,7 @@ function buildUserImageStrip(atts) {
     img.src = `/api/attachments/${att.id}`;
     img.alt = att.filename || 'Attached image';
     img.loading = 'lazy';
-    img.addEventListener('click', () => openLightbox(img.src));
+    img.addEventListener('click', () => openLightbox(img.src, '.user-image-thumb'));
     strip.appendChild(img);
   }
   return strip;
@@ -259,7 +262,7 @@ function buildInlineImage(att) {
   img.src = `/api/attachments/${att.id}`;
   img.alt = att.title || 'Generated image';
   img.loading = 'lazy';
-  img.addEventListener('click', () => openLightbox(img.src));
+  img.addEventListener('click', () => openLightbox(img.src, '.inline-image-img'));
 
   const actions = document.createElement('div');
   actions.className = 'inline-image-actions';
