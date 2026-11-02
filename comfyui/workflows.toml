@@ -1,0 +1,403 @@
+# ComfyUI workflow registry for the generate_image tool.
+#
+# Each [[workflow]] is a ComfyUI API-format export in comfyui/workflows/ (paths
+# are relative to this file). The tool never edits a file by guessing: every
+# input it changes is named here as "node_id.input_name", and every binding is
+# checked against the graph at startup. A workflow that fails the check is
+# logged and reported as unavailable instead of being used.
+#
+#   id              exact name the model can pass as workflow_id (if exposed)
+#   file            workflow JSON, relative to this file
+#   description     shown to the model for exposed workflows
+#   exposed         list this workflow in the tool's workflow_id enum
+#   timeout         seconds to wait for the image (default 120)
+#   prompt          string input containing %PROMPT% exactly once; any text
+#                   around it (e.g. Pony's score tags) is kept
+#   negative_prompt optional string input; its value in the file is the default
+#                   negative, which the model may replace. Omit it for graphs
+#                   where a negative has no effect (cfg 1, ConditioningZeroOut,
+#                   BasicGuider)
+#   seed            integer input(s) that receive the seed
+#   width, height   integer input(s) that receive the dimensions
+#   output          node whose images are returned
+#   sizes           [width, height] per aspect ratio: square, landscape, portrait
+#
+# Timeouts come from warm-model timings in ComfyTestBed (roughly 4× the
+# slowest warm run, minimum 120s) to allow for a cold model load.
+#
+# Profiles (fast, general, ...) are mapped to these IDs in lemon.toml.
+
+# --- lemon-chat's original workflows (previously generate_image_sdxl / _flux) ---
+
+[[workflow]]
+id              = "lemon_sdxl"
+file            = "workflows/lemon_sdxl.json"
+description     = "Classic Stable Diffusion XL base, 30 steps, CFG 7, karras scheduler. Works best with shorter, keyword-style prompts."
+exposed         = true
+prompt          = "2.text"
+negative_prompt = "3.text"
+seed            = ["5.seed"]
+width           = ["4.width"]
+height          = ["4.height"]
+output          = "7"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "lemon_flux_schnell"
+file            = "workflows/lemon_flux_schnell.json"
+description     = "Flux Schnell, 4 steps. Fast; ignores negative prompts."
+prompt          = "6.text"
+seed            = ["3.seed"]
+width           = ["5.width"]
+height          = ["5.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+# --- Imported from ComfyTestBed (only square has been tested there) ---
+
+[[workflow]]
+id              = "Flux_Schnell"
+file            = "workflows/Flux_Schnell.json"
+description     = "Flux Schnell, 6 steps, guidance 10."
+prompt          = "6.text"
+seed            = ["3.seed"]
+width           = ["5.width"]
+height          = ["5.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "SDXL"
+file            = "workflows/SDXL.json"
+description     = "Stable Diffusion XL base, 30 steps, CFG 7."
+prompt          = "6.text"
+negative_prompt = "7.text"
+seed            = ["3.seed"]
+width           = ["5.width"]
+height          = ["5.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "SD35_large"
+file            = "workflows/SD35_large.json"
+description     = "Stable Diffusion 3.5 Large, 30 steps."
+timeout         = 180
+prompt          = "6.text"
+negative_prompt = "71.text"
+seed            = ["294.seed"]
+width           = ["302.width"]
+height          = ["302.height"]
+output          = "303"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "SD35_medium"
+file            = "workflows/SD35_medium.json"
+description     = "Stable Diffusion 3.5 Medium, 30 steps."
+prompt          = "6.text"
+negative_prompt = "71.text"
+seed            = ["294.seed"]
+width           = ["302.width"]
+height          = ["302.height"]
+output          = "303"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "sd35_large_turbo"
+file            = "workflows/sd35_large_turbo.json"
+description     = "Stable Diffusion 3.5 Large Turbo, 6 steps, CFG 1."
+prompt          = "6.text"
+seed            = ["294.seed"]
+width           = ["135.width"]
+height          = ["135.height"]
+output          = "302"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "anima_aesthetic_1_1"
+file            = "workflows/anima_aesthetic_1_1.json"
+description     = "Anima Aesthetic 1.1, anime style (prompt is prefixed with quality tags)."
+exposed         = true
+prompt          = "60:11.text"
+negative_prompt = "60:12.text"
+seed            = ["60:19.seed"]
+width           = ["60:28.width"]
+height          = ["60:28.height"]
+output          = "46"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "chroma"
+file            = "workflows/chroma.json"
+description     = "Chroma (unlocked v39), 26 steps, CFG 4."
+timeout         = 270
+prompt          = "74.text"
+negative_prompt = "75.text"
+seed            = ["68.noise_seed"]
+width           = ["69.width"]
+height          = ["69.height"]
+output          = "81"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "cyberrealistic_pony"
+file            = "workflows/cyberrealistic_pony.json"
+description     = "CyberRealistic Pony v8 (prompt is prefixed with Pony score tags)."
+prompt          = "6.text"
+negative_prompt = "7.text"
+seed            = ["3.seed"]
+width           = ["5.width"]
+height          = ["5.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "pony_realism"
+file            = "workflows/pony_realism.json"
+description     = "Pony Realism v2.2 (prompt is prefixed with Pony score tags)."
+prompt          = "6.text"
+negative_prompt = "7.text"
+seed            = ["3.seed"]
+width           = ["5.width"]
+height          = ["5.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "hassaku_xl"
+file            = "workflows/hassaku_xl.json"
+description     = "Hassaku XL (Illustrious), anime style."
+prompt          = "6.text"
+negative_prompt = "7.text"
+seed            = ["3.seed"]
+width           = ["5.width"]
+height          = ["5.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "illustrious_xl"
+file            = "workflows/illustrious_xl.json"
+description     = "Illustrious XL v0.1, anime style."
+prompt          = "6.text"
+negative_prompt = "7.text"
+seed            = ["3.seed"]
+width           = ["5.width"]
+height          = ["5.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "juggernaut_xi"
+file            = "workflows/juggernaut_xi.json"
+description     = "Juggernaut XI (SDXL), photographic."
+prompt          = "6.text"
+negative_prompt = "7.text"
+seed            = ["3.seed"]
+width           = ["5.width"]
+height          = ["5.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "flux_dev"
+file            = "workflows/flux_dev.json"
+description     = "Flux.1 Dev, 20 steps, guidance 3.5."
+prompt          = "6.text"
+seed            = ["25.noise_seed"]
+width           = ["27.width", "30.width"]
+height          = ["27.height", "30.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "flux1_krea_dev"
+file            = "workflows/flux1_krea_dev.json"
+description     = "Flux.1 Krea Dev, 20 steps."
+prompt          = "200:195.text"
+seed            = ["200:197.seed"]
+width           = ["200:196.width"]
+height          = ["200:196.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "flux2_dev"
+file            = "workflows/flux2_dev.json"
+description     = "Flux.2 Dev, 20 steps. Slow."
+timeout         = 360
+prompt          = "98:6.text"
+seed            = ["98:25.noise_seed"]
+width           = ["98:47.width", "98:48.width"]
+height          = ["98:47.height", "98:48.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "flux2_dev_turbo"
+file            = "workflows/flux2_dev_turbo.json"
+description     = "Flux.2 Dev with turbo LoRA, 8 steps."
+timeout         = 180
+prompt          = "98:6.text"
+seed            = ["98:25.noise_seed"]
+width           = ["98:47.width", "98:48.width"]
+height          = ["98:47.height", "98:48.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "flux2_klein_4b"
+file            = "workflows/flux2_klein_4b.json"
+description     = "Flux.2 Klein 4B, 20 steps, CFG 5."
+prompt          = "127.text"
+negative_prompt = "120.text"
+seed            = ["123.noise_seed"]
+width           = ["121.value"]
+height          = ["122.value"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "flux2_klein_9b"
+file            = "workflows/flux2_klein_9b.json"
+description     = "Flux.2 Klein 9B, 20 steps, CFG 5."
+timeout         = 240
+prompt          = "127.text"
+negative_prompt = "120.text"
+seed            = ["123.noise_seed"]
+width           = ["121.value"]
+height          = ["122.value"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+# ResolutionSelector was removed from this copy; the latent size is bound directly.
+[[workflow]]
+id              = "krea2_turbo"
+file            = "workflows/krea2_turbo.json"
+description     = "Krea 2 Turbo, 8 steps."
+exposed         = true
+prompt          = "30:6.text"
+seed            = ["30:3.seed"]
+width           = ["30:5.width"]
+height          = ["30:5.height"]
+output          = "29"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "qwen_image"
+file            = "workflows/qwen_image.json"
+description     = "Qwen-Image, 20 steps, CFG 2.5. Good at rendering text."
+timeout         = 240
+prompt          = "6.text"
+negative_prompt = "7.text"
+seed            = ["3.seed"]
+width           = ["58.width"]
+height          = ["58.height"]
+output          = "60"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+# ResolutionSelector was removed from this copy; the latent size is bound directly.
+# The encoder has a negative_prompt input, but the sampler runs at CFG 1 so it is
+# not bound.
+[[workflow]]
+id              = "qwen_image_2_1"
+file            = "workflows/qwen_image_2_1.json"
+description     = "Qwen-Image 2.1, 25 steps."
+prompt          = "459:452.prompt"
+seed            = ["459:458.seed"]
+width           = ["459:456.width"]
+height          = ["459:456.height"]
+output          = "461"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+# ResolutionSelector was removed from this copy; the latent size is bound directly.
+[[workflow]]
+id              = "z_image"
+file            = "workflows/z_image.json"
+description     = "Z-Image base, 25 steps, CFG 4. Slow."
+timeout         = 420
+prompt          = "76:67.text"
+negative_prompt = "76:71.text"
+seed            = ["76:69.seed"]
+width           = ["76:68.width"]
+height          = ["76:68.height"]
+output          = "95"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "z_image_turbo_int8"
+file            = "workflows/z_image_turbo_int8.json"
+description     = "Z-Image Turbo (int8), 8 steps. Very fast."
+prompt          = "57:27.text"
+seed            = ["57:3.seed"]
+width           = ["57:13.width"]
+height          = ["57:13.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "flux3_klein_distilled"
+file            = "workflows/flux3_klein_distilled.json"
+description     = "FLUX 3 Klein (distilled, int8), 16 steps, CFG 1. Very fast."
+exposed         = true
+prompt          = "18:4.text"
+seed            = ["18:7.seed"]
+width           = ["18:6.width"]
+height          = ["18:6.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "flux3_klein_base"
+file            = "workflows/flux3_klein_base.json"
+description     = "FLUX 3 Klein (base, int8), 50 steps, CFG 3.5."
+prompt          = "18:4.text"
+negative_prompt = "18:5.text"
+seed            = ["18:7.seed"]
+width           = ["18:6.width"]
+height          = ["18:6.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+# The ComfyTestBed export runs the prompt through an in-graph LLM rewriter
+# (TextGenerate + switch). This copy removes it and encodes the prompt directly;
+# ComfyTestBed's MOSS renders and timings were made WITH the rewriter.
+# MOSS was trained on captions describing finished images: 80-200 words of plain
+# prose, medium and subject first, visible text quoted exactly, no quality tags.
+[[workflow]]
+id              = "moss_image_int8"
+file            = "workflows/moss_image_int8.json"
+description     = "MOSS-Image (int8), 25 steps, CFG 2.5. Wants a detailed prose caption of the finished image (medium and subject first, exact quoted text, no quality tags)."
+exposed         = true
+prompt          = "18:4.text"
+negative_prompt = "18:5.text"
+seed            = ["18:7.seed"]
+width           = ["18:6.width"]
+height          = ["18:6.height"]
+output          = "9"
+sizes           = { square = [1024, 1024], landscape = [1216, 832], portrait = [832, 1216] }
+
+[[workflow]]
+id              = "sd15"
+file            = "workflows/sd15.json"
+description     = "Stable Diffusion 1.5, 512px."
+prompt          = "6.text"
+negative_prompt = "7.text"
+seed            = ["3.seed"]
+width           = ["5.width"]
+height          = ["5.height"]
+output          = "9"
+sizes           = { square = [512, 512], landscape = [768, 512], portrait = [512, 768] }
+
+[[workflow]]
+id              = "sd21"
+file            = "workflows/sd21.json"
+description     = "Stable Diffusion 2.1, 768px."
+prompt          = "6.text"
+negative_prompt = "7.text"
+seed            = ["3.seed"]
+width           = ["5.width"]
+height          = ["5.height"]
+output          = "9"
+sizes           = { square = [768, 768], landscape = [960, 640], portrait = [640, 960] }

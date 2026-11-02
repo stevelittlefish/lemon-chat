@@ -13,6 +13,10 @@ Completed work is archived in [`docs/archive/TODO-completed.md`](docs/archive/TO
 - [ ] **Text file attachments.** Allow users to upload and send text files in chat.
 - [x] **Paste images into the chat composer.** Clipboard image paste is handled by the composer's paste listener (`static/js/composer.js`), uploading each pasted image as an attachment.
 
+## Image generation (backlog)
+
+- [ ] **Advanced image generation tools.** A second, opt-in tool set alongside the general-purpose `generate_image` (`internal/server/tools_image.go`), for experimenting with image generation from chat: list every registered workflow in `comfyui/workflows.toml` (not just `exposed` ones, with descriptions and availability), and generate with extra parameters such as CFG, steps, sampler/scheduler and explicit width/height (e.g. the same prompt at a fixed seed across several CFG values). Needs new optional bindings in the registry (`internal/comfyui/registry.go`) for those inputs, validated per workflow like the existing ones.
+
 ## Provider abstraction & OAuth (backlog)
 
 Design docs: [`docs/provider_abstraction.md`](docs/provider_abstraction.md),

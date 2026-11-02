@@ -55,9 +55,17 @@ type SearXNG struct {
 }
 
 type ComfyUI struct {
-	URL          string `toml:"url"`
-	SDXLWorkflow string `toml:"sdxl_workflow"`
-	FluxWorkflow string `toml:"flux_workflow"`
+	URL            string                  `toml:"url"`
+	Workflows      string                  `toml:"workflows"`       // workflow registry file
+	DefaultProfile string                  `toml:"default_profile"` // profile used when the model names neither profile nor workflow
+	Profiles       map[string]ComfyProfile `toml:"profile"`
+}
+
+// ComfyProfile maps a task-oriented profile name (e.g. "fast") to a workflow ID
+// in the registry. Changing which workflow backs a profile is config-only.
+type ComfyProfile struct {
+	Workflow    string `toml:"workflow"`
+	Description string `toml:"description"` // shown to the model
 }
 
 type Server struct {
@@ -176,6 +184,9 @@ func Load(path string) (*Config, error) {
 		Bootstrap: Bootstrap{
 			AdminUsername: "admin",
 		},
+		ComfyUI: ComfyUI{
+			Workflows: "comfyui/workflows.toml",
+		},
 		Research: Research{
 			MaxRounds:             8,
 			MaxTimeSeconds:        600,
@@ -196,6 +207,11 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 	if keys := meta.Undecoded(); len(keys) > 0 {
+		for _, k := range keys {
+			if k.String() == "comfyui.sdxl_workflow" || k.String() == "comfyui.flux_workflow" {
+				return nil, fmt.Errorf("config: [comfyui] sdxl_workflow and flux_workflow were replaced by the workflow registry and profiles — see [comfyui] in lemon.toml.example")
+			}
+		}
 		return nil, fmt.Errorf("config: unknown or misplaced keys: %v", keys)
 	}
 
@@ -276,6 +292,19 @@ func (c *Config) Validate() error {
 		}
 		if _, ok := serverNames[m.ModelServer]; !ok {
 			return fmt.Errorf("config: model %q references unknown model_server %q", m.Name, m.ModelServer)
+		}
+	}
+	for name, p := range c.ComfyUI.Profiles {
+		if p.Workflow == "" {
+			return fmt.Errorf("config: [comfyui.profile.%s] missing workflow field", name)
+		}
+	}
+	if len(c.ComfyUI.Profiles) > 0 {
+		if c.ComfyUI.DefaultProfile == "" {
+			return fmt.Errorf("config: [comfyui] default_profile is required when profiles are configured")
+		}
+		if _, ok := c.ComfyUI.Profiles[c.ComfyUI.DefaultProfile]; !ok {
+			return fmt.Errorf("config: [comfyui] default_profile %q is not a configured profile", c.ComfyUI.DefaultProfile)
 		}
 	}
 	return nil

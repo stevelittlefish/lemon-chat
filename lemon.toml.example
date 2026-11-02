@@ -107,13 +107,44 @@ model_server = "local"
 # max_empty_rounds = 2        # consecutive zero-finding rounds before aborting
 # synthesis_window = 10       # only the last N findings are passed to each synthesis call
 
-# Optional: ComfyUI image generation integration.
-# Set url plus whichever workflow files you have. Each enables a separate tool:
-#   sdxl_workflow → generate_image_sdxl  (20–50 steps, supports negative prompt)
-#   flux_workflow → generate_image_flux  (1–4 steps, faster, no negative prompt)
-# Workflow JSON files use placeholder strings: "__PROMPT__", "__NEGATIVE_PROMPT__",
-#   __SEED__, __CFG__, __WIDTH__, __HEIGHT__, __STEPS__
+# Optional: ComfyUI image generation (the generate_image tool).
+# Workflows are registered in comfyui/workflows.toml, which names the exact
+# node inputs the tool may set in each ComfyUI API-format graph.
+#
+# Profiles describe what the user wants, not which model makes it: the chat
+# model picks a profile from its description, and you point each profile at
+# whichever registered workflow currently does that job best. Several profiles
+# may share a workflow, and swapping one is a one-line config change. Write
+# descriptions as "when to use it" plus prompt tips for that kind of image.
 # [comfyui]
-# url           = "http://localhost:8188"
-# sdxl_workflow = "data/comfyui/sdxl.json"
-# flux_workflow = "data/comfyui/flux.json"
+# url             = "http://localhost:8188"
+# workflows       = "comfyui/workflows.toml"   # default
+# default_profile = "general"                  # used when the model names neither profile nor workflow
+#
+# [comfyui.profile.general]
+# workflow    = "moss_image_int8"
+# description = "The default. Everyday scenes and anything that doesn't clearly fit another profile."
+#
+# [comfyui.profile.fast]
+# workflow    = "flux3_klein_distilled"
+# description = "Quick drafts and variations, when speed matters more than polish."
+#
+# [comfyui.profile.photo]
+# workflow    = "krea2_turbo"
+# description = "Photorealistic images. Describe it as a photograph: lens, lighting, depth of field."
+#
+# [comfyui.profile.painting]
+# workflow    = "krea2_turbo"
+# description = "Paintings and traditional media. Name the medium and technique explicitly."
+#
+# [comfyui.profile.illustration]
+# workflow    = "krea2_turbo"
+# description = "Drawn, non-anime illustration. Name the drawn style explicitly (ink outlines, flat colour, ...)."
+#
+# [comfyui.profile.anime]
+# workflow    = "anima_aesthetic_1_1"
+# description = "Anime and manga style."
+#
+# [comfyui.profile.text]
+# workflow    = "moss_image_int8"
+# description = "Readable words matter: posters, signs, menus. Quote every piece of text exactly."

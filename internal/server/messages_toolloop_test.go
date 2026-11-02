@@ -12,11 +12,13 @@ import (
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
-// fakeProvider replays scripted turns and records whether tools were offered.
+// fakeProvider replays scripted turns and records whether tools were offered
+// and the messages each turn was sent.
 type fakeProvider struct {
 	turns        []fakeTurn
 	calls        int
 	toolsOffered []bool
+	sent         [][]chatMsg
 }
 
 type fakeTurn struct {
@@ -26,6 +28,9 @@ type fakeTurn struct {
 
 func (f *fakeProvider) Stream(ctx context.Context, req llm.Request, h llm.Handler) (llm.Completion, error) {
 	f.toolsOffered = append(f.toolsOffered, req.Tools != nil)
+	if msgs, ok := req.Messages.([]chatMsg); ok {
+		f.sent = append(f.sent, append([]chatMsg(nil), msgs...))
+	}
 	if h.OnStart != nil {
 		h.OnStart()
 	}

@@ -1,8 +1,10 @@
 package server
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/stevelittlefish/lemon-chat/internal/comfyui"
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 )
 
@@ -79,17 +81,48 @@ func TestInitToolsDerivesExecutorsAndMetadata(t *testing.T) {
 	if _, ok := executors["get_time"]; !ok {
 		t.Error("static executor was not derived from registry")
 	}
-	if _, ok := executors["generate_image_sdxl"]; ok {
-		t.Error("unconfigured SDXL executor should not be installed")
+	if _, ok := executors["generate_image"]; ok {
+		t.Error("unconfigured image executor should not be installed")
+	}
+	if _, ok := toolRegistry["generate_image"].Function.Parameters.Properties["profile"].(map[string]any)["enum"]; ok {
+		t.Error("unconfigured image tool should not list profiles")
 	}
 
-	cfg.ComfyUI = config.ComfyUI{URL: "http://comfy.test", SDXLWorkflow: "sdxl.json", FluxWorkflow: "flux.json"}
-	InitTools(cfg)
-	if _, ok := executors["generate_image_sdxl"]; !ok {
-		t.Error("configured SDXL executor was not installed")
+	cfg.ComfyUI = config.ComfyUI{
+		URL:            "http://comfy.test",
+		Workflows:      "../../comfyui/workflows.toml",
+		DefaultProfile: "general",
+		Profiles: map[string]config.ComfyProfile{
+			"fast":    {Workflow: "lemon_flux_schnell"},
+			"general": {Workflow: "lemon_sdxl"},
+		},
 	}
-	if _, ok := executors["generate_image_flux"]; !ok {
-		t.Error("configured Flux executor was not installed")
+	InitTools(cfg)
+	if _, ok := executors["generate_image"]; !ok {
+		t.Error("configured image executor was not installed")
+	}
+	props := toolRegistry["generate_image"].Function.Parameters.Properties
+	if got := props["profile"].(map[string]any)["enum"]; !reflect.DeepEqual(got, []any{"fast", "general", nil}) {
+		t.Errorf("profile enum = %v", got)
+	}
+	// Which workflows are exposed is registry configuration, so derive it.
+	reg, err := comfyui.Load(cfg.ComfyUI.Workflows, cfg.ComfyUI.Profiles, cfg.ComfyUI.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []any
+	for _, w := range reg.Exposed() {
+		want = append(want, w.ID)
+	}
+	want = append(want, nil)
+	if got := props["workflow_id"].(map[string]any)["enum"]; len(want) < 2 || !reflect.DeepEqual(got, want) {
+		t.Errorf("workflow_id enum = %v, want %v", got, want)
+	}
+
+	// Re-initialising without ComfyUI must drop the configured schema again.
+	InitTools(&config.Config{})
+	if _, ok := toolRegistry["generate_image"].Function.Parameters.Properties["profile"].(map[string]any)["enum"]; ok {
+		t.Error("schema override from previous config leaked into re-init")
 	}
 }
 

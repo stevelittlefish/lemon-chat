@@ -7,23 +7,24 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/stevelittlefish/lemon-chat/internal/comfyui"
 )
 
 const (
 	comfySubmitTimeout         = 15 * time.Second
-	comfyPollTimeout           = 120 * time.Second
-	comfyPollInterval          = time.Second
 	comfyHistoryRequestTimeout = 5 * time.Second
 	comfyDownloadTimeout       = 30 * time.Second
 )
+
+// comfyPollInterval is a var so tests can poll a fake ComfyUI quickly.
+var comfyPollInterval = time.Second
 
 type comfyImage struct {
 	Filename  string `json:"filename"`
@@ -57,14 +58,22 @@ func submitToComfyUI(comfyBase string, promptPayload []byte) (string, error) {
 	return pr.PromptID, nil
 }
 
-func pollComfyUI(comfyBase, promptID string) (*comfyImage, error) {
+// pollComfyUI waits for promptID to finish and returns the first image from
+// outputNode. A ComfyUI execution error is returned as soon as it is reported
+// rather than waiting out the timeout.
+func pollComfyUI(comfyBase, promptID, outputNode string, timeout time.Duration) (*comfyImage, error) {
 	type comfyOutput struct {
 		Images []comfyImage `json:"images"`
 	}
 	type comfyJob struct {
 		Outputs map[string]comfyOutput `json:"outputs"`
+		Status  struct {
+			StatusStr string              `json:"status_str"`
+			Completed bool                `json:"completed"`
+			Messages  [][]json.RawMessage `json:"messages"`
+		} `json:"status"`
 	}
-	deadline := time.Now().Add(comfyPollTimeout)
+	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		time.Sleep(comfyPollInterval)
 		ctx, cancel := context.WithTimeout(context.Background(), comfyHistoryRequestTimeout)
@@ -80,16 +89,45 @@ func pollComfyUI(comfyBase, promptID string) (*comfyImage, error) {
 		if err := json.Unmarshal(body, &history); err != nil {
 			continue
 		}
-		if job, ok := history[promptID]; ok {
-			for _, output := range job.Outputs {
-				if len(output.Images) > 0 {
-					img := output.Images[0]
-					return &img, nil
-				}
-			}
+		job, ok := history[promptID]
+		if !ok {
+			continue
+		}
+		if job.Status.StatusStr == "error" {
+			return nil, fmt.Errorf("ComfyUI failed to run the workflow: %s — tell the user image generation failed and pass on this error", comfyExecutionError(job.Status.Messages))
+		}
+		if out, ok := job.Outputs[outputNode]; ok && len(out.Images) > 0 {
+			img := out.Images[0]
+			return &img, nil
+		}
+		if job.Status.Completed {
+			return nil, fmt.Errorf("ComfyUI finished the workflow but output node %q produced no image — tell the user image generation failed", outputNode)
 		}
 	}
-	return nil, fmt.Errorf("image generation timed out after %d seconds — tell the user the image was not produced in time and suggest checking that ComfyUI is processing jobs correctly", int(comfyPollTimeout/time.Second))
+	return nil, fmt.Errorf("image generation timed out after %d seconds — tell the user the image was not produced in time and suggest checking that ComfyUI is processing jobs correctly", int(timeout/time.Second))
+}
+
+// comfyExecutionError pulls the exception out of a history entry's status
+// messages ([["execution_error", {...}], ...]).
+func comfyExecutionError(messages [][]json.RawMessage) string {
+	for _, m := range messages {
+		if len(m) != 2 {
+			continue
+		}
+		var kind string
+		if json.Unmarshal(m[0], &kind) != nil || kind != "execution_error" {
+			continue
+		}
+		var e struct {
+			NodeID           string `json:"node_id"`
+			NodeType         string `json:"node_type"`
+			ExceptionMessage string `json:"exception_message"`
+		}
+		if json.Unmarshal(m[1], &e) == nil {
+			return fmt.Sprintf("node %s (%s): %s", e.NodeID, e.NodeType, strings.TrimSpace(e.ExceptionMessage))
+		}
+	}
+	return "unknown execution error"
 }
 
 func downloadAndSaveImage(dataDir, comfyBase string, img *comfyImage) (string, error) {
@@ -120,81 +158,75 @@ func downloadAndSaveImage(dataDir, comfyBase string, img *comfyImage) (string, e
 	return filepath.Join(relDir, "image.png"), nil
 }
 
-// makeImageExecutor returns an executor for a ComfyUI workflow. comfyURL,
-// workflowFile, defaultSteps, and defaultCFG are captured at startup.
-func makeImageExecutor(comfyURL, workflowFile string, defaultSteps int, defaultCFG float64) func(string, ToolContext) (string, error) {
+// imageResult is what generate_image returns to the model. It embeds
+// AttachmentResult so messages.go still recognises it as an attachment.
+type imageResult struct {
+	AttachmentResult
+	WorkflowID     string   `json:"workflow_id"`
+	WorkflowHash   string   `json:"workflow_hash"`
+	Profile        string   `json:"profile,omitempty"`
+	Seed           int64    `json:"seed"`
+	AspectRatio    string   `json:"aspect_ratio"`
+	NegativePrompt *string  `json:"negative_prompt,omitempty"`
+	Warnings       []string `json:"warnings,omitempty"`
+}
+
+// makeImageExecutor returns the generate_image executor for a loaded registry.
+func makeImageExecutor(comfyURL string, reg *comfyui.Registry) toolExecutor {
+	comfyBase := strings.TrimRight(comfyURL, "/")
 	return func(argsJSON string, tctx ToolContext) (string, error) {
 		var args struct {
 			Prompt         string  `json:"prompt"`
-			NegativePrompt string  `json:"negative_prompt"`
+			Profile        string  `json:"profile"`
+			WorkflowID     string  `json:"workflow_id"`
+			AspectRatio    string  `json:"aspect_ratio"`
+			NegativePrompt *string `json:"negative_prompt"`
 			Seed           int64   `json:"seed"`
-			CFG            float64 `json:"cfg"`
-			Width          int     `json:"width"`
-			Height         int     `json:"height"`
-			Steps          int     `json:"steps"`
 			Background     bool    `json:"background"`
 			Async          *bool   `json:"async"` // nil = default true
 		}
 		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 			return "", fmt.Errorf("invalid args: %w", err)
 		}
-		if args.Prompt == "" {
-			return "", fmt.Errorf("prompt is required")
-		}
-
-		seed := args.Seed
-		if seed <= 0 {
-			seed = rand.Int63()
-		}
-		cfg := args.CFG
-		if cfg <= 0 {
-			cfg = defaultCFG
-		}
-		width := args.Width
-		if width <= 0 {
-			width = 1024
-		}
-		height := args.Height
-		if height <= 0 {
-			height = 1024
-		}
-		steps := args.Steps
-		if steps <= 0 {
-			steps = defaultSteps
-		}
-
-		workflowData, err := os.ReadFile(workflowFile)
+		job, err := reg.Prepare(comfyui.Request{
+			Prompt:         args.Prompt,
+			Profile:        args.Profile,
+			WorkflowID:     args.WorkflowID,
+			AspectRatio:    args.AspectRatio,
+			Seed:           args.Seed,
+			NegativePrompt: args.NegativePrompt,
+		})
 		if err != nil {
-			return "", fmt.Errorf("generate_image: cannot read workflow file %q — check the workflow path in lemon.toml: %w", workflowFile, err)
+			return "", err
 		}
+		w := job.Workflow
 
-		// Replace placeholders: prompts use JSON-encoded strings; numeric values are bare.
-		// Placeholders absent from the workflow JSON are replaced as no-ops.
-		promptJSON, _ := json.Marshal(args.Prompt)
-		negJSON, _ := json.Marshal(args.NegativePrompt)
-		workflowStr := strings.ReplaceAll(string(workflowData), `"__PROMPT__"`, string(promptJSON))
-		workflowStr = strings.ReplaceAll(workflowStr, `"__NEGATIVE_PROMPT__"`, string(negJSON))
-		workflowStr = strings.ReplaceAll(workflowStr, `__SEED__`, strconv.FormatInt(seed, 10))
-		workflowStr = strings.ReplaceAll(workflowStr, `__CFG__`, strconv.FormatFloat(cfg, 'f', -1, 64))
-		workflowStr = strings.ReplaceAll(workflowStr, `__WIDTH__`, strconv.Itoa(width))
-		workflowStr = strings.ReplaceAll(workflowStr, `__HEIGHT__`, strconv.Itoa(height))
-		workflowStr = strings.ReplaceAll(workflowStr, `__STEPS__`, strconv.Itoa(steps))
-
-		var workflow map[string]any
-		if err := json.Unmarshal([]byte(workflowStr), &workflow); err != nil {
-			return "", fmt.Errorf("workflow file %q contains invalid JSON: %w — tell the user the image could not be generated due to an invalid workflow file", workflowFile, err)
-		}
-
-		clientID := randomID()
 		promptPayload, _ := json.Marshal(map[string]any{
-			"prompt":    workflow,
-			"client_id": clientID,
+			"prompt":    job.Graph,
+			"client_id": randomID(),
 		})
 
-		comfyBase := strings.TrimRight(comfyURL, "/")
 		useAsync := args.Async == nil || *args.Async
 
-		log.Printf("Generating image prompt=%q async=%v conversation_id=%d", args.Prompt, useAsync, tctx.ConversationID)
+		log.Printf("Generating image workflow=%q profile=%q seed=%d size=%dx%d async=%v conversation_id=%d prompt=%q",
+			w.ID, job.Profile, job.Seed, job.Width, job.Height, useAsync, tctx.ConversationID, args.Prompt)
+
+		result := imageResult{
+			AttachmentResult: AttachmentResult{
+				Title:    "Generated image",
+				Filename: "image.png",
+				MimeType: "image/png",
+				Width:    job.Width,
+				Height:   job.Height,
+			},
+			WorkflowID:     w.ID,
+			WorkflowHash:   w.Hash,
+			Profile:        job.Profile,
+			Seed:           job.Seed,
+			AspectRatio:    job.AspectRatio,
+			NegativePrompt: job.NegativePrompt,
+			Warnings:       job.Warnings,
+		}
 
 		// Phase 1 (always sync): submit to ComfyUI. Failure is reported to the LLM immediately.
 		promptID, err := submitToComfyUI(comfyBase, promptPayload)
@@ -212,11 +244,11 @@ func makeImageExecutor(comfyURL, workflowFile string, defaultSteps int, defaultC
 
 			// Phase 2 (async): poll, download, finalise.
 			go func(attID, convID int64, bg bool) {
-				img, err := pollComfyUI(comfyBase, promptID)
+				img, err := pollComfyUI(comfyBase, promptID, w.Output, w.Timeout)
 				if err != nil {
 					log.Printf("Image generation failed attachment_id=%d: %v", attID, err)
 					tctx.Store.FailAttachment(attID, err.Error()) //nolint:errcheck
-					tctx.Hub.BroadcastAttachmentError(convID, attID, "Image generation timed out")
+					tctx.Hub.BroadcastAttachmentError(convID, attID, "Image generation failed")
 					return
 				}
 				diskPath, err := downloadAndSaveImage(tctx.DataDir, comfyBase, img)
@@ -247,19 +279,14 @@ func makeImageExecutor(comfyURL, workflowFile string, defaultSteps int, defaultC
 				tctx.Hub.BroadcastAttachmentReady(finalAtt, bg)
 			}(att.ID, tctx.ConversationID, args.Background)
 
-			result := AttachmentResult{
-				AttachmentID: att.ID,
-				Title:        "Generated image",
-				Filename:     "image.png",
-				MimeType:     "image/png",
-				Status:       "pending",
-			}
+			result.AttachmentID = att.ID
+			result.Status = "pending"
 			out, _ := json.Marshal(result)
 			return string(out), nil
 		}
 
 		// Sync path: poll and download before returning.
-		img, err := pollComfyUI(comfyBase, promptID)
+		img, err := pollComfyUI(comfyBase, promptID, w.Output, w.Timeout)
 		if err != nil {
 			return "", err
 		}
@@ -278,14 +305,171 @@ func makeImageExecutor(comfyURL, workflowFile string, defaultSteps int, defaultC
 				tctx.Hub.BroadcastConversationBackground(tctx.ConversationID, att.ID)
 			}
 		}
-		result := AttachmentResult{
-			AttachmentID: att.ID,
-			Title:        "Generated image",
-			Filename:     "image.png",
-			MimeType:     "image/png",
-			Background:   args.Background,
-		}
+		result.AttachmentID = att.ID
+		result.Background = args.Background
 		out, _ := json.Marshal(result)
 		return string(out), nil
+	}
+}
+
+// imageGenFunction builds the model-facing generate_image definition. With a
+// registry, profile and workflow_id are enums of what is actually configured;
+// without one (ComfyUI not configured) they are plain strings.
+//
+// Optional fields are nullable. Some models (and the Codex Responses backend)
+// fill in every parameter rather than omitting optional ones; null gives them
+// a way to say "not set" that doesn't collide with the profile/workflow_id
+// exclusivity check or override the workflow's default negative prompt.
+func imageGenFunction(reg *comfyui.Registry) toolFunction {
+	profile := map[string]any{
+		"type":        []any{"string", "null"},
+		"description": "Image generation profile. Null or omit to use the default.",
+	}
+	workflowID := map[string]any{
+		"type":        []any{"string", "null"},
+		"description": "Exact workflow to use. Only set this when the user asks for a specific workflow or model; otherwise leave it null and use profile.",
+	}
+	if reg != nil {
+		var names []any
+		var lines []string
+		for _, p := range reg.Profiles() {
+			names = append(names, p.Name)
+			line := "- " + p.Name
+			if p.Description != "" {
+				line += ": " + p.Description
+			}
+			lines = append(lines, line)
+		}
+		profile["enum"] = append(names, nil)
+		profile["description"] = fmt.Sprintf("Image generation profile. Null or omit to use the default (%s). Must be null when workflow_id is set.\n%s", reg.DefaultProfile, strings.Join(lines, "\n"))
+
+		var ids []any
+		lines = lines[:0]
+		for _, w := range reg.Exposed() {
+			ids = append(ids, w.ID)
+			lines = append(lines, "- "+w.ID+": "+w.Description)
+		}
+		if len(ids) > 0 {
+			workflowID["enum"] = append(ids, nil)
+			workflowID["description"] = workflowID["description"].(string) + " Must be null when profile is set.\n" + strings.Join(lines, "\n")
+		}
+	}
+
+	aspect := make([]any, len(comfyui.AspectRatios))
+	for i, a := range comfyui.AspectRatios {
+		aspect[i] = a
+	}
+	props := map[string]any{
+		"prompt": map[string]any{
+			"type":        "string",
+			"description": "Detailed visual description of the image. Include subject, setting, art style, lighting, and mood. If the user wants text in the image, put the exact text in quotes.",
+		},
+		"profile":     profile,
+		"workflow_id": workflowID,
+		"aspect_ratio": map[string]any{
+			"type":        "string",
+			"enum":        aspect,
+			"description": "Image shape. Default: square.",
+		},
+		"negative_prompt": map[string]any{
+			"type":        []any{"string", "null"},
+			"description": "Replaces the workflow's default negative prompt (things to keep out of the image). Usually null or omitted, which keeps the default. The negative prompt actually used is returned in the result, so to adjust it, start from that value — e.g. remove \"text\" or \"watermark\" if the user wants lettering, or add something that keeps appearing unwanted. Some workflows ignore negative prompts; the result then includes a warning.",
+		},
+		"seed": map[string]any{
+			"type":        []any{"integer", "null"},
+			"description": "Seed for reproducible results. Null, omitted or 0 for a random seed; the seed used is returned in the result.",
+		},
+		"background": map[string]any{
+			"type":        "boolean",
+			"description": "If true, set the generated image as the chat background instead of displaying it inline.",
+		},
+		"async": map[string]any{
+			"type":        "boolean",
+			"description": "If false, block the response until the image is ready. Default: true (image generates in the background while you continue responding).",
+		},
+	}
+	return toolFunction{
+		Name:        "generate_image",
+		Description: "Generates an image via ComfyUI. Use to illustrate scenes, characters, or objects, or whenever the user asks for a picture. Write the prompt yourself — be descriptive about subject, art style, lighting, and mood. Prefer profile over workflow_id. The generated image is automatically displayed in the chat — do not describe or embed it in your text response.",
+		Parameters: toolParam{
+			Type:       "object",
+			Properties: props,
+			Required:   []string{"prompt"},
+		},
+	}
+}
+
+// viewImageWait bounds how long view_image waits for an image that is still
+// generating; it stays well inside the chat response timeout.
+const viewImageWait = 3 * time.Minute
+
+// viewImageResult is what view_image returns. It deliberately has no
+// attachment_id field: messages.go treats that as a newly created attachment
+// and would render the image a second time.
+type viewImageResult struct {
+	ImageID int64  `json:"image_id"`
+	Status  string `json:"status"`
+}
+
+// viewedImageID extracts the image a successful view_image result refers to,
+// or 0 for errors and anything else.
+func viewedImageID(result string) int64 {
+	var r viewImageResult
+	if json.Unmarshal([]byte(result), &r) != nil || r.Status != "shown" {
+		return 0
+	}
+	return r.ImageID
+}
+
+// executeViewImage validates the request; the tool loop attaches the image
+// itself as a follow-up user message, since tool results are text-only.
+func executeViewImage(argsJSON string, tctx ToolContext) (string, error) {
+	var args struct {
+		ImageID int64 `json:"image_id"`
+	}
+	if argsJSON != "" {
+		if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+			return "", fmt.Errorf("invalid args: %w", err)
+		}
+	}
+	if !tctx.ModelVision {
+		return "", fmt.Errorf("the current model cannot view images")
+	}
+
+	id := args.ImageID
+	if id == 0 {
+		atts, err := tctx.Store.ListAttachmentsByConversation(tctx.ConversationID)
+		if err != nil {
+			return "", fmt.Errorf("server error: could not list images: %w", err)
+		}
+		for i := len(atts) - 1; i >= 0; i-- {
+			if atts[i].Source == "tool" && strings.HasPrefix(atts[i].MimeType, "image/") && atts[i].Status != "error" {
+				id = atts[i].ID
+				break
+			}
+		}
+		if id == 0 {
+			return "", fmt.Errorf("no images have been generated in this conversation")
+		}
+	}
+
+	log.Printf("Viewing image attachment_id=%d conversation_id=%d", id, tctx.ConversationID)
+	deadline := time.Now().Add(viewImageWait)
+	for {
+		att, err := tctx.Store.GetAttachment(id)
+		if err != nil || att.ConversationID != tctx.ConversationID || !strings.HasPrefix(att.MimeType, "image/") {
+			return "", fmt.Errorf("there is no image with image_id %d in this conversation", id)
+		}
+		switch att.Status {
+		case "ready":
+			out, _ := json.Marshal(viewImageResult{ImageID: id, Status: "shown"})
+			return string(out), nil
+		case "error":
+			return "", fmt.Errorf("image %d failed to generate: %s", id, att.Error)
+		}
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("image %d is still generating after %d seconds — try again later", id, int(viewImageWait/time.Second))
+		}
+		time.Sleep(comfyPollInterval)
 	}
 }

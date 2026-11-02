@@ -15,7 +15,18 @@ type toolFunction struct {
 }
 
 type toolExecutor func(string, ToolContext) (string, error)
-type toolConfigurer func(*config.Config) (configured bool, hint string, executor toolExecutor)
+
+// toolConfigurer reports whether a tool's external dependencies are configured
+// and returns its executor. Function, when non-nil, replaces the tool's static
+// model-facing definition (for schemas that depend on config).
+type toolConfigurer func(*config.Config) toolConfig
+
+type toolConfig struct {
+	Configured bool
+	Hint       string
+	Executor   toolExecutor
+	Function   *toolFunction
+}
 
 type toolDef struct {
 	Type     string       `json:"type"`
@@ -218,101 +229,36 @@ Examples:
 			},
 		},
 	},
-	"generate_image_sdxl": {
-		DisplayName: "Generate image (SDXL)",
+	"generate_image": {
+		DisplayName: "Generate image",
+		Summary:     "Generates an image with ComfyUI from a text prompt, using a configured profile or workflow.",
 		Group:       "Image generation",
 		Order:       100,
-		Configure:   configureSDXL,
+		Configure:   configureImageGen,
 		Type:        "function",
-		Function: toolFunction{
-			Name:        "generate_image_sdxl",
-			Description: "Generates an image using Stable Diffusion XL via ComfyUI. Use to illustrate scenes, characters, or objects. Be descriptive — include art style, lighting, and mood. The generated image is automatically displayed in the chat — do not describe or embed it in your text response.",
-			Parameters: toolParam{
-				Type: "object",
-				Properties: map[string]any{
-					"prompt": map[string]any{
-						"type":        "string",
-						"description": "Detailed visual description of the image. Include subject, setting, art style, lighting, and mood.",
-					},
-					"negative_prompt": map[string]any{
-						"type":        "string",
-						"description": "Things to exclude from the image (e.g. 'blurry, low quality, extra limbs').",
-					},
-					"seed": map[string]any{
-						"type":        "integer",
-						"description": "Seed for reproducible results. Omit or set to 0 for a random seed.",
-					},
-					"cfg": map[string]any{
-						"type":        "number",
-						"description": "Classifier-free guidance scale. Higher values follow the prompt more strictly. Default: 7.0. Typical range: 5–12.",
-					},
-					"width": map[string]any{
-						"type":        "integer",
-						"description": "Image width in pixels. Default: 1024. Must be a multiple of 64. SDXL works best at ~1 megapixel total — recommended sizes: 1024×1024 (square), 1344×768 (16:9), 768×1344 (9:16), 1216×832 (3:2), 832×1216 (2:3), 1152×896 (4:3), 896×1152 (3:4).",
-					},
-					"height": map[string]any{
-						"type":        "integer",
-						"description": "Image height in pixels. Default: 1024. Must be a multiple of 64. See width description for recommended size combinations.",
-					},
-					"steps": map[string]any{
-						"type":        "integer",
-						"description": "Number of diffusion steps. Default: 30. More steps can improve quality but take longer. Typical range: 20–50.",
-					},
-					"background": map[string]any{
-						"type":        "boolean",
-						"description": "If true, set the generated image as the chat background instead of displaying it inline.",
-					},
-					"async": map[string]any{
-						"type":        "boolean",
-						"description": "If false, block the response until the image is ready. Default: true (image generates in the background while you continue responding).",
-					},
-				},
-				Required: []string{"prompt"},
-			},
-		},
+		// Function is replaced at startup by imageGenFunction, which adds the
+		// configured profiles and workflow IDs as enums.
+		Function: imageGenFunction(nil),
 	},
-	"generate_image_flux": {
-		DisplayName: "Generate image (Flux Schnell)",
+	"view_image": {
+		DisplayName: "View image",
+		Summary:     "Lets the model look at an image generated in this conversation. Only offered to vision models.",
 		Group:       "Image generation",
 		Order:       110,
-		Configure:   configureFlux,
+		Executor:    executeViewImage,
 		Type:        "function",
 		Function: toolFunction{
-			Name:        "generate_image_flux",
-			Description: "Generates an image using Flux Schnell via ComfyUI. Fast, high-quality image generation. Use 1–4 steps for best results — no negative prompt needed. Be descriptive about subject, art style, lighting, and mood. The generated image is automatically displayed in the chat — do not describe or embed it in your text response.",
+			Name:        "view_image",
+			Description: "Look at an image generated earlier in this conversation, e.g. to check it matches what the user asked for or to answer questions about it. The image is shown to you in the next message. Waits for the image if it is still generating.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
-					"prompt": map[string]any{
-						"type":        "string",
-						"description": "Detailed visual description of the image. Include subject, setting, art style, lighting, and mood.",
-					},
-					"seed": map[string]any{
-						"type":        "integer",
-						"description": "Seed for reproducible results. Omit or set to 0 for a random seed.",
-					},
-					"width": map[string]any{
-						"type":        "integer",
-						"description": "Image width in pixels. Default: 1024. Must be a multiple of 64. Recommended sizes: 1024×1024 (square), 1360×768 (16:9), 768×1360 (9:16), 1024×768 (4:3), 768×1024 (3:4).",
-					},
-					"height": map[string]any{
-						"type":        "integer",
-						"description": "Image height in pixels. Default: 1024. Must be a multiple of 64. See width description for recommended size combinations.",
-					},
-					"steps": map[string]any{
-						"type":        "integer",
-						"description": "Number of diffusion steps. Default: 4. Range: 1–8. Flux Schnell is optimised for very few steps.",
-					},
-					"background": map[string]any{
-						"type":        "boolean",
-						"description": "If true, set the generated image as the chat background instead of displaying it inline.",
-					},
-					"async": map[string]any{
-						"type":        "boolean",
-						"description": "If false, block the response until the image is ready. Default: true (image generates in the background while you continue responding).",
+					"image_id": map[string]any{
+						"type":        []any{"integer", "null"},
+						"description": "The attachment_id returned by generate_image. Null or omit for the most recently generated image.",
 					},
 				},
-				Required: []string{"prompt"},
+				Required: []string{},
 			},
 		},
 	},
@@ -616,6 +562,17 @@ Call note_list at the start of a session to discover what notes are available, t
 		Order:       130,
 		Members:     []string{"note_save", "note_load", "note_list", "note_delete", "note_append"},
 	},
+}
+
+// withoutTool returns defs minus the tool named name.
+func withoutTool(defs []toolDef, name string) []toolDef {
+	out := defs[:0:0]
+	for _, d := range defs {
+		if d.Function.Name != name {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
 // ToolDefsForCharacter returns model-facing definitions for the selected tools.

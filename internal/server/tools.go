@@ -25,6 +25,7 @@ import (
 // and visible when the user returns to the conversation.
 type ToolContext struct {
 	ModelName       string
+	ModelVision     bool // the chat model accepts image input
 	ModelServer     *config.ModelServer
 	Provider        llm.Provider // the chat model's provider, for tools that call the model
 	FetchClient     *http.Client // for model-chosen URLs (fetch_url); nil uses http.DefaultClient
@@ -49,6 +50,10 @@ type AttachmentResult struct {
 	MimeType     string `json:"mime_type"`
 	Background   bool   `json:"background,omitempty"`
 	Status       string `json:"status,omitempty"` // "pending" when async; empty = ready
+	// Image dimensions, when known before the file exists, so the frontend can
+	// size the placeholder.
+	Width  int `json:"width,omitempty"`
+	Height int `json:"height,omitempty"`
 }
 
 func mimeTypeForFilename(filename string) string {

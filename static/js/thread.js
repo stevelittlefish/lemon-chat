@@ -65,17 +65,37 @@ function fileIconName(mimeType, filename) {
 const IMG_MAX_W = 320;
 const IMG_MAX_H = 240;
 
+// Best guess at a generated image's size before the server reports it.
+// Mirrors the 3:2 sizes in comfyui/workflows.toml; older generate_image_sdxl /
+// _flux calls in history passed width and height directly.
+const ASPECT_SIZES = { square: [1024, 1024], landscape: [1216, 832], portrait: [832, 1216] };
+
+function guessImageSize(args) {
+  if (Number(args?.width) > 0 && Number(args?.height) > 0) return [Number(args.width), Number(args.height)];
+  return ASPECT_SIZES[args?.aspect_ratio] ?? ASPECT_SIZES.square;
+}
+
+// Size a placeholder to the exact box the finished image will render in, so
+// swapping the image in causes no layout shift (and no scroll jump).
+function sizeImagePlaceholder(div, width, height) {
+  const scale = Math.min(IMG_MAX_W / width, IMG_MAX_H / height, 1);
+  div.style.width = `${Math.round(width * scale)}px`;
+  div.style.height = `${Math.round(height * scale)}px`;
+}
+
+// The tool result records the size the workflow actually used.
+function imageSizeFromResult(result, args) {
+  try {
+    const r = JSON.parse(result);
+    if (r.width > 0 && r.height > 0) return [r.width, r.height];
+  } catch { /* not JSON, or no result yet */ }
+  return guessImageSize(args);
+}
+
 function buildImagePlaceholder(width, height) {
   const div = document.createElement('div');
   div.className = 'image-placeholder';
-  // Size the placeholder to the exact box the finished image will render in, so
-  // swapping the image in causes no layout shift (and no scroll jump). Generated
-  // images default to 1024×1024 when the model omits a size (see makeImageExecutor).
-  const w = Number(width) > 0 ? Number(width) : 1024;
-  const h = Number(height) > 0 ? Number(height) : 1024;
-  const scale = Math.min(IMG_MAX_W / w, IMG_MAX_H / h, 1);
-  div.style.width = `${Math.round(w * scale)}px`;
-  div.style.height = `${Math.round(h * scale)}px`;
+  sizeImagePlaceholder(div, width, height);
   const label = document.createElement('span');
   label.className = 'image-placeholder-label';
   label.textContent = 'Generating image…';
@@ -610,7 +630,7 @@ export function startStreaming() {
       if (toolCall.id) toolCallEls.set(toolCall.id, el);
       toolCallsEl.appendChild(el);
       if (toolCall.name.startsWith('generate_image') && toolCall.id) {
-        const placeholder = buildImagePlaceholder(toolCall.args?.width, toolCall.args?.height);
+        const placeholder = buildImagePlaceholder(...guessImageSize(toolCall.args));
         if (accumulated) {
           colEl.insertBefore(placeholder, waitingEl ?? null);
         } else {
@@ -634,6 +654,8 @@ export function startStreaming() {
           const placeholder = pendingImages.get(att.tool_call_id);
           if (placeholder) {
             placeholder.dataset.attachmentId = att.id;
+            // The server now knows the real size (the workflow picked it).
+            if (att.width > 0 && att.height > 0) sizeImagePlaceholder(placeholder, att.width, att.height);
             pendingImages.delete(att.tool_call_id);
           }
           return;
@@ -918,7 +940,7 @@ function buildMessage(msg, hideAvatar = false) {
         } else if (ti.attachment.status === 'pending') {
           // Still generating — render a correctly-sized placeholder the WS
           // attachment_ready/_error event can later resolve in place.
-          const ph = buildImagePlaceholder(ti.args?.width, ti.args?.height);
+          const ph = buildImagePlaceholder(...imageSizeFromResult(ti.result, ti.args));
           ph.dataset.attachmentId = ti.attachment.id;
           colEl.appendChild(ph);
         } else {

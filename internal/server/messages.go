@@ -70,19 +70,44 @@ func userContentParts(text string, images []any) []any {
 // It is the single source of truth used by both the send handler and the context
 // preview endpoint, so the two are guaranteed to produce identical output.
 // imagesFor, when non-nil, returns the image_url content parts for a message id
-// (empty for messages without image attachments).
-func buildChatMsgs(prefix []chatMsg, history []store.Message, imagesFor func(msgID int64) []any) []chatMsg {
+// (empty for messages without image attachments). viewedImage, when non-nil,
+// loads images the model asked to see with view_image; those are re-attached
+// after each round of tool results exactly as the live tool loop sends them.
+func buildChatMsgs(prefix []chatMsg, history []store.Message, imagesFor func(msgID int64) []any, viewedImage func(attID int64) any) []chatMsg {
 	msgs := append([]chatMsg(nil), prefix...)
+	callNames := map[string]string{}
+	var viewed []int64
+	flushViewed := func() {
+		if len(viewed) > 0 && viewedImage != nil {
+			msgs = append(msgs, viewedImagesMsg(viewed, viewedImage))
+		}
+		viewed = nil
+	}
 	for _, m := range history {
+		if m.Role != "tool" {
+			flushViewed()
+		}
 		msg := chatMsg{Role: m.Role, Content: m.Content}
 		if m.ToolCalls != nil {
 			var tc []any
 			if json.Unmarshal([]byte(*m.ToolCalls), &tc) == nil {
 				msg.ToolCalls = tc
+				for _, call := range tc {
+					c, _ := call.(map[string]any)
+					id, _ := c["id"].(string)
+					fn, _ := c["function"].(map[string]any)
+					name, _ := fn["name"].(string)
+					callNames[id] = name
+				}
 			}
 		}
 		if m.ToolCallID != "" {
 			msg.ToolCallID = m.ToolCallID
+			if callNames[m.ToolCallID] == "view_image" {
+				if id := viewedImageID(m.Content); id > 0 {
+					viewed = append(viewed, id)
+				}
+			}
 		}
 		if imagesFor != nil && m.Role == "user" {
 			if imgs := imagesFor(m.ID); len(imgs) > 0 {
@@ -92,7 +117,24 @@ func buildChatMsgs(prefix []chatMsg, history []store.Message, imagesFor func(msg
 		}
 		msgs = append(msgs, msg)
 	}
+	flushViewed()
 	return msgs
+}
+
+// viewedImagesMsg is the user message that carries images requested with
+// view_image. Tool results are text-only on chat-completions, so the images
+// follow the round's tool results as a separate user turn. load returns an
+// image part, or nil when the image can no longer be read.
+func viewedImagesMsg(ids []int64, load func(attID int64) any) chatMsg {
+	parts := []any{map[string]any{"type": "text", "text": "[Images you requested with view_image]"}}
+	for _, id := range ids {
+		if img := load(id); img != nil {
+			parts = append(parts, map[string]any{"type": "text", "text": fmt.Sprintf("image_id=%d:", id)}, img)
+		} else {
+			parts = append(parts, map[string]any{"type": "text", "text": fmt.Sprintf("image_id=%d is no longer available.", id)})
+		}
+	}
+	return chatMsg{Role: "user", ContentParts: parts}
 }
 
 func resolveUserName(user *store.User) string {
@@ -269,6 +311,9 @@ type messageToolLoop struct {
 	toolContext     ToolContext
 	maxLoops        int
 	responseStarted *time.Time
+	// viewedImage loads images requested with view_image; nil when the model
+	// has no vision support.
+	viewedImage func(attID int64) any
 }
 
 // run streams model turns and executes requested tools until the model returns
@@ -356,8 +401,17 @@ func (loop *messageToolLoop) run() (string, *store.MessageStats, bool) {
 
 		if !lastIteration && comp.FinishReason == "tool_calls" && len(comp.ToolCalls) > 0 {
 			loop.persistToolCall(comp.Content, comp.ToolCalls)
+			var viewed []int64
 			for _, tc := range comp.ToolCalls {
-				loop.executeTool(tc)
+				result := loop.executeTool(tc)
+				if tc.Name == "view_image" {
+					if id := viewedImageID(result); id > 0 {
+						viewed = append(viewed, id)
+					}
+				}
+			}
+			if len(viewed) > 0 && loop.viewedImage != nil {
+				loop.messages = append(loop.messages, viewedImagesMsg(viewed, loop.viewedImage))
 			}
 
 			newTurnEvt, _ := json.Marshal(map[string]any{"new_turn": map[string]any{"name": loop.assistantName}})
@@ -401,7 +455,7 @@ func (loop *messageToolLoop) persistToolCall(content string, toolCalls []llm.Too
 	loop.messages = append(loop.messages, chatMsg{Role: "assistant", Content: content, ToolCalls: calls})
 }
 
-func (loop *messageToolLoop) executeTool(tc llm.ToolCall) {
+func (loop *messageToolLoop) executeTool(tc llm.ToolCall) string {
 	logArgs := tc.Arguments
 	if len(logArgs) > 200 {
 		logArgs = logArgs[:200] + "…"
@@ -444,6 +498,8 @@ func (loop *messageToolLoop) executeTool(tc llm.ToolCall) {
 			"mime_type":    attachment.MimeType,
 			"background":   attachment.Background,
 			"status":       attachment.Status,
+			"width":        attachment.Width,
+			"height":       attachment.Height,
 		}})
 		fmt.Fprintf(loop.writer, "data: %s\n\n", attachmentEvent)
 		loop.flusher.Flush()
@@ -453,6 +509,7 @@ func (loop *messageToolLoop) executeTool(tc llm.ToolCall) {
 		log.Printf("messages: failed to persist tool result for conv %d: %v", loop.conversationID, err)
 	}
 	loop.messages = append(loop.messages, chatMsg{Role: "tool", Content: result, ToolCallID: tc.ID})
+	return result
 }
 
 const (
@@ -578,7 +635,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	// bound to the user message once it is persisted (see commit below).
 	var newImageParts []any
 	if len(req.AttachmentIDs) > 0 {
-		if m := s.cfg.ModelByName(modelName); m == nil || !m.Vision {
+		if !s.modelHasVision(modelName) {
 			writeError(w, http.StatusBadRequest, "selected model does not support image input")
 			return
 		}
@@ -613,7 +670,12 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	chatMsgs = buildChatMsgs(chatMsgs, history, func(id int64) []any { return imagesByMsg[id] })
+	modelVision := s.modelHasVision(modelName)
+	var viewedImage func(int64) any
+	if modelVision {
+		viewedImage = s.viewedImagePart(convID)
+	}
+	chatMsgs = buildChatMsgs(chatMsgs, history, func(id int64) []any { return imagesByMsg[id] }, viewedImage)
 	userMsg := chatMsg{Role: "user", Content: req.Content}
 	if len(newImageParts) > 0 {
 		userMsg.ContentParts = userContentParts(req.Content, newImageParts)
@@ -625,6 +687,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	var activeToolDefs []toolDef
 	if usedCharacter != nil && len(usedCharacter.Tools) > 0 {
 		activeToolDefs = ToolDefsForCharacter(usedCharacter.Tools)
+		if !modelVision {
+			activeToolDefs = withoutTool(activeToolDefs, "view_image")
+		}
 	}
 
 	responseTimeout := time.Duration(s.cfg.Server.ResponseTimeoutSeconds) * time.Second
@@ -704,8 +769,10 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		characterID:     usedCharacterID,
 		maxLoops:        s.cfg.Server.MaxToolLoops,
 		responseStarted: &startTime,
+		viewedImage:     viewedImage,
 		toolContext: ToolContext{
 			ModelName:       modelName,
+			ModelVision:     modelVision,
 			ModelServer:     modelServer,
 			Provider:        provider,
 			FetchClient:     s.fetchClient,
@@ -801,6 +868,10 @@ func (s *Server) handleGetMessageContext(w http.ResponseWriter, r *http.Request)
 	}
 
 	var prefix []chatMsg
+	modelName := ""
+	if conv.Model != nil {
+		modelName = *conv.Model
+	}
 
 	if conv.CharacterID != nil {
 		var char *store.Character
@@ -808,6 +879,7 @@ func (s *Server) handleGetMessageContext(w http.ResponseWriter, r *http.Request)
 		if char == nil {
 			return
 		}
+		modelName = char.Model
 	}
 
 	imagesByMsg, err := s.uploadImagePartsByMessage(convID)
@@ -815,7 +887,11 @@ func (s *Server) handleGetMessageContext(w http.ResponseWriter, r *http.Request)
 		internalError(w, err)
 		return
 	}
-	chatMsgs := buildChatMsgs(prefix, history, func(id int64) []any { return imagesByMsg[id] })
+	var viewedImage func(int64) any
+	if s.modelHasVision(modelName) {
+		viewedImage = s.viewedImagePart(convID)
+	}
+	chatMsgs := buildChatMsgs(prefix, history, func(id int64) []any { return imagesByMsg[id] }, viewedImage)
 	if chatMsgs == nil {
 		chatMsgs = []chatMsg{}
 	}

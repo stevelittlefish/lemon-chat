@@ -75,7 +75,12 @@ Apply this substitution wherever character text is rendered or sent to the model
 ```
 cmd/lemon-chat/
   main.go              # entry point, config loading, bootstrap, workers, HTTP server
+comfyui/
+  workflows.toml       # image workflow registry: IDs, node bindings, sizes, timeouts
+  workflows/           # ComfyUI API-format workflow JSON files
 internal/
+  comfyui/
+    registry.go        # workflow registry: load/validate bindings, profile selection, per-request graph build
   config/
     config.go          # TOML struct definitions and loading
   debug/
@@ -125,7 +130,7 @@ internal/
     tools_registry.go  # toolRegistry: every selectable tool's schema + metadata
     tools_meta.go      # InitTools, GET /api/tools metadata
     tools_web.go       # fetch_url, SearXNG, Wikipedia tools
-    tools_image.go     # ComfyUI image generation tools
+    tools_image.go     # generate_image: ComfyUI submit/poll/download + tool schema
     tools_state_notes.go # world-state and notes tools
   store/
     store.go           # open DB, run migrations, bootstrap
@@ -246,8 +251,8 @@ Available tools and their config requirements:
 | `wikipedia_search` | Wikipedia search | — |
 | `wikipedia_get_page` | Wikipedia get page | — |
 | `searxng` | SearXNG | `[searxng] url` in `lemon.toml` |
-| `generate_image_sdxl` | Generate image (SDXL) | `[comfyui] url` + `sdxl_workflow` in `lemon.toml` |
-| `generate_image_flux` | Generate image (Flux Schnell) | `[comfyui] url` + `flux_workflow` in `lemon.toml` |
+| `generate_image` | Generate image | `[comfyui] url`, `default_profile` + `[comfyui.profile.*]` in `lemon.toml` |
+| `view_image` | View image | a `vision = true` model (withheld from other models) |
 | `world_state` | World state (compound) | — |
 | `state_set` | World state: set | — |
 | `state_modify` | World state: modify | — |
@@ -268,11 +273,23 @@ Compound group IDs expand to multiple tools:
 - `world_state` → `state_set`, `state_modify`, `state_unset`, `state_list`, `state_clear`
 - `notes` → `note_save`, `note_load`, `note_list`, `note_delete`, `note_append`
 
+### Image generation
+
+`generate_image` is a general-purpose, ChatGPT-style image tool: the model writes the prompt and picks an aspect ratio; CFG, steps and sampler are fixed inside each workflow. It is backed by a workflow registry (`internal/comfyui/`):
+
+- `comfyui/workflows/*.json` are ComfyUI API-format exports, committed to the repo. `comfyui/workflows.toml` registers each one with an exact ID, explicit `node_id.input_name` bindings for prompt, optional negative prompt, seed and width/height, the output node, a timeout, and per-aspect-ratio sizes. Bindings are validated against the graph at startup; a workflow that fails is logged and reported as unavailable, never used. Nothing is inferred from filenames.
+- The prompt input contains `%PROMPT%` exactly once; text around it (e.g. Pony score tags) is part of the workflow's recipe. The bound negative input's value in the file is the default negative; the model may replace it, and the negative actually used is returned in the result.
+- Profiles (`[comfyui.profile.<name>]` in `lemon.toml`) map task names to workflow IDs, so swapping the workflow behind a profile is config-only. Only workflows with `exposed = true` can be selected by `workflow_id`; selection is deterministic and never falls back to a different workflow.
+- Each request decodes a fresh copy of the graph before setting inputs, so concurrent requests never share state. The result includes the attachment plus workflow ID, workflow hash, profile, seed, size and the negative prompt used.
+- Prompt-rewriting (`_llm`) workflows from ComfyTestBed are deliberately not imported; the chat model writes the prompt.
+
+`view_image` lets a vision model look at an image generated in the current conversation (by `image_id`, default the latest; it waits for a pending image). Tool results are text-only on chat-completions, so the executor only validates and returns `{"image_id":N,"status":"shown"}`; the tool loop then appends a user message carrying the image after that round's tool results. `buildChatMsgs` rebuilds the same message from stored `view_image` results on every later turn, so nothing extra is persisted. The tool is filtered out of the tool list for models without `vision = true`, and the loader only serves ready images from the same conversation.
+
 ### Attachments
 
 The `attachment` table backs two kinds of file, distinguished by its `source` column:
 
-- **`source = "tool"` (model output).** Tools that produce files (`create_document`, `generate_image_sdxl`, `generate_image_flux`) create an `attachment` record keyed on `tool_call_id` and write the file under `<data_dir>/attachments/<random-id>/`. They return an `AttachmentResult` JSON struct; `messages.go` detects this shape and emits an `attachment` SSE event so the frontend can render a download card.
+- **`source = "tool"` (model output).** Tools that produce files (`create_document`, `generate_image`) create an `attachment` record keyed on `tool_call_id` and write the file under `<data_dir>/attachments/<random-id>/`. They return an `AttachmentResult` JSON struct; `messages.go` detects this shape and emits an `attachment` SSE event so the frontend can render a download card.
 - **`source = "upload"` (user input / vision).** A user uploads an image via `POST /api/conversations/{id}/attachments` (multipart field `file`, image-only, ≤10 MB), handled by `handleUploadAttachment`. The record is created unlinked (`message_id` NULL); when the user sends the message it was attached to, `LinkAttachmentsToMessage` backfills `message_id`. On send and on history reload, upload attachments for a message are lowered into chat-completions multimodal content (a text part plus one `image_url` data-URL part each) by `buildChatMsgs` / `chatMsg.MarshalJSON`; the Responses surface lowers these to `input_image` in `lowerUserContent` (`internal/llm/responses.go`). Image input is gated on the model's `vision = true` flag in `lemon.toml` (exposed via `GET /api/models`); the composer only shows its attach control for vision models.
 
 Both kinds are served by `handleGetAttachment` in `attachments.go` — `?download=1` forces a download, otherwise the file is served inline.

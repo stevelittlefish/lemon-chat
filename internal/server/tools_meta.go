@@ -1,9 +1,11 @@
 package server
 
 import (
+	"log"
 	"net/http"
 	"sort"
 
+	"github.com/stevelittlefish/lemon-chat/internal/comfyui"
 	"github.com/stevelittlefish/lemon-chat/internal/config"
 )
 
@@ -20,7 +22,18 @@ type ToolMeta struct {
 var (
 	allTools  []ToolMeta
 	executors = staticExecutors(toolRegistry)
+	// staticToolRegistry keeps the compiled-in definitions so InitTools can be
+	// re-run (tests do) without inheriting a previous config's schema overrides.
+	staticToolRegistry = cloneToolRegistry(toolRegistry)
 )
+
+func cloneToolRegistry(registry map[string]toolDef) map[string]toolDef {
+	out := make(map[string]toolDef, len(registry))
+	for id, tool := range registry {
+		out[id] = tool
+	}
+	return out
+}
 
 func staticExecutors(registry map[string]toolDef) map[string]toolExecutor {
 	out := make(map[string]toolExecutor)
@@ -32,25 +45,26 @@ func staticExecutors(registry map[string]toolDef) map[string]toolExecutor {
 	return out
 }
 
-func configureSearXNG(cfg *config.Config) (bool, string, toolExecutor) {
+func configureSearXNG(cfg *config.Config) toolConfig {
 	if cfg.SearXNG.URL == "" {
-		return false, "Add [searxng] url = \"http://…\" to lemon.toml to enable SearXNG search.", executeSearXNG
+		return toolConfig{Hint: "Add [searxng] url = \"http://…\" to lemon.toml to enable SearXNG search.", Executor: executeSearXNG}
 	}
-	return true, "", executeSearXNG
+	return toolConfig{Configured: true, Executor: executeSearXNG}
 }
 
-func configureSDXL(cfg *config.Config) (bool, string, toolExecutor) {
-	if cfg.ComfyUI.URL == "" || cfg.ComfyUI.SDXLWorkflow == "" {
-		return false, "Add [comfyui] url and sdxl_workflow to lemon.toml to enable SDXL image generation.", nil
+func configureImageGen(cfg *config.Config) toolConfig {
+	c := cfg.ComfyUI
+	if c.URL == "" || len(c.Profiles) == 0 {
+		return toolConfig{Hint: "Add [comfyui] url, default_profile and at least one [comfyui.profile.<name>] to lemon.toml to enable image generation."}
 	}
-	return true, "", makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.SDXLWorkflow, 30, 7.0)
-}
-
-func configureFlux(cfg *config.Config) (bool, string, toolExecutor) {
-	if cfg.ComfyUI.URL == "" || cfg.ComfyUI.FluxWorkflow == "" {
-		return false, "Add [comfyui] url and flux_workflow to lemon.toml to enable Flux Schnell image generation.", nil
+	reg, err := comfyui.Load(c.Workflows, c.Profiles, c.DefaultProfile)
+	if err != nil {
+		log.Printf("Image generation disabled: %v", err)
+		return toolConfig{Hint: "Image generation is misconfigured: " + err.Error()}
 	}
-	return true, "", makeImageExecutor(cfg.ComfyUI.URL, cfg.ComfyUI.FluxWorkflow, 4, 1.0)
+	reg.LogStatus()
+	fn := imageGenFunction(reg)
+	return toolConfig{Configured: true, Executor: makeImageExecutor(c.URL, reg), Function: &fn}
 }
 
 // InitTools derives executors and frontend metadata from toolRegistry. Call once
@@ -59,12 +73,18 @@ func InitTools(cfg *config.Config) {
 	executors = make(map[string]toolExecutor)
 	allTools = allTools[:0]
 
-	for id, tool := range toolRegistry {
+	for id, tool := range staticToolRegistry {
+		toolRegistry[id] = tool
 		configured := true
 		hint := ""
 		executor := tool.Executor
 		if tool.Configure != nil {
-			configured, hint, executor = tool.Configure(cfg)
+			tc := tool.Configure(cfg)
+			configured, hint, executor = tc.Configured, tc.Hint, tc.Executor
+			if tc.Function != nil {
+				tool.Function = *tc.Function
+				toolRegistry[id] = tool
+			}
 		}
 		if executor != nil {
 			executors[id] = executor

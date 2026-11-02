@@ -874,6 +874,57 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v42 → v43 complete")
 	}
 
+	if version < 44 {
+		log.Println("store: migrating v43 → v44 (merge generate_image_sdxl/generate_image_flux into generate_image in character tools)")
+		rows, err := s.db.Query(`SELECT id, tools FROM character WHERE tools IS NOT NULL AND tools LIKE '%generate_image_%'`)
+		if err != nil {
+			return err
+		}
+		type row struct {
+			id    int64
+			tools string
+		}
+		var toUpdate []row
+		for rows.Next() {
+			var r row
+			if err := rows.Scan(&r.id, &r.tools); err != nil {
+				rows.Close()
+				return err
+			}
+			toUpdate = append(toUpdate, r)
+		}
+		rows.Close()
+		log.Printf("store: migrating v43 → v44 — found %d character(s) with old image tools", len(toUpdate))
+		for _, r := range toUpdate {
+			var tools []string
+			if err := json.Unmarshal([]byte(r.tools), &tools); err != nil {
+				return fmt.Errorf("store: character id=%d has invalid tools JSON: %w", r.id, err)
+			}
+			out := make([]string, 0, len(tools))
+			added := false
+			for _, t := range tools {
+				if t == "generate_image_sdxl" || t == "generate_image_flux" || t == "generate_image" {
+					if added {
+						continue
+					}
+					t = "generate_image"
+					added = true
+				}
+				out = append(out, t)
+			}
+			b, _ := json.Marshal(out)
+			if _, err := s.db.Exec(`UPDATE character SET tools = ? WHERE id = ?`, string(b), r.id); err != nil {
+				return err
+			}
+			log.Printf("store:   character id=%d tools %s → %s", r.id, r.tools, string(b))
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (44, ?)`, now()); err != nil {
+			return err
+		}
+		version = 44
+		log.Println("store: migration v43 → v44 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

@@ -159,3 +159,22 @@ func (s *Server) handleGetAttachment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	http.ServeFile(w, r, filepath.Join(s.cfg.Server.DataDir, att.DiskPath))
 }
+
+// viewedImagePart returns a loader for images the model asked to see with
+// view_image. It only serves ready image attachments from convID, so a stored
+// tool result can never pull in another conversation's files. It returns nil
+// for anything it cannot load.
+func (s *Server) viewedImagePart(convID int64) func(attID int64) any {
+	return func(attID int64) any {
+		att, err := s.store.GetAttachment(attID)
+		if err != nil || att.ConversationID != convID || att.Status != "ready" || !strings.HasPrefix(att.MimeType, "image/") {
+			return nil
+		}
+		url, err := s.imageDataURL(att)
+		if err != nil {
+			log.Printf("viewedImagePart: skipping attachment id=%d: %v", attID, err)
+			return nil
+		}
+		return imagePart(url)
+	}
+}

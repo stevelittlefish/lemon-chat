@@ -18,6 +18,7 @@ WORKDIR /app
 
 COPY --from=builder /lemon-chat /usr/local/bin/lemon-chat
 COPY static/ ./static/
+COPY comfyui/ ./comfyui/
 
 VOLUME ["/data"]
 

@@ -68,7 +68,7 @@ func TestBuildChatMsgsImages(t *testing.T) {
 		}
 		return nil
 	}
-	msgs := buildChatMsgs(nil, history, imagesFor)
+	msgs := buildChatMsgs(nil, history, imagesFor, nil)
 	if msgs[0].ContentParts == nil {
 		t.Fatal("message 1 should have image content parts")
 	}

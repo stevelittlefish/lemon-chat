@@ -57,6 +57,12 @@ func (s *Server) StartTitleWorker() {
 	s.titler.Start(s.hub.BroadcastTitleUpdate, s.hub.BroadcastCompletionTitleUpdate)
 }
 
+// modelHasVision reports whether the configured model accepts image input.
+func (s *Server) modelHasVision(name string) bool {
+	m := s.cfg.ModelByName(name)
+	return m != nil && m.Vision
+}
+
 // providerFor builds the model provider for srv, with the protocol and
 // credentials (static key or shared OAuth token) its config calls for. Every
 // model call should go through this rather than building raw requests.
