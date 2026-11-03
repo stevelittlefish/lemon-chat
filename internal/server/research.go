@@ -273,7 +273,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 	cfg := research.Config{
 		Query:                 llmQuery,
 		SlugSource:            llmQuery,
-		Model:                 job.Model,
+		Model:                 s.cfg.ProviderModelID(job.Model),
 		Mode:                  job.Mode,
 		ForceSearch:           job.ForceSearch,
 		DeepReport:            job.DeepReport,
@@ -284,7 +284,7 @@ func (s *Server) runResearch(job *store.ResearchJob) {
 		APIAccountID:          s.oauthAccountID(modelServer),
 		CacheKey:              fmt.Sprintf("lemon-research-%d", job.ID),
 		ErrorLog:              s.modelErrors,
-		WorkerModel:           workerModel,
+		WorkerModel:           s.cfg.ProviderModelID(workerModel),
 		WorkerAPIBase:         workerAPIBase,
 		WorkerAPIToken:        workerAPIToken,
 		WorkerResponses:       workerResponses,

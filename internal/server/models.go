@@ -40,7 +40,7 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 			Default:     m.Name == defaultName,
 			Vision:      m.Vision,
 		}
-		if p, ok := prices[m.Name]; ok {
+		if p, ok := prices[m.ProviderID()]; ok {
 			prompt, completion := p.PromptUSD, p.CompletionUSD
 			resp.PromptUSD, resp.CompletionUSD = &prompt, &completion
 		}

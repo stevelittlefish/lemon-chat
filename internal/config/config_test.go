@@ -112,3 +112,38 @@ func TestLoadRejectsStaticDirThatIsAFile(t *testing.T) {
 		t.Fatal("load config with a file as static_dir: got nil error")
 	}
 }
+
+func TestModelProviderIDDefaultsToName(t *testing.T) {
+	cfg := &Config{Models: []Model{
+		{Name: "gpt-sol", ID: "gpt-6.1-sol", ModelServer: "s"},
+		{Name: "gemma4-31b", ModelServer: "s"},
+	}}
+	if got := cfg.ProviderModelID("gpt-sol"); got != "gpt-6.1-sol" {
+		t.Errorf("ProviderModelID(gpt-sol) = %q", got)
+	}
+	if got := cfg.ProviderModelID("gemma4-31b"); got != "gemma4-31b" {
+		t.Errorf("ProviderModelID without id = %q, want the name", got)
+	}
+	if got := cfg.ProviderModelID("unknown"); got != "unknown" {
+		t.Errorf("ProviderModelID(unknown) = %q, want it unchanged", got)
+	}
+}
+
+func TestValidateRejectsDuplicateModelNames(t *testing.T) {
+	cfg := &Config{
+		ModelServers: []ModelServer{{Name: "s"}},
+		Models: []Model{
+			{Name: "fast", ID: "a", ModelServer: "s"},
+			{Name: "fast", ID: "b", ModelServer: "s"},
+		},
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected an error for a duplicate model name")
+	}
+	// Two names sharing one provider id is fine.
+	cfg.Models[1].Name = "fast-too"
+	cfg.Models[1].ID = "a"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("shared id rejected: %v", err)
+	}
+}

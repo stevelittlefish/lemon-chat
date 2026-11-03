@@ -81,69 +81,92 @@ api_base = "https://chatgpt.com/backend-api/codex"
 api      = "responses"
 auth     = "oauth"
 
-# --- Codex
+# Models: name is the stable name stored by characters, conversations and
+# research; id is what the provider is sent. To upgrade a model, edit its id
+# (and display_name if it carries a version) and leave name alone.
+
+# --- Codex (ChatGPT subscription: usage limits, no per-token cost)
 
 [[model]]
-name         = "gpt-6.1-sol"
-display_name = "GPT-6.1 Sol"
+name         = "gpt-sol"
+id           = "gpt-6.1-sol"
+display_name = "GPT Sol"
 model_server = "codex"
 vision       = true
 modes        = ["chat"]
 
 [[model]]
-name         = "gpt-6.1-terra"
-display_name = "GPT-6.1 Terra"
+name         = "gpt-terra"
+id           = "gpt-6.1-terra"
+display_name = "GPT Terra"
 model_server = "codex"
 vision       = true
 modes        = ["chat"]
 
 [[model]]
-name         = "gpt-6-luna"
-display_name = "GPT-6 Luna"
+name         = "gpt-luna"
+id           = "gpt-6-luna"
+display_name = "GPT Luna"
 model_server = "codex"
 vision       = true
 modes        = []             # hidden from pickers; still selectable for research
 
-# --- OpenRouter
+# --- OpenRouter (paid per token; restricted above)
 
 [[model]]
-name         = "anthropic/claude-sonnet-4.6"
-display_name = "Claude Sonnet 4.6"
+name         = "claude-sonnet"
+id           = "anthropic/claude-sonnet-5.5"
+display_name = "Claude Sonnet"
 model_server = "openrouter"
 vision       = true
 modes        = ["chat"]
 
 [[model]]
-name         = "google/gemini-3.5-flash"
-display_name = "Gemini 3.5 Flash"
+name         = "claude-haiku"
+id           = "anthropic/claude-haiku-5.5"
+display_name = "Claude Haiku"
 model_server = "openrouter"
 vision       = true
 modes        = ["chat"]
 
 [[model]]
-name         = "x-ai/grok-4.5"
-display_name = "Grok 4.5"
+name         = "gemini-flash"
+id           = "google/gemini-3.8-flash"
+display_name = "Gemini Flash"
 model_server = "openrouter"
 vision       = true
 modes        = ["chat"]
 
 [[model]]
-name         = "moonshotai/kimi-k2.6"
-display_name = "Kimi K2.6"
+name         = "grok"
+id           = "x-ai/grok-4.7"
+display_name = "Grok"
 model_server = "openrouter"
 vision       = true
 modes        = ["chat"]
 
 [[model]]
-name         = "deepseek/deepseek-v4-pro"
-display_name = "DeepSeek V4 Pro"
+name         = "kimi"
+id           = "moonshotai/kimi-k3.1-pro"
+display_name = "Kimi"
 model_server = "openrouter"
+vision       = true
 modes        = ["chat"]
 
 [[model]]
-name         = "qwen/qwen3.7-max"
-display_name = "Qwen 3.7 Max"
+name         = "deepseek-flash"
+id           = "deepseek/deepseek-v4.1-flash"
+display_name = "DeepSeek Flash"
 model_server = "openrouter"
+vision       = true
+modes        = ["chat"]
+
+[[model]]
+name         = "qwen-max"
+id           = "qwen/qwen3.8-max-prime"
+display_name = "Qwen Max"
+model_server = "openrouter"
+vision       = true
 modes        = ["chat"]
 
 # --- Local
@@ -156,13 +179,15 @@ vision       = true
 modes        = ["chat"]
 
 [[model]]
-name         = "hf.co/mradermacher/gemma-4-31B-GGUF:Q4_K_M"
+name         = "gemma4-31b-base"
+id           = "hf.co/mradermacher/gemma-4-31B-GGUF:Q4_K_M"
 display_name = "Gemma 4 31B"
 model_server = "ollama"
 modes        = ["complete"]
 
 [[model]]
-name         = "llama3.1:8b-text-q8_0"
+name         = "llama3.1-8b-base"
+id           = "llama3.1:8b-text-q8_0"
 display_name = "Llama 3.1 8B"
 model_server = "ollama"
 modes        = ["complete"]

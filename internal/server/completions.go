@@ -211,7 +211,7 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 	completionURL := modelServer.APIBase + "/completions"
 
 	modelPayload := map[string]any{
-		"model":  comp.Model,
+		"model":  s.cfg.ProviderModelID(comp.Model),
 		"prompt": req.Content,
 		"stream": true,
 		"stream_options": map[string]any{

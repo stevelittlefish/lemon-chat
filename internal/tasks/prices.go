@@ -72,7 +72,7 @@ func refreshModelPrices(st *store.Store, cfg *config.Config) {
 		if srv == nil || !srv.IsOpenRouter() {
 			continue
 		}
-		wanted[cfg.Models[i].Name] = true
+		wanted[cfg.Models[i].ProviderID()] = true
 		if base == "" {
 			base = strings.TrimRight(srv.APIBase, "/")
 		}

@@ -25,6 +25,8 @@ func main() {
 	tokenLogFlag := flag.Bool("token-log", false, "log replay-oriented model HTTP transcripts to <data_dir>/model_tokens.log (overrides config)")
 	listModelsFlag := flag.Bool("list-models", false, "list models from all configured model servers and exit")
 	openaiLoginFlag := flag.Bool("openai-login", false, "run the OpenAI (Codex) account login on this host and exit")
+	modelsInUseFlag := flag.Bool("models-in-use", false, "list the model names stored in the database, flagging any not in the config, and exit")
+	renameModelFlag := flag.Bool("rename-model", false, "rename stored model names and exit: --rename-model OLD NEW [OLD NEW ...]")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)
@@ -51,6 +53,16 @@ func main() {
 
 	if *openaiLoginFlag {
 		openaiLogin(st)
+		os.Exit(0)
+	}
+
+	if *modelsInUseFlag {
+		modelsInUse(st, cfg)
+		os.Exit(0)
+	}
+
+	if *renameModelFlag {
+		renameModels(st, cfg, flag.Args())
 		os.Exit(0)
 	}
 
@@ -83,6 +95,45 @@ func main() {
 	}
 	if err := httpSrv.ListenAndServe(); err != nil {
 		log.Fatalf("server: %v", err)
+	}
+}
+
+// modelsInUse prints every model name the database references, with counts,
+// marking names that no [[model]] in the config defines.
+func modelsInUse(st *store.Store, cfg *config.Config) {
+	usage, err := st.ModelNamesInUse()
+	if err != nil {
+		log.Fatalf("models-in-use: %v", err)
+	}
+	missing := 0
+	for _, u := range usage {
+		mark := "  "
+		if cfg.ModelByName(u.Name) == nil {
+			mark = "! "
+			missing++
+		}
+		fmt.Printf("%s%-45s %4d  %v\n", mark, u.Name, u.Total, u.Counts)
+	}
+	if missing > 0 {
+		fmt.Printf("\n! = not a configured model name (%d). Map them with --rename-model OLD NEW.\n", missing)
+	}
+}
+
+// renameModels applies OLD NEW pairs to every stored model reference. NEW must
+// be a configured model name, so a typo can't strand the rows.
+func renameModels(st *store.Store, cfg *config.Config, args []string) {
+	if len(args) == 0 || len(args)%2 != 0 {
+		log.Fatalf("rename-model: expected OLD NEW pairs, got %d argument(s)", len(args))
+	}
+	for i := 0; i < len(args); i += 2 {
+		if cfg.ModelByName(args[i+1]) == nil {
+			log.Fatalf("rename-model: %q is not a model name in the config — add its [[model]] first", args[i+1])
+		}
+	}
+	for i := 0; i < len(args); i += 2 {
+		if _, err := st.RenameModel(args[i], args[i+1]); err != nil {
+			log.Fatalf("rename-model: %v", err)
+		}
 	}
 }
 

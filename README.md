@@ -94,6 +94,7 @@ Startup fails if a referenced variable is unset. Write `$${` for a literal `${`.
 
 ```
 lemon-chat [--config <path>] [--debug] [--token-log] [--list-models]
+           [--models-in-use] [--rename-model OLD NEW [OLD NEW ...]]
 ```
 
 | Flag | Description |
@@ -102,6 +103,8 @@ lemon-chat [--config <path>] [--debug] [--token-log] [--list-models]
 | `--debug` | Enable verbose debug logging (overrides `debug = true` in config) |
 | `--token-log` | Log every raw SSE token from the model to `<data_dir>/model_tokens.log` |
 | `--list-models` | Query all configured model servers, print their model IDs, then exit |
+| `--models-in-use` | List the model names stored in the database (characters, conversations, research…), flagging any the config doesn't define, then exit |
+| `--rename-model OLD NEW …` | Rewrite stored references from model name `OLD` to `NEW` (which must be configured), in one transaction per pair, then exit |
 
 ## Stack
 

@@ -72,10 +72,17 @@ api_base = "http://localhost:8000/v1"
 # api      = "responses"
 # auth     = "oauth"
 
+# name is what lemon-chat stores (characters, conversations, research,
+# default_model) and must be unique. id is the model ID sent to the provider and
+# defaults to name. Give models a stable name and put the version in id: then
+# upgrading means editing id, and nothing that refers to the model breaks.
+# Renaming a model later? Run lemon-chat --rename-model OLD NEW to update stored
+# references (--models-in-use lists them).
 [[model]]
 name         = "meta-llama/Llama-3.2-8B-Instruct"
 display_name = "Llama 3.2 8B"
 model_server = "local"
+# id = "meta-llama/Llama-3.2-8B-Instruct"   # provider model ID, if it differs from name
 # modes = ["chat", "complete"]   # omit to allow in both; restrict with ["chat"] or ["complete"]; use [] to hide from both pickers (still usable for research)
 # vision = true                  # set for models that accept image input; enables the composer's image-attach control for this model
 # restricted = false             # overrides the server's restricted flag, e.g. to open one cheap model on a paid server

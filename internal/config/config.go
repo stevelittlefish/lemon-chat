@@ -151,7 +151,11 @@ func (s *ModelServer) IsOpenRouter() bool {
 }
 
 type Model struct {
+	// Name is the stable name lemon-chat stores (characters, conversations,
+	// research, default_model). ID is what the provider is sent; it defaults
+	// to Name. Upgrading a model means editing ID; Name never changes.
 	Name        string    `toml:"name"`
+	ID          string    `toml:"id"`
 	DisplayName string    `toml:"display_name"`
 	ModelServer string    `toml:"model_server"`
 	Modes       *[]string `toml:"modes"`
@@ -162,6 +166,14 @@ type Model struct {
 	// Restricted overrides the model server's restricted flag when set, e.g.
 	// restricted = false to open one cheap model on an otherwise paid server.
 	Restricted *bool `toml:"restricted"`
+}
+
+// ProviderID returns the model ID sent to the provider: ID, or Name if unset.
+func (m *Model) ProviderID() string {
+	if m.ID != "" {
+		return m.ID
+	}
+	return m.Name
 }
 
 // AvailableIn reports whether the model is available in the given mode.
@@ -302,7 +314,15 @@ func (c *Config) Validate() error {
 		}
 		serverNames[s.Name] = struct{}{}
 	}
+	modelNames := make(map[string]struct{}, len(c.Models))
 	for _, m := range c.Models {
+		if m.Name == "" {
+			return fmt.Errorf("config: model missing name field")
+		}
+		if _, dup := modelNames[m.Name]; dup {
+			return fmt.Errorf("config: model name %q is used twice — names must be unique (several may share an id)", m.Name)
+		}
+		modelNames[m.Name] = struct{}{}
 		if m.ModelServer == "" {
 			return fmt.Errorf("config: model %q missing model_server field", m.Name)
 		}
@@ -334,6 +354,15 @@ func (c *Config) ModelByName(name string) *Model {
 		}
 	}
 	return nil
+}
+
+// ProviderModelID maps a configured model name to the ID its provider expects.
+// An unknown name is returned unchanged (resolving it fails separately).
+func (c *Config) ProviderModelID(name string) string {
+	if m := c.ModelByName(name); m != nil {
+		return m.ProviderID()
+	}
+	return name
 }
 
 // ModelRestricted reports whether modelName is limited to users with access to

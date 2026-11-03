@@ -115,7 +115,7 @@ func (s *Server) handleRedditHarnessValidate(w http.ResponseWriter, r *http.Requ
 		}
 		rc := s.cfg.Research
 		researcher := research.New(research.Config{
-			Query: input.Goal, Model: model, APIBase: modelServer.APIBase, APIToken: s.tokenSource(modelServer),
+			Query: input.Goal, Model: s.cfg.ProviderModelID(model), APIBase: modelServer.APIBase, APIToken: s.tokenSource(modelServer),
 			MaxContentChars: rc.MaxContentChars, Location: time.Local,
 		}, research.State{}, nil, nil)
 		findings := make([]research.Finding, 0, len(pages))

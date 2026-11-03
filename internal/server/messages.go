@@ -767,7 +767,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		writer:          w,
 		flusher:         flusher,
 		provider:        provider,
-		request:         llm.Request{Model: modelName, Tools: toolsArg, CacheKey: fmt.Sprintf("lemon-conv-%d", convID)},
+		request:         llm.Request{Model: s.cfg.ProviderModelID(modelName), Tools: toolsArg, CacheKey: fmt.Sprintf("lemon-conv-%d", convID)},
 		messages:        chatMsgs,
 		wireLog:         tokenLog,
 		onStart:         commit,
@@ -780,7 +780,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		responseStarted: &startTime,
 		viewedImage:     viewedImage,
 		toolContext: ToolContext{
-			ModelName:       modelName,
+			ModelName:       s.cfg.ProviderModelID(modelName),
 			ModelVision:     modelVision,
 			ModelServer:     modelServer,
 			Provider:        provider,

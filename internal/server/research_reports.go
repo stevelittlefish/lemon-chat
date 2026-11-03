@@ -242,7 +242,7 @@ func (s *Server) newReportRegenerator(job *store.ResearchJob, model string, deep
 	cfg := research.Config{
 		Query:             llmQuery,
 		SlugSource:        llmQuery,
-		Model:             model,
+		Model:             s.cfg.ProviderModelID(model),
 		Mode:              job.Mode,
 		DeepReport:        deepReport,
 		Resynthesize:      resynthesize,
@@ -345,7 +345,7 @@ func (s *Server) generateReportHTML(ctx context.Context, model, title, markdown,
 			onProgress(generated.Len(), tail)
 		}
 		completion, err := provider.Stream(ctx, llm.Request{
-			Model:       model,
+			Model:       s.cfg.ProviderModelID(model),
 			Messages:    messages,
 			MaxTokens:   s.cfg.Research.HTMLReportTokens,
 			Temperature: &temperature,

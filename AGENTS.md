@@ -48,6 +48,10 @@ Icons are Lucide SVGs served from `static/assets/icons/` and loaded by `static/j
 
 **Whenever you use a new icon name, you must add it to the `ICONS` array in `icons.js`.** Icons not in that list are preloaded at startup; any name missing from the list will return an empty string from `icon()` and render as nothing.
 
+## Model names and IDs
+
+A `[[model]]`'s `name` is the stable identifier lemon-chat stores — in `character.model`, `conversation.model`, `completion.model`, the research tables and `default_model` — and must be unique. Its optional `id` is the model ID sent to the provider (defaults to `name`). Any code that sends a model to a provider must map it with `s.cfg.ProviderModelID(name)` (or `Model.ProviderID()`); OpenRouter prices are keyed by the provider ID too. Everything else — storage, comparisons, `ServerForModel`, restrictions — uses `name`. The columns that store names are listed in `modelColumns` (`internal/store/model_names.go`); add any new one there so `--rename-model` and `--models-in-use` cover it.
+
 ## Model modes
 
 Each `[[model]]` in `lemon.toml` has an optional `modes` array that restricts which interface it appears in:
@@ -88,7 +92,7 @@ internal/
   comfyui/
     registry.go        # workflow registry: load/validate bindings, profile selection, per-request graph build
   config/
-    config.go          # TOML struct definitions and loading
+    config.go          # TOML struct definitions, loading, model name → provider ID mapping
     env.go             # ${VAR} environment substitution in config string values
   debug/
     debug.go           # debug logging flag (debug.Enabled, debug.Log)
@@ -153,6 +157,7 @@ internal/
     research_reports.go # research report variant queries
     attachments.go     # attachment queries, unlinked-upload sweep, safe file removal
     oauth.go           # shared OAuth token row
+    model_names.go     # stored model-name references: usage listing and --rename-model
     prices.go          # cached model per-token price queries
   tasks/
     titles.go          # Titler: conversation/completion titles via the Provider, with retry backoff
@@ -393,9 +398,12 @@ lemon-chat [flags]
   --token-log        log raw model SSE tokens to <data_dir>/model_tokens.log (overrides config)
   --list-models      query all configured model servers, print their model lists, then exit
   --openai-login     run the OpenAI (Codex) account login on this host, store the token, then exit
+  --models-in-use    list model names stored in the DB with counts, flagging ones not in the config, then exit
+  --rename-model OLD NEW [OLD NEW ...]
+                     rewrite stored model-name references (NEW must be configured), then exit
 ```
 
-`--list-models` is useful for finding exact model ID strings to put in `lemon.toml`.
+`--list-models` is useful for finding exact model ID strings to put in a model's `id`.
 
 `--openai-login` runs the local-browser PKCE flow (loopback on `localhost:1455`) and persists a
 single shared OAuth token used by every `auth = "oauth"` model server. For a remote/LAN install

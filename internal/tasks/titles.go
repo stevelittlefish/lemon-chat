@@ -122,7 +122,7 @@ func (t *Titler) resolveTitleModel(skipDesc string) (titleModel, bool) {
 	}
 	return titleModel{
 		provider: t.provider(srv),
-		name:     modelName,
+		name:     t.cfg.ProviderModelID(modelName),
 		timeout:  time.Duration(t.cfg.Server.ResponseTimeoutSeconds) * time.Second,
 	}, true
 }
