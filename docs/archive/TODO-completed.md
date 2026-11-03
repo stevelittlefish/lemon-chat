@@ -233,3 +233,9 @@ Findings from `docs/archive/code_review_2026-06-13.md`, in suggested priority or
 
 - [x] **Size image placeholder to match final image dimensions** (`static/js/thread.js:64`)
   `buildImagePlaceholder` used a fixed 320×160 box, but a loaded image can be taller (inline images are capped at 320×240). When an async image resolved it grew past the placeholder, pushing text down and forcing a manual scroll while the content jumped. Fixed by sizing the placeholder to the exact render box from the tool-call `args` width/height (defaulting 1024×1024) against the same max constraints, so the swap is seamless. Also fixed the reload-during-pending path to render a sized placeholder the WS event can resolve in place.
+
+## User attachments
+
+- [x] **Image attachments (vision input).** Users upload an image and send it with text to vision-capable models. Reused the `attachment` table (added `message_id` + `source` columns, migration v43); `POST /api/conversations/{id}/attachments` upload handler; `buildChatMsgs`/`chatMsg.MarshalJSON` lower to chat-completions `image_url` parts and `internal/llm/responses.go` to `input_image`; gated on a `vision` flag on `[[model]]`; composer attach button + paste + thumbnail strip, thread renders sent images. Orphan cleanup for never-sent uploads followed separately (below).
+- [x] **Clean up orphaned image uploads.** Built as `deleteUnlinkedUploads` in `internal/tasks/cleanup.go`: a background sweep that removes upload attachments with a NULL `message_id` older than 24 hours, deleting both the row and the files on disk.
+- [x] **Paste images into the chat composer.** Clipboard image paste is handled by the composer's paste listener (`static/js/composer.js`), uploading each pasted image as an attachment.

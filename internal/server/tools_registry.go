@@ -82,7 +82,7 @@ var toolRegistry = map[string]toolDef{
 		Type:        "function",
 		Function: toolFunction{
 			Name:        "searxng",
-			Description: "Search the web via SearXNG and return the top results.",
+			Description: "Searches the web and returns a numbered list of results, each with a title, URL and a short snippet. Snippets are fragments, often out of date or missing context; before relying on a result, read the page with fetch_url if it is available.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
