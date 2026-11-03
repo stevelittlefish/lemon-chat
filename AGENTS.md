@@ -73,10 +73,11 @@ Every handler that runs a model on a user's behalf must call `s.denyRestrictedMo
 
 ## Character variable substitution
 
-Character system prompts and first messages support two placeholders that are substituted at runtime:
+Character system prompts and first messages support three placeholders that are substituted at runtime:
 
 - `{{char}}` — replaced with the character's name
 - `{{user}}` — replaced with the logged-in user's display name
+- `{{model}}` — replaced with the character model's provider ID (`ProviderModelID`, e.g. `gpt-6.1-sol`), not its lemon-chat `name`
 
 Apply this substitution wherever character text is rendered or sent to the model. The substitution logic lives in `internal/server/messages.go`.
 

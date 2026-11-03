@@ -144,10 +144,13 @@ func resolveUserName(user *store.User) string {
 	return user.Username
 }
 
-func substituteVars(s, charName, userName string) string {
-	s = strings.ReplaceAll(s, "{{char}}", charName)
-	s = strings.ReplaceAll(s, "{{user}}", userName)
-	return s
+// substituteVars expands the character template placeholders. {{model}} is
+// the provider model ID (e.g. "gpt-6.1-sol"), not the lemon-chat name.
+func (s *Server) substituteVars(text string, char *store.Character, userName string) string {
+	text = strings.ReplaceAll(text, "{{char}}", char.Name)
+	text = strings.ReplaceAll(text, "{{user}}", userName)
+	text = strings.ReplaceAll(text, "{{model}}", s.cfg.ProviderModelID(char.Model))
+	return text
 }
 
 // resolveCharacter fetches a character, checks visibility for the given user,
@@ -164,7 +167,7 @@ func (s *Server) resolveCharacter(w http.ResponseWriter, user *store.User, charI
 	}
 	userName := resolveUserName(user)
 	if char.SystemPrompt != nil {
-		msgs = append(msgs, chatMsg{Role: "system", Content: substituteVars(*char.SystemPrompt, char.Name, userName)})
+		msgs = append(msgs, chatMsg{Role: "system", Content: s.substituteVars(*char.SystemPrompt, char, userName)})
 	}
 	hiddenMsgs, err := s.store.ListCharacterHiddenMessages(char.ID)
 	if err != nil {
@@ -172,7 +175,7 @@ func (s *Server) resolveCharacter(w http.ResponseWriter, user *store.User, charI
 		return nil, nil
 	}
 	for _, hm := range hiddenMsgs {
-		msgs = append(msgs, chatMsg{Role: hm.Role, Content: substituteVars(hm.Content, char.Name, userName)})
+		msgs = append(msgs, chatMsg{Role: hm.Role, Content: s.substituteVars(hm.Content, char, userName)})
 	}
 	return char, msgs
 }
@@ -972,7 +975,7 @@ func (s *Server) handleFirstMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Sending first message conversation_id=%d user_id=%d", convID, user.ID)
-	content := substituteVars(*char.FirstMessage, char.Name, resolveUserName(user))
+	content := s.substituteVars(*char.FirstMessage, char, resolveUserName(user))
 	msg, err := s.store.CreateMessage(convID, "assistant", content, charID, &char.Name, nil, nil, "")
 	if err != nil {
 		internalError(w, err)
