@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
@@ -53,6 +54,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   requestIsHTTPS(r),
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(30 * 24 * time.Hour),
 	})
@@ -68,13 +70,25 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		_ = s.store.DeleteSession(cookie.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:    "session",
-		Value:   "",
-		Path:    "/",
-		MaxAge:  -1,
-		Expires: time.Unix(0, 0),
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   requestIsHTTPS(r),
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
 	})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// requestIsHTTPS reports whether the browser reached us over HTTPS, either
+// directly or through a TLS-terminating reverse proxy that sets
+// X-Forwarded-Proto (nginx's proxy_params does). The session cookie is marked
+// Secure only then, so plain-HTTP LAN installs keep working. Trusting the header
+// is safe here: a forged value can only make the cookie stricter.
+func requestIsHTTPS(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {

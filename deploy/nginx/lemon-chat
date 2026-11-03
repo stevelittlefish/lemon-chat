@@ -1,0 +1,49 @@
+# nginx site for lemon-chat (matches the house style used by the other
+# seaslug.io sites: wildcard cert, proxy_params, plain localhost upstream).
+#
+# Install on the server:
+#   sudo cp deploy/nginx/lemon-chat /etc/nginx/sites-available/lemon-chat
+#   sudo ln -s /etc/nginx/sites-available/lemon-chat /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#
+# Needs $connection_upgrade defined at http level. On lemon that is the shared
+# /etc/nginx/conf.d/websocket-upgrade.conf, loaded whichever sites are enabled.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name chat.seaslug.io;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name chat.seaslug.io;
+
+    ssl_certificate /etc/letsencrypt/live/seaslug-wildcard/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/seaslug-wildcard/privkey.pem;
+
+    # Conversation and note-pack imports are capped at 32 MB by the app.
+    client_max_body_size 32M;
+
+    location / {
+        proxy_pass http://localhost:8069;
+        # Sets Host to $host, which the /ws origin check compares against.
+        include proxy_params;
+
+        # The live-update websocket (/ws) needs the upgrade handshake passed through.
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+
+        # Replies, tool runs (image generation can take minutes) and research
+        # jobs stream over SSE with no keepalives, so allow long silences.
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+
+        # Stream tokens and progress events to the browser as they arrive.
+        proxy_buffering off;
+    }
+}

@@ -210,6 +210,7 @@ data/
   lemon.toml           # config for Docker volume mount
 deploy/
   lemon.toml           # the maintainer's live deployment config (committed; secrets via ${VAR})
+  nginx/lemon-chat     # nginx site for that deployment (TLS, websocket, SSE streaming)
 Dockerfile
 docker-compose.yml
 docker-compose.override.yml.example
