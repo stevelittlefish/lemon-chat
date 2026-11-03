@@ -35,6 +35,10 @@ Raised by conversation 102, where the general assistant's opening `note_list` du
   - *Open:* how long to keep fetched pages and where (memory vs disk); handling messy pages with no headings; section size limits.
   - **Needs plenty of experimenting and thorough testing before it's considered done:** the Python article questions (3.0 release date ~char 23,900; walrus operator ~36,300; CPython's C standard ~52,300, past the old cut-off), the Lemon article (under the old cap), pages without headings (forums, badly structured sites), and very long pages, on both Gemma and `gpt-sol`, checking speed and that the model doesn't answer from memory when it hasn't read the section.
 
+## Handoff (backlog)
+
+- [ ] **Handoff.** The user has a design in mind; to be discussed and written up when we get to it.
+
 ## User attachments (backlog)
 
 - [ ] **Text file attachments.** Allow users to upload and send text files in chat.
