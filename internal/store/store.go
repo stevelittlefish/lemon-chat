@@ -964,6 +964,31 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v46 → v47 complete")
 	}
 
+	if version < 48 {
+		log.Println("store: migrating v47 → v48 (create memory table, add character.load_memories)")
+		if _, err := s.db.Exec(`
+			CREATE TABLE memory (
+				id              INTEGER PRIMARY KEY,
+				user_id         INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+				text            TEXT    NOT NULL,
+				conversation_id INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
+				created_at      TEXT    NOT NULL,
+				updated_at      TEXT    NOT NULL
+			);
+			CREATE INDEX memory_user_id ON memory(user_id);
+		`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`ALTER TABLE character ADD COLUMN load_memories INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (48, ?)`, now()); err != nil {
+			return err
+		}
+		version = 48
+		log.Println("store: migration v47 → v48 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

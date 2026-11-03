@@ -515,6 +515,15 @@ func (loop *messageToolLoop) executeTool(tc llm.ToolCall) string {
 	return result
 }
 
+// persistMemoryAutoload stores the opening memory_list call and its result.
+func (s *Server) persistMemoryAutoload(convID int64, characterID *int64, assistantName, toolCalls, result string) error {
+	if _, err := s.store.CreateMessage(convID, "assistant", "", characterID, &assistantName, nil, &toolCalls, ""); err != nil {
+		return err
+	}
+	_, err := s.store.CreateMessage(convID, "tool", result, nil, nil, nil, nil, memoryAutoloadCallID(convID))
+	return err
+}
+
 const (
 	titleTriggerNone          = ""
 	titleTriggerCharacterAuto = "character-auto-title"
@@ -695,6 +704,38 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	chatMsgs = append(chatMsgs, userMsg)
 
+	// "Load memories at start": after the first user message the conversation
+	// gets a stored memory_list call and its result, as if the model had made
+	// it. Stored, so later turns replay the same prefix and caching holds.
+	memoriesLoaded := false
+	var memoryCalls, memoryResult string
+	if loadsMemories(usedCharacter) {
+		firstUserMessage := true
+		for _, m := range history {
+			if m.Role == "user" {
+				firstUserMessage = false
+			}
+			if m.ToolCallID == memoryAutoloadCallID(convID) {
+				memoriesLoaded = true
+			}
+		}
+		if firstUserMessage {
+			memoryResult, err = formatMemories(s.store, user.ID)
+			if err != nil {
+				internalError(w, err)
+				return
+			}
+			memoryCalls = fmt.Sprintf(`[{"id":%q,"type":"function","function":{"name":"memory_list","arguments":"{}"}}]`, memoryAutoloadCallID(convID))
+			var callsAny []any
+			json.Unmarshal([]byte(memoryCalls), &callsAny) //nolint:errcheck
+			chatMsgs = append(chatMsgs,
+				chatMsg{Role: "assistant", ToolCalls: callsAny},
+				chatMsg{Role: "tool", Content: memoryResult, ToolCallID: memoryAutoloadCallID(convID)})
+			memoriesLoaded = true
+			log.Printf("Loading memories at start conversation_id=%d user_id=%d", convID, user.ID)
+		}
+	}
+
 	// Determine tool definitions for this character.
 	var activeToolDefs []toolDef
 	if usedCharacter != nil && len(usedCharacter.Tools) > 0 {
@@ -754,6 +795,12 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		if memoryCalls != "" {
+			if err := s.persistMemoryAutoload(convID, usedCharacterID, assistantName, memoryCalls, memoryResult); err != nil {
+				persistErr = err
+				return
+			}
+		}
 		committed = true
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
@@ -761,6 +808,17 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		startTime = time.Now()
 		nameJSON, _ := json.Marshal(map[string]string{"name": assistantName})
 		fmt.Fprintf(w, "data: %s\n\n", nameJSON)
+		if memoryCalls != "" {
+			// Show the loaded memories like any other tool round.
+			callEvent, _ := json.Marshal(map[string]any{"tool_call": map[string]any{
+				"id": memoryAutoloadCallID(convID), "name": "memory_list", "args": map[string]any{},
+			}})
+			resultEvent, _ := json.Marshal(map[string]any{"tool_result": map[string]any{
+				"id": memoryAutoloadCallID(convID), "result": memoryResult,
+			}})
+			newTurnEvt, _ := json.Marshal(map[string]any{"new_turn": map[string]any{"name": assistantName}})
+			fmt.Fprintf(w, "data: %s\n\ndata: %s\n\ndata: %s\n\n", callEvent, resultEvent, newTurnEvt)
+		}
 		flusher.Flush()
 	}
 
@@ -793,6 +851,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			Timezone:        s.cfg.Server.Timezone,
 			UserID:          user.ID,
 			ConversationID:  convID,
+			MemoriesLoaded:  memoriesLoaded,
 			Store:           s.store,
 			DataDir:         s.cfg.Server.DataDir,
 			Hub:             s.hub,

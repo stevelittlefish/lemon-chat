@@ -36,6 +36,9 @@ type ToolContext struct {
 	ToolCallID     string
 	UserID         int64
 	ConversationID int64
+	// MemoriesLoaded is true when the conversation opened with the user's
+	// memories, so memory_save needn't repeat the list.
+	MemoriesLoaded bool
 	Store          *store.Store
 	DataDir        string
 	Hub            *Hub

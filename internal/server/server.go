@@ -148,6 +148,12 @@ func (s *Server) Handler() http.Handler {
 	// Tools
 	mux.HandleFunc("GET /api/tools", s.requireAuth(s.handleGetTools))
 
+	// Memories (the settings page; the model uses the memory tools)
+	mux.HandleFunc("GET /api/memories", s.requireAuth(s.handleListMemories))
+	mux.HandleFunc("POST /api/memories", s.requireAuth(s.handleCreateMemory))
+	mux.HandleFunc("PATCH /api/memories/{id}", s.requireAuth(s.handleUpdateMemory))
+	mux.HandleFunc("DELETE /api/memories/{id}", s.requireAuth(s.handleDeleteMemory))
+
 	// Conversations
 	mux.HandleFunc("GET /api/conversations", s.requireAuth(s.handleListConversations))
 	mux.HandleFunc("POST /api/conversations", s.requireAuth(s.handleCreateConversation))
@@ -244,6 +250,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings/characters/{id}/edit", serveFile(staticDir, "settings/character-edit.html"))
 	mux.HandleFunc("GET /settings/users", serveFile(staticDir, "settings/users.html"))
 	mux.HandleFunc("GET /settings/tools", serveFile(staticDir, "settings/tools.html"))
+	mux.HandleFunc("GET /settings/memories", serveFile(staticDir, "settings/memories.html"))
 	mux.HandleFunc("GET /settings/import_chat", serveFile(staticDir, "settings/import_chat.html"))
 
 	// Static files — no forced no-cache; ETags handle revalidation naturally

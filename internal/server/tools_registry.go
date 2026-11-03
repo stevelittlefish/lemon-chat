@@ -433,6 +433,80 @@ Examples:
 			},
 		},
 	},
+	"memory_list": {
+		Executor: executeMemoryList,
+		Type:     "function",
+		Function: toolFunction{
+			Name:        "memory_list",
+			Description: "Lists what you remember about the user from earlier conversations, one fact per line with its id. Call it near the start of a conversation, before answering, so you can use what you already know about the user.",
+			Parameters:  toolParam{Type: "object", Properties: map[string]any{}, Required: []string{}},
+		},
+	},
+	"memory_save": {
+		Executor: executeMemorySave,
+		Type:     "function",
+		Function: toolFunction{
+			Name:        "memory_save",
+			Description: "Saves one fact about the user so you remember it in future conversations. Save without being asked when the user tells you something that will still matter later: their preferences, important people and pets, ongoing projects, their work or situation, things they say about themselves. Don't save small talk, details that only matter to the current task, story or roleplay content, or sensitive personal information unless the user asks you to remember it. Write one short fact that makes sense on its own, e.g. \"Has a cat called Biscuit\". If a memory on the same subject already exists, use memory_update instead of saving a duplicate.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"text": map[string]any{
+						"type":        "string",
+						"description": "The fact to remember, at most 500 characters.",
+					},
+				},
+				Required: []string{"text"},
+			},
+		},
+	},
+	"memory_update": {
+		Executor: executeMemoryUpdate,
+		Type:     "function",
+		Function: toolFunction{
+			Name:        "memory_update",
+			Description: "Replaces the text of an existing memory. Use it when a fact has changed, or to add a new detail to a memory on the same subject.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"id": map[string]any{
+						"type":        "integer",
+						"description": "The memory's id, from memory_list.",
+					},
+					"text": map[string]any{
+						"type":        "string",
+						"description": "The new text, at most 500 characters.",
+					},
+				},
+				Required: []string{"id", "text"},
+			},
+		},
+	},
+	"memory_forget": {
+		Executor: executeMemoryForget,
+		Type:     "function",
+		Function: toolFunction{
+			Name:        "memory_forget",
+			Description: "Deletes a memory. Use it when the user asks you to forget something, or a memory is no longer true.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"id": map[string]any{
+						"type":        "integer",
+						"description": "The memory's id, from memory_list.",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+	},
+	"memory": {
+		DisplayName: "Memory",
+		Summary:     "Remembers facts about the user across conversations: list, save, update and forget. Each user has their own memories, shown on the Memories settings page.",
+		Group:       "Memory",
+		Order:       130,
+		Members:     []string{"memory_list", "memory_save", "memory_update", "memory_forget"},
+	},
 	"world_state": {
 		DisplayName: "World state",
 		Summary:     "Session state tools: set, modify, remove, clear, and list named values scoped to this conversation.",

@@ -149,6 +149,13 @@ func (s *Store) DeleteUser(id int64) (attachmentPaths, avatarFiles []string, err
 	}
 	log.Printf("store: DeleteUser — deleted %d character(s)", len(chars))
 
+	res, err = tx.Exec(`DELETE FROM memory WHERE user_id = ?`, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	n, _ = res.RowsAffected()
+	log.Printf("store: DeleteUser — deleted %d memory(ies)", n)
+
 	if _, err := tx.Exec(`DELETE FROM user WHERE id = ?`, id); err != nil {
 		return nil, nil, err
 	}

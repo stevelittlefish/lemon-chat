@@ -32,12 +32,15 @@ type Character struct {
 	IsRecommended bool `json:"is_recommended"`
 	// IsDisabled hides the character from every picker and refuses new
 	// conversations with it, without deleting it. Existing ones carry on.
-	IsDisabled     bool     `json:"is_disabled"`
-	Tools          []string `json:"tools"`
-	AvatarFilename *string  `json:"-"`
-	HasAvatar      bool     `json:"has_avatar"`
-	CreatedAt      string   `json:"created_at"`
-	UpdatedAt      string   `json:"updated_at"`
+	IsDisabled bool     `json:"is_disabled"`
+	Tools      []string `json:"tools"`
+	// LoadMemories, with the memory tool enabled, opens each conversation
+	// with a memory_list call and its result after the first user message.
+	LoadMemories   bool    `json:"load_memories"`
+	AvatarFilename *string `json:"-"`
+	HasAvatar      bool    `json:"has_avatar"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
 }
 
 // ListCharacters returns all characters visible to the given user.
@@ -46,7 +49,7 @@ func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) 
 	rows, err := s.db.Query(
 		`SELECT c.id, c.name, c.model, c.system_prompt, c.first_message, c.title_prompt, c.created_by,
 		        COALESCE(u.display_name, u.username) as created_by_name,
-		        c.visibility, c.auto_title, c.is_default, c.is_recommended, c.is_disabled, c.tools, c.avatar_filename, c.created_at, c.updated_at
+		        c.visibility, c.auto_title, c.is_default, c.is_recommended, c.is_disabled, c.tools, c.load_memories, c.avatar_filename, c.created_at, c.updated_at
 		 FROM character c
 		 LEFT JOIN user u ON u.id = c.created_by
 		 WHERE c.visibility != 'private' OR c.created_by = ? OR ?
@@ -62,7 +65,7 @@ func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) 
 		var c Character
 		var autoTitle, isDefault, isRecommended, isDisabled int
 		var toolsJSON sql.NullString
-		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.CreatedByName, &c.Visibility, &autoTitle, &isDefault, &isRecommended, &isDisabled, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.CreatedByName, &c.Visibility, &autoTitle, &isDefault, &isRecommended, &isDisabled, &toolsJSON, &c.LoadMemories, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		c.AutoTitle = autoTitle != 0
@@ -86,9 +89,9 @@ func (s *Store) GetCharacter(id int64) (*Character, error) {
 	var autoTitle, isDefault, isRecommended, isDisabled int
 	var toolsJSON sql.NullString
 	err := s.db.QueryRow(
-		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, is_default, is_recommended, is_disabled, tools, avatar_filename, created_at, updated_at
+		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, is_default, is_recommended, is_disabled, tools, load_memories, avatar_filename, created_at, updated_at
 		 FROM character WHERE id = ?`, id,
-	).Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &isDefault, &isRecommended, &isDisabled, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &isDefault, &isRecommended, &isDisabled, &toolsJSON, &c.LoadMemories, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -148,6 +151,13 @@ func (s *Store) UpdateCharacter(id int64, name, model string, systemPrompt, firs
 		 WHERE id = ?`,
 		name, model, systemPrompt, firstMessage, titlePrompt, visibility, boolToInt(autoTitle), toolsJSON, now(), id,
 	)
+	return err
+}
+
+// SetCharacterLoadMemories sets whether the character's conversations open
+// with the user's memories.
+func (s *Store) SetCharacterLoadMemories(id int64, load bool) error {
+	_, err := s.db.Exec(`UPDATE character SET load_memories = ? WHERE id = ?`, boolToInt(load), id)
 	return err
 }
 

@@ -70,6 +70,7 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 		Visibility     string                         `json:"visibility"`
 		AutoTitle      bool                           `json:"auto_title"`
 		Tools          []string                       `json:"tools"`
+		LoadMemories   bool                           `json:"load_memories"`
 		HiddenMessages []store.CharacterHiddenMessage `json:"hidden_messages"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -90,6 +91,13 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		internalError(w, err)
 		return
+	}
+	if req.LoadMemories {
+		if err := s.store.SetCharacterLoadMemories(char.ID, true); err != nil {
+			internalError(w, err)
+			return
+		}
+		char.LoadMemories = true
 	}
 	if len(req.HiddenMessages) > 0 {
 		if err := s.store.ReplaceCharacterHiddenMessages(char.ID, req.HiddenMessages); err != nil {
@@ -129,6 +137,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		Visibility     string                          `json:"visibility"`
 		AutoTitle      bool                            `json:"auto_title"`
 		Tools          []string                        `json:"tools"`
+		LoadMemories   bool                            `json:"load_memories"`
 		HiddenMessages *[]store.CharacterHiddenMessage `json:"hidden_messages"`
 	}{
 		Name:         existing.Name,
@@ -139,6 +148,7 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		Visibility:   existing.Visibility,
 		AutoTitle:    existing.AutoTitle,
 		Tools:        existing.Tools,
+		LoadMemories: existing.LoadMemories,
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -171,6 +181,12 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.TitlePrompt, req.Visibility, req.AutoTitle, req.Tools); err != nil {
 		internalError(w, err)
 		return
+	}
+	if req.LoadMemories != existing.LoadMemories {
+		if err := s.store.SetCharacterLoadMemories(id, req.LoadMemories); err != nil {
+			internalError(w, err)
+			return
+		}
 	}
 	if req.HiddenMessages != nil {
 		if err := s.store.ReplaceCharacterHiddenMessages(id, *req.HiddenMessages); err != nil {
