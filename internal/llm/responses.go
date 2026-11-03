@@ -197,8 +197,13 @@ func ResponsesToChatSSE(r io.Reader) io.Reader {
 
 // responsesConverter turns Responses events into chat-completions frames.
 type responsesConverter struct {
-	w             io.Writer
-	toolIndex     map[int]int // Responses output_index → chat tool_calls index
+	w         io.Writer
+	toolIndex map[int]int // Responses output_index → chat tool_calls index
+	// argsSent marks chat tool_calls indexes whose arguments have been
+	// forwarded. Arguments normally stream as deltas, but a call can arrive
+	// with them only in its .done events (seen with parallel calls), so those
+	// fill in for any call that got no deltas.
+	argsSent      map[int]bool
 	nextTool      int
 	sawToolCall   bool
 	finishWritten bool
@@ -295,29 +300,27 @@ func (c *responsesConverter) onEvent(data string) error {
 	}
 	switch ev.Type {
 	case "response.output_item.added":
-		var item struct {
-			Type   string `json:"type"`
-			CallID string `json:"call_id"`
-			Name   string `json:"name"`
-		}
+		var item functionCallItem
 		if json.Unmarshal(ev.Item, &item) == nil && item.Type == "function_call" {
-			c.sawToolCall = true
-			if c.toolIndex == nil {
-				c.toolIndex = map[int]int{}
+			_, err := c.startToolCall(ev.OutputIndex, item)
+			return err
+		}
+	case "response.output_item.done":
+		var item functionCallItem
+		if json.Unmarshal(ev.Item, &item) == nil && item.Type == "function_call" {
+			k, ok := c.toolIndex[ev.OutputIndex]
+			if !ok {
+				// No .added event for this call: emit it whole.
+				var err error
+				if k, err = c.startToolCall(ev.OutputIndex, item); err != nil {
+					return err
+				}
 			}
-			k := c.nextTool
-			c.nextTool++
-			c.toolIndex[ev.OutputIndex] = k
-			return c.writeChunk(map[string]any{
-				"choices": []any{map[string]any{"index": 0, "delta": map[string]any{
-					"tool_calls": []any{map[string]any{
-						"index":    k,
-						"id":       item.CallID,
-						"type":     "function",
-						"function": map[string]any{"name": item.Name, "arguments": ""},
-					}},
-				}}},
-			})
+			return c.fillToolArgs(k, item.Arguments)
+		}
+	case "response.function_call_arguments.done":
+		if k, ok := c.toolIndex[ev.OutputIndex]; ok {
+			return c.fillToolArgs(k, ev.Arguments)
 		}
 	case "response.output_text.delta":
 		if ev.Delta != "" {
@@ -327,14 +330,8 @@ func (c *responsesConverter) onEvent(data string) error {
 		}
 	case "response.function_call_arguments.delta":
 		if k, ok := c.toolIndex[ev.OutputIndex]; ok && ev.Delta != "" {
-			return c.writeChunk(map[string]any{
-				"choices": []any{map[string]any{"index": 0, "delta": map[string]any{
-					"tool_calls": []any{map[string]any{
-						"index":    k,
-						"function": map[string]any{"arguments": ev.Delta},
-					}},
-				}}},
-			})
+			c.argsSent[k] = true
+			return c.writeToolArgs(k, ev.Delta)
 		}
 	case "response.completed", "response.incomplete":
 		return c.finish(ev)
@@ -342,6 +339,58 @@ func (c *responsesConverter) onEvent(data string) error {
 		return fmt.Errorf("responses: stream error: %s", ev.errorDetail())
 	}
 	return nil
+}
+
+// functionCallItem is the item of a function_call output event.
+type functionCallItem struct {
+	Type      string `json:"type"`
+	CallID    string `json:"call_id"`
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
+// startToolCall assigns the next chat tool_calls index to a Responses output
+// item and emits its opening frame (id and name, empty arguments).
+func (c *responsesConverter) startToolCall(outputIndex int, item functionCallItem) (int, error) {
+	c.sawToolCall = true
+	if c.toolIndex == nil {
+		c.toolIndex = map[int]int{}
+		c.argsSent = map[int]bool{}
+	}
+	k := c.nextTool
+	c.nextTool++
+	c.toolIndex[outputIndex] = k
+	return k, c.writeChunk(map[string]any{
+		"choices": []any{map[string]any{"index": 0, "delta": map[string]any{
+			"tool_calls": []any{map[string]any{
+				"index":    k,
+				"id":       item.CallID,
+				"type":     "function",
+				"function": map[string]any{"name": item.Name, "arguments": ""},
+			}},
+		}}},
+	})
+}
+
+// fillToolArgs emits a call's complete arguments from a .done event, unless
+// they already arrived as deltas.
+func (c *responsesConverter) fillToolArgs(k int, args string) error {
+	if c.argsSent[k] || args == "" {
+		return nil
+	}
+	c.argsSent[k] = true
+	return c.writeToolArgs(k, args)
+}
+
+func (c *responsesConverter) writeToolArgs(k int, args string) error {
+	return c.writeChunk(map[string]any{
+		"choices": []any{map[string]any{"index": 0, "delta": map[string]any{
+			"tool_calls": []any{map[string]any{
+				"index":    k,
+				"function": map[string]any{"arguments": args},
+			}},
+		}}},
+	})
 }
 
 // finish emits the terminal chat-completions frame carrying finish_reason and

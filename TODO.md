@@ -6,10 +6,6 @@ Completed work is archived in [`docs/archive/TODO-completed.md`](docs/archive/TO
 
 --
 
-## Bugs
-
-- [ ] **Parallel tool calls lose their arguments on Responses-API servers** (`internal/llm/responses.go:328`). In conversation 102 (`gpt-sol` on the Codex server) the model made six parallel note calls; all six arrived with `"arguments": ""` and failed with `invalid args: unexpected end of JSON input`, then worked when retried one at a time. The converter only forwards arguments from `response.function_call_arguments.delta` and ignores `response.function_call_arguments.done` / `response.output_item.done` (the `Arguments` field on `responsesEvent`, `responses.go:213`, is never read). Likely cause: for parallel calls the server sends arguments only in the final event. Not yet confirmed against a wire capture (successful requests aren't in `model_errors.log`; needs a `--token-log` run). Fix: track whether each tool index got any deltas and, if not, emit the full arguments from the `.done` event.
-
 ## Notes, memory and tools (to review one by one)
 
 Raised by conversation 102, where the general assistant's opening `note_list` dumped every adventure note (with spoilers) to find `u.memories`. Notes were built for the choose-your-own-adventure games and later repurposed as memory; the games are no longer used. Each item below needs a decision before any work.

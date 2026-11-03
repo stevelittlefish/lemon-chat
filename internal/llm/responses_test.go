@@ -163,6 +163,101 @@ func TestResponsesToChatSSEToolCalls(t *testing.T) {
 	}
 }
 
+// reassembleToolCalls rebuilds tool calls by chat index from converted frames,
+// concatenating argument fragments the way the chat handler does.
+func reassembleToolCalls(t *testing.T, frames []map[string]any) map[int][3]string {
+	t.Helper()
+	calls := map[int][3]string{} // index → {id, name, arguments}
+	for _, f := range frames {
+		choices, _ := f["choices"].([]any)
+		if len(choices) == 0 {
+			continue
+		}
+		delta, _ := choices[0].(map[string]any)["delta"].(map[string]any)
+		tcs, _ := delta["tool_calls"].([]any)
+		for _, tcAny := range tcs {
+			tc := tcAny.(map[string]any)
+			k := int(tc["index"].(float64))
+			c := calls[k]
+			if v, ok := tc["id"].(string); ok && v != "" {
+				c[0] = v
+			}
+			fn, _ := tc["function"].(map[string]any)
+			if v, ok := fn["name"].(string); ok && v != "" {
+				c[1] = v
+			}
+			if v, ok := fn["arguments"].(string); ok {
+				c[2] += v
+			}
+			calls[k] = c
+		}
+	}
+	return calls
+}
+
+// Parallel calls can arrive with their arguments only in the .done events and
+// no deltas (conversation 102: every call in a batch of six ran with "").
+func TestResponsesToChatSSEParallelToolCallsArgsOnlyInDone(t *testing.T) {
+	in := sse(
+		`{"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","call_id":"a","name":"note_save","arguments":""}}`,
+		`{"type":"response.output_item.added","output_index":2,"item":{"type":"function_call","call_id":"b","name":"note_list","arguments":""}}`,
+		`{"type":"response.output_item.added","output_index":3,"item":{"type":"function_call","call_id":"c","name":"note_load","arguments":""}}`,
+		`{"type":"response.function_call_arguments.done","output_index":1,"arguments":"{\"key\":\"c.x\",\"value\":\"v\"}"}`,
+		`{"type":"response.output_item.done","output_index":1,"item":{"type":"function_call","call_id":"a","name":"note_save","arguments":"{\"key\":\"c.x\",\"value\":\"v\"}"}}`,
+		// Only output_item.done carries call b's arguments.
+		`{"type":"response.output_item.done","output_index":2,"item":{"type":"function_call","call_id":"b","name":"note_list","arguments":"{\"prefix\":\"c\"}"}}`,
+		`{"type":"response.function_call_arguments.done","output_index":3,"arguments":"{\"key\":\"c.x\"}"}`,
+		`{"type":"response.completed","response":{"status":"completed"}}`,
+	)
+	calls := reassembleToolCalls(t, collectFrames(t, ResponsesToChatSSE(strings.NewReader(in))))
+	want := map[int][3]string{
+		0: {"a", "note_save", `{"key":"c.x","value":"v"}`},
+		1: {"b", "note_list", `{"prefix":"c"}`},
+		2: {"c", "note_load", `{"key":"c.x"}`},
+	}
+	if len(calls) != len(want) {
+		t.Fatalf("got %d calls, want %d: %v", len(calls), len(want), calls)
+	}
+	for k, w := range want {
+		if calls[k] != w {
+			t.Errorf("call %d = %v, want %v", k, calls[k], w)
+		}
+	}
+}
+
+// A call reported only by output_item.done (no .added) is emitted whole.
+func TestResponsesToChatSSEToolCallWithoutAdded(t *testing.T) {
+	in := sse(
+		`{"type":"response.output_item.done","output_index":0,"item":{"type":"function_call","call_id":"c1","name":"get_time","arguments":"{}"}}`,
+		`{"type":"response.completed","response":{"status":"completed"}}`,
+	)
+	frames := collectFrames(t, ResponsesToChatSSE(strings.NewReader(in)))
+	calls := reassembleToolCalls(t, frames)
+	if got, want := calls[0], [3]string{"c1", "get_time", "{}"}; len(calls) != 1 || got != want {
+		t.Errorf("calls = %v, want only %v", calls, want)
+	}
+	last := frames[len(frames)-1]["choices"].([]any)[0].(map[string]any)
+	if last["finish_reason"] != "tool_calls" {
+		t.Errorf("finish = %v, want tool_calls", last["finish_reason"])
+	}
+}
+
+// Arguments that streamed as deltas are not repeated by the .done events.
+func TestResponsesToChatSSEToolArgsNotDuplicated(t *testing.T) {
+	in := sse(
+		`{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","call_id":"c1","name":"roll_dice"}}`,
+		`{"type":"response.function_call_arguments.delta","output_index":0,"delta":"{\"notation\":"}`,
+		`{"type":"response.function_call_arguments.delta","output_index":0,"delta":"\"2d6\"}"}`,
+		`{"type":"response.function_call_arguments.done","output_index":0,"arguments":"{\"notation\":\"2d6\"}"}`,
+		`{"type":"response.output_item.done","output_index":0,"item":{"type":"function_call","call_id":"c1","name":"roll_dice","arguments":"{\"notation\":\"2d6\"}"}}`,
+		`{"type":"response.completed","response":{"status":"completed"}}`,
+	)
+	calls := reassembleToolCalls(t, collectFrames(t, ResponsesToChatSSE(strings.NewReader(in))))
+	if got := calls[0][2]; got != `{"notation":"2d6"}` {
+		t.Errorf("arguments = %q, want them once", got)
+	}
+}
+
 func TestResponsesToChatSSEError(t *testing.T) {
 	in := sse(`{"type":"response.failed","response":{"status":"failed"},"message":"boom"}`)
 	_, err := readChatCompletionsStream(ResponsesToChatSSE(strings.NewReader(in)), nil)
