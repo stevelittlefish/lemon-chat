@@ -16,17 +16,23 @@ type CharacterHiddenMessage struct {
 }
 
 type Character struct {
-	ID             int64    `json:"id"`
-	Name           string   `json:"name"`
-	Model          string   `json:"model"`
-	SystemPrompt   *string  `json:"system_prompt"`
-	FirstMessage   *string  `json:"first_message"`
-	TitlePrompt    *string  `json:"title_prompt"`
-	CreatedBy      int64    `json:"created_by"`
-	CreatedByName  string   `json:"created_by_name"`
-	Visibility     string   `json:"visibility"`
-	AutoTitle      bool     `json:"auto_title"`
-	IsDefault      bool     `json:"is_default"`
+	ID            int64   `json:"id"`
+	Name          string  `json:"name"`
+	Model         string  `json:"model"`
+	SystemPrompt  *string `json:"system_prompt"`
+	FirstMessage  *string `json:"first_message"`
+	TitlePrompt   *string `json:"title_prompt"`
+	CreatedBy     int64   `json:"created_by"`
+	CreatedByName string  `json:"created_by_name"`
+	Visibility    string  `json:"visibility"`
+	AutoTitle     bool    `json:"auto_title"`
+	IsDefault     bool    `json:"is_default"`
+	// IsRecommended puts the character in the picker's top section (silver
+	// star) beside the default. Several may be recommended.
+	IsRecommended bool `json:"is_recommended"`
+	// IsDisabled hides the character from every picker and refuses new
+	// conversations with it, without deleting it. Existing ones carry on.
+	IsDisabled     bool     `json:"is_disabled"`
 	Tools          []string `json:"tools"`
 	AvatarFilename *string  `json:"-"`
 	HasAvatar      bool     `json:"has_avatar"`
@@ -40,7 +46,7 @@ func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) 
 	rows, err := s.db.Query(
 		`SELECT c.id, c.name, c.model, c.system_prompt, c.first_message, c.title_prompt, c.created_by,
 		        COALESCE(u.display_name, u.username) as created_by_name,
-		        c.visibility, c.auto_title, c.is_default, c.tools, c.avatar_filename, c.created_at, c.updated_at
+		        c.visibility, c.auto_title, c.is_default, c.is_recommended, c.is_disabled, c.tools, c.avatar_filename, c.created_at, c.updated_at
 		 FROM character c
 		 LEFT JOIN user u ON u.id = c.created_by
 		 WHERE c.visibility != 'private' OR c.created_by = ? OR ?
@@ -54,13 +60,15 @@ func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) 
 	var chars []Character
 	for rows.Next() {
 		var c Character
-		var autoTitle, isDefault int
+		var autoTitle, isDefault, isRecommended, isDisabled int
 		var toolsJSON sql.NullString
-		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.CreatedByName, &c.Visibility, &autoTitle, &isDefault, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.CreatedByName, &c.Visibility, &autoTitle, &isDefault, &isRecommended, &isDisabled, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		c.AutoTitle = autoTitle != 0
 		c.IsDefault = isDefault != 0
+		c.IsRecommended = isRecommended != 0
+		c.IsDisabled = isDisabled != 0
 		c.HasAvatar = c.AvatarFilename != nil
 		if toolsJSON.Valid && toolsJSON.String != "" {
 			json.Unmarshal([]byte(toolsJSON.String), &c.Tools) //nolint:errcheck
@@ -75,12 +83,12 @@ func (s *Store) ListCharacters(userID int64, isAdmin bool) ([]Character, error) 
 
 func (s *Store) GetCharacter(id int64) (*Character, error) {
 	c := &Character{}
-	var autoTitle, isDefault int
+	var autoTitle, isDefault, isRecommended, isDisabled int
 	var toolsJSON sql.NullString
 	err := s.db.QueryRow(
-		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, is_default, tools, avatar_filename, created_at, updated_at
+		`SELECT id, name, model, system_prompt, first_message, title_prompt, created_by, visibility, auto_title, is_default, is_recommended, is_disabled, tools, avatar_filename, created_at, updated_at
 		 FROM character WHERE id = ?`, id,
-	).Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &isDefault, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.Name, &c.Model, &c.SystemPrompt, &c.FirstMessage, &c.TitlePrompt, &c.CreatedBy, &c.Visibility, &autoTitle, &isDefault, &isRecommended, &isDisabled, &toolsJSON, &c.AvatarFilename, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -89,6 +97,8 @@ func (s *Store) GetCharacter(id int64) (*Character, error) {
 	}
 	c.AutoTitle = autoTitle != 0
 	c.IsDefault = isDefault != 0
+	c.IsRecommended = isRecommended != 0
+	c.IsDisabled = isDisabled != 0
 	c.HasAvatar = c.AvatarFilename != nil
 	if toolsJSON.Valid && toolsJSON.String != "" {
 		json.Unmarshal([]byte(toolsJSON.String), &c.Tools) //nolint:errcheck
@@ -201,6 +211,14 @@ func (s *Store) SetDefaultCharacter(id int64) error {
 
 func (s *Store) ClearDefaultCharacter() error {
 	_, err := s.db.Exec(`UPDATE character SET is_default = 0 WHERE is_default = 1`)
+	return err
+}
+
+// SetCharacterPlacement sets whether a character is recommended (shown in the
+// picker's top section) and whether it is disabled (hidden everywhere).
+func (s *Store) SetCharacterPlacement(id int64, recommended, disabled bool) error {
+	_, err := s.db.Exec(`UPDATE character SET is_recommended = ?, is_disabled = ? WHERE id = ?`,
+		boolToInt(recommended), boolToInt(disabled), id)
 	return err
 }
 

@@ -197,6 +197,47 @@ function renderDefaultSection(character) {
   `;
 }
 
+function renderPlacementSection(character) {
+  const isPrivate = character.visibility === 'private';
+  // The default already has the top spot; private and disabled characters can't be recommended.
+  const cantRecommend = isPrivate || character.is_disabled || character.is_default;
+  return `
+    <label class="character-form-lbl">Picker</label>
+    <div class="char-placement">
+      <label class="char-placement-check"${cantRecommend ? ' title="The default, private and disabled characters cannot be recommended"' : ''}>
+        <input type="checkbox" id="char-recommended" ${character.is_recommended ? 'checked' : ''} ${cantRecommend ? 'disabled' : ''}>
+        <img src="/assets/icons/star-silver.svg" width="13" height="13" alt="">
+        Recommended — shown beside the default at the top of the picker
+      </label>
+      <label class="char-placement-check"${character.is_default ? ' title="Choose another default first"' : ''}>
+        <input type="checkbox" id="char-disabled" ${character.is_disabled ? 'checked' : ''} ${character.is_default ? 'disabled' : ''}>
+        Disabled — hidden from the pickers and can't start new chats; existing chats carry on
+      </label>
+    </div>
+  `;
+}
+
+function attachPlacementSection(character) {
+  const errorEl = document.getElementById('char-err');
+  const update = async (patch, input) => {
+    input.disabled = true;
+    try {
+      const res = await charactersApi.setPlacement(character.id, patch);
+      character.is_recommended = res.is_recommended;
+      character.is_disabled    = res.is_disabled;
+    } catch (err) {
+      input.checked = !input.checked;
+      if (errorEl) { errorEl.hidden = false; errorEl.textContent = err.message; }
+    }
+    document.getElementById('char-placement-row').innerHTML = renderPlacementSection(character);
+    attachPlacementSection(character);
+  };
+  const rec = document.getElementById('char-recommended');
+  const dis = document.getElementById('char-disabled');
+  rec?.addEventListener('change', () => update({ recommended: rec.checked }, rec));
+  dis?.addEventListener('change', () => update({ disabled: dis.checked }, dis));
+}
+
 function attachDefaultSection(character) {
   const setBtn   = document.getElementById('char-set-default-btn');
   const unsetBtn = document.getElementById('char-unset-default-btn');
@@ -211,6 +252,8 @@ function attachDefaultSection(character) {
         character.is_default = true;
         document.getElementById('char-default-row').innerHTML = renderDefaultSection(character);
         attachDefaultSection(character);
+        document.getElementById('char-placement-row').innerHTML = renderPlacementSection(character);
+        attachPlacementSection(character);
       } catch (err) {
         setBtn.disabled    = false;
         setBtn.textContent = 'Set as default';
@@ -228,6 +271,8 @@ function attachDefaultSection(character) {
         character.is_default = false;
         document.getElementById('char-default-row').innerHTML = renderDefaultSection(character);
         attachDefaultSection(character);
+        document.getElementById('char-placement-row').innerHTML = renderPlacementSection(character);
+        attachPlacementSection(character);
       } catch (err) {
         unsetBtn.disabled    = false;
         unsetBtn.textContent = 'Remove as default';
@@ -328,6 +373,9 @@ function renderForm(character, modelsData) {
         ${user.is_admin && !isNew ? `
         <div class="character-form-row" id="char-default-row">
           ${renderDefaultSection(character)}
+        </div>
+        <div class="character-form-row" id="char-placement-row">
+          ${renderPlacementSection(character)}
         </div>` : ''}
       </div>
       <div class="field-msg field-msg--error" id="char-err" hidden></div>
@@ -381,6 +429,7 @@ function renderForm(character, modelsData) {
 
   if (user.is_admin && !isNew && character) {
     attachDefaultSection(character);
+    attachPlacementSection(character);
   }
 }
 

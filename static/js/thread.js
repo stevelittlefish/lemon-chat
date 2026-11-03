@@ -416,13 +416,20 @@ export function showEmpty() {
 }
 
 export function showPicker(models, characters, onSelect) {
+  // Top section: the default (gold star) then recommended characters (silver).
   const defaultChar = characters.find(c => c.is_default) ?? null;
-  const restChars   = characters.filter(c => !c.is_default);
+  const recommended = characters.filter(c => c.is_recommended && !c.is_default);
+  const featured    = defaultChar ? [defaultChar, ...recommended] : recommended;
+  const restChars   = characters.filter(c => !c.is_default && !c.is_recommended);
 
   function charCard(c) {
+    const featuredCard = c.is_default || c.is_recommended;
+    const star = c.is_default
+      ? `<span class="picker-card-star" title="Default">${icon('star', 11)}</span>`
+      : c.is_recommended ? `<span class="picker-card-star picker-card-star--silver" title="Recommended">${icon('star', 11)}</span>` : '';
     return `
-      <button class="picker-card${c.is_default ? ' picker-card--default' : ''}" data-type="character" data-id="${c.id}">
-        ${c.is_default ? `<span class="picker-card-star">${icon('star', 11)}</span>` : ''}
+      <button class="picker-card${featuredCard ? ' picker-card--featured' : ''}" data-type="character" data-id="${c.id}">
+        ${star}
         ${c.has_avatar
           ? `<div class="picker-card-avatar"><img src="/api/characters/${c.id}/avatar" alt=""></div>`
           : `<div class="picker-card-avatar picker-card-avatar--placeholder">${icon('drama', 20)}</div>`
@@ -445,10 +452,10 @@ export function showPicker(models, characters, onSelect) {
 
   threadEl.innerHTML = `
     <div class="picker">
-      ${defaultChar ? `
+      ${featured.length ? `
         <div class="picker-section">
-          <div class="picker-section-label">default</div>
-          <div class="picker-grid">${charCard(defaultChar)}</div>
+          <div class="picker-section-label">${recommended.length ? 'recommended' : 'default'}</div>
+          <div class="picker-grid">${featured.map(charCard).join('')}</div>
         </div>
       ` : ''}
       <div class="picker-section">

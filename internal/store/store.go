@@ -937,6 +937,21 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v44 → v45 complete")
 	}
 
+	if version < 46 {
+		log.Println("store: migrating v45 → v46 (add character.is_recommended and character.is_disabled)")
+		if _, err := s.db.Exec(`ALTER TABLE character ADD COLUMN is_recommended INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`ALTER TABLE character ADD COLUMN is_disabled INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (46, ?)`, now()); err != nil {
+			return err
+		}
+		version = 46
+		log.Println("store: migration v45 → v46 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

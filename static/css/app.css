@@ -1073,16 +1073,16 @@ html, body {
   color: var(--fg-muted);
 }
 
-.picker-card--default {
+.picker-card--featured {
   position: relative;
 }
 
-.picker-card--default .picker-card-avatar {
+.picker-card--featured .picker-card-avatar {
   width: 56px;
   height: 56px;
 }
 
-.picker-card--default .picker-card-avatar--placeholder {
+.picker-card--featured .picker-card-avatar--placeholder {
   font-size: 28px;
 }
 
@@ -1093,6 +1093,11 @@ html, body {
   color: var(--lemon-500);
   display: flex;
   line-height: 1;
+}
+
+.picker-card-star--silver,
+.model-picker-option-icon--silver {
+  color: var(--fg-faint);
 }
 
 /* ── Markdown modal ─────────────────────────────────────────── */

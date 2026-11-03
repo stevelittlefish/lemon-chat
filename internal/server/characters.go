@@ -163,6 +163,10 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "cannot set visibility to private while this is the default character")
 		return
 	}
+	if existing.IsRecommended && req.Visibility == "private" {
+		writeError(w, http.StatusBadRequest, "cannot set visibility to private while this character is recommended")
+		return
+	}
 	log.Printf("Updating character id=%d name=%q user_id=%d", id, req.Name, user.ID)
 	if err := s.store.UpdateCharacter(id, req.Name, req.Model, req.SystemPrompt, req.FirstMessage, req.TitlePrompt, req.Visibility, req.AutoTitle, req.Tools); err != nil {
 		internalError(w, err)
@@ -290,12 +294,73 @@ func (s *Server) handleSetDefaultCharacter(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, "cannot set a private character as the default")
 		return
 	}
+	if char.IsDisabled {
+		writeError(w, http.StatusBadRequest, "cannot set a disabled character as the default")
+		return
+	}
 	log.Printf("Setting default character id=%d name=%q", id, char.Name)
 	if err := s.store.SetDefaultCharacter(id); err != nil {
 		internalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleSetCharacterPlacement lets an admin recommend a character (silver star
+// in the picker's top section) or disable it (hidden from every picker, no new
+// conversations, but kept). Omitted fields keep their current value.
+func (s *Server) handleSetCharacterPlacement(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	char, err := s.store.GetCharacter(id)
+	if notFoundOr500(w, err) {
+		return
+	}
+	var req struct {
+		Recommended *bool `json:"recommended"`
+		Disabled    *bool `json:"disabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	recommended, disabled := char.IsRecommended, char.IsDisabled
+	if req.Recommended != nil {
+		recommended = *req.Recommended
+	}
+	if req.Disabled != nil {
+		disabled = *req.Disabled
+	}
+	if disabled && char.IsDefault {
+		writeError(w, http.StatusBadRequest, "cannot disable the default character — choose another default first")
+		return
+	}
+	if disabled {
+		recommended = false
+	}
+	if recommended && char.Visibility == "private" {
+		writeError(w, http.StatusBadRequest, "cannot recommend a private character")
+		return
+	}
+	log.Printf("Setting character placement id=%d name=%q recommended=%t disabled=%t admin_id=%d", id, char.Name, recommended, disabled, currentUser(r).ID)
+	if err := s.store.SetCharacterPlacement(id, recommended, disabled); err != nil {
+		internalError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"is_recommended": recommended, "is_disabled": disabled})
+}
+
+// refuseDisabledCharacter writes a 400 and returns true if id names a disabled
+// character, for handlers that would start using it.
+func (s *Server) refuseDisabledCharacter(w http.ResponseWriter, id int64) bool {
+	char, err := s.store.GetCharacter(id)
+	if err != nil || !char.IsDisabled {
+		return false // missing characters fail later with their usual error
+	}
+	writeError(w, http.StatusBadRequest, fmt.Sprintf("%s is disabled", char.Name))
+	return true
 }
 
 func (s *Server) handleClearDefaultCharacter(w http.ResponseWriter, r *http.Request) {

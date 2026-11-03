@@ -171,6 +171,7 @@ export const characters = {
   deleteAvatar: (id)       => request('DELETE', `/api/characters/${id}/avatar`),
   setDefault:   (id)       => request('POST',   `/api/characters/${id}/set-default`),
   clearDefault: ()         => request('DELETE', '/api/characters/default'),
+  setPlacement: (id, patch) => request('PATCH', `/api/characters/${id}/placement`, patch),
 };
 
 // Completions

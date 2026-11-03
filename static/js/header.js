@@ -14,10 +14,11 @@ let state = {
   tokenStats: null, // { prompt: number, completion: number } | null
 };
 
-// Characters whose model this user may use. state.characters keeps the rest so
-// an existing conversation with one still shows its name.
+// Characters this user can start a chat with: not disabled, on a model they may
+// use. state.characters keeps the rest so an existing conversation with one
+// still shows its name.
 function pickableCharacters() {
-  return state.characters.filter(c => c.model_available !== false);
+  return state.characters.filter(c => c.model_available !== false && !c.is_disabled);
 }
 
 export function init({ models, characters, onChange = null }) {
@@ -139,18 +140,22 @@ function toggleDropdown() {
   const isCSel = state.selection?.type === 'character';
 
   const defaultChar = pickableCharacters().find(c => c.is_default) ?? null;
-  const restChars   = pickableCharacters().filter(c => !c.is_default);
+  const recommended = pickableCharacters().filter(c => c.is_recommended && !c.is_default);
+  const featured    = defaultChar ? [defaultChar, ...recommended] : recommended;
+  const restChars   = pickableCharacters().filter(c => !c.is_default && !c.is_recommended);
 
   let html = '';
 
-  if (defaultChar) {
-    html += `<div class="model-picker-dropdown-label">default</div>`;
-    const sel = isCSel && defaultChar.id === state.selection.id;
-    html += `
-      <div class="model-picker-option${sel ? ' selected' : ''}" data-type="character" data-id="${defaultChar.id}">
-        <span class="model-picker-option-icon">${icon(sel ? 'check' : 'star', 13)}</span>
-        <span class="model-picker-option-name">${escapeHtml(defaultChar.name)}</span>
+  if (featured.length) {
+    html += `<div class="model-picker-dropdown-label">${recommended.length ? 'recommended' : 'default'}</div>`;
+    html += featured.map(c => {
+      const sel = isCSel && c.id === state.selection.id;
+      return `
+      <div class="model-picker-option${sel ? ' selected' : ''}" data-type="character" data-id="${c.id}">
+        <span class="model-picker-option-icon${c.is_default ? '' : ' model-picker-option-icon--silver'}">${icon(sel ? 'check' : 'star', 13)}</span>
+        <span class="model-picker-option-name">${escapeHtml(c.name)}</span>
       </div>`;
+    }).join('');
     html += `<div class="model-picker-divider"></div>`;
   }
 
@@ -214,7 +219,7 @@ function toggleDropdown() {
 function selectionIcon() {
   if (state.selection?.type === 'character') {
     const char = state.characters.find(c => c.id === state.selection.id);
-    return char?.is_default ? 'star' : 'drama';
+    return char?.is_default || char?.is_recommended ? 'star' : 'drama';
   }
   return 'cpu';
 }

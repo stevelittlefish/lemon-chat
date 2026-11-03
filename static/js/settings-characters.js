@@ -180,14 +180,17 @@ function renderCharRows(list, emptyMsg, showOwner) {
     const avatarHtml = c.has_avatar
       ? `<img class="avatar-sm" src="/api/characters/${c.id}/avatar" alt="">`
       : '';
-    const starHtml = c.is_default ? `<img src="/assets/icons/star-mustard.svg" class="char-list-star" width="12" height="12" alt="" title="Default character">` : '';
+    const starHtml = c.is_default
+      ? `<img src="/assets/icons/star-mustard.svg" class="char-list-star" width="12" height="12" alt="" title="Default character">`
+      : c.is_recommended ? `<img src="/assets/icons/star-silver.svg" class="char-list-star" width="12" height="12" alt="" title="Recommended character">` : '';
+    const disabledChip = c.is_disabled ? ` <span class="chip" title="Hidden from the chat pickers">disabled</span>` : '';
     const ownerCell = showOwner ? `<td class="char-col-owner">${escapeHtml(c.created_by_name)}</td>` : '';
     return `
-      <tr data-id="${c.id}">
+      <tr data-id="${c.id}"${c.is_disabled ? ' class="char-row--disabled"' : ''}>
         <td class="char-col-name"><div class="char-name-cell">${starHtml}${avatarHtml}${escapeHtml(c.name)}</div></td>
         ${ownerCell}
         <td class="char-col-model"><span class="chip">${escapeHtml(c.model)}</span></td>
-        <td class="char-col-visibility"><span class="chip character-chip--${c.visibility}">${visLabel}</span></td>
+        <td class="char-col-visibility"><span class="chip character-chip--${c.visibility}">${visLabel}</span>${disabledChip}</td>
         <td class="char-col-actions"><div class="user-row-actions">${exportBtn}${editBtn}${deleteBtn}</div></td>
       </tr>`;
   }).join('');

@@ -600,6 +600,12 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		if char == nil {
 			return
 		}
+		// Switching a conversation to a disabled character is refused; one that
+		// already uses it carries on (the conv.CharacterID branch below).
+		if char.IsDisabled && (conv.CharacterID == nil || *conv.CharacterID != char.ID) {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("%s is disabled", char.Name))
+			return
+		}
 		usedCharacterID = req.CharacterID
 		usedCharacter = char
 		modelName = char.Model

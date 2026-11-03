@@ -73,7 +73,7 @@ function getConversationIdFromUrl() {
 
 function showPickerScreen() {
   composerContainer.classList.add('hidden');
-  thread.showPicker(modelList, characterList.filter(c => c.model_available !== false), handlePickerSelect);
+  thread.showPicker(modelList, characterList.filter(c => c.model_available !== false && !c.is_disabled), handlePickerSelect);
 }
 
 async function handlePickerSelect(sel) {
