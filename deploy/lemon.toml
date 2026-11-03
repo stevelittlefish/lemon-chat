@@ -76,11 +76,10 @@ restricted = true
 # OpenAI via ChatGPT/Codex account login (Responses API, shared OAuth token).
 # Connect the account with `lemon-chat --openai-login` or Settings → Tools.
 [[model_server]]
-name       = "codex"
-api_base   = "https://chatgpt.com/backend-api/codex"
-api        = "responses"
-auth       = "oauth"
-restricted = true
+name     = "codex"
+api_base = "https://chatgpt.com/backend-api/codex"
+api      = "responses"
+auth     = "oauth"
 
 # --- Codex
 
