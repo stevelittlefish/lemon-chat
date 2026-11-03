@@ -952,7 +952,105 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v45 → v46 complete")
 	}
 
+	if version < 47 {
+		log.Println("store: migrating v46 → v47 (remove the notes feature: drop note table, strip notes tools from characters)")
+		if err := s.migrateRemoveNotes(); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (47, ?)`, now()); err != nil {
+			return err
+		}
+		version = 47
+		log.Println("store: migration v46 → v47 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
+	return nil
+}
+
+// removedNoteTools are the tool IDs the notes feature contributed to
+// character.tools: the compound group and its members.
+var removedNoteTools = map[string]bool{
+	"notes": true, "note_save": true, "note_load": true,
+	"note_list": true, "note_delete": true, "note_append": true,
+}
+
+// migrateRemoveNotes drops the note table and removes the notes tools from
+// every character's tool list, in one transaction.
+func (s *Store) migrateRemoveNotes() error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	var count, exists int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'note'`).Scan(&exists); err != nil {
+		return err
+	}
+	if exists > 0 {
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM note`).Scan(&count); err != nil {
+			return fmt.Errorf("count notes: %w", err)
+		}
+		log.Printf("store: migrateRemoveNotes — dropping note table with %d note(s)", count)
+	} else {
+		log.Println("store: migrateRemoveNotes — no note table to drop")
+	}
+
+	rows, err := tx.Query(`SELECT id, tools FROM character WHERE tools IS NOT NULL AND tools != ''`)
+	if err != nil {
+		return fmt.Errorf("list character tools: %w", err)
+	}
+	type update struct {
+		id   int64
+		json string
+	}
+	var updates []update
+	for rows.Next() {
+		var id int64
+		var toolsJSON string
+		if err := rows.Scan(&id, &toolsJSON); err != nil {
+			rows.Close()
+			return err
+		}
+		var tools []string
+		if json.Unmarshal([]byte(toolsJSON), &tools) != nil {
+			continue
+		}
+		kept := make([]string, 0, len(tools))
+		for _, t := range tools {
+			if !removedNoteTools[t] {
+				kept = append(kept, t)
+			}
+		}
+		if len(kept) == len(tools) {
+			continue
+		}
+		out, err := json.Marshal(kept)
+		if err != nil {
+			rows.Close()
+			return err
+		}
+		updates = append(updates, update{id, string(out)})
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, u := range updates {
+		log.Printf("store:   character id=%d — removing notes tools, tools now %s", u.id, u.json)
+		if _, err := tx.Exec(`UPDATE character SET tools = ? WHERE id = ?`, u.json, u.id); err != nil {
+			return fmt.Errorf("update character %d tools: %w", u.id, err)
+		}
+	}
+
+	if _, err := tx.Exec(`DROP TABLE IF EXISTS note`); err != nil {
+		return fmt.Errorf("drop note table: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	log.Printf("store: migrateRemoveNotes — dropped %d note(s), updated %d character(s)", count, len(updates))
 	return nil
 }
 

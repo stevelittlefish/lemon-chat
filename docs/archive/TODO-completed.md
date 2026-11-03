@@ -243,3 +243,7 @@ Findings from `docs/archive/code_review_2026-06-13.md`, in suggested priority or
 ## Bugs
 
 - [x] **Parallel tool calls lost their arguments on Responses-API servers** (`internal/llm/responses.go`). In conversation 102 (`gpt-sol` on the Codex server) six parallel note calls all ran with `"arguments": ""`. The converter only forwarded `response.function_call_arguments.delta`; it now also takes the complete arguments from `response.function_call_arguments.done` and `response.output_item.done` for any call that got no deltas (never duplicating ones that did), and emits a call reported only by `output_item.done`. Covered by tests; the exact Codex event sequence wasn't captured on the wire.
+
+## Notes, memory and tools
+
+- [x] **Remove the notes feature, including note packs.** Built for the choose-your-own-adventure games and later repurposed (poorly) as memory; no longer used. Removed the `note_*` tools and `notes` group, the notes API and settings page, admin note-pack import and its Tools-page section, and `internal/store/notes.go`. Migration v47 drops the `note` table and strips the notes tool IDs from `character.tools`. `note_to_self` is unrelated and kept (now in `internal/server/tools_state.go`). The spec moved to `docs/archive/note-store-spec.html`.

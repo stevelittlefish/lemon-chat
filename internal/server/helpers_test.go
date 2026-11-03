@@ -78,8 +78,8 @@ func TestLimitRequestBody(t *testing.T) {
 		size                    int
 		wantErr                 bool
 	}{
-		{"json under limit", "/api/notes", "application/json", defaultBodyLimit, false},
-		{"json over limit", "/api/notes", "application/json", defaultBodyLimit + 1, true},
+		{"json under limit", "/api/characters", "application/json", defaultBodyLimit, false},
+		{"json over limit", "/api/characters", "application/json", defaultBodyLimit + 1, true},
 		{"upload over json limit", "/api/conversations/1/attachments", "multipart/form-data; boundary=x", defaultBodyLimit + 1, false},
 		{"upload over limit", "/api/conversations/1/attachments", "multipart/form-data; boundary=x", multipartBodyLimit + 1, true},
 		{"import over json limit", "/api/conversations/import_chat", "application/json", defaultBodyLimit + 1, false},

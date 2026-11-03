@@ -6,12 +6,11 @@ Completed work is archived in [`docs/archive/TODO-completed.md`](docs/archive/TO
 
 --
 
-## Notes, memory and tools (to review one by one)
+## Memory and tools
 
-Raised by conversation 102, where the general assistant's opening `note_list` dumped every adventure note (with spoilers) to find `u.memories`. Notes were built for the choose-your-own-adventure games and later repurposed as memory; the games are no longer used. Each item below needs a decision before any work.
+Raised by conversation 102, where the general assistant's opening `note_list` dumped every adventure note (with spoilers) to find `u.memories`. Notes were built for the choose-your-own-adventure games and later repurposed as memory; the games are no longer used, and the notes feature has now been removed.
 
-- [ ] **Replace notes-as-memory with a real memory system.** Sketch: a `memory` table (one fact per row: user, text, created/updated, source conversation); all of a user's memories put into the system prompt automatically, so no lookup is needed (search only if it grows to hundreds of facts); `memory_save` / `memory_update(id)` / `memory_forget(id)` tools; a settings page to view, edit and delete memories. Starts empty — existing `u.memories` content isn't worth keeping. Open questions: (1) per-character opt-in, or available to every character? (2) save only on "remember…", or let the model decide too?
-- [ ] **Remove the notes feature.** The `note_*` tools and `notes` group (`internal/server/tools_registry.go`, `tools_state_notes.go`), the notes settings page (`static/settings/notes.html`, `static/js/settings-notes.js`), note-pack import (`handleAdminImportNotePack`, `internal/server/admin.go:196`), `internal/store/notes.go`, and a migration dropping the `note` table (destructive — confirm first). Existing notes don't need preserving.
+- [ ] **Build a real memory system** (notes, which were repurposed as memory, have been removed). Sketch: a `memory` table (one fact per row: user, text, created/updated, source conversation); all of a user's memories put into the system prompt automatically, so no lookup is needed (search only if it grows to hundreds of facts); `memory_save` / `memory_update(id)` / `memory_forget(id)` tools; a settings page to view, edit and delete memories. Starts empty — existing `u.memories` content isn't worth keeping. Open questions: (1) per-character opt-in, or available to every character? (2) save only on "remember…", or let the model decide too?
 - [x] **Review every tool: keep, change or remove.** Reviewed one by one; outcome per tool:
   - `get_time` — **keep as is (decided).** Not moving the date into the system prompt: it breaks prompt caching, and models ignore it in long conversations.
   - `searxng` — **keep (decided); description improved** to say results are snippets and to read pages with `fetch_url` before relying on them. Name and ID unchanged.
@@ -22,7 +21,7 @@ Raised by conversation 102, where the general assistant's opening `note_list` du
   - `roll_dice`, `pick_random`, `random_chance` — **keep as is (decided).** Only enabled on characters that want them.
   - `world_state` / `state_*` — **keep as is (decided).** Opt-in; useful for any game or tracker within a conversation, not only the adventures.
   - `note_to_self` — **keep as is (decided).** Essential for games: the model commits to hidden outcomes before narrating, so it can't cheat, and the user can check afterwards via View LLM context. Not part of the notes feature (no-op executor, `tools_state_notes.go:71`; doesn't use the `note` table).
-  - `notes` / `note_*` — see the two items above.
+  - `notes` / `note_*` — **removed (decided and done).**
 - [ ] **Redesign `fetch_url`: outline, sections and find instead of a model rewrite.** Must work well on Gemma 4 (vLLM, 64k context).
   - *Current behaviour, tested on the Wikipedia Python article (~138,000 characters after stripping):* the tool keeps the first 50,000 characters and sends them through a hidden model call (`summariseHTML`, `internal/server/tools_web.go:361`) to rewrite as markdown. On Gemma this was very slow, mostly spent writing a ~2,000-token summary. Facts inside the kept part survived, but ~60% of the article was silently dropped: the "[truncated]" note went into the rewrite and was lost, so for a question past the cut-off the model answered "not mentioned" rather than "not read". About the first 20,700 characters were page junk (language list, navboxes, raw wiki markup) that `htmltext.Strip` kept, wasting ~40% of the budget. Truncation also slices bytes and can split a multi-byte character (`tools_web.go:74`, `:82`).
   - *Rejected:* a goal-based helper call per fetch (every follow-up question about the same page feeds the whole page to Gemma again, and reading the page is the slow part).

@@ -148,13 +148,6 @@ func (s *Server) Handler() http.Handler {
 	// Tools
 	mux.HandleFunc("GET /api/tools", s.requireAuth(s.handleGetTools))
 
-	// Notes
-	mux.HandleFunc("GET /api/notes", s.requireAuth(s.handleListNotes))
-	mux.HandleFunc("GET /api/notes/{id}", s.requireAuth(s.handleGetNote))
-	mux.HandleFunc("PUT /api/notes", s.requireAuth(s.handleUpsertNote))
-	mux.HandleFunc("DELETE /api/notes/{id}", s.requireAuth(s.handleDeleteNote))
-	mux.HandleFunc("PATCH /api/notes/{id}/read-only", s.requireAuth(s.handleSetNoteReadOnly))
-
 	// Conversations
 	mux.HandleFunc("GET /api/conversations", s.requireAuth(s.handleListConversations))
 	mux.HandleFunc("POST /api/conversations", s.requireAuth(s.handleCreateConversation))
@@ -194,7 +187,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/admin/openai/login/begin", s.requireAdmin(s.handleOpenAILoginBegin))
 	mux.HandleFunc("POST /api/admin/openai/login/complete", s.requireAdmin(s.handleOpenAILoginComplete))
 	mux.HandleFunc("POST /api/admin/openai/disconnect", s.requireAdmin(s.handleOpenAIDisconnect))
-	mux.HandleFunc("POST /api/admin/note-packs/import", s.requireAdmin(s.handleAdminImportNotePack))
 
 	// Research
 	mux.HandleFunc("GET /api/research", s.requireAuth(s.handleListResearch))
@@ -252,7 +244,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings/characters/{id}/edit", serveFile(staticDir, "settings/character-edit.html"))
 	mux.HandleFunc("GET /settings/users", serveFile(staticDir, "settings/users.html"))
 	mux.HandleFunc("GET /settings/tools", serveFile(staticDir, "settings/tools.html"))
-	mux.HandleFunc("GET /settings/notes", serveFile(staticDir, "settings/notes.html"))
 	mux.HandleFunc("GET /settings/import_chat", serveFile(staticDir, "settings/import_chat.html"))
 
 	// Static files — no forced no-cache; ETags handle revalidation naturally
@@ -265,7 +256,7 @@ func (s *Server) Handler() http.Handler {
 const (
 	defaultBodyLimit   = 4 << 20                    // JSON API requests
 	multipartBodyLimit = maxUploadBytes + (1 << 20) // image/avatar uploads plus form overhead
-	importBodyLimit    = 32 << 20                   // whole-conversation and note-pack imports
+	importBodyLimit    = 32 << 20                   // whole-conversation imports
 )
 
 // limitRequestBody caps every request body so a client can't make a handler
@@ -275,7 +266,7 @@ func limitRequestBody(next http.Handler) http.Handler {
 		if r.Body != nil && r.Body != http.NoBody {
 			limit := int64(defaultBodyLimit)
 			switch {
-			case r.URL.Path == "/api/conversations/import_chat" || r.URL.Path == "/api/admin/note-packs/import":
+			case r.URL.Path == "/api/conversations/import_chat":
 				limit = importBodyLimit
 			case strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data"):
 				limit = multipartBodyLimit

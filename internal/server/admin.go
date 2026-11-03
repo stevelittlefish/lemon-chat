@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -191,56 +190,6 @@ func (s *Server) handleAdminListModels(w http.ResponseWriter, r *http.Request) {
 	wg.Wait()
 	log.Printf("server: handleAdminListModels — completed %d provider(s) user_id=%d", len(providers), user.ID)
 	writeJSON(w, http.StatusOK, providers)
-}
-
-func (s *Server) handleAdminImportNotePack(w http.ResponseWriter, r *http.Request) {
-	user := currentUser(r)
-
-	var pack struct {
-		ID      string `json:"id"`
-		Name    string `json:"name"`
-		Version string `json:"version"`
-		Notes   []struct {
-			Key      string `json:"key"`
-			Value    string `json:"value"`
-			ReadOnly bool   `json:"read_only"`
-		} `json:"notes"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&pack); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid note pack JSON")
-		return
-	}
-	if pack.ID == "" || pack.Name == "" || pack.Version == "" {
-		writeError(w, http.StatusBadRequest, "note pack must have id, name, and version")
-		return
-	}
-	if len(pack.Notes) == 0 {
-		writeError(w, http.StatusBadRequest, "note pack contains no notes")
-		return
-	}
-
-	log.Printf("Importing note pack id=%q name=%q version=%q notes=%d user_id=%d username=%q",
-		pack.ID, pack.Name, pack.Version, len(pack.Notes), user.ID, user.Username)
-
-	imported := 0
-	for _, n := range pack.Notes {
-		ro := n.ReadOnly
-		note, err := s.store.UpsertNoteAdmin(n.Key, n.Value, &ro, nil, nil)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("note %q: %v", n.Key, err))
-			return
-		}
-		log.Printf("  note id=%d key=%q read_only=%v", note.ID, note.Key, ro)
-		imported++
-	}
-
-	log.Printf("Note pack import complete: %d note(s) imported/updated", imported)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"imported":     imported,
-		"pack_id":      pack.ID,
-		"pack_name":    pack.Name,
-		"pack_version": pack.Version,
-	})
 }
 
 func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {

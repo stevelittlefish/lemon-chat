@@ -73,8 +73,8 @@ func (s *Store) SetUserCanUseRestricted(id int64, allowed bool) error {
 // DeleteUser removes a user and everything they own: sessions, conversations
 // (with their messages and attachments), and the characters they created.
 // Other users' conversations that used one of those characters revert to the
-// character's model, as with DeleteCharacter. Completions, notes and research
-// jobs go via ON DELETE CASCADE.
+// character's model, as with DeleteCharacter. Completions and research jobs go
+// via ON DELETE CASCADE.
 //
 // It returns the attachment disk paths and avatar filenames (the user's and
 // their characters') so the caller can remove the files after commit.

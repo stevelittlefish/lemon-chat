@@ -214,8 +214,8 @@ func TestMigrationsV31AndV32PreserveExistingResearchData(t *testing.T) {
 		t.Fatalf("new Reddit state was not safely defaulted: %+v", job)
 	}
 	var version int
-	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 46 {
-		t.Fatalf("schema version = %d, err=%v; want 46", version, err)
+	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 47 {
+		t.Fatalf("schema version = %d, err=%v; want 47", version, err)
 	}
 	var violations int
 	rows, err := s.db.Query(`PRAGMA foreign_key_check`)

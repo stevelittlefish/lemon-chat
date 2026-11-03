@@ -127,9 +127,8 @@ internal/
     models.go          # model list handler
     characters.go      # character CRUD handlers
     completions.go     # completions CRUD + streaming handlers
-    notes.go           # notes API handlers
     attachments.go     # attachment upload + serve handlers
-    admin.go           # admin user-management, model listing, note-pack import
+    admin.go           # admin user-management, model listing
     oauth_login.go     # admin "Connect OpenAI account" paste-the-code flow
     middleware.go      # session, auth, admin middleware
     errorlog.go        # always-on model_errors.log sink
@@ -144,7 +143,7 @@ internal/
     tools_meta.go      # InitTools, GET /api/tools metadata
     tools_web.go       # fetch_url, SearXNG, Wikipedia tools
     tools_image.go     # generate_image: ComfyUI submit/poll/download + tool schema
-    tools_state_notes.go # world-state and notes tools
+    tools_state.go     # world-state and note_to_self tools
   store/
     store.go           # open DB, run migrations, bootstrap
     users.go           # user queries (incl. full user deletion)
@@ -153,7 +152,6 @@ internal/
     messages.go        # message queries
     characters.go      # character queries
     completions.go     # completion queries
-    notes.go           # note queries
     state.go           # world-state queries
     research.go        # research job queries (incl. resume checkpoints)
     research_reports.go # research report variant queries
@@ -193,7 +191,6 @@ static/
     settings-character-edit.js # character edit page
     settings-characters.js    # characters list page
     settings-import-chat.js   # import chat page
-    settings-notes.js         # notes page
     settings-tools.js         # admin tools page
     settings-users.js         # user management page (typed-confirmation delete)
     vendor/
@@ -213,7 +210,6 @@ static/
     character-edit.html   # character edit page
     characters.html       # characters list page
     import_chat.html      # import chat page
-    notes.html            # notes page
     tools.html            # admin tools page
     users.html            # user management page
   assets/
@@ -277,19 +273,12 @@ Available tools and their config requirements:
 | `state_unset` | World state: unset | — |
 | `state_list` | World state: list | — |
 | `state_clear` | World state: clear | — |
-| `notes` | Notes (compound) | — |
 | `note_to_self` | Note to self | — |
-| `note_save` | Note: save | — |
-| `note_load` | Note: load | — |
-| `note_list` | Note: list | — |
-| `note_delete` | Note: delete | — |
-| `note_append` | Note: append | — |
 
 `InitTools(cfg)` is called once at startup and sets the `Configured` flag on tools that need external services. The frontend reads `GET /api/tools` and shows a config hint for unconfigured tools.
 
 Compound group IDs expand to multiple tools:
 - `world_state` → `state_set`, `state_modify`, `state_unset`, `state_list`, `state_clear`
-- `notes` → `note_save`, `note_load`, `note_list`, `note_delete`, `note_append`
 
 ### Image generation
 

@@ -53,10 +53,6 @@ function renderNav() {
       ${svgCpu}
       Characters
     </a>
-    <a href="/settings/notes" class="snav-item${path === '/settings/notes' ? ' active' : ''}">
-      ${icon('file-text', 16)}
-      Notes
-    </a>
     <div class="snav-group-label">Admin</div>
     <a href="/settings/users" class="snav-item${path === '/settings/users' ? ' active' : ''}">
       ${svgUsers}
@@ -327,7 +323,7 @@ function deleteUser(id) {
   const m = getDeleteModal();
 
   m.body.textContent = `This permanently deletes ${u.username}, along with all of their conversations, ` +
-    'completions, notes, research, uploaded files, and the characters they created. ' +
+    'completions, research, uploaded files, and the characters they created. ' +
     'Other users\' conversations with those characters will switch to the character\'s model. ' +
     'This cannot be undone.';
   m.label.textContent = `Type ${u.username} to confirm`;
