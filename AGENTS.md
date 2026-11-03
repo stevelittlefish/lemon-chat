@@ -144,6 +144,8 @@ internal/
     tools_web.go       # fetch_url, SearXNG, Wikipedia tools
     tools_image.go     # generate_image: ComfyUI submit/poll/download + tool schema
     tools_state.go     # world-state and note_to_self tools
+    tools_memory.go    # memory tools and the "Load memories at start" helpers
+    memories.go        # memories settings-page API (own memories; admins any user's)
   store/
     store.go           # open DB, run migrations, bootstrap
     users.go           # user queries (incl. full user deletion)
@@ -153,6 +155,7 @@ internal/
     characters.go      # character queries
     completions.go     # completion queries
     state.go           # world-state queries
+    memories.go        # memory queries
     research.go        # research job queries (incl. resume checkpoints)
     research_reports.go # research report variant queries
     attachments.go     # attachment queries, unlinked-upload sweep, safe file removal
@@ -191,6 +194,7 @@ static/
     settings-character-edit.js # character edit page
     settings-characters.js    # characters list page
     settings-import-chat.js   # import chat page
+    settings-memories.js      # memories page (admins can pick another user)
     settings-tools.js         # admin tools page
     settings-users.js         # user management page (typed-confirmation delete)
     vendor/
@@ -210,6 +214,7 @@ static/
     character-edit.html   # character edit page
     characters.html       # characters list page
     import_chat.html      # import chat page
+    memories.html         # memories page
     tools.html            # admin tools page
     users.html            # user management page
   assets/
@@ -274,11 +279,21 @@ Available tools and their config requirements:
 | `state_list` | World state: list | — |
 | `state_clear` | World state: clear | — |
 | `note_to_self` | Note to self | — |
+| `memory` | Memory (compound) | — |
+| `memory_list` | Memory: list | — |
+| `memory_save` | Memory: save | — |
+| `memory_update` | Memory: update | — |
+| `memory_forget` | Memory: forget | — |
 
 `InitTools(cfg)` is called once at startup and sets the `Configured` flag on tools that need external services. The frontend reads `GET /api/tools` and shows a config hint for unconfigured tools.
 
 Compound group IDs expand to multiple tools:
 - `world_state` → `state_set`, `state_modify`, `state_unset`, `state_list`, `state_clear`
+- `memory` → `memory_list`, `memory_save`, `memory_update`, `memory_forget`
+
+### Memory
+
+The `memory` table holds one fact per row per user (capped at 500 characters), shared by every character that has the `memory` tool; characters without it can't see memories. The model decides when to save, guided by the tool descriptions. `character.load_memories` ("Load memories at start" under the tool in the character editor) makes `handleSendMessage` store a synthetic `memory_list` call (id `memory_autoload_<conv>`) and its result right after the first user message, so later turns replay the same prefix and prompt caching holds. Users see and edit their memories at `/settings/memories`; admins can pick another user there, and those actions are logged with `admin_id`.
 
 ### Image generation
 

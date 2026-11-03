@@ -19,6 +19,7 @@ let dragSrcIndex   = null;
 // In-memory state for the tools section.
 let allTools    = [];
 let enabledTools = [];
+let loadMemories = false;
 
 async function init() {
   user = await requireAuth();
@@ -97,6 +98,10 @@ function renderNav() {
       ${svgCpu}
       Characters
     </a>
+    <a href="/settings/memories" class="snav-item">
+      ${icon('brain', 16)}
+      Memories
+    </a>
     ${adminSection}
   `;
 }
@@ -142,11 +147,34 @@ function renderToolGroups(tools, enabled) {
                 ${!t.configured ? `<span class="char-tool-config-hint">Not configured — ${escapeHtml(t.config_hint)}</span>` : ''}
               </div>
             </label>
+            ${t.id === 'memory' ? renderMemoryOption(enabled.includes('memory')) : ''}
           `).join('')}
         </div>
       </div>
     `;
   }).join('');
+}
+
+// The memory tool's one option. It only applies while the tool is on.
+function renderMemoryOption(memoryOn) {
+  return `
+    <label class="char-tool-option">
+      <input type="checkbox" id="char-load-memories" ${loadMemories ? 'checked' : ''} ${memoryOn ? '' : 'disabled'}>
+      <div class="char-tool-info">
+        <span class="char-tool-name">Load memories at start</span>
+        <span class="char-tool-desc">After the first message, the conversation gets a memory_list call and its result, so the model always starts with the user's memories.</span>
+      </div>
+    </label>
+  `;
+}
+
+function attachMemoryOption() {
+  const option = document.getElementById('char-load-memories');
+  const memory = document.querySelector('.char-tool-checkbox[data-id="memory"]');
+  if (!option || !memory) return;
+  const sync = () => { option.disabled = !memory.checked; };
+  memory.addEventListener('change', sync);
+  memory.closest('.char-tool-group')?.querySelector('.char-tool-group-toggle')?.addEventListener('change', sync);
 }
 
 function attachToolGroupToggles() {
@@ -301,6 +329,7 @@ function renderForm(character, modelsData) {
   const autoTitle    = character ? !!character.auto_title              : false;
 
   enabledTools = character?.tools ?? [];
+  loadMemories = !!character?.load_memories;
 
   document.title = `${isNew ? 'New character' : 'Edit character'} — Settings — lemon chat`;
 
@@ -387,6 +416,7 @@ function renderForm(character, modelsData) {
   renderHiddenMessages();
   document.getElementById('hidden-msg-add-btn').addEventListener('click', addHiddenMessage);
   attachToolGroupToggles();
+  attachMemoryOption();
 
   if (!isNew && character) {
     const avatarUrl = `/api/characters/${character.id}/avatar`;
@@ -547,6 +577,7 @@ function readForm(isOwnerOrAdmin) {
     visibility:      isOwnerOrAdmin ? (document.getElementById('char-visibility')?.value ?? undefined) : undefined,
     auto_title:      document.getElementById('char-auto-title')?.classList.contains('on') ?? false,
     tools,
+    load_memories:   document.getElementById('char-load-memories')?.checked ?? false,
     hidden_messages: hiddenMessages.map(m => ({ role: m.role, content: m.content })),
   };
 }
@@ -616,6 +647,7 @@ async function cloneChar(character) {
       visibility:      'private',
       auto_title:      character.auto_title,
       tools:           character.tools ?? [],
+      load_memories:   !!character.load_memories,
       hidden_messages: hiddenMessages.map(m => ({ role: m.role, content: m.content })),
     };
     const created = await charactersApi.create(data);

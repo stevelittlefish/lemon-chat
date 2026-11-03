@@ -698,6 +698,27 @@ a.snav-item { text-decoration: none; }
   height: 14px;
 }
 
+.char-tool-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 0 0 var(--space-2) calc(14px + var(--space-3));
+  cursor: pointer;
+}
+
+.char-tool-option input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: var(--lemon-500);
+  width: 14px;
+  height: 14px;
+}
+
+.char-tool-row:has(+ .char-tool-option) { border-bottom: none; }
+.char-tool-option:not(:last-child) { border-bottom: 1px solid var(--border-soft); }
+
+.char-tool-option:has(input:disabled) { opacity: 0.5; cursor: default; }
+
 .char-tool-info {
   display: flex;
   flex-direction: column;
@@ -1055,6 +1076,64 @@ a.snav-item { text-decoration: none; }
     max-width: 100%;
   }
 }
+
+/* ── Memories page ──────────────────────────────────────── */
+
+.memory-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.memory-add-form,
+.memory-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.memory-add-form { margin-bottom: 20px; }
+
+.memory-text-input { width: 100%; resize: vertical; }
+
+.memory-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.memory-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.memory-row-main { flex: 1; min-width: 0; }
+
+.memory-row-text {
+  font-size: 14px;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.memory-row-meta {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.memory-row-meta a { color: inherit; }
+
+.memory-row-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.memory-empty { margin-top: 16px; }
 
 /* ── Typed confirmation modal ───────────────────────────── */
 

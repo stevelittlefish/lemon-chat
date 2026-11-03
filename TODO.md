@@ -10,13 +10,14 @@ Completed work is archived in [`docs/archive/TODO-completed.md`](docs/archive/TO
 
 Raised by conversation 102, where the general assistant's opening `note_list` dumped every adventure note (with spoilers) to find `u.memories`. Notes were built for the choose-your-own-adventure games and later repurposed as memory; the games are no longer used, and the notes feature has now been removed.
 
-- [ ] **Build a real memory system** (notes, which were repurposed as memory, have been removed). Agreed design:
+- [~] **Build a real memory system** (notes, which were repurposed as memory, have been removed). Agreed design:
   - *Storage:* a `memory` table, one fact per row: user, text, created/updated, source conversation. One pool of memories per user; no domains or per-character memories until a real need appears (add the column then, not in advance).
   - *Access is the tool:* memory is a selectable tool group (e.g. `memory_list`, `memory_save`, `memory_update(id)`, `memory_forget(id)`). A character without it can't read or save memories and isn't told they exist. No other per-character memory setting.
   - *Retrieval:* the model calls `memory_list` itself. Optional per-character toggle "Load memories at start" next to the tool in the character editor (the first tool with an option): when on, the server stores a synthetic `memory_list` call and its result as the opening messages of a new conversation. Frozen for that conversation, so prompt caching keeps working; visible in View LLM context. Not injected into the system prompt.
   - *Saving:* the model decides, guided by the tool description: save lasting facts that help future conversations (preferences, important people, ongoing projects, things the user says about themselves); not small talk, one-off details, roleplay/story content, or likely-private things unless asked; update rather than duplicate. Without auto-load, `memory_save` returns the current list so the model can avoid duplicates.
   - *Oversight:* every save shows as a tool call in the chat. A "Memories" settings page (in the settings sidebar, where Notes was) lists the user's own memories for viewing, editing and deleting. Admins get a user picker on the same page to view, edit and delete another user's memories (admin actions on another user's memories get logged like other admin actions).
-  - *Testing:* tune the save guidance on both Gemma and `gpt-sol`; expect one to over-save and the other to under-save.
+  - *Built:* everything above, plus adding memories by hand on the settings page and a 500-character cap per memory.
+  - *Still to do — testing:* tune the save guidance on both Gemma and `gpt-sol`; expect one to over-save and the other to under-save.
 - [x] **Review every tool: keep, change or remove.** Reviewed one by one; outcome per tool:
   - `get_time` — **keep as is (decided).** Not moving the date into the system prompt: it breaks prompt caching, and models ignore it in long conversations.
   - `searxng` — **keep (decided); description improved** to say results are snippets and to read pages with `fetch_url` before relying on them. Name and ID unchanged.

@@ -84,6 +84,16 @@ export const models = {
 };
 
 // Tools
+// userId (admins only) picks another user's memories; omit for your own.
+const memoryQuery = (userId) => userId ? `?user_id=${userId}` : '';
+
+export const memories = {
+  list: (userId) => request('GET', `/api/memories${memoryQuery(userId)}`),
+  create: (text, userId) => request('POST', `/api/memories${memoryQuery(userId)}`, { text }),
+  update: (id, text) => request('PATCH', `/api/memories/${id}`, { text }),
+  delete: (id) => request('DELETE', `/api/memories/${id}`),
+};
+
 export const tools = {
   list: () => request('GET', '/api/tools'),
 };

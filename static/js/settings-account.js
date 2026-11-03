@@ -56,6 +56,10 @@ function renderNav() {
       ${svgCpu}
       Characters
     </a>
+    <a href="/settings/memories" class="snav-item">
+      ${icon('brain', 16)}
+      Memories
+    </a>
     ${adminSection}
   `;
 }

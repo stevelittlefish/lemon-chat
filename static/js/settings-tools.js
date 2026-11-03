@@ -46,6 +46,10 @@ function renderNav() {
       ${icon('drama', 16)}
       Characters
     </a>
+    <a href="/settings/memories" class="snav-item">
+      ${icon('brain', 16)}
+      Memories
+    </a>
     <div class="snav-group-label">Admin</div>
     <a href="/settings/users" class="snav-item${path === '/settings/users' ? ' active' : ''}">
       ${svgUsers}
