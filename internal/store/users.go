@@ -13,7 +13,10 @@ type User struct {
 	AvatarFilename *string
 	PasswordHash   *string
 	IsAdmin        bool
-	CreatedAt      string
+	// CanUseRestricted grants access to models marked restricted in the config
+	// (typically ones that cost money). Admins have access regardless.
+	CanUseRestricted bool
+	CreatedAt        string
 }
 
 var ErrNotFound = errors.New("not found")
@@ -21,8 +24,8 @@ var ErrNotFound = errors.New("not found")
 func (s *Store) UserByID(id int64) (*User, error) {
 	u := &User{}
 	err := s.db.QueryRow(
-		`SELECT id, username, display_name, avatar_filename, password_hash, is_admin, created_at FROM user WHERE id = ?`, id,
-	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarFilename, &u.PasswordHash, &u.IsAdmin, &u.CreatedAt)
+		`SELECT id, username, display_name, avatar_filename, password_hash, is_admin, can_use_restricted, created_at FROM user WHERE id = ?`, id,
+	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarFilename, &u.PasswordHash, &u.IsAdmin, &u.CanUseRestricted, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -32,8 +35,8 @@ func (s *Store) UserByID(id int64) (*User, error) {
 func (s *Store) UserByUsername(username string) (*User, error) {
 	u := &User{}
 	err := s.db.QueryRow(
-		`SELECT id, username, display_name, avatar_filename, password_hash, is_admin, created_at FROM user WHERE username = ?`, username,
-	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarFilename, &u.PasswordHash, &u.IsAdmin, &u.CreatedAt)
+		`SELECT id, username, display_name, avatar_filename, password_hash, is_admin, can_use_restricted, created_at FROM user WHERE username = ?`, username,
+	).Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarFilename, &u.PasswordHash, &u.IsAdmin, &u.CanUseRestricted, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -58,6 +61,12 @@ func (s *Store) UpdateUser(id int64, username string, passwordHash *string, isAd
 		`UPDATE user SET username = ?, display_name = ?, password_hash = ?, is_admin = ? WHERE id = ?`,
 		username, displayName, passwordHash, boolToInt(isAdmin), id,
 	)
+	return err
+}
+
+// SetUserCanUseRestricted grants or revokes access to restricted models.
+func (s *Store) SetUserCanUseRestricted(id int64, allowed bool) error {
+	_, err := s.db.Exec(`UPDATE user SET can_use_restricted = ? WHERE id = ?`, boolToInt(allowed), id)
 	return err
 }
 
@@ -168,7 +177,7 @@ func queryIDs(tx *sql.Tx, query string, args ...any) ([]int64, error) {
 }
 
 func (s *Store) ListUsers() ([]User, error) {
-	rows, err := s.db.Query(`SELECT id, username, display_name, avatar_filename, password_hash, is_admin, created_at FROM user ORDER BY username`)
+	rows, err := s.db.Query(`SELECT id, username, display_name, avatar_filename, password_hash, is_admin, can_use_restricted, created_at FROM user ORDER BY username`)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +185,7 @@ func (s *Store) ListUsers() ([]User, error) {
 	var users []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarFilename, &u.PasswordHash, &u.IsAdmin, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AvatarFilename, &u.PasswordHash, &u.IsAdmin, &u.CanUseRestricted, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, u)

@@ -21,10 +21,17 @@ func (s *Server) handleListCharacters(w http.ResponseWriter, r *http.Request) {
 		internalError(w, err)
 		return
 	}
-	if chars == nil {
-		chars = []store.Character{}
+	// ModelAvailable lets pickers grey out shared characters whose model this
+	// user may not use (restricted models); sending to them is refused anyway.
+	type characterListItem struct {
+		store.Character
+		ModelAvailable bool `json:"model_available"`
 	}
-	writeJSON(w, http.StatusOK, chars)
+	items := make([]characterListItem, 0, len(chars))
+	for _, c := range chars {
+		items = append(items, characterListItem{Character: c, ModelAvailable: s.userCanUseModel(user, c.Model)})
+	}
+	writeJSON(w, http.StatusOK, items)
 }
 
 func (s *Server) handleGetCharacter(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +78,9 @@ func (s *Server) handleCreateCharacter(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Name == "" || req.Model == "" {
 		writeError(w, http.StatusBadRequest, "name and model are required")
+		return
+	}
+	if s.denyRestrictedModel(w, user, req.Model) {
 		return
 	}
 	if !validVisibility(req.Visibility) {
@@ -136,6 +146,11 @@ func (s *Server) handleUpdateCharacter(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Name == "" || req.Model == "" {
 		writeError(w, http.StatusBadRequest, "name and model are required")
+		return
+	}
+	// Keeping a restricted model someone else chose is fine (the user still
+	// can't chat with it); switching to one is not.
+	if req.Model != existing.Model && s.denyRestrictedModel(w, user, req.Model) {
 		return
 	}
 	// Only owner or admin may change visibility.

@@ -110,6 +110,9 @@ func (s *Server) handleRedditHarnessValidate(w http.ResponseWriter, r *http.Requ
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		if s.denyRestrictedModel(w, currentUser(r), model) {
+			return
+		}
 		rc := s.cfg.Research
 		researcher := research.New(research.Config{
 			Query: input.Goal, Model: model, APIBase: modelServer.APIBase, APIToken: s.tokenSource(modelServer),

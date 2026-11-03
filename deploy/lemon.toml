@@ -65,18 +65,22 @@ api_base = "http://ai.lemon.com:8008/v1"
 name     = "ollama"
 api_base = "http://ai.lemon.com:11434/v1"
 
+# Restricted servers cost money: only admins and users granted "Restricted
+# models" on the admin users page can use them.
 [[model_server]]
-name     = "openrouter"
-api_base = "https://openrouter.ai/api/v1"
-api_key  = "${OPENROUTER_API_KEY}"
+name       = "openrouter"
+api_base   = "https://openrouter.ai/api/v1"
+api_key    = "${OPENROUTER_API_KEY}"
+restricted = true
 
 # OpenAI via ChatGPT/Codex account login (Responses API, shared OAuth token).
 # Connect the account with `lemon-chat --openai-login` or Settings → Tools.
 [[model_server]]
-name     = "codex"
-api_base = "https://chatgpt.com/backend-api/codex"
-api      = "responses"
-auth     = "oauth"
+name       = "codex"
+api_base   = "https://chatgpt.com/backend-api/codex"
+api        = "responses"
+auth       = "oauth"
+restricted = true
 
 # --- Codex
 

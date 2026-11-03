@@ -629,6 +629,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "unknown model")
 		return
 	}
+	if s.denyRestrictedModel(w, user, modelName) {
+		return
+	}
 
 	// Validate any image attachments and gate them on model vision support.
 	// Attachments were uploaded (unlinked) via POST .../attachments; they are

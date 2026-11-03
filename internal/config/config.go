@@ -116,6 +116,10 @@ type ModelServer struct {
 	// Auth selects how requests are authenticated. Empty defaults to api_key;
 	// set to "oauth" to use the shared OpenAI login token instead of api_key.
 	Auth string `toml:"auth"`
+	// Restricted limits this server's models to admins and users granted
+	// access on the admin users page — typically servers that cost money.
+	// A model can override it with its own restricted key.
+	Restricted bool `toml:"restricted"`
 }
 
 // UsesResponses reports whether this server speaks the OpenAI Responses API
@@ -155,6 +159,9 @@ type Model struct {
 	// receive user-uploaded image attachments in the prompt; the frontend hides
 	// the attach control for non-vision models.
 	Vision bool `toml:"vision"`
+	// Restricted overrides the model server's restricted flag when set, e.g.
+	// restricted = false to open one cheap model on an otherwise paid server.
+	Restricted *bool `toml:"restricted"`
 }
 
 // AvailableIn reports whether the model is available in the given mode.
@@ -327,6 +334,26 @@ func (c *Config) ModelByName(name string) *Model {
 		}
 	}
 	return nil
+}
+
+// ModelRestricted reports whether modelName is limited to users with access to
+// restricted models: the model's own restricted key if set, otherwise its
+// server's. Unknown models are reported unrestricted; resolving them fails
+// separately.
+func (c *Config) ModelRestricted(modelName string) bool {
+	m := c.ModelByName(modelName)
+	if m == nil {
+		return false
+	}
+	if m.Restricted != nil {
+		return *m.Restricted
+	}
+	for _, s := range c.ModelServers {
+		if s.Name == m.ModelServer {
+			return s.Restricted
+		}
+	}
+	return false
 }
 
 // ServerForModel returns the ModelServer that hosts modelName.

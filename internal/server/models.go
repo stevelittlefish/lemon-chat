@@ -15,6 +15,7 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 		OAuth         bool     `json:"oauth,omitempty"`          // authenticated via shared OAuth login
 		Vision        bool     `json:"vision,omitempty"`         // accepts image input
 	}
+	user := currentUser(r)
 	mode := r.URL.Query().Get("mode")
 	defaultName := s.cfg.Server.DefaultModel
 	// Prices are best-effort chrome; a lookup failure just omits them.
@@ -26,6 +27,11 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	var models []modelResponse
 	for _, m := range s.cfg.Models {
 		if mode != "" && !m.AvailableIn(mode) {
+			continue
+		}
+		// Restricted models are invisible to users without access; the
+		// handlers that run models enforce the same rule.
+		if !s.userCanUseModel(user, m.Name) {
 			continue
 		}
 		resp := modelResponse{

@@ -349,6 +349,13 @@ a.snav-item { text-decoration: none; }
   font-size: 13px;
 }
 
+.user-checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+}
+
 .user-admin-check {
   display: flex;
   align-items: center;

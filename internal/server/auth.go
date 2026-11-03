@@ -164,8 +164,10 @@ func userResponse(u *store.User) map[string]any {
 		"username":     u.Username,
 		"display_name": u.DisplayName,
 		"is_admin":     u.IsAdmin,
-		"has_password": u.PasswordHash != nil,
-		"has_avatar":   u.AvatarFilename != nil,
+		// Admins always have access; the flag itself only matters for others.
+		"can_use_restricted": u.CanUseRestricted,
+		"has_password":       u.PasswordHash != nil,
+		"has_avatar":         u.AvatarFilename != nil,
 	}
 }
 

@@ -925,6 +925,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v43 → v44 complete")
 	}
 
+	if version < 45 {
+		log.Println("store: migrating v44 → v45 (add user.can_use_restricted)")
+		if _, err := s.db.Exec(`ALTER TABLE user ADD COLUMN can_use_restricted INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (45, ?)`, now()); err != nil {
+			return err
+		}
+		version = 45
+		log.Println("store: migration v44 → v45 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

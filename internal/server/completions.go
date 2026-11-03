@@ -205,6 +205,9 @@ func (s *Server) handleRunCompletion(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "unknown model")
 		return
 	}
+	if s.denyRestrictedModel(w, user, comp.Model) {
+		return
+	}
 	completionURL := modelServer.APIBase + "/completions"
 
 	modelPayload := map[string]any{

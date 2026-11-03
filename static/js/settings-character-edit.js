@@ -238,9 +238,15 @@ function attachDefaultSection(character) {
 }
 
 function modelOptions(modelsData, selected) {
-  return modelsData.map(m =>
+  const options = modelsData.map(m =>
     `<option value="${escapeHtml(m.name)}" ${m.name === selected ? 'selected' : ''}>${escapeHtml(m.display_name || m.name)}</option>`
   ).join('');
+  // The model list omits restricted models this user can't use. Keep the
+  // character's current one selectable so saving other edits doesn't change it.
+  if (selected && !modelsData.some(m => m.name === selected)) {
+    return `<option value="${escapeHtml(selected)}" selected>${escapeHtml(selected)} (restricted)</option>` + options;
+  }
+  return options;
 }
 
 function renderForm(character, modelsData) {

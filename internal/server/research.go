@@ -701,6 +701,9 @@ func (s *Server) handleStartResearch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if s.denyRestrictedModel(w, user, model, htmlReportModel, workerModel) {
+		return
+	}
 
 	// ForceSearch only changes brainstorm-mode behaviour; ignore it otherwise.
 	forceSearch := req.ForceSearch && mode == research.ModeBrainstorm

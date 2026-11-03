@@ -61,6 +61,12 @@ modes        = ["chat"]     # only appears in chat, not completions
 
 Valid values are `"chat"` and `"complete"`. Omit `modes` entirely to allow the model in both. Set `modes = []` (an explicitly empty list) to hide the model from both the chat and completions pickers — it remains selectable for research, which lists all configured models regardless of mode. This omitted-vs-empty distinction is why `Model.Modes` is a `*[]string` rather than a plain slice. The frontend fetches `GET /api/models?mode=chat` or `?mode=complete` and only shows the filtered list. When adding a new interface or model picker, pass the correct `mode` parameter.
 
+## Restricted models
+
+`restricted = true` on a `[[model_server]]` (or on a single `[[model]]`, which overrides its server; `restricted = false` opens one model on a restricted server) limits those models to admins and users with `user.can_use_restricted`, toggled as "Restricted models" on the admin users page. It exists so household members can't run up paid API usage. Which models cost money is config; who may use them is per user in the database (usernames never go in the committed config).
+
+Every handler that runs a model on a user's behalf must call `s.denyRestrictedModel(w, user, names...)` (chat send, completions, research start and report regeneration, the Reddit harness), and handlers that store a model choice check it too (conversation create/import, character create, character update when the model changes). `GET /api/models` omits models the user can't use, and `GET /api/characters` sets `model_available` so the chat pickers hide characters on such models. Background work (titles via `default_model`, already-started research) is not re-checked. When adding a new place a user picks or runs a model, add the check.
+
 ## Character variable substitution
 
 Character system prompts and first messages support two placeholders that are substituted at runtime:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -61,6 +62,31 @@ func (s *Server) StartTitleWorker() {
 func (s *Server) modelHasVision(name string) bool {
 	m := s.cfg.ModelByName(name)
 	return m != nil && m.Vision
+}
+
+// userCanUseModel reports whether u may run the named model: restricted
+// models (see config.ModelRestricted) need an admin or a user granted access.
+func (s *Server) userCanUseModel(u *store.User, name string) bool {
+	return u.IsAdmin || u.CanUseRestricted || !s.cfg.ModelRestricted(name)
+}
+
+// denyRestrictedModel writes a 403 and returns true if u may not use one of
+// the named models. Empty names are skipped, so optional models (worker, HTML
+// report) can be passed unresolved.
+func (s *Server) denyRestrictedModel(w http.ResponseWriter, u *store.User, names ...string) bool {
+	for _, name := range names {
+		if name == "" || s.userCanUseModel(u, name) {
+			continue
+		}
+		label := name
+		if m := s.cfg.ModelByName(name); m != nil && m.DisplayName != "" {
+			label = m.DisplayName
+		}
+		log.Printf("Refusing restricted model %q user_id=%d", name, u.ID)
+		writeError(w, http.StatusForbidden, fmt.Sprintf("%s is restricted on this server — ask an admin for access", label))
+		return true
+	}
+	return false
 }
 
 // providerFor builds the model provider for srv, with the protocol and

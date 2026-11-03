@@ -121,9 +121,14 @@ function renderUsersList() {
     html += `
       <div class="user-row user-row--form">
         <input class="input user-name-input" id="add-username" placeholder="username" autocomplete="off" spellcheck="false">
-        <label class="user-admin-check">
-          <input type="checkbox" id="add-is-admin"> Admin
-        </label>
+        <div class="user-checks">
+          <label class="user-admin-check">
+            <input type="checkbox" id="add-is-admin"> Admin
+          </label>
+          <label class="user-admin-check" title="Models marked restricted in lemon.toml, typically paid ones. Admins always have access.">
+            <input type="checkbox" id="add-restricted"> Restricted models
+          </label>
+        </div>
         <div class="user-row-actions">
           <button class="btn btn-ghost btn-sm" id="cancel-add-btn">Cancel</button>
           <button class="btn btn-primary btn-sm" id="save-add-btn">Add user</button>
@@ -141,9 +146,14 @@ function renderUsersList() {
       html += `
         <div class="user-row user-row--form" data-id="${u.id}">
           <input class="input user-name-input" id="edit-username-${u.id}" value="${escapeHtml(u.username)}" autocomplete="off" spellcheck="false">
-          <label class="user-admin-check">
-            <input type="checkbox" id="edit-is-admin-${u.id}" ${u.is_admin ? 'checked' : ''}> Admin
-          </label>
+          <div class="user-checks">
+            <label class="user-admin-check">
+              <input type="checkbox" id="edit-is-admin-${u.id}" ${u.is_admin ? 'checked' : ''}> Admin
+            </label>
+            <label class="user-admin-check" title="Models marked restricted in lemon.toml, typically paid ones. Admins always have access.">
+              <input type="checkbox" id="edit-restricted-${u.id}" ${u.can_use_restricted ? 'checked' : ''}> Restricted models
+            </label>
+          </div>
           <div class="user-row-actions">
             <button class="btn btn-ghost btn-sm" data-action="cancel-edit">Cancel</button>
             <button class="btn btn-primary btn-sm" data-action="save-edit" data-id="${u.id}">Save</button>
@@ -154,7 +164,9 @@ function renderUsersList() {
       html += `
         <div class="user-row" data-id="${u.id}">
           <div class="user-name">${escapeHtml(u.username)}</div>
-          ${u.is_admin ? '<span class="user-badge">admin</span>' : '<span></span>'}
+          ${u.is_admin
+            ? '<span class="user-badge">admin</span>'
+            : u.can_use_restricted ? '<span class="user-badge" title="Can use restricted models">restricted models</span>' : '<span></span>'}
           <div class="user-row-actions">
             <button class="btn btn-ghost btn-sm" data-action="edit" data-id="${u.id}">${svgPencil} Edit</button>
             <button class="btn btn-ghost btn-sm" data-action="delete" data-id="${u.id}">${svgTrash} Delete</button>
@@ -215,6 +227,7 @@ async function createUser() {
   const usernameInput = document.getElementById('add-username');
   const username = usernameInput.value.trim();
   const isAdmin  = document.getElementById('add-is-admin').checked;
+  const canUseRestricted = document.getElementById('add-restricted').checked;
   const errorEl  = document.getElementById('add-err');
   const saveBtn  = document.getElementById('save-add-btn');
 
@@ -230,7 +243,7 @@ async function createUser() {
   saveBtn.textContent = 'Adding…';
 
   try {
-    const newUser = await admin.users.create({ username, is_admin: isAdmin });
+    const newUser = await admin.users.create({ username, is_admin: isAdmin, can_use_restricted: canUseRestricted });
     usersData.push(newUser);
     usersData.sort((a, b) => a.username.localeCompare(b.username));
     showingAddForm = false;
@@ -247,6 +260,7 @@ async function saveEditUser(id) {
   const usernameInput = document.getElementById(`edit-username-${id}`);
   const username = usernameInput.value.trim();
   const isAdmin  = document.getElementById(`edit-is-admin-${id}`).checked;
+  const canUseRestricted = document.getElementById(`edit-restricted-${id}`).checked;
   const errorEl  = document.getElementById(`edit-err-${id}`);
   const saveBtn  = document.querySelector(`[data-action="save-edit"][data-id="${id}"]`);
 
@@ -262,9 +276,9 @@ async function saveEditUser(id) {
   saveBtn.textContent = 'Saving…';
 
   try {
-    await admin.users.update(id, { username, is_admin: isAdmin });
+    await admin.users.update(id, { username, is_admin: isAdmin, can_use_restricted: canUseRestricted });
     const u = usersData.find(u => u.id === id);
-    if (u) { u.username = username; u.is_admin = isAdmin; }
+    if (u) { u.username = username; u.is_admin = isAdmin; u.can_use_restricted = canUseRestricted; }
     usersData.sort((a, b) => a.username.localeCompare(b.username));
     editingId = null;
     renderUsersList();

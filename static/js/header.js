@@ -14,11 +14,17 @@ let state = {
   tokenStats: null, // { prompt: number, completion: number } | null
 };
 
+// Characters whose model this user may use. state.characters keeps the rest so
+// an existing conversation with one still shows its name.
+function pickableCharacters() {
+  return state.characters.filter(c => c.model_available !== false);
+}
+
 export function init({ models, characters, onChange = null }) {
   state.models = models;
   state.characters = characters;
   state.onChange = onChange;
-  const defaultChar = characters.find(c => c.is_default);
+  const defaultChar = pickableCharacters().find(c => c.is_default);
   if (defaultChar) {
     state.selection = { type: 'character', id: defaultChar.id };
   } else {
@@ -132,8 +138,8 @@ function toggleDropdown() {
   const isMSel = state.selection?.type === 'model';
   const isCSel = state.selection?.type === 'character';
 
-  const defaultChar = state.characters.find(c => c.is_default) ?? null;
-  const restChars   = state.characters.filter(c => !c.is_default);
+  const defaultChar = pickableCharacters().find(c => c.is_default) ?? null;
+  const restChars   = pickableCharacters().filter(c => !c.is_default);
 
   let html = '';
 

@@ -62,6 +62,9 @@ func (s *Server) handleCreateConversation(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "exactly one of model or character_id is required")
 		return
 	}
+	if req.Model != nil && s.denyRestrictedModel(w, user, *req.Model) {
+		return
+	}
 	log.Printf("Creating conversation user_id=%d", user.ID)
 	conv, err := s.store.CreateConversation(user.ID, req.Title, req.Model, req.CharacterID)
 	if err != nil {
@@ -189,6 +192,9 @@ func (s *Server) handleImportConversation(w http.ResponseWriter, r *http.Request
 	}
 	if (req.Model == nil) == (req.CharacterID == nil) {
 		writeError(w, http.StatusBadRequest, "exactly one of model or character_id is required")
+		return
+	}
+	if req.Model != nil && s.denyRestrictedModel(w, user, *req.Model) {
 		return
 	}
 

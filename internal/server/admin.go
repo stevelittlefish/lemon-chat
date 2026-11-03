@@ -36,6 +36,8 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		DisplayName *string `json:"display_name"`
 		Password    *string `json:"password"`
 		IsAdmin     bool    `json:"is_admin"`
+		// CanUseRestricted grants access to restricted (typically paid) models.
+		CanUseRestricted bool `json:"can_use_restricted"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -55,7 +57,7 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		s := string(h)
 		hash = &s
 	}
-	log.Printf("Creating user username=%q is_admin=%t admin_id=%d", req.Username, req.IsAdmin, currentUser(r).ID)
+	log.Printf("Creating user username=%q is_admin=%t can_use_restricted=%t admin_id=%d", req.Username, req.IsAdmin, req.CanUseRestricted, currentUser(r).ID)
 	user, err := s.store.CreateUser(req.Username, hash, req.IsAdmin, req.DisplayName)
 	if isDuplicateUsername(err) {
 		writeError(w, http.StatusConflict, "username already taken")
@@ -64,6 +66,13 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		internalError(w, err)
 		return
+	}
+	if req.CanUseRestricted {
+		if err := s.store.SetUserCanUseRestricted(user.ID, true); err != nil {
+			internalError(w, err)
+			return
+		}
+		user.CanUseRestricted = true
 	}
 	writeJSON(w, http.StatusCreated, userResponse(user))
 }
@@ -83,6 +92,8 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		DisplayName *string `json:"display_name"`
 		Password    *string `json:"password"`
 		IsAdmin     *bool   `json:"is_admin"`
+		// CanUseRestricted grants access to restricted (typically paid) models.
+		CanUseRestricted *bool `json:"can_use_restricted"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
@@ -120,13 +131,24 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Printf("Updating user id=%d username=%q is_admin=%t password_changed=%t admin_id=%d", id, username, isAdmin, req.Password != nil, currentUser(r).ID)
+	canUseRestricted := existing.CanUseRestricted
+	if req.CanUseRestricted != nil {
+		canUseRestricted = *req.CanUseRestricted
+	}
+
+	log.Printf("Updating user id=%d username=%q is_admin=%t can_use_restricted=%t password_changed=%t admin_id=%d", id, username, isAdmin, canUseRestricted, req.Password != nil, currentUser(r).ID)
 	if err := s.store.UpdateUser(id, username, passwordHash, isAdmin, displayName); isDuplicateUsername(err) {
 		writeError(w, http.StatusConflict, "username already taken")
 		return
 	} else if err != nil {
 		internalError(w, err)
 		return
+	}
+	if canUseRestricted != existing.CanUseRestricted {
+		if err := s.store.SetUserCanUseRestricted(id, canUseRestricted); err != nil {
+			internalError(w, err)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

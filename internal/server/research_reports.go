@@ -97,6 +97,9 @@ func (s *Server) handleRegenerateResearchReport(w http.ResponseWriter, r *http.R
 			return
 		}
 	}
+	if s.denyRestrictedModel(w, user, markdownModel, htmlModel) {
+		return
+	}
 
 	title := job.Query
 	if job.Title != nil && *job.Title != "" {
