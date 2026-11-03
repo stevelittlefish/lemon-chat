@@ -72,10 +72,23 @@ All configuration lives in `lemon.toml`. See `lemon.toml.example` for the full r
 | Variable | Overrides |
 |---|---|
 | `LEMON_PORT` | `server.port` |
-| `LEMON_DATA_DIR` | `server.data_dir` |
+| `LEMON_DATA_DIR` | data directory for `lemon.db`, avatars and attachments (default `./data`; not settable in the config file) |
 | `LEMON_DB_PATH` | `server.db_path` |
 | `LEMON_ADMIN_USERNAME` | `bootstrap.admin_username` |
 | `LEMON_ADMIN_PASSWORD` | `bootstrap.admin_password` |
+
+The Docker image sets `LEMON_DATA_DIR=/data`.
+
+Any string value can also reference an environment variable as `${NAME}`, so a config can be committed with its secrets kept elsewhere:
+
+```toml
+[[model_server]]
+name     = "openrouter"
+api_base = "https://openrouter.ai/api/v1"
+api_key  = "${OPENROUTER_API_KEY}"
+```
+
+Startup fails if a referenced variable is unset. Write `$${` for a literal `${`. `run.sh` loads a `.env` file (gitignored) from the repo root if present; under Docker, pass one with `env_file:` (see `docker-compose.override.yml.example`).
 
 ## CLI flags
 

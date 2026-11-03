@@ -1,0 +1,165 @@
+# Live config for the lemon.com deployment. Committed: it holds no secrets.
+# Secrets come from the environment via ${VAR} (the server's .env, gitignored).
+# Data lives in $LEMON_DATA_DIR: ./data for local runs (./run.sh --config
+# deploy/lemon.toml), /data in the Docker image.
+
+[server]
+port                     = 8069
+debug                    = false
+default_model            = "gemma4-31b"
+dial_timeout_seconds     = 10
+response_timeout_seconds = 600
+max_tool_loops           = 10
+timezone                 = "Europe/London"
+
+# Bootstrap: runs once on first start when the DB has no users.
+# Set LEMON_ADMIN_PASSWORD for a fresh install.
+[bootstrap]
+admin_username = "admin"
+
+[searxng]
+url = "http://lemon.com:8181"
+
+[comfyui]
+url             = "https://comfy.seaslug.ai"
+default_profile = "general"
+
+# Profiles are what the user wants, not which model makes it. Point them at
+# whichever registered workflow (comfyui/workflows.toml) currently does that job
+# best; several profiles may share a workflow. Descriptions are shown to the chat
+# model, so they say when to pick the profile and how to write its prompt.
+
+[comfyui.profile.general]
+workflow    = "moss_image_int8"
+description = "The default. Everyday scenes and anything that doesn't clearly fit another profile. Write a detailed description of the finished image in plain sentences: subject, setting, composition, lighting, colours."
+
+[comfyui.profile.fast]
+workflow    = "flux3_klein_distilled"
+description = "Quick drafts, rough ideas and lots of variations, when speed matters more than polish (about 5 seconds)."
+
+[comfyui.profile.photo]
+workflow    = "krea2_turbo"
+description = "Photorealistic images: portraits, products, places, street and documentary scenes. Describe it as a photograph: lens or shot type, lighting, depth of field, film or camera look."
+
+[comfyui.profile.painting]
+workflow    = "krea2_turbo"
+description = "Paintings and traditional media: oil, watercolour, gouache, ink, charcoal, pencil. Name the medium and technique explicitly (e.g. thick impasto brushstrokes, wet-on-wet washes, visible paper texture)."
+
+[comfyui.profile.illustration]
+workflow    = "krea2_turbo"
+description = "Drawn, non-anime illustration: graphic novel, comic, picture book, poster art, editorial, flat or vector styles. Name the drawn style explicitly (e.g. clean ink outlines, flat colour, halftone shading); without it the result tends to look rendered or photographic."
+
+[comfyui.profile.anime]
+workflow    = "anima_aesthetic_1_1"
+description = "Anime and manga style. Describe the characters (hair, eyes, clothing, expression, pose) and the scene."
+
+[comfyui.profile.text]
+workflow    = "moss_image_int8"
+description = "Images where readable words matter: posters, signs, menus, labels, covers. Put every piece of text in double quotes exactly as it should appear, and say where it goes and how it looks."
+
+[[model_server]]
+name     = "lemon"
+api_base = "http://ai.lemon.com:8008/v1"
+
+[[model_server]]
+name     = "ollama"
+api_base = "http://ai.lemon.com:11434/v1"
+
+[[model_server]]
+name     = "openrouter"
+api_base = "https://openrouter.ai/api/v1"
+api_key  = "${OPENROUTER_API_KEY}"
+
+# OpenAI via ChatGPT/Codex account login (Responses API, shared OAuth token).
+# Connect the account with `lemon-chat --openai-login` or Settings → Tools.
+[[model_server]]
+name     = "codex"
+api_base = "https://chatgpt.com/backend-api/codex"
+api      = "responses"
+auth     = "oauth"
+
+# --- Codex
+
+[[model]]
+name         = "gpt-6.1-sol"
+display_name = "GPT-6.1 Sol"
+model_server = "codex"
+vision       = true
+modes        = ["chat"]
+
+[[model]]
+name         = "gpt-6.1-terra"
+display_name = "GPT-6.1 Terra"
+model_server = "codex"
+vision       = true
+modes        = ["chat"]
+
+[[model]]
+name         = "gpt-6-luna"
+display_name = "GPT-6 Luna"
+model_server = "codex"
+vision       = true
+modes        = []             # hidden from pickers; still selectable for research
+
+# --- OpenRouter
+
+[[model]]
+name         = "anthropic/claude-sonnet-4.6"
+display_name = "Claude Sonnet 4.6"
+model_server = "openrouter"
+vision       = true
+modes        = ["chat"]
+
+[[model]]
+name         = "google/gemini-3.5-flash"
+display_name = "Gemini 3.5 Flash"
+model_server = "openrouter"
+vision       = true
+modes        = ["chat"]
+
+[[model]]
+name         = "x-ai/grok-4.5"
+display_name = "Grok 4.5"
+model_server = "openrouter"
+vision       = true
+modes        = ["chat"]
+
+[[model]]
+name         = "moonshotai/kimi-k2.6"
+display_name = "Kimi K2.6"
+model_server = "openrouter"
+vision       = true
+modes        = ["chat"]
+
+[[model]]
+name         = "deepseek/deepseek-v4-pro"
+display_name = "DeepSeek V4 Pro"
+model_server = "openrouter"
+modes        = ["chat"]
+
+[[model]]
+name         = "qwen/qwen3.7-max"
+display_name = "Qwen 3.7 Max"
+model_server = "openrouter"
+modes        = ["chat"]
+
+# --- Local
+
+[[model]]
+name         = "gemma4-31b"
+display_name = "Gemma 4"
+model_server = "lemon"
+vision       = true
+modes        = ["chat"]
+
+[[model]]
+name         = "hf.co/mradermacher/gemma-4-31B-GGUF:Q4_K_M"
+display_name = "Gemma 4 31B"
+model_server = "ollama"
+modes        = ["complete"]
+
+[[model]]
+name         = "llama3.1:8b-text-q8_0"
+display_name = "Llama 3.1 8B"
+model_server = "ollama"
+modes        = ["complete"]

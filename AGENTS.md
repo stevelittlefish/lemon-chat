@@ -83,6 +83,7 @@ internal/
     registry.go        # workflow registry: load/validate bindings, profile selection, per-request graph build
   config/
     config.go          # TOML struct definitions and loading
+    env.go             # ${VAR} environment substitution in config string values
   debug/
     debug.go           # debug logging flag (debug.Enabled, debug.Log)
   htmltext/
@@ -207,12 +208,15 @@ static/
     *.svg              # brand SVGs (logo, lemon-slice, sparkle, scribble-underline)
 data/
   lemon.toml           # config for Docker volume mount
+deploy/
+  lemon.toml           # the maintainer's live deployment config (committed; secrets via ${VAR})
 Dockerfile
 docker-compose.yml
 docker-compose.override.yml.example
 run.sh                 # shortcut: go run ./cmd/lemon-chat
 lemon.toml.example     # documented config template (committed)
-lemon.toml             # live config (gitignored)
+lemon.toml             # local config (gitignored)
+.env                   # secrets for ${VAR} config references (gitignored; loaded by run.sh)
 docs/
   SPEC.md              # feature specification (not actively maintained)
 README.md

@@ -69,8 +69,11 @@ type ComfyProfile struct {
 }
 
 type Server struct {
-	Port                   int    `toml:"port"`
-	DataDir                string `toml:"data_dir"`
+	Port int `toml:"port"`
+	// DataDir holds lemon.db, avatars and attachments. It is set only by
+	// LEMON_DATA_DIR (default ./data), not the config file: it describes where
+	// this process runs, so one committed config serves every host.
+	DataDir                string `toml:"-"`
 	DBPath                 string `toml:"db_path"`
 	StaticDir              string `toml:"static_dir"`
 	Debug                  bool   `toml:"debug"`
@@ -175,7 +178,7 @@ func Load(path string) (*Config, error) {
 	cfg := &Config{
 		Server: Server{
 			Port:                   8080,
-			DataDir:                ".",
+			DataDir:                "./data",
 			StaticDir:              "static",
 			DialTimeoutSeconds:     10,
 			ResponseTimeoutSeconds: 600,
@@ -208,6 +211,9 @@ func Load(path string) (*Config, error) {
 	}
 	if keys := meta.Undecoded(); len(keys) > 0 {
 		for _, k := range keys {
+			if k.String() == "server.data_dir" {
+				return nil, fmt.Errorf("config: [server] data_dir was removed — set the LEMON_DATA_DIR environment variable instead (default ./data)")
+			}
 			if k.String() == "comfyui.sdxl_workflow" || k.String() == "comfyui.flux_workflow" {
 				return nil, fmt.Errorf("config: [comfyui] sdxl_workflow and flux_workflow were replaced by the workflow registry and profiles — see [comfyui] in lemon.toml.example")
 			}
@@ -215,6 +221,9 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("config: unknown or misplaced keys: %v", keys)
 	}
 
+	if err := expandEnv(cfg); err != nil {
+		return nil, err
+	}
 	applyEnv(cfg)
 
 	// max_report_tokens historically capped both synthesis and the final report.
@@ -242,7 +251,7 @@ func Load(path string) (*Config, error) {
 // resolveStaticDir normalises static_dir to an absolute path and checks that it
 // actually exists, so a typo fails at startup rather than turning every page
 // into a silent 404. Relative paths resolve against the working directory at
-// startup, matching how data_dir behaves.
+// startup, matching how LEMON_DATA_DIR behaves.
 //
 // This lives here rather than in Validate because it touches the filesystem;
 // Validate stays a pure check over the parsed struct.

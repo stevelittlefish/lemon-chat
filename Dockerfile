@@ -21,6 +21,7 @@ COPY static/ ./static/
 COPY comfyui/ ./comfyui/
 
 VOLUME ["/data"]
+ENV LEMON_DATA_DIR=/data
 
 EXPOSE 8080
 

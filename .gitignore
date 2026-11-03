@@ -1,4 +1,5 @@
-lemon.toml
+/lemon.toml
+.env
 lemon.db
 lemon.db-shm
 lemon.db-wal
