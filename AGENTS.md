@@ -104,6 +104,7 @@ internal/
     responses.go       # Responses API body building and stream → chat-frame translation
     llm.go             # shared types (Usage, Completion), SSE scanner, legacy raw helpers
     models.go          # /models listing
+    capabilities.go    # image-input support per model (for the --list-models config check)
   netguard/
     netguard.go        # HTTP client for model-chosen URLs that refuses private/LAN addresses
   openai_auth/         # Codex-style OAuth (PKCE) login, token refresh, shared token store
@@ -403,7 +404,7 @@ lemon-chat [flags]
                      rewrite stored model-name references (NEW must be configured), then exit
 ```
 
-`--list-models` is useful for finding exact model ID strings to put in a model's `id`.
+`--list-models` is useful for finding exact model ID strings to put in a model's `id`. After each server's list it checks that server's configured models: an `id` the server doesn't offer, or a `vision` flag that disagrees with the server's reported image support (`llm.ImageInputSupport`: Codex catalog, OpenRouter `architecture`, Ollama `/api/show`; vLLM reports nothing). `vision` stays a config flag — this is a check, not runtime detection.
 
 `--openai-login` runs the local-browser PKCE flow (loopback on `localhost:1455`) and persists a
 single shared OAuth token used by every `auth = "oauth"` model server. For a remote/LAN install

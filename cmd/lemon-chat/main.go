@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/config"
@@ -169,6 +170,49 @@ func listModels(cfg *config.Config) {
 		for _, model := range models {
 			fmt.Printf("  - %s\n", model)
 		}
+		checkConfiguredModels(cfg, srv, models, token, accountID)
+	}
+}
+
+// checkConfiguredModels compares this server's [[model]] entries with what the
+// server reports: whether each id is offered at all, and whether its image
+// support matches the configured vision flag.
+func checkConfiguredModels(cfg *config.Config, srv *config.ModelServer, offered []string, token config.TokenSource, accountID string) {
+	var configured []*config.Model
+	var ids []string
+	for i := range cfg.Models {
+		if cfg.Models[i].ModelServer == srv.Name {
+			configured = append(configured, &cfg.Models[i])
+			ids = append(ids, cfg.Models[i].ProviderID())
+		}
+	}
+	if len(configured) == 0 {
+		return
+	}
+	ctx := context.Background()
+	key, _ := token(ctx)
+	vision, err := llm.ImageInputSupport(ctx, http.DefaultClient, srv, key, accountID, ids)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "  could not read model capabilities: %v\n", err)
+	}
+	fmt.Println("  config check:")
+	for _, m := range configured {
+		id := m.ProviderID()
+		status := "ok"
+		reported, known := vision[id]
+		switch {
+		case !slices.Contains(offered, id):
+			status = "NOT OFFERED by this server — check the id"
+		case !known:
+			status = "ok (server doesn't report image support)"
+		case !m.AvailableIn("chat"):
+			status = "ok (completions only: images unused)"
+		case reported && !m.Vision:
+			status = "MISMATCH: server accepts images — add vision = true"
+		case !reported && m.Vision:
+			status = "MISMATCH: server says no image input — remove vision = true"
+		}
+		fmt.Printf("    %-18s %-45s vision=%-5t %s\n", m.Name, id, m.Vision, status)
 	}
 }
 
