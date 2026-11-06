@@ -512,17 +512,20 @@ Examples:
 		Type:     "function",
 		Function: toolFunction{
 			Name:        "history_list",
-			Description: "Lists the user's previous conversations, most recent first, with each one's id, title, character, message count and dates. Use it when the user refers to an earlier chat or asks what they have talked about recently. Read a conversation with history_read.",
+			Description: "Lists the user's previous conversations, most recent first, with each one's id, title, character, number of messages and dates. Use since and until for a period (e.g. last week) and character for conversations with one character. To find a topic, use history_search instead.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
+					"since":     historySinceSchema,
+					"until":     historyUntilSchema,
+					"character": historyCharacterSchema,
 					"limit": map[string]any{
 						"type":        "integer",
 						"description": "How many conversations to list (default 20, at most 50).",
 					},
 					"offset": map[string]any{
 						"type":        "integer",
-						"description": "How many of the most recent conversations to skip, to page back through older ones.",
+						"description": "How many conversations to skip, to see older ones (default 0).",
 					},
 					historyUserParam: historyUserSchema,
 				},
@@ -535,7 +538,7 @@ Examples:
 		Type:     "function",
 		Function: toolFunction{
 			Name:        "history_search",
-			Description: "Searches the user's previous conversations, in titles and in what the user and the assistant said. Give several words at once, including other words for the same thing and related words, since you don't know how it was worded (e.g. \"guitar chords tuning fretboard\" or \"school exam test revision\"). A conversation matches if it mentions any of the words; word endings don't matter (\"tuned\" finds \"tuning\") and partial words match. Conversations mentioning the most words come first, each with an extract of its best-matching message. If nothing useful comes back, search again with different words. Read a conversation with history_read.",
+			Description: "Searches the user's previous conversations for words. Use it in two steps. Step 1: search all conversations with a query (optionally since, until, character); you get the best-matching conversations, each with an extract. Step 2: search again with the same query and the conversation_id of the one you want; you get its matching messages with their message numbers. Then read around a match with history_read. Put several words in the query, including other words for the same thing, since you don't know the exact wording (e.g. \"guitar chords tuning\"). Any of the words can match, word endings don't matter, and conversations matching more words come first. If nothing useful comes back, try different words.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
@@ -543,6 +546,13 @@ Examples:
 						"type":        "string",
 						"description": "Words to look for, separated by spaces. Common words like \"the\" are ignored.",
 					},
+					"conversation_id": map[string]any{
+						"type":        "integer",
+						"description": "Step 2 only: search inside this one conversation and list its matching messages.",
+					},
+					"since":          historySinceSchema,
+					"until":          historyUntilSchema,
+					"character":      historyCharacterSchema,
 					historyUserParam: historyUserSchema,
 				},
 				Required: []string{"query"},
@@ -554,7 +564,7 @@ Examples:
 		Type:     "function",
 		Function: toolFunction{
 			Name:        "history_read",
-			Description: "Reads a previous conversation: what the user and the assistant said, with timestamps (tool calls and their results are left out). Long conversations come in pages; the result says which offset to pass for the rest. Don't claim something wasn't discussed unless you have read the whole conversation.",
+			Description: "Reads messages from a previous conversation: who said what and when, numbered from 1 (tool calls are left out). To read around a match from history_search, give start a few messages before it and count, e.g. start=40 count=8 for message 43. Without start and count it reads from the beginning, as much as fits, and says where to continue. Don't say something wasn't discussed unless you have read the whole conversation.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
@@ -562,9 +572,13 @@ Examples:
 						"type":        "integer",
 						"description": "The conversation's id, from history_list or history_search.",
 					},
-					"offset": map[string]any{
+					"start": map[string]any{
 						"type":        "integer",
-						"description": "How many messages to skip, to continue a long conversation (default 0, the start).",
+						"description": "The message number to start at (default 1, the beginning).",
+					},
+					"count": map[string]any{
+						"type":        "integer",
+						"description": "How many messages to read (default: as many as fit).",
 					},
 				},
 				Required: []string{"conversation_id"},
@@ -593,6 +607,22 @@ var historyUserSchema = map[string]any{
 	"type":        "string",
 	"description": "Admins only: the username or display name of another user whose conversations to look at. Leave it out for the current user's own conversations.",
 }
+
+// The period and character filters shared by history_list and history_search.
+var (
+	historySinceSchema = map[string]any{
+		"type":        "string",
+		"description": "Only messages sent on or after this date, written YYYY-MM-DD.",
+	}
+	historyUntilSchema = map[string]any{
+		"type":        "string",
+		"description": "Only messages sent on or before this date, written YYYY-MM-DD.",
+	}
+	historyCharacterSchema = map[string]any{
+		"type":        "string",
+		"description": "Only conversations with a character whose name contains this, e.g. \"tutor\".",
+	}
+)
 
 // withoutTool returns defs minus the tool named name.
 func withoutTool(defs []toolDef, name string) []toolDef {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
@@ -16,8 +17,9 @@ func historyFixture(t *testing.T) (st *store.Store, dad, son *store.User, dadCon
 	son, _ = st.CreateUser("sam", nil, false, &sonName)
 	model := "m"
 	dadConv, _ = st.CreateConversation(dad.ID, nil, &model, nil)
+	tutor, _ := st.CreateCharacter("Music Tutor", "m", nil, nil, nil, dad.ID, "readonly", false, nil)
 	title := "Guitar practice"
-	sonConv, _ = st.CreateConversation(son.ID, &title, &model, nil)
+	sonConv, _ = st.CreateConversation(son.ID, &title, nil, &tutor.ID)
 	st.CreateMessage(sonConv.ID, "user", "How do I tune a guitar to drop D?", nil, nil, nil, nil, "")
 	calls := `[{"id":"c1","type":"function","function":{"name":"searxng","arguments":"{}"}}]`
 	st.CreateMessage(sonConv.ID, "assistant", "", nil, nil, nil, &calls, "")
@@ -36,7 +38,7 @@ func TestHistoryToolsOwnConversations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, fmt.Sprintf("#%d: \"Guitar practice\"", sonConv.ID)) || !strings.Contains(out, "2 messages") {
+	if !strings.Contains(out, fmt.Sprintf("#%d: \"Guitar practice\" with Music Tutor", sonConv.ID)) || !strings.Contains(out, "2 messages") || !strings.Contains(out, "Today is") {
 		t.Fatalf("list = %q", out)
 	}
 	if strings.Contains(out, fmt.Sprintf("#%d:", current.ID)) {
@@ -58,15 +60,70 @@ func TestHistoryToolsOwnConversations(t *testing.T) {
 		t.Fatal("a query of only stop words should be refused")
 	}
 
+	// Inside one conversation: matching messages with the numbers history_read uses.
+	out, err = executeHistorySearch(fmt.Sprintf(`{"query":"string","conversation_id":%d}`, sonConv.ID), tctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "[message 2] Music Tutor (assistant") || !strings.Contains(out, fmt.Sprintf("conversation_id=%d, start=1, count=8", sonConv.ID)) {
+		t.Fatalf("search in conversation = %q", out)
+	}
+
 	out, err = executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d}`, sonConv.ID), tctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "Sam (user") || !strings.Contains(out, "whole step") || strings.Contains(out, "secret") || !strings.Contains(out, "[End of conversation.]") {
+	if !strings.Contains(out, "[message 1] Sam (user") || !strings.Contains(out, "[message 2] Music Tutor") || strings.Contains(out, "secret") || !strings.Contains(out, "You have read all of it") {
 		t.Fatalf("read = %q", out)
 	}
 	if _, err := executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d}`, current.ID), tctx); err == nil {
 		t.Fatal("read the current conversation")
+	}
+}
+
+func TestHistoryFilters(t *testing.T) {
+	st, _, son, _, sonConv := historyFixture(t)
+	tctx := ToolContext{Store: st, UserID: son.ID}
+	today := time.Now().Format("2006-01-02")
+	tomorrow := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	found := fmt.Sprintf("#%d:", sonConv.ID)
+
+	for _, tc := range []struct {
+		args string
+		want bool
+	}{
+		{fmt.Sprintf(`{"since":%q}`, today), true},
+		{fmt.Sprintf(`{"until":%q}`, today), true},
+		{fmt.Sprintf(`{"since":%q}`, tomorrow), false},
+		{fmt.Sprintf(`{"until":%q}`, yesterday), false},
+		{`{"character":"tutor"}`, true},
+	} {
+		out, err := executeHistoryList(tc.args, tctx)
+		if err != nil {
+			t.Fatalf("list %s: %v", tc.args, err)
+		}
+		if strings.Contains(out, found) != tc.want {
+			t.Errorf("list %s = %q; want found=%v", tc.args, out, tc.want)
+		}
+		search := strings.Replace(tc.args, "{", `{"query":"guitar",`, 1)
+		out, err = executeHistorySearch(search, tctx)
+		if err != nil {
+			t.Fatalf("search %s: %v", search, err)
+		}
+		if strings.Contains(out, found) != tc.want {
+			t.Errorf("search %s = %q; want found=%v", search, out, tc.want)
+		}
+	}
+
+	if _, err := executeHistoryList(`{"since":"last week"}`, tctx); err == nil || !strings.Contains(err.Error(), "YYYY-MM-DD") {
+		t.Errorf("bad date error = %v", err)
+	}
+	if _, err := executeHistoryList(fmt.Sprintf(`{"since":%q,"until":%q}`, today, yesterday), tctx); err == nil {
+		t.Error("until before since was accepted")
+	}
+	if _, err := executeHistoryList(`{"character":"chef"}`, tctx); err == nil || !strings.Contains(err.Error(), "Music Tutor") {
+		t.Errorf("unknown character error = %v; want the character names", err)
 	}
 }
 
@@ -82,6 +139,10 @@ func TestHistoryToolsCrossUserAccess(t *testing.T) {
 	if _, err := executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d}`, dadConv.ID), sonCtx); err == nil {
 		t.Fatal("non-admin read another user's conversation")
 	}
+	st.CreateMessage(dadConv.ID, "user", "guitar strings for Sam's birthday", nil, nil, nil, nil, "")
+	if _, err := executeHistorySearch(fmt.Sprintf(`{"query":"guitar","conversation_id":%d}`, dadConv.ID), sonCtx); err == nil {
+		t.Fatal("non-admin searched inside another user's conversation")
+	}
 	// Naming yourself is fine.
 	if _, err := executeHistoryList(`{"user":"Sam"}`, sonCtx); err != nil {
 		t.Fatal(err)
@@ -96,12 +157,42 @@ func TestHistoryToolsCrossUserAccess(t *testing.T) {
 	if err != nil || !strings.Contains(out, "Guitar practice") {
 		t.Fatalf("admin search = %q, %v", out, err)
 	}
+	out, err = executeHistorySearch(fmt.Sprintf(`{"query":"guitar","conversation_id":%d}`, sonConv.ID), dadCtx)
+	if err != nil || !strings.Contains(out, "of Sam (sam)") {
+		t.Fatalf("admin search in conversation = %q, %v", out, err)
+	}
 	out, err = executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d}`, sonConv.ID), dadCtx)
 	if err != nil || !strings.Contains(out, "of Sam (sam)") {
 		t.Fatalf("admin read = %q, %v", out, err)
 	}
 	if _, err := executeHistoryList(`{"user":"nobody"}`, dadCtx); err == nil || !strings.Contains(err.Error(), "Sam (sam)") {
 		t.Fatalf("unknown user error = %v; want the list of users", err)
+	}
+}
+
+func TestHistoryReadStartAndCount(t *testing.T) {
+	st := memoryTestStore(t)
+	u, _ := st.CreateUser("u", nil, false, nil)
+	model := "m"
+	conv, _ := st.CreateConversation(u.ID, nil, &model, nil)
+	for i := 1; i <= 10; i++ {
+		st.CreateMessage(conv.ID, "user", fmt.Sprintf("line %d", i), nil, nil, nil, nil, "")
+	}
+	tctx := ToolContext{Store: st, UserID: u.ID}
+	out, err := executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d,"start":4,"count":3}`, conv.ID), tctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "line 3\n") || !strings.Contains(out, "[message 4]") || !strings.Contains(out, "[message 6]") || strings.Contains(out, "[message 7]") ||
+		!strings.Contains(out, "Showing messages 4–6 of 10") || !strings.Contains(out, "start=7") {
+		t.Fatalf("window = %q", out)
+	}
+	out, _ = executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d,"start":9}`, conv.ID), tctx)
+	if !strings.Contains(out, "Showing messages 9–10 of 10; that is the end") {
+		t.Fatalf("tail = %q", out)
+	}
+	if _, err := executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d,"start":11}`, conv.ID), tctx); err == nil {
+		t.Fatal("start past the end was accepted")
 	}
 }
 
@@ -119,15 +210,11 @@ func TestHistoryReadPages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "Showing messages 1–2 of 5") || !strings.Contains(out, "offset=2") {
+	if !strings.Contains(out, "Showing messages 1–2 of 5") || !strings.Contains(out, "start=3") {
 		t.Fatalf("first page = %q", out[len(out)-200:])
 	}
-	out, err = executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d,"offset":4}`, conv.ID), tctx)
-	if err != nil || !strings.Contains(out, "[5]") || !strings.Contains(out, "[End of conversation.]") {
-		t.Fatalf("last page = %v", err)
-	}
 
-	// One message bigger than a page is cut off rather than skipped.
+	// One message bigger than the limit is cut off rather than skipped.
 	conv2, _ := st.CreateConversation(u.ID, nil, &model, nil)
 	st.CreateMessage(conv2.ID, "user", strings.Repeat("y", historyReadMaxChars+10), nil, nil, nil, nil, "")
 	out, _ = executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d}`, conv2.ID), tctx)
@@ -163,7 +250,7 @@ func TestHistorySearchRanksByWordsMatched(t *testing.T) {
 	both, _ := st.CreateConversation(u.ID, nil, &model, nil)
 	st.CreateMessage(both.ID, "user", "Chess club tournament", nil, nil, nil, nil, "")
 
-	matches, err := st.SearchConversations(u.ID, 0, "chess tournament", 10)
+	matches, err := st.SearchConversations(u.ID, 0, "chess tournament", store.HistoryFilter{}, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,9 +258,9 @@ func TestHistorySearchRanksByWordsMatched(t *testing.T) {
 		t.Fatalf("matches = %+v", matches)
 	}
 
-	// The index follows edits and deletions.
+	// The index follows deletions.
 	st.DeleteConversation(both.ID, u.ID)
-	if matches, _ := st.SearchConversations(u.ID, 0, "tournament", 10); len(matches) != 0 {
+	if matches, _ := st.SearchConversations(u.ID, 0, "tournament", store.HistoryFilter{}, 10); len(matches) != 0 {
 		t.Fatalf("deleted conversation still found: %+v", matches)
 	}
 }

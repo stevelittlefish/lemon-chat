@@ -32,35 +32,87 @@ type ConversationMatch struct {
 	Best         *SearchExcerpt
 }
 
-// SearchExcerpt is the best-matching message in a conversation, with the
-// matching words marked **like this**.
+// SearchExcerpt is a matching message, with the matching words marked
+// **like this**.
 type SearchExcerpt struct {
 	MessageID int64
 	Role      string
+	Name      *string
 	CreatedAt string
 	Snippet   string
+}
+
+// HistoryFilter narrows the history tools to a period and a character. Zero
+// values don't filter.
+type HistoryFilter struct {
+	Since string // RFC 3339; only messages sent at or after this
+	Until string // RFC 3339; only messages sent before this
+	// Character keeps conversations whose character's name contains this
+	// text, ignoring case.
+	Character string
 }
 
 // historyMessageFilter selects the messages the history tools show: what the
 // user and the assistant said, not tool calls or tool results.
 const historyMessageFilter = `m.role IN ('user', 'assistant') AND m.content <> ''`
 
+// messageTimeSQL limits message alias m to the filter's period.
+func (f HistoryFilter) messageTimeSQL() (string, []any) {
+	var sql string
+	var args []any
+	if f.Since != "" {
+		sql += ` AND julianday(m.created_at) >= julianday(?)`
+		args = append(args, f.Since)
+	}
+	if f.Until != "" {
+		sql += ` AND julianday(m.created_at) < julianday(?)`
+		args = append(args, f.Until)
+	}
+	return sql, args
+}
+
+// conversationSQL limits conversation alias c (joined to character ch) to the
+// filter's character, and to conversations with a message in its period.
+func (f HistoryFilter) conversationSQL() (string, []any) {
+	var sql string
+	var args []any
+	if f.Character != "" {
+		sql += ` AND ch.name LIKE ? ESCAPE '\'`
+		args = append(args, likePattern(f.Character))
+	}
+	if timeSQL, timeArgs := f.messageTimeSQL(); timeSQL != "" {
+		sql += ` AND EXISTS (SELECT 1 FROM message m WHERE m.conversation_id = c.id AND ` + historyMessageFilter + timeSQL + `)`
+		args = append(args, timeArgs...)
+	}
+	return sql, args
+}
+
+// likePattern turns text into a LIKE pattern matching it anywhere, with the
+// wildcards in it escaped (use with ESCAPE '\').
+func likePattern(text string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return "%" + r.Replace(text) + "%"
+}
+
 const summaryColumns = `c.id, c.user_id, c.title, ch.name, c.model, c.created_at, c.updated_at,
 	(SELECT COUNT(*) FROM message m WHERE m.conversation_id = c.id AND ` + historyMessageFilter + `)`
 
-func scanSummary(row interface{ Scan(...any) error }, c *ConversationSummary, extra ...any) error {
-	return row.Scan(append([]any{&c.ID, &c.UserID, &c.Title, &c.CharacterName, &c.Model, &c.CreatedAt, &c.UpdatedAt, &c.MessageCount}, extra...)...)
+const summaryFrom = ` FROM conversation c LEFT JOIN character ch ON ch.id = c.character_id`
+
+func scanSummary(row interface{ Scan(...any) error }, c *ConversationSummary) error {
+	return row.Scan(&c.ID, &c.UserID, &c.Title, &c.CharacterName, &c.Model, &c.CreatedAt, &c.UpdatedAt, &c.MessageCount)
 }
 
-// ListConversationSummaries lists a user's conversations, most recently
-// updated first, leaving out excludeID (the conversation asking).
-func (s *Store) ListConversationSummaries(userID, excludeID int64, limit, offset int) ([]ConversationSummary, error) {
+// ListConversationSummaries lists a user's conversations that pass f, most
+// recently updated first, leaving out excludeID (the conversation asking).
+func (s *Store) ListConversationSummaries(userID, excludeID int64, f HistoryFilter, limit, offset int) ([]ConversationSummary, error) {
+	filterSQL, filterArgs := f.conversationSQL()
+	args := append([]any{userID, excludeID}, filterArgs...)
 	rows, err := s.db.Query(
-		`SELECT `+summaryColumns+`
-		 FROM conversation c LEFT JOIN character ch ON ch.id = c.character_id
-		 WHERE c.user_id = ? AND c.id <> ?
+		`SELECT `+summaryColumns+summaryFrom+`
+		 WHERE c.user_id = ? AND c.id <> ?`+filterSQL+`
 		 ORDER BY c.updated_at DESC, c.id DESC LIMIT ? OFFSET ?`,
-		userID, excludeID, limit, offset,
+		append(args, limit, offset)...,
 	)
 	if err != nil {
 		return nil, err
@@ -77,12 +129,36 @@ func (s *Store) ListConversationSummaries(userID, excludeID int64, limit, offset
 	return out, rows.Err()
 }
 
-// CountConversations returns how many conversations a user has, leaving out
-// excludeID.
-func (s *Store) CountConversations(userID, excludeID int64) (int, error) {
+// CountConversations returns how many of a user's conversations pass f,
+// leaving out excludeID.
+func (s *Store) CountConversations(userID, excludeID int64, f HistoryFilter) (int, error) {
+	filterSQL, filterArgs := f.conversationSQL()
 	var n int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM conversation WHERE user_id = ? AND id <> ?`, userID, excludeID).Scan(&n)
+	err := s.db.QueryRow(
+		`SELECT COUNT(*)`+summaryFrom+` WHERE c.user_id = ? AND c.id <> ?`+filterSQL,
+		append([]any{userID, excludeID}, filterArgs...)...,
+	).Scan(&n)
 	return n, err
+}
+
+// UserCharacterNames lists the names of the characters a user has had
+// conversations with, for telling the model which names it can filter on.
+func (s *Store) UserCharacterNames(userID int64) ([]string, error) {
+	rows, err := s.db.Query(
+		`SELECT DISTINCT ch.name`+summaryFrom+` WHERE c.user_id = ? AND ch.name IS NOT NULL ORDER BY ch.name`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		names = append(names, n)
+	}
+	return names, rows.Err()
 }
 
 // searchStopWords are left out of searches: they appear in nearly every
@@ -131,13 +207,23 @@ func ftsTerm(word string) string {
 	return t
 }
 
-// SearchConversations finds a user's conversations, leaving out excludeID,
-// that mention any of the words in query, in their title or in what the user
-// and the assistant said. Words match whatever their ending ("tuned" finds
-// "tuning"). Conversations mentioning the most different words come first,
-// then those with the words in the title, then the most matching messages,
-// then the most recent.
-func (s *Store) SearchConversations(userID, excludeID int64, query string, limit int) ([]ConversationMatch, error) {
+// anyWordQuery is the FTS5 query matching any of words.
+func anyWordQuery(words []string) string {
+	terms := make([]string, len(words))
+	for i, w := range words {
+		terms[i] = ftsTerm(w)
+	}
+	return strings.Join(terms, " OR ")
+}
+
+// SearchConversations finds a user's conversations that pass f, leaving out
+// excludeID, that mention any of the words in query, in their title or in
+// what the user and the assistant said. Words match whatever their ending
+// ("tuned" finds "tuning"). With a period set, only messages sent in it
+// count. Conversations mentioning the most different words come first, then
+// those with the words in the title, then the most matching messages, then
+// the most recent.
+func (s *Store) SearchConversations(userID, excludeID int64, query string, f HistoryFilter, limit int) ([]ConversationMatch, error) {
 	words := SearchWords(query)
 	if len(words) == 0 {
 		return nil, nil
@@ -154,15 +240,19 @@ func (s *Store) SearchConversations(userID, excludeID int64, query string, limit
 		}
 		return hits[id]
 	}
+	convSQL, convArgs := f.conversationSQL()
+	timeSQL, timeArgs := f.messageTimeSQL()
 	for _, w := range words {
 		matched := map[int64]bool{}
+		args := append([]any{ftsTerm(w), userID, excludeID}, timeArgs...)
 		rows, err := s.db.Query(
 			`SELECT m.conversation_id, COUNT(*) FROM message_fts
 			 JOIN message m ON m.id = message_fts.rowid
 			 JOIN conversation c ON c.id = m.conversation_id
-			 WHERE message_fts MATCH ? AND c.user_id = ? AND c.id <> ?
+			 LEFT JOIN character ch ON ch.id = c.character_id
+			 WHERE message_fts MATCH ? AND c.user_id = ? AND c.id <> ?`+timeSQL+convSQL+`
 			 GROUP BY m.conversation_id`,
-			ftsTerm(w), userID, excludeID,
+			append(args, convArgs...)...,
 		)
 		if err != nil {
 			return nil, err
@@ -174,8 +264,7 @@ func (s *Store) SearchConversations(userID, excludeID int64, query string, limit
 				rows.Close()
 				return nil, err
 			}
-			h := get(id)
-			h.messages += n
+			get(id).messages += n
 			matched[id] = true
 		}
 		rows.Close()
@@ -185,8 +274,9 @@ func (s *Store) SearchConversations(userID, excludeID int64, query string, limit
 		rows, err = s.db.Query(
 			`SELECT c.id FROM conversation_title_fts
 			 JOIN conversation c ON c.id = conversation_title_fts.rowid
-			 WHERE conversation_title_fts MATCH ? AND c.user_id = ? AND c.id <> ?`,
-			ftsTerm(w), userID, excludeID,
+			 LEFT JOIN character ch ON ch.id = c.character_id
+			 WHERE conversation_title_fts MATCH ? AND c.user_id = ? AND c.id <> ?`+convSQL,
+			append([]any{ftsTerm(w), userID, excludeID}, convArgs...)...,
 		)
 		if err != nil {
 			return nil, err
@@ -240,44 +330,59 @@ func (s *Store) SearchConversations(userID, excludeID int64, query string, limit
 		out = out[:limit]
 	}
 
-	terms := make([]string, len(words))
-	for i, w := range words {
-		terms[i] = ftsTerm(w)
-	}
-	anyWord := strings.Join(terms, " OR ")
 	for i := range out {
 		if out[i].MessageHits == 0 {
 			continue
 		}
-		e := &SearchExcerpt{}
-		err := s.db.QueryRow(
-			`SELECT m.id, m.role, m.created_at, snippet(message_fts, 0, '**', '**', '…', 40)
-			 FROM message_fts JOIN message m ON m.id = message_fts.rowid
-			 WHERE message_fts MATCH ? AND m.conversation_id = ?
-			 ORDER BY rank LIMIT 1`,
-			anyWord, out[i].ID,
-		).Scan(&e.MessageID, &e.Role, &e.CreatedAt, &e.Snippet)
-		if errors.Is(err, sql.ErrNoRows) {
-			continue
-		}
+		excerpts, err := s.SearchConversation(out[i].ID, query, f, 1)
 		if err != nil {
 			return nil, err
 		}
-		e.Snippet = strings.Join(strings.Fields(e.Snippet), " ")
-		out[i].Best = e
+		if len(excerpts) > 0 {
+			out[i].Best = &excerpts[0]
+		}
 	}
 	return out, nil
+}
+
+// SearchConversation finds the messages in one conversation that mention any
+// of the words in query and were sent in f's period (f's character is
+// ignored), best matches first, at most limit of them.
+func (s *Store) SearchConversation(conversationID int64, query string, f HistoryFilter, limit int) ([]SearchExcerpt, error) {
+	words := SearchWords(query)
+	if len(words) == 0 {
+		return nil, nil
+	}
+	timeSQL, timeArgs := f.messageTimeSQL()
+	args := append([]any{anyWordQuery(words), conversationID}, timeArgs...)
+	rows, err := s.db.Query(
+		`SELECT m.id, m.role, m.name, m.created_at, snippet(message_fts, 0, '**', '**', '…', 40)
+		 FROM message_fts JOIN message m ON m.id = message_fts.rowid
+		 WHERE message_fts MATCH ? AND m.conversation_id = ?`+timeSQL+`
+		 ORDER BY rank LIMIT ?`,
+		append(args, limit)...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SearchExcerpt
+	for rows.Next() {
+		var e SearchExcerpt
+		if err := rows.Scan(&e.MessageID, &e.Role, &e.Name, &e.CreatedAt, &e.Snippet); err != nil {
+			return nil, err
+		}
+		e.Snippet = strings.Join(strings.Fields(e.Snippet), " ")
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }
 
 // ConversationSummaryByID returns one conversation's summary whoever owns it;
 // callers check ownership.
 func (s *Store) ConversationSummaryByID(id int64) (*ConversationSummary, error) {
 	c := &ConversationSummary{}
-	err := scanSummary(s.db.QueryRow(
-		`SELECT `+summaryColumns+`
-		 FROM conversation c LEFT JOIN character ch ON ch.id = c.character_id
-		 WHERE c.id = ?`, id,
-	), c)
+	err := scanSummary(s.db.QueryRow(`SELECT `+summaryColumns+summaryFrom+` WHERE c.id = ?`, id), c)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
