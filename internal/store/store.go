@@ -989,6 +989,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v47 → v48 complete")
 	}
 
+	if version < 49 {
+		log.Println("store: migrating v48 → v49 (full-text search indexes for conversation history)")
+		if err := s.migrateHistorySearch(); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (49, ?)`, now()); err != nil {
+			return err
+		}
+		version = 49
+		log.Println("store: migration v48 → v49 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }
@@ -1170,5 +1182,70 @@ func (s *Store) migrateResearchRedditState() (err error) {
 	if violations != 0 {
 		return fmt.Errorf("research_job migration produced %d foreign key violation(s)", violations)
 	}
+	return tx.Commit()
+}
+
+// migrateHistorySearch creates the full-text indexes the history_search tool
+// uses — one over what the user and the assistant said, one over conversation
+// titles — with triggers that keep them in step, and fills them from the
+// existing rows, in one transaction. Porter stemming lets "tuned" find
+// "tuning"; remove_diacritics lets "cafe" find "café".
+func (s *Store) migrateHistorySearch() error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if _, err := tx.Exec(`
+		CREATE VIRTUAL TABLE message_fts USING fts5(content, tokenize = 'porter unicode61 remove_diacritics 2');
+		CREATE TRIGGER message_fts_insert AFTER INSERT ON message
+			WHEN new.role IN ('user', 'assistant') AND new.content <> ''
+		BEGIN
+			INSERT INTO message_fts (rowid, content) VALUES (new.id, new.content);
+		END;
+		CREATE TRIGGER message_fts_delete AFTER DELETE ON message
+		BEGIN
+			DELETE FROM message_fts WHERE rowid = old.id;
+		END;
+		CREATE TRIGGER message_fts_update AFTER UPDATE OF role, content ON message
+		BEGIN
+			DELETE FROM message_fts WHERE rowid = old.id;
+			INSERT INTO message_fts (rowid, content)
+				SELECT new.id, new.content WHERE new.role IN ('user', 'assistant') AND new.content <> '';
+		END;
+
+		CREATE VIRTUAL TABLE conversation_title_fts USING fts5(title, tokenize = 'porter unicode61 remove_diacritics 2');
+		CREATE TRIGGER conversation_title_fts_insert AFTER INSERT ON conversation
+			WHEN new.title IS NOT NULL AND new.title <> ''
+		BEGIN
+			INSERT INTO conversation_title_fts (rowid, title) VALUES (new.id, new.title);
+		END;
+		CREATE TRIGGER conversation_title_fts_delete AFTER DELETE ON conversation
+		BEGIN
+			DELETE FROM conversation_title_fts WHERE rowid = old.id;
+		END;
+		CREATE TRIGGER conversation_title_fts_update AFTER UPDATE OF title ON conversation
+		BEGIN
+			DELETE FROM conversation_title_fts WHERE rowid = old.id;
+			INSERT INTO conversation_title_fts (rowid, title)
+				SELECT new.id, new.title WHERE new.title IS NOT NULL AND new.title <> '';
+		END;
+	`); err != nil {
+		return err
+	}
+	res, err := tx.Exec(`INSERT INTO message_fts (rowid, content)
+		SELECT id, content FROM message WHERE role IN ('user', 'assistant') AND content <> ''`)
+	if err != nil {
+		return err
+	}
+	messages, _ := res.RowsAffected()
+	res, err = tx.Exec(`INSERT INTO conversation_title_fts (rowid, title)
+		SELECT id, title FROM conversation WHERE title IS NOT NULL AND title <> ''`)
+	if err != nil {
+		return err
+	}
+	titles, _ := res.RowsAffected()
+	log.Printf("store: migrateHistorySearch — indexed %d message(s) and %d conversation title(s)", messages, titles)
 	return tx.Commit()
 }

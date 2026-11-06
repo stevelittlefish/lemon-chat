@@ -43,18 +43,19 @@ func TestHistoryToolsOwnConversations(t *testing.T) {
 		t.Fatalf("list includes the current conversation: %q", out)
 	}
 
-	out, err = executeHistorySearch(`{"query":"DROP d"}`, tctx)
+	// Word endings, case and extra unmatched words don't stop a match.
+	out, err = executeHistorySearch(`{"query":"Tuned GUITARS ukulele"}`, tctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "1 matching messages") || !strings.Contains(out, "tune a guitar to drop D") {
+	if !strings.Contains(out, "Matches 2 of 3 words (tuned, guitars), in the title") || !strings.Contains(out, "**tune**") {
 		t.Fatalf("search = %q", out)
 	}
 	if out, _ := executeHistorySearch(`{"query":"secret"}`, tctx); !strings.Contains(out, "No conversations") {
 		t.Fatalf("search matched a tool result: %q", out)
 	}
-	if out, _ := executeHistorySearch(`{"query":"100%"}`, tctx); !strings.Contains(out, "No conversations") {
-		t.Fatalf("%% should be literal: %q", out)
+	if _, err := executeHistorySearch(`{"query":"the 'and'"}`, tctx); err == nil {
+		t.Fatal("a query of only stop words should be refused")
 	}
 
 	out, err = executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d}`, sonConv.ID), tctx)
@@ -149,5 +150,30 @@ func TestWithoutHistoryUserParam(t *testing.T) {
 	// The registry itself is untouched.
 	if _, ok := toolRegistry["history_list"].Function.Parameters.Properties[historyUserParam]; !ok {
 		t.Fatal("stripping modified the registry")
+	}
+}
+
+func TestHistorySearchRanksByWordsMatched(t *testing.T) {
+	st := memoryTestStore(t)
+	u, _ := st.CreateUser("u", nil, false, nil)
+	model := "m"
+	one, _ := st.CreateConversation(u.ID, nil, &model, nil)
+	st.CreateMessage(one.ID, "user", "Chess openings", nil, nil, nil, nil, "")
+	st.CreateMessage(one.ID, "user", "More chess", nil, nil, nil, nil, "")
+	both, _ := st.CreateConversation(u.ID, nil, &model, nil)
+	st.CreateMessage(both.ID, "user", "Chess club tournament", nil, nil, nil, nil, "")
+
+	matches, err := st.SearchConversations(u.ID, 0, "chess tournament", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 2 || matches[0].ID != both.ID || matches[1].ID != one.ID || matches[1].MessageHits != 2 {
+		t.Fatalf("matches = %+v", matches)
+	}
+
+	// The index follows edits and deletions.
+	st.DeleteConversation(both.ID, u.ID)
+	if matches, _ := st.SearchConversations(u.ID, 0, "tournament", 10); len(matches) != 0 {
+		t.Fatalf("deleted conversation still found: %+v", matches)
 	}
 }

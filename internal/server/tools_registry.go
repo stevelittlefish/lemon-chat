@@ -535,13 +535,13 @@ Examples:
 		Type:     "function",
 		Function: toolFunction{
 			Name:        "history_search",
-			Description: "Searches the user's previous conversations for a word or short phrase, in titles and in what the user and the assistant said. Matches the exact text, ignoring case, so search for one distinctive word (e.g. \"guitar\") rather than a question; run several searches for different words. Returns the matching conversations with a snippet of the first match. Read a conversation with history_read.",
+			Description: "Searches the user's previous conversations, in titles and in what the user and the assistant said. Give several words at once, including other words for the same thing and related words, since you don't know how it was worded (e.g. \"guitar chords tuning fretboard\" or \"school exam test revision\"). A conversation matches if it mentions any of the words; word endings don't matter (\"tuned\" finds \"tuning\") and partial words match. Conversations mentioning the most words come first, each with an extract of its best-matching message. If nothing useful comes back, search again with different words. Read a conversation with history_read.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
 					"query": map[string]any{
 						"type":        "string",
-						"description": "The word or phrase to look for.",
+						"description": "Words to look for, separated by spaces. Common words like \"the\" are ignored.",
 					},
 					historyUserParam: historyUserSchema,
 				},

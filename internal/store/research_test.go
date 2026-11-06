@@ -157,7 +157,8 @@ func TestMigrationsV31AndV32PreserveExistingResearchData(t *testing.T) {
 		INSERT INTO user (id) VALUES (7);
 		CREATE TABLE schema_version (version INTEGER, timestamp TEXT);
 		INSERT INTO schema_version (version, timestamp) VALUES (30, '2026-01-01T00:00:00Z');
-		CREATE TABLE message (id INTEGER PRIMARY KEY);
+		CREATE TABLE conversation (id INTEGER PRIMARY KEY, title TEXT);
+		CREATE TABLE message (id INTEGER PRIMARY KEY, role TEXT NOT NULL, content TEXT NOT NULL);
 		CREATE TABLE character (id INTEGER PRIMARY KEY, tools TEXT);
 		CREATE TABLE attachment (
 			id INTEGER PRIMARY KEY AUTOINCREMENT, tool_call_id TEXT NOT NULL,
@@ -214,8 +215,8 @@ func TestMigrationsV31AndV32PreserveExistingResearchData(t *testing.T) {
 		t.Fatalf("new Reddit state was not safely defaulted: %+v", job)
 	}
 	var version int
-	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 48 {
-		t.Fatalf("schema version = %d, err=%v; want 48", version, err)
+	if err := s.db.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 49 {
+		t.Fatalf("schema version = %d, err=%v; want 49", version, err)
 	}
 	var violations int
 	rows, err := s.db.Query(`PRAGMA foreign_key_check`)

@@ -7,17 +7,15 @@ import (
 	"log"
 	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
 const (
-	historyListDefault   = 20
-	historyListMax       = 50
-	historySearchMax     = 20
-	historySnippetRadius = 150 // characters either side of a search match
+	historyListDefault = 20
+	historyListMax     = 50
+	historySearchMax   = 20
 	// historyReadMaxChars caps one history_read page so a long conversation
 	// is read in pieces rather than filling the context in one go.
 	historyReadMaxChars = 24000
@@ -176,32 +174,6 @@ func executeHistoryList(argsJSON string, tctx ToolContext) (string, error) {
 	return b.String(), nil
 }
 
-// snippet returns the text around the first case-insensitive match of query
-// in text, with ellipses where it was cut.
-func snippet(text, query string) string {
-	runes := []rune(text)
-	lower := make([]rune, len(runes))
-	for i, r := range runes {
-		lower[i] = unicode.ToLower(r)
-	}
-	q := []rune(strings.ToLower(query))
-	at := strings.Index(string(lower), string(q))
-	start := 0
-	if at >= 0 {
-		start = utf8.RuneCountInString(string(lower)[:at])
-	}
-	from := max(start-historySnippetRadius, 0)
-	to := min(start+len(q)+historySnippetRadius, len(runes))
-	s := strings.Join(strings.Fields(string(runes[from:to])), " ")
-	if from > 0 {
-		s = "…" + s
-	}
-	if to < len(runes) {
-		s += "…"
-	}
-	return s
-}
-
 func executeHistorySearch(argsJSON string, tctx ToolContext) (string, error) {
 	var args struct {
 		Query string `json:"query"`
@@ -210,35 +182,40 @@ func executeHistorySearch(argsJSON string, tctx ToolContext) (string, error) {
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
 	}
-	query := strings.TrimSpace(args.Query)
-	if query == "" {
-		return "", errors.New("query is required")
+	words := store.SearchWords(args.Query)
+	if len(words) == 0 {
+		return "", errors.New("query needs at least one word to search for (very common words like \"the\" are ignored)")
 	}
 	owner, err := historyUser(tctx, args.User, "history_search")
 	if err != nil {
 		return "", err
 	}
-	matches, err := tctx.Store.SearchConversations(owner.ID, tctx.ConversationID, query, historySearchMax)
+	matches, err := tctx.Store.SearchConversations(owner.ID, tctx.ConversationID, args.Query, historySearchMax)
 	if err != nil {
 		return "", err
 	}
+	searched := strings.Join(words, ", ")
 	if len(matches) == 0 {
-		return fmt.Sprintf("No conversations of %s mention %q. The search matches the exact text; try a shorter or different word.", userLabel(owner), query), nil
+		return fmt.Sprintf("No conversations of %s mention any of: %s. Try other words for the same thing, or broader ones.", userLabel(owner), searched), nil
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "Conversations of %s mentioning %q, most recent first:", userLabel(owner), query)
+	fmt.Fprintf(&b, "Conversations of %s mentioning any of: %s. Those matching the most words come first.", userLabel(owner), searched)
 	for i := range matches {
 		m := &matches[i]
 		writeSummaryLine(&b, &m.ConversationSummary, tctx.Timezone)
-		if m.FirstMatch == nil {
-			b.WriteString("\n  (matched the title)")
-			continue
+		fmt.Fprintf(&b, "\n  Matches %d of %d words (%s)", len(m.MatchedWords), len(words), strings.Join(m.MatchedWords, ", "))
+		if m.TitleMatch {
+			b.WriteString(", in the title")
 		}
-		fmt.Fprintf(&b, "\n  %d matching messages; first (%s, %s): %s",
-			m.MatchCount, m.FirstMatch.Role, historyTime(m.FirstMatch.CreatedAt, tctx.Timezone), snippet(m.FirstMatch.Content, query))
+		if m.MessageHits > 0 {
+			fmt.Fprintf(&b, "; %d matching messages", m.MessageHits)
+		}
+		if m.Best != nil {
+			fmt.Fprintf(&b, "\n  Best match (%s, %s): %s", m.Best.Role, historyTime(m.Best.CreatedAt, tctx.Timezone), m.Best.Snippet)
+		}
 	}
 	if len(matches) == historySearchMax {
-		fmt.Fprintf(&b, "\n\nShowing the %d most recent matches; there may be more. Use a more specific query to narrow it down.", historySearchMax)
+		fmt.Fprintf(&b, "\n\nShowing the best %d matches; there may be more.", historySearchMax)
 	}
 	b.WriteString("\n\nRead one with history_read.")
 	return b.String(), nil
