@@ -507,6 +507,77 @@ Examples:
 		Order:       130,
 		Members:     []string{"memory_list", "memory_save", "memory_update", "memory_forget"},
 	},
+	"history_list": {
+		Executor: executeHistoryList,
+		Type:     "function",
+		Function: toolFunction{
+			Name:        "history_list",
+			Description: "Lists the user's previous conversations, most recent first, with each one's id, title, character, message count and dates. Use it when the user refers to an earlier chat or asks what they have talked about recently. Read a conversation with history_read.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"limit": map[string]any{
+						"type":        "integer",
+						"description": "How many conversations to list (default 20, at most 50).",
+					},
+					"offset": map[string]any{
+						"type":        "integer",
+						"description": "How many of the most recent conversations to skip, to page back through older ones.",
+					},
+					historyUserParam: historyUserSchema,
+				},
+				Required: []string{},
+			},
+		},
+	},
+	"history_search": {
+		Executor: executeHistorySearch,
+		Type:     "function",
+		Function: toolFunction{
+			Name:        "history_search",
+			Description: "Searches the user's previous conversations for a word or short phrase, in titles and in what the user and the assistant said. Matches the exact text, ignoring case, so search for one distinctive word (e.g. \"guitar\") rather than a question; run several searches for different words. Returns the matching conversations with a snippet of the first match. Read a conversation with history_read.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"query": map[string]any{
+						"type":        "string",
+						"description": "The word or phrase to look for.",
+					},
+					historyUserParam: historyUserSchema,
+				},
+				Required: []string{"query"},
+			},
+		},
+	},
+	"history_read": {
+		Executor: executeHistoryRead,
+		Type:     "function",
+		Function: toolFunction{
+			Name:        "history_read",
+			Description: "Reads a previous conversation: what the user and the assistant said, with timestamps (tool calls and their results are left out). Long conversations come in pages; the result says which offset to pass for the rest. Don't claim something wasn't discussed unless you have read the whole conversation.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"conversation_id": map[string]any{
+						"type":        "integer",
+						"description": "The conversation's id, from history_list or history_search.",
+					},
+					"offset": map[string]any{
+						"type":        "integer",
+						"description": "How many messages to skip, to continue a long conversation (default 0, the start).",
+					},
+				},
+				Required: []string{"conversation_id"},
+			},
+		},
+	},
+	"history": {
+		DisplayName: "Conversation history",
+		Summary:     "Lists, searches and reads the user's previous conversations. Admins can also read other users' conversations; those reads are logged.",
+		Group:       "Memory",
+		Order:       135,
+		Members:     []string{"history_list", "history_search", "history_read"},
+	},
 	"world_state": {
 		DisplayName: "World state",
 		Summary:     "Session state tools: set, modify, remove, clear, and list named values scoped to this conversation.",
@@ -514,6 +585,13 @@ Examples:
 		Order:       120,
 		Members:     []string{"state_set", "state_modify", "state_unset", "state_list", "state_clear"},
 	},
+}
+
+// historyUserSchema is the admin-only user argument of history_list and
+// history_search; withoutHistoryUserParam removes it for non-admins.
+var historyUserSchema = map[string]any{
+	"type":        "string",
+	"description": "Admins only: the username or display name of another user whose conversations to look at. Leave it out for the current user's own conversations.",
 }
 
 // withoutTool returns defs minus the tool named name.

@@ -145,6 +145,7 @@ internal/
     tools_image.go     # generate_image: ComfyUI submit/poll/download + tool schema
     tools_state.go     # world-state and note_to_self tools
     tools_memory.go    # memory tools and the "Load memories at start" helpers
+    tools_history.go   # conversation history tools (list, search, read; admins any user)
     memories.go        # memories settings-page API (own memories; admins any user's)
   store/
     store.go           # open DB, run migrations, bootstrap
@@ -156,6 +157,7 @@ internal/
     completions.go     # completion queries
     state.go           # world-state queries
     memories.go        # memory queries
+    history.go         # conversation history tool queries (summaries, search)
     research.go        # research job queries (incl. resume checkpoints)
     research_reports.go # research report variant queries
     attachments.go     # attachment queries, unlinked-upload sweep, safe file removal
@@ -284,16 +286,25 @@ Available tools and their config requirements:
 | `memory_save` | Memory: save | — |
 | `memory_update` | Memory: update | — |
 | `memory_forget` | Memory: forget | — |
+| `history` | Conversation history (compound) | — |
+| `history_list` | History: list | — |
+| `history_search` | History: search | — |
+| `history_read` | History: read | — |
 
 `InitTools(cfg)` is called once at startup and sets the `Configured` flag on tools that need external services. The frontend reads `GET /api/tools` and shows a config hint for unconfigured tools.
 
 Compound group IDs expand to multiple tools:
 - `world_state` → `state_set`, `state_modify`, `state_unset`, `state_list`, `state_clear`
 - `memory` → `memory_list`, `memory_save`, `memory_update`, `memory_forget`
+- `history` → `history_list`, `history_search`, `history_read`
 
 ### Memory
 
 The `memory` table holds one fact per row per user (capped at 500 characters), shared by every character that has the `memory` tool; characters without it can't see memories. The model decides when to save, guided by the tool descriptions. `character.load_memories` ("Load memories at start" under the tool in the character editor) makes `handleSendMessage` store a synthetic `memory_list` call (id `memory_autoload_<conv>`) and its result right after the first user message, so later turns replay the same prefix and prompt caching holds. Users see and edit their memories at `/settings/memories`; admins can pick another user there, and those actions are logged with `admin_id`.
+
+### Conversation history
+
+The `history` tools (`internal/server/tools_history.go`, queries in `internal/store/history.go`) let the model list, search and read the user's previous conversations. They show only what the user and the assistant said (no tool calls or results), leave out the current conversation, and `history_read` pages long conversations (24,000 characters per call). Search is a literal, case-insensitive `LIKE` match on titles and message text. Admins' models also get a `user` argument (username or display name) on `history_list`/`history_search`, and `history_read` accepts any conversation ID for an admin; `handleSendMessage` strips that argument from the schemas for non-admins and the executors refuse it anyway. Every read of another user's history is logged with `admin_id`.
 
 ### Image generation
 

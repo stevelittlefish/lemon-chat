@@ -743,6 +743,9 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		if !modelVision {
 			activeToolDefs = withoutTool(activeToolDefs, "view_image")
 		}
+		if !user.IsAdmin {
+			activeToolDefs = withoutHistoryUserParam(activeToolDefs)
+		}
 	}
 
 	responseTimeout := time.Duration(s.cfg.Server.ResponseTimeoutSeconds) * time.Second
