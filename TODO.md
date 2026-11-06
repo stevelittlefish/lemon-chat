@@ -38,7 +38,12 @@ Raised by conversation 102, where the general assistant's opening `note_list` du
 
 ## Handoff (backlog)
 
-- [ ] **Handoff.** The user has a design in mind; to be discussed and written up when we get to it.
+- [ ] **Handoff.** An easy way to generate a handoff document from a conversation that can either be downloaded or used to seed a new conversation. The user has a design in mind; to be discussed and written up when we get to it. Download could reuse the attachment serving path (`internal/server/attachments.go`); seeding fits alongside fork/import in `internal/server/conversations.go`.
+
+## Conversation history (backlog)
+
+- [ ] **Conversation history tools: search past chats and load one into context.** A new tool group in `toolRegistry` (`internal/server/tools_registry.go:44`): search the user's previous conversations (titles and message text) and load a chosen conversation's messages into the current context. Store side starts from `ListConversations` (`internal/store/conversations.go:21`); search needs a new query (conversation search is not built yet). Loading must cap or summarise long conversations so it doesn't blow the context.
+- [ ] **Let admins use the history tools on other users' conversations.** An admin should be able to ask, say, for a summary of what a family member has been talking about. Needs a user argument on the history tools that only admins may set (non-admins are always scoped to themselves), and logging of every cross-user read with `admin_id`, as the memories page does (`internal/server/memories.go:14`, `:137`).
 
 ## User attachments (backlog)
 
@@ -47,6 +52,7 @@ Raised by conversation 102, where the general assistant's opening `note_list` du
 ## Image generation (backlog)
 
 - [ ] **Advanced image generation tools.** A second, opt-in tool set alongside the general-purpose `generate_image` (`internal/server/tools_image.go`), for experimenting with image generation from chat: list every registered workflow in `comfyui/workflows.toml` (not just `exposed` ones, with descriptions and availability), and generate with extra parameters such as CFG, steps, sampler/scheduler and explicit width/height (e.g. the same prompt at a fixed seed across several CFG values). Needs new optional bindings in the registry (`internal/comfyui/registry.go`) for those inputs, validated per workflow like the existing ones.
+- [ ] **Image edit tool.** Let the model edit an existing image, either one the user pasted (`source = "upload"`) or one generated earlier in the conversation, possibly with several reference images at once. Alongside `generate_image` (`internal/server/tools_image.go:175`); select images by ID the way `view_image` does (`tools_image.go:426`), and needs edit/reference workflows plus image-input bindings in the registry (`internal/comfyui/registry.go`).
 
 ## Provider abstraction & OAuth (backlog)
 
