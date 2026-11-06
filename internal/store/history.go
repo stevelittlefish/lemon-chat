@@ -11,14 +11,16 @@ import (
 
 // ConversationSummary is one conversation as the history tools list it.
 type ConversationSummary struct {
-	ID            int64
-	UserID        int64
-	Title         *string
-	CharacterName *string
-	Model         *string
-	CreatedAt     string
-	UpdatedAt     string
-	MessageCount  int // user and assistant messages with text
+	ID               int64
+	UserID           int64
+	OwnerUsername    string
+	OwnerDisplayName *string
+	Title            *string
+	CharacterName    *string
+	Model            *string
+	CreatedAt        string
+	UpdatedAt        string
+	MessageCount     int // user and assistant messages with text
 }
 
 // ConversationMatch is a search hit: the conversation, which of the search
@@ -94,23 +96,31 @@ func likePattern(text string) string {
 	return "%" + r.Replace(text) + "%"
 }
 
-const summaryColumns = `c.id, c.user_id, c.title, ch.name, c.model, c.created_at, c.updated_at,
+const summaryColumns = `c.id, c.user_id, u.username, u.display_name, c.title, ch.name, c.model, c.created_at, c.updated_at,
 	(SELECT COUNT(*) FROM message m WHERE m.conversation_id = c.id AND ` + historyMessageFilter + `)`
 
-const summaryFrom = ` FROM conversation c LEFT JOIN character ch ON ch.id = c.character_id`
+const summaryFrom = ` FROM conversation c JOIN user u ON u.id = c.user_id LEFT JOIN character ch ON ch.id = c.character_id`
 
-func scanSummary(row interface{ Scan(...any) error }, c *ConversationSummary) error {
-	return row.Scan(&c.ID, &c.UserID, &c.Title, &c.CharacterName, &c.Model, &c.CreatedAt, &c.UpdatedAt, &c.MessageCount)
+// ownerSQL limits conversation alias c to one user's conversations, or
+// leaves it open when userID is 0 (all users; admin tools only).
+func ownerSQL(userID int64) (string, []any) {
+	if userID == 0 {
+		return ``, nil
+	}
+	return ` AND c.user_id = ?`, []any{userID}
 }
 
-// ListConversationSummaries lists a user's conversations that pass f, most
-// recently updated first, leaving out excludeID (the conversation asking).
+func scanSummary(row interface{ Scan(...any) error }, c *ConversationSummary) error {
+	return row.Scan(&c.ID, &c.UserID, &c.OwnerUsername, &c.OwnerDisplayName, &c.Title, &c.CharacterName, &c.Model, &c.CreatedAt, &c.UpdatedAt, &c.MessageCount)
+}
+
+// ListConversationSummaries lists a user's conversations (everyone's when
+// userID is 0) that pass f, most recently updated first, leaving out
+// excludeID (the conversation asking).
 func (s *Store) ListConversationSummaries(userID, excludeID int64, f HistoryFilter, limit, offset int) ([]ConversationSummary, error) {
-	filterSQL, filterArgs := f.conversationSQL()
-	args := append([]any{userID, excludeID}, filterArgs...)
+	where, args := historyWhere(userID, excludeID, f)
 	rows, err := s.db.Query(
-		`SELECT `+summaryColumns+summaryFrom+`
-		 WHERE c.user_id = ? AND c.id <> ?`+filterSQL+`
+		`SELECT `+summaryColumns+summaryFrom+where+`
 		 ORDER BY c.updated_at DESC, c.id DESC LIMIT ? OFFSET ?`,
 		append(args, limit, offset)...,
 	)
@@ -129,23 +139,31 @@ func (s *Store) ListConversationSummaries(userID, excludeID int64, f HistoryFilt
 	return out, rows.Err()
 }
 
-// CountConversations returns how many of a user's conversations pass f,
-// leaving out excludeID.
+// CountConversations returns how many of a user's conversations (everyone's
+// when userID is 0) pass f, leaving out excludeID.
 func (s *Store) CountConversations(userID, excludeID int64, f HistoryFilter) (int, error) {
-	filterSQL, filterArgs := f.conversationSQL()
+	where, args := historyWhere(userID, excludeID, f)
 	var n int
-	err := s.db.QueryRow(
-		`SELECT COUNT(*)`+summaryFrom+` WHERE c.user_id = ? AND c.id <> ?`+filterSQL,
-		append([]any{userID, excludeID}, filterArgs...)...,
-	).Scan(&n)
+	err := s.db.QueryRow(`SELECT COUNT(*)`+summaryFrom+where, args...).Scan(&n)
 	return n, err
 }
 
-// UserCharacterNames lists the names of the characters a user has had
-// conversations with, for telling the model which names it can filter on.
+// historyWhere is the WHERE clause for conversation alias c: the owner (all
+// users when userID is 0), not excludeID, and passing f.
+func historyWhere(userID, excludeID int64, f HistoryFilter) (string, []any) {
+	ownSQL, ownArgs := ownerSQL(userID)
+	filterSQL, filterArgs := f.conversationSQL()
+	args := append([]any{excludeID}, ownArgs...)
+	return ` WHERE c.id <> ?` + ownSQL + filterSQL, append(args, filterArgs...)
+}
+
+// UserCharacterNames lists the names of the characters a user (everyone when
+// userID is 0) has had conversations with, for telling the model which names
+// it can filter on.
 func (s *Store) UserCharacterNames(userID int64) ([]string, error) {
+	ownSQL, ownArgs := ownerSQL(userID)
 	rows, err := s.db.Query(
-		`SELECT DISTINCT ch.name`+summaryFrom+` WHERE c.user_id = ? AND ch.name IS NOT NULL ORDER BY ch.name`, userID)
+		`SELECT DISTINCT ch.name`+summaryFrom+` WHERE ch.name IS NOT NULL`+ownSQL+` ORDER BY ch.name`, ownArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +234,8 @@ func anyWordQuery(words []string) string {
 	return strings.Join(terms, " OR ")
 }
 
-// SearchConversations finds a user's conversations that pass f, leaving out
+// SearchConversations finds a user's conversations (everyone's when userID is
+// 0) that pass f, leaving out
 // excludeID, that mention any of the words in query, in their title or in
 // what the user and the assistant said. Words match whatever their ending
 // ("tuned" finds "tuning"). With a period set, only messages sent in it
@@ -240,19 +259,19 @@ func (s *Store) SearchConversations(userID, excludeID int64, query string, f His
 		}
 		return hits[id]
 	}
-	convSQL, convArgs := f.conversationSQL()
+	where, whereArgs := historyWhere(userID, excludeID, f)
 	timeSQL, timeArgs := f.messageTimeSQL()
 	for _, w := range words {
 		matched := map[int64]bool{}
-		args := append([]any{ftsTerm(w), userID, excludeID}, timeArgs...)
+		args := append(append([]any{}, whereArgs...), ftsTerm(w))
 		rows, err := s.db.Query(
 			`SELECT m.conversation_id, COUNT(*) FROM message_fts
 			 JOIN message m ON m.id = message_fts.rowid
 			 JOIN conversation c ON c.id = m.conversation_id
-			 LEFT JOIN character ch ON ch.id = c.character_id
-			 WHERE message_fts MATCH ? AND c.user_id = ? AND c.id <> ?`+timeSQL+convSQL+`
+			 LEFT JOIN character ch ON ch.id = c.character_id`+where+`
+			 AND message_fts MATCH ?`+timeSQL+`
 			 GROUP BY m.conversation_id`,
-			append(args, convArgs...)...,
+			append(args, timeArgs...)...,
 		)
 		if err != nil {
 			return nil, err
@@ -274,9 +293,9 @@ func (s *Store) SearchConversations(userID, excludeID int64, query string, f His
 		rows, err = s.db.Query(
 			`SELECT c.id FROM conversation_title_fts
 			 JOIN conversation c ON c.id = conversation_title_fts.rowid
-			 LEFT JOIN character ch ON ch.id = c.character_id
-			 WHERE conversation_title_fts MATCH ? AND c.user_id = ? AND c.id <> ?`+convSQL,
-			append([]any{ftsTerm(w), userID, excludeID}, convArgs...)...,
+			 LEFT JOIN character ch ON ch.id = c.character_id`+where+`
+			 AND conversation_title_fts MATCH ?`,
+			append(append([]any{}, whereArgs...), ftsTerm(w))...,
 		)
 		if err != nil {
 			return nil, err
@@ -387,4 +406,37 @@ func (s *Store) ConversationSummaryByID(id int64) (*ConversationSummary, error) 
 		return nil, ErrNotFound
 	}
 	return c, err
+}
+
+// UserActivity is a user with how many conversations they have and when they
+// last used one, for the admin user list.
+type UserActivity struct {
+	ID            int64
+	Username      string
+	DisplayName   *string
+	IsAdmin       bool
+	Conversations int
+	LastActive    *string
+}
+
+// ListUserActivity lists every user with their conversation count and the
+// last time one of their conversations was updated.
+func (s *Store) ListUserActivity() ([]UserActivity, error) {
+	rows, err := s.db.Query(
+		`SELECT u.id, u.username, u.display_name, u.is_admin, COUNT(c.id), MAX(c.updated_at)
+		 FROM user u LEFT JOIN conversation c ON c.user_id = u.id
+		 GROUP BY u.id ORDER BY u.username`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []UserActivity
+	for rows.Next() {
+		var a UserActivity
+		if err := rows.Scan(&a.ID, &a.Username, &a.DisplayName, &a.IsAdmin, &a.Conversations, &a.LastActive); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
 }

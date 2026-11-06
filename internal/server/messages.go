@@ -744,7 +744,7 @@ func (s *Server) handleSendMessage(w http.ResponseWriter, r *http.Request) {
 			activeToolDefs = withoutTool(activeToolDefs, "view_image")
 		}
 		if !user.IsAdmin {
-			activeToolDefs = withoutHistoryUserParam(activeToolDefs)
+			activeToolDefs = withoutAdminTools(activeToolDefs)
 		}
 	}
 

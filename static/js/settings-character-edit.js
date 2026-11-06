@@ -568,6 +568,10 @@ function readForm(isOwnerOrAdmin) {
   const tools = Array.from(toolCheckboxes)
     .filter(cb => cb.checked)
     .map(cb => cb.dataset.id);
+  // Keep enabled tools this user isn't shown (admin-only ones, for a
+  // non-admin), so saving doesn't silently drop them.
+  const shown = new Set(Array.from(toolCheckboxes, cb => cb.dataset.id));
+  tools.push(...enabledTools.filter(id => !shown.has(id)));
   return {
     name:            document.getElementById('char-name')?.value.trim()          ?? '',
     model:           document.getElementById('char-model')?.value                ?? '',

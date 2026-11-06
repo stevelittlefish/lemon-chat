@@ -145,7 +145,7 @@ internal/
     tools_image.go     # generate_image: ComfyUI submit/poll/download + tool schema
     tools_state.go     # world-state and note_to_self tools
     tools_memory.go    # memory tools and the "Load memories at start" helpers
-    tools_history.go   # conversation history tools (list, search, read; admins any user)
+    tools_history.go   # conversation history tools: own (history_*) and admin (admin_history_*)
     memories.go        # memories settings-page API (own memories; admins any user's)
   store/
     store.go           # open DB, run migrations, bootstrap
@@ -290,6 +290,11 @@ Available tools and their config requirements:
 | `history_list` | History: list | — |
 | `history_search` | History: search | — |
 | `history_read` | History: read | — |
+| `admin_history` | Conversation history (admin) (compound, admins only) | — |
+| `admin_list_users` | Admin: list users | — |
+| `admin_history_list` | Admin history: list | — |
+| `admin_history_search` | Admin history: search | — |
+| `admin_history_read` | Admin history: read | — |
 
 `InitTools(cfg)` is called once at startup and sets the `Configured` flag on tools that need external services. The frontend reads `GET /api/tools` and shows a config hint for unconfigured tools.
 
@@ -297,6 +302,9 @@ Compound group IDs expand to multiple tools:
 - `world_state` → `state_set`, `state_modify`, `state_unset`, `state_list`, `state_clear`
 - `memory` → `memory_list`, `memory_save`, `memory_update`, `memory_forget`
 - `history` → `history_list`, `history_search`, `history_read`
+- `admin_history` → `admin_list_users`, `admin_history_list`, `admin_history_search`, `admin_history_read`
+
+`AdminOnly` tools (set on the registry entry and on each member) are left out of `GET /api/tools` and of the model's tool list (`withoutAdminTools` in `handleSendMessage`) whenever the logged-in user isn't an admin, so a shared character with them enabled is safe for everyone; their executors also refuse non-admins. The character editor keeps enabled tools it doesn't show when saving, so a non-admin saving such a character doesn't drop them.
 
 ### Memory
 
@@ -310,7 +318,7 @@ The `history` tools (`internal/server/tools_history.go`, queries in `internal/st
 - **Filters:** `history_list` and `history_search` take `since`/`until` (whole days, `YYYY-MM-DD`, in `[server] timezone`, both inclusive; only messages sent in the period count) and `character` (case-insensitive substring of the character's name; an unknown name gets an error listing the user's characters). Results start with today's date so the model can work out "last week".
 - **Search** uses two SQLite FTS5 indexes (`message_fts` over user/assistant message text, `conversation_title_fts` over titles; Porter stemming, diacritics removed), kept in step by triggers on `message` and `conversation`. The query is split into words (stop words dropped); a conversation matches if it mentions any word, ranked by how many different words matched, then title matches, then matching messages, then recency, each with an FTS `snippet()` extract.
 - **Reading** is capped at 24,000 characters per `history_read` call; the result says where to continue.
-- **Admins:** admins' models also get a `user` argument (username or display name) on `history_list`/`history_search`, and can open any conversation by ID; `handleSendMessage` strips that argument from the schemas for non-admins and the executors refuse it anyway. Every read of another user's history is logged with `admin_id`.
+- **Two scopes, one implementation** (`historyScope`): the regular `history_*` tools only ever see the logged-in user's own conversations (even for an admin) and have no way to name anyone else; results call that user "the person you are talking to". The admin-only `admin_history_*` tools see everyone's: `user` (username or display name) narrows list/search to one person, leaving it out covers all users, every result line says whose conversation it is, `admin_history_read` opens any conversation, and `admin_list_users` lists the users with their conversation counts. Every admin tool call is logged (`Using admin history tool … admin_id=`).
 
 ### Image generation
 

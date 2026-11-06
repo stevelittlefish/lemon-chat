@@ -1,6 +1,10 @@
 package server
 
-import "github.com/stevelittlefish/lemon-chat/internal/config"
+import (
+	"fmt"
+
+	"github.com/stevelittlefish/lemon-chat/internal/config"
+)
 
 type toolParam struct {
 	Type       string         `json:"type"`
@@ -39,6 +43,9 @@ type toolDef struct {
 	Executor    toolExecutor   `json:"-"`
 	Members     []string       `json:"-"`
 	Configure   toolConfigurer `json:"-"`
+	// AdminOnly tools are withheld from the model, and hidden in the
+	// character editor, unless the logged-in user is an admin.
+	AdminOnly bool `json:"-"`
 }
 
 var toolRegistry = map[string]toolDef{
@@ -510,87 +517,60 @@ Examples:
 	"history_list": {
 		Executor: executeHistoryList,
 		Type:     "function",
-		Function: toolFunction{
-			Name:        "history_list",
-			Description: "Lists the user's previous conversations, most recent first, with each one's id, title, character, number of messages and dates. Use since and until for a period (e.g. last week) and character for conversations with one character. To find a topic, use history_search instead.",
-			Parameters: toolParam{
-				Type: "object",
-				Properties: map[string]any{
-					"since":     historySinceSchema,
-					"until":     historyUntilSchema,
-					"character": historyCharacterSchema,
-					"limit": map[string]any{
-						"type":        "integer",
-						"description": "How many conversations to list (default 20, at most 50).",
-					},
-					"offset": map[string]any{
-						"type":        "integer",
-						"description": "How many conversations to skip, to see older ones (default 0).",
-					},
-					historyUserParam: historyUserSchema,
-				},
-				Required: []string{},
-			},
-		},
+		Function: historyListFunction(ownHistory),
 	},
 	"history_search": {
 		Executor: executeHistorySearch,
 		Type:     "function",
-		Function: toolFunction{
-			Name:        "history_search",
-			Description: "Searches the user's previous conversations for words. Use it in two steps. Step 1: search all conversations with a query (optionally since, until, character); you get the best-matching conversations, each with an extract. Step 2: search again with the same query and the conversation_id of the one you want; you get its matching messages with their message numbers. Then read around a match with history_read. Put several words in the query, including other words for the same thing, since you don't know the exact wording (e.g. \"guitar chords tuning\"). Any of the words can match, word endings don't matter, and conversations matching more words come first. If nothing useful comes back, try different words.",
-			Parameters: toolParam{
-				Type: "object",
-				Properties: map[string]any{
-					"query": map[string]any{
-						"type":        "string",
-						"description": "Words to look for, separated by spaces. Common words like \"the\" are ignored.",
-					},
-					"conversation_id": map[string]any{
-						"type":        "integer",
-						"description": "Step 2 only: search inside this one conversation and list its matching messages.",
-					},
-					"since":          historySinceSchema,
-					"until":          historyUntilSchema,
-					"character":      historyCharacterSchema,
-					historyUserParam: historyUserSchema,
-				},
-				Required: []string{"query"},
-			},
-		},
+		Function: historySearchFunction(ownHistory),
 	},
 	"history_read": {
 		Executor: executeHistoryRead,
 		Type:     "function",
-		Function: toolFunction{
-			Name:        "history_read",
-			Description: "Reads messages from a previous conversation: who said what and when, numbered from 1 (tool calls are left out). To read around a match from history_search, give start a few messages before it and count, e.g. start=40 count=8 for message 43. Without start and count it reads from the beginning, as much as fits, and says where to continue. Don't say something wasn't discussed unless you have read the whole conversation.",
-			Parameters: toolParam{
-				Type: "object",
-				Properties: map[string]any{
-					"conversation_id": map[string]any{
-						"type":        "integer",
-						"description": "The conversation's id, from history_list or history_search.",
-					},
-					"start": map[string]any{
-						"type":        "integer",
-						"description": "The message number to start at (default 1, the beginning).",
-					},
-					"count": map[string]any{
-						"type":        "integer",
-						"description": "How many messages to read (default: as many as fit).",
-					},
-				},
-				Required: []string{"conversation_id"},
-			},
-		},
+		Function: historyReadFunction(ownHistory),
 	},
 	"history": {
 		DisplayName: "Conversation history",
-		Summary:     "Lists, searches and reads the user's previous conversations. Admins can also read other users' conversations; those reads are logged.",
+		Summary:     "Lists, searches and reads the user's own previous conversations.",
 		Group:       "Memory",
 		Order:       135,
 		Members:     []string{"history_list", "history_search", "history_read"},
+	},
+	"admin_list_users": {
+		Executor:  executeAdminListUsers,
+		AdminOnly: true,
+		Type:      "function",
+		Function: toolFunction{
+			Name:        "admin_list_users",
+			Description: "Admin tool: lists everyone who uses this chat app, with their username, display name, number of conversations and when they were last active. Use a username from here as the user argument of admin_history_list and admin_history_search.",
+			Parameters:  toolParam{Type: "object", Properties: map[string]any{}, Required: []string{}},
+		},
+	},
+	"admin_history_list": {
+		Executor:  executeAdminHistoryList,
+		AdminOnly: true,
+		Type:      "function",
+		Function:  historyListFunction(adminHistory),
+	},
+	"admin_history_search": {
+		Executor:  executeAdminHistorySearch,
+		AdminOnly: true,
+		Type:      "function",
+		Function:  historySearchFunction(adminHistory),
+	},
+	"admin_history_read": {
+		Executor:  executeAdminHistoryRead,
+		AdminOnly: true,
+		Type:      "function",
+		Function:  historyReadFunction(adminHistory),
+	},
+	"admin_history": {
+		DisplayName: "Conversation history (admin)",
+		Summary:     "Admins only: lists the users and lists, searches and reads everyone's conversations. Withheld whenever a non-admin is chatting; every call is logged.",
+		Group:       "Admin",
+		Order:       145,
+		AdminOnly:   true,
+		Members:     []string{"admin_list_users", "admin_history_list", "admin_history_search", "admin_history_read"},
 	},
 	"world_state": {
 		DisplayName: "World state",
@@ -601,14 +581,10 @@ Examples:
 	},
 }
 
-// historyUserSchema is the admin-only user argument of history_list and
-// history_search; withoutHistoryUserParam removes it for non-admins.
-var historyUserSchema = map[string]any{
-	"type":        "string",
-	"description": "Admins only: the username or display name of another user whose conversations to look at. Leave it out for the current user's own conversations.",
-}
-
-// The period and character filters shared by history_list and history_search.
+// The history tool schemas. The regular history_* tools and the admin
+// admin_history_* tools take the same arguments, except that the admin list
+// and search also take user, and their descriptions say whose conversations
+// they cover.
 var (
 	historySinceSchema = map[string]any{
 		"type":        "string",
@@ -622,7 +598,111 @@ var (
 		"type":        "string",
 		"description": "Only conversations with a character whose name contains this, e.g. \"tutor\".",
 	}
+	adminHistoryUserSchema = map[string]any{
+		"type":        "string",
+		"description": "Only this user's conversations: a username or display name from admin_list_users. Leave it out to cover every user.",
+	}
 )
+
+func historyListFunction(sc historyScope) toolFunction {
+	props := map[string]any{
+		"since":     historySinceSchema,
+		"until":     historyUntilSchema,
+		"character": historyCharacterSchema,
+		"limit": map[string]any{
+			"type":        "integer",
+			"description": "How many conversations to list (default 20, at most 50).",
+		},
+		"offset": map[string]any{
+			"type":        "integer",
+			"description": "How many conversations to skip, to see older ones (default 0).",
+		},
+	}
+	desc := "Lists the user's previous conversations, most recent first, with each one's id, title, character, number of messages and dates. Use since and until for a period (e.g. last week) and character for conversations with one character. To find a topic, use history_search instead."
+	if sc.admin {
+		props["user"] = adminHistoryUserSchema
+		desc = "Admin tool: lists previous conversations of every user, or of one user if you give user, most recent first, with whose each one is, its id, title, character, number of messages and dates. Use since and until for a period (e.g. last week) and character for conversations with one character. To find a topic, use admin_history_search instead."
+	}
+	return toolFunction{
+		Name:        sc.tool("list"),
+		Description: desc,
+		Parameters:  toolParam{Type: "object", Properties: props, Required: []string{}},
+	}
+}
+
+func historySearchFunction(sc historyScope) toolFunction {
+	props := map[string]any{
+		"query": map[string]any{
+			"type":        "string",
+			"description": "Words to look for, separated by spaces. Common words like \"the\" are ignored.",
+		},
+		"conversation_id": map[string]any{
+			"type":        "integer",
+			"description": "Step 2 only: search inside this one conversation and list its matching messages.",
+		},
+		"since":     historySinceSchema,
+		"until":     historyUntilSchema,
+		"character": historyCharacterSchema,
+	}
+	whose := "the user's previous conversations"
+	if sc.admin {
+		props["user"] = adminHistoryUserSchema
+		whose = "every user's previous conversations (or one user's, if you give user)"
+	}
+	desc := fmt.Sprintf("Searches %s for words. Use it in two steps. Step 1: search with a query (optionally since, until, character); you get the best-matching conversations, each with an extract. Step 2: search again with the same query and the conversation_id of the one you want; you get its matching messages with their message numbers. Then read around a match with %s. Put several words in the query, including other words for the same thing, since you don't know the exact wording (e.g. \"guitar chords tuning\"). Any of the words can match, word endings don't matter, and conversations matching more words come first. If nothing useful comes back, try different words.", whose, sc.tool("read"))
+	if sc.admin {
+		desc = "Admin tool: " + desc
+	}
+	return toolFunction{
+		Name:        sc.tool("search"),
+		Description: desc,
+		Parameters:  toolParam{Type: "object", Properties: props, Required: []string{"query"}},
+	}
+}
+
+func historyReadFunction(sc historyScope) toolFunction {
+	whose := "a previous conversation"
+	if sc.admin {
+		whose = "any user's previous conversation"
+	}
+	desc := fmt.Sprintf("Reads messages from %s: who said what and when, numbered from 1 (tool calls are left out). To read around a match from %s, give start a few messages before it and count, e.g. start=40 count=8 for message 43. Without start and count it reads from the beginning, as much as fits, and says where to continue. Don't say something wasn't discussed unless you have read the whole conversation.", whose, sc.tool("search"))
+	if sc.admin {
+		desc = "Admin tool: " + desc
+	}
+	return toolFunction{
+		Name:        sc.tool("read"),
+		Description: desc,
+		Parameters: toolParam{
+			Type: "object",
+			Properties: map[string]any{
+				"conversation_id": map[string]any{
+					"type":        "integer",
+					"description": fmt.Sprintf("The conversation's id, from %s or %s.", sc.tool("list"), sc.tool("search")),
+				},
+				"start": map[string]any{
+					"type":        "integer",
+					"description": "The message number to start at (default 1, the beginning).",
+				},
+				"count": map[string]any{
+					"type":        "integer",
+					"description": "How many messages to read (default: as many as fit).",
+				},
+			},
+			Required: []string{"conversation_id"},
+		},
+	}
+}
+
+// withoutAdminTools drops the admin-only tools, for a non-admin's request.
+func withoutAdminTools(defs []toolDef) []toolDef {
+	out := defs[:0:0]
+	for _, d := range defs {
+		if !d.AdminOnly {
+			out = append(out, d)
+		}
+	}
+	return out
+}
 
 // withoutTool returns defs minus the tool named name.
 func withoutTool(defs []toolDef, name string) []toolDef {

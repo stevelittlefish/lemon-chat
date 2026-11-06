@@ -28,57 +28,65 @@ const (
 	historyReadAround = 3
 )
 
-// historyUserParam is the argument that lets an admin's model read another
-// user's history. It is removed from the schemas sent for non-admins.
-const historyUserParam = "user"
-
-// isHistoryTool reports whether name is one of the history tools.
-func isHistoryTool(name string) bool {
-	return strings.HasPrefix(name, "history_")
+// historyScope is which conversations a set of history tools can see. The
+// regular history_* tools see only the user's own; the admin_history_* tools
+// see everyone's and refuse to run for non-admins. Both share one
+// implementation.
+type historyScope struct {
+	admin  bool
+	prefix string // tool name prefix, for "call X next" hints
 }
 
-// withoutHistoryUserParam drops the admin-only user argument from the history
-// tool schemas, so non-admins' models aren't offered it.
-func withoutHistoryUserParam(defs []toolDef) []toolDef {
-	out := make([]toolDef, len(defs))
-	for i, d := range defs {
-		if isHistoryTool(d.Function.Name) {
-			props := make(map[string]any, len(d.Function.Parameters.Properties))
-			for k, v := range d.Function.Parameters.Properties {
-				if k != historyUserParam {
-					props[k] = v
-				}
-			}
-			d.Function.Parameters.Properties = props
-		}
-		out[i] = d
-	}
-	return out
-}
+var (
+	ownHistory   = historyScope{prefix: "history_"}
+	adminHistory = historyScope{admin: true, prefix: "admin_history_"}
+)
 
-// historyUser resolves whose history a tool call reads: the asking user when
-// name is empty, otherwise (admins only) the user with that username or
-// display name. It logs every read of another user's history.
-func historyUser(tctx ToolContext, name, tool string) (*store.User, error) {
+func (sc historyScope) tool(name string) string { return sc.prefix + name }
+
+// historySelf loads the asking user, refusing the admin tools to non-admins.
+// The admin tools are withheld from non-admins' models, so this only trips if
+// a model calls one it wasn't offered.
+func (sc historyScope) historySelf(tctx ToolContext) (*store.User, error) {
 	self, err := tctx.Store.UserByID(tctx.UserID)
 	if err != nil {
 		return nil, err
 	}
-	name = strings.TrimSpace(name)
-	if name == "" || matchesUser(self, name) {
-		return self, nil
+	if sc.admin && !self.IsAdmin {
+		return nil, errors.New("this tool is for admins only")
 	}
-	if !self.IsAdmin {
-		return nil, errors.New("you can only see this user's own conversations")
+	return self, nil
+}
+
+// historyOwner resolves whose conversations a list or search covers: the
+// asking user's own for the regular tools; for the admin tools, the user
+// named (by username or display name), or everyone (nil) when name is empty.
+// Admin calls are logged.
+func (sc historyScope) historyOwner(tctx ToolContext, name, tool string) (self, owner *store.User, err error) {
+	if self, err = sc.historySelf(tctx); err != nil {
+		return nil, nil, err
 	}
-	users, err := tctx.Store.ListUsers()
+	if !sc.admin {
+		return self, self, nil
+	}
+	if name = strings.TrimSpace(name); name != "" {
+		if owner, err = findUser(tctx.Store, name); err != nil {
+			return nil, nil, err
+		}
+	}
+	log.Printf("Using admin history tool tool=%s admin_id=%d user_id=%d conversation_id=%d", tool, self.ID, ownerID(owner), tctx.ConversationID)
+	return self, owner, nil
+}
+
+// findUser finds a user by username or display name, ignoring case; the error
+// lists the users so the model can correct itself.
+func findUser(st *store.Store, name string) (*store.User, error) {
+	users, err := st.ListUsers()
 	if err != nil {
 		return nil, err
 	}
 	for i := range users {
 		if matchesUser(&users[i], name) {
-			log.Printf("Reading another user's conversation history admin_id=%d user_id=%d tool=%s conversation_id=%d",
-				self.ID, users[i].ID, tool, tctx.ConversationID)
 			return &users[i], nil
 		}
 	}
@@ -90,17 +98,18 @@ func historyUser(tctx ToolContext, name, tool string) (*store.User, error) {
 }
 
 // historyConversation loads a conversation a history tool asked for by id and
-// its owner. Users can open their own conversations, admins anyone's (logged).
-func historyConversation(tctx ToolContext, id int64, tool string) (*store.ConversationSummary, *store.User, error) {
+// its owner: the user's own for the regular tools, anyone's for the admin
+// tools (logged).
+func (sc historyScope) historyConversation(tctx ToolContext, id int64, tool string) (*store.ConversationSummary, *store.User, error) {
 	if id == tctx.ConversationID {
 		return nil, nil, errors.New("that is the current conversation")
 	}
-	self, err := tctx.Store.UserByID(tctx.UserID)
+	self, err := sc.historySelf(tctx)
 	if err != nil {
 		return nil, nil, err
 	}
 	conv, err := tctx.Store.ConversationSummaryByID(id)
-	if err == nil && conv.UserID != self.ID && !self.IsAdmin {
+	if err == nil && conv.UserID != self.ID && !sc.admin {
 		err = store.ErrNotFound
 	}
 	if errors.Is(err, store.ErrNotFound) {
@@ -109,6 +118,10 @@ func historyConversation(tctx ToolContext, id int64, tool string) (*store.Conver
 	if err != nil {
 		return nil, nil, err
 	}
+	if sc.admin {
+		log.Printf("Using admin history tool tool=%s admin_id=%d user_id=%d read_conversation_id=%d conversation_id=%d",
+			tool, self.ID, conv.UserID, conv.ID, tctx.ConversationID)
+	}
 	if conv.UserID == self.ID {
 		return conv, self, nil
 	}
@@ -116,22 +129,41 @@ func historyConversation(tctx ToolContext, id int64, tool string) (*store.Conver
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Printf("Reading another user's conversation admin_id=%d user_id=%d tool=%s read_conversation_id=%d conversation_id=%d",
-		self.ID, owner.ID, tool, conv.ID, tctx.ConversationID)
 	return conv, owner, nil
+}
+
+// whose says whose conversations a result covers.
+func (sc historyScope) whose(owner *store.User) string {
+	switch {
+	case owner == nil:
+		return "all users"
+	case sc.admin:
+		return userLabel(owner)
+	}
+	return userLabel(owner) + " (the person you are talking to)"
+}
+
+// ownerID is the store's owner argument: 0 for everyone.
+func ownerID(owner *store.User) int64 {
+	if owner == nil {
+		return 0
+	}
+	return owner.ID
 }
 
 func matchesUser(u *store.User, name string) bool {
 	return strings.EqualFold(u.Username, name) || (u.DisplayName != nil && strings.EqualFold(*u.DisplayName, name))
 }
 
-// userLabel names a user for the model: "Display name (username)".
-func userLabel(u *store.User) string {
-	if u.DisplayName != nil && *u.DisplayName != "" && *u.DisplayName != u.Username {
-		return fmt.Sprintf("%s (%s)", *u.DisplayName, u.Username)
+// nameLabel names a user for the model: "Display name (username)".
+func nameLabel(username string, displayName *string) string {
+	if displayName != nil && *displayName != "" && *displayName != username {
+		return fmt.Sprintf("%s (%s)", *displayName, username)
 	}
-	return u.Username
+	return username
 }
+
+func userLabel(u *store.User) string { return nameLabel(u.Username, u.DisplayName) }
 
 func userSpeaker(u *store.User) string {
 	if u.DisplayName != nil && *u.DisplayName != "" {
@@ -177,8 +209,7 @@ func historyToday(timezone string) string {
 	return "Today is " + time.Now().In(historyLocation(timezone)).Format("Mon 2 Jan 2006") + "."
 }
 
-// historyFilterArgs are the filter arguments history_list and history_search
-// share.
+// historyFilterArgs are the filter arguments the list and search tools share.
 type historyFilterArgs struct {
 	Since     string `json:"since"`
 	Until     string `json:"until"`
@@ -240,12 +271,12 @@ func (a historyFilterArgs) describe() string {
 }
 
 // checkCharacter fails with the names the model could use when no character
-// the owner has talked to matches the character filter.
-func checkCharacter(st *store.Store, owner *store.User, character string) error {
+// in the covered conversations matches the character filter.
+func (sc historyScope) checkCharacter(st *store.Store, owner *store.User, character string) error {
 	if character == "" {
 		return nil
 	}
-	names, err := st.UserCharacterNames(owner.ID)
+	names, err := st.UserCharacterNames(ownerID(owner))
 	if err != nil {
 		return err
 	}
@@ -255,9 +286,9 @@ func checkCharacter(st *store.Store, owner *store.User, character string) error 
 		}
 	}
 	if len(names) == 0 {
-		return fmt.Errorf("%s has no conversations with a character", userLabel(owner))
+		return fmt.Errorf("none of the conversations of %s are with a character", sc.whose(owner))
 	}
-	return fmt.Errorf("no character name contains %q; %s has talked to: %s", character, userLabel(owner), strings.Join(names, ", "))
+	return fmt.Errorf("no character name contains %q; the conversations of %s are with: %s", character, sc.whose(owner), strings.Join(names, ", "))
 }
 
 // countNoun writes n and the singular, or the plural form (default: singular
@@ -279,9 +310,14 @@ func historyTitle(c *store.ConversationSummary) string {
 	return "(untitled)"
 }
 
-// writeSummaryLine writes one conversation as a list line.
-func writeSummaryLine(b *strings.Builder, c *store.ConversationSummary, timezone string) {
-	fmt.Fprintf(b, "\n#%d: %q", c.ID, historyTitle(c))
+// writeSummaryLine writes one conversation as a list line. The admin tools
+// say whose conversation it is.
+func (sc historyScope) writeSummaryLine(b *strings.Builder, c *store.ConversationSummary, timezone string) {
+	fmt.Fprintf(b, "\n#%d", c.ID)
+	if sc.admin {
+		fmt.Fprintf(b, " (%s)", nameLabel(c.OwnerUsername, c.OwnerDisplayName))
+	}
+	fmt.Fprintf(b, ": %q", historyTitle(c))
 	if c.CharacterName != nil {
 		fmt.Fprintf(b, " with %s", *c.CharacterName)
 	}
@@ -290,9 +326,33 @@ func writeSummaryLine(b *strings.Builder, c *store.ConversationSummary, timezone
 }
 
 func executeHistoryList(argsJSON string, tctx ToolContext) (string, error) {
+	return ownHistory.list(argsJSON, tctx)
+}
+
+func executeHistorySearch(argsJSON string, tctx ToolContext) (string, error) {
+	return ownHistory.search(argsJSON, tctx)
+}
+
+func executeHistoryRead(argsJSON string, tctx ToolContext) (string, error) {
+	return ownHistory.read(argsJSON, tctx)
+}
+
+func executeAdminHistoryList(argsJSON string, tctx ToolContext) (string, error) {
+	return adminHistory.list(argsJSON, tctx)
+}
+
+func executeAdminHistorySearch(argsJSON string, tctx ToolContext) (string, error) {
+	return adminHistory.search(argsJSON, tctx)
+}
+
+func executeAdminHistoryRead(argsJSON string, tctx ToolContext) (string, error) {
+	return adminHistory.read(argsJSON, tctx)
+}
+
+func (sc historyScope) list(argsJSON string, tctx ToolContext) (string, error) {
 	var args struct {
 		historyFilterArgs
-		User   string `json:"user"`
+		User   string `json:"user"` // admin tools only
 		Limit  int    `json:"limit"`
 		Offset int    `json:"offset"`
 	}
@@ -308,25 +368,25 @@ func executeHistoryList(argsJSON string, tctx ToolContext) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	owner, err := historyUser(tctx, args.User, "history_list")
+	_, owner, err := sc.historyOwner(tctx, args.User, sc.tool("list"))
 	if err != nil {
 		return "", err
 	}
-	if err := checkCharacter(tctx.Store, owner, f.Character); err != nil {
+	if err := sc.checkCharacter(tctx.Store, owner, f.Character); err != nil {
 		return "", err
 	}
-	total, err := tctx.Store.CountConversations(owner.ID, tctx.ConversationID, f)
+	total, err := tctx.Store.CountConversations(ownerID(owner), tctx.ConversationID, f)
 	if err != nil {
 		return "", err
 	}
-	convs, err := tctx.Store.ListConversationSummaries(owner.ID, tctx.ConversationID, f, args.Limit, args.Offset)
+	convs, err := tctx.Store.ListConversationSummaries(ownerID(owner), tctx.ConversationID, f, args.Limit, args.Offset)
 	if err != nil {
 		return "", err
 	}
-	which := fmt.Sprintf("conversations of %s%s", userLabel(owner), args.describe())
+	which := fmt.Sprintf("conversations of %s%s", sc.whose(owner), args.describe())
 	if len(convs) == 0 {
 		if total == 0 {
-			return fmt.Sprintf("There are no other %s. %s", which, historyToday(tctx.Timezone)), nil
+			return fmt.Sprintf("%s There are no other %s.", historyToday(tctx.Timezone), which), nil
 		}
 		return fmt.Sprintf("No conversations at offset %d; there are %d %s.", args.Offset, total, which), nil
 	}
@@ -334,21 +394,22 @@ func executeHistoryList(argsJSON string, tctx ToolContext) (string, error) {
 	fmt.Fprintf(&b, "%s There are %d %s. Most recent first (%d–%d):",
 		historyToday(tctx.Timezone), total, which, args.Offset+1, args.Offset+len(convs))
 	for i := range convs {
-		writeSummaryLine(&b, &convs[i], tctx.Timezone)
+		sc.writeSummaryLine(&b, &convs[i], tctx.Timezone)
 	}
 	if next := args.Offset + len(convs); next < total {
-		fmt.Fprintf(&b, "\n\nThere are older ones: call history_list with offset=%d to see them.", next)
+		fmt.Fprintf(&b, "\n\nThere are older ones: call %s with offset=%d to see them.", sc.tool("list"), next)
 	}
-	b.WriteString("\n\nNext: to find something inside a conversation, use history_search with its conversation_id. To read one, use history_read.")
+	fmt.Fprintf(&b, "\n\nNext: to find something inside a conversation, use %s with its conversation_id. To read one, use %s.",
+		sc.tool("search"), sc.tool("read"))
 	return b.String(), nil
 }
 
-func executeHistorySearch(argsJSON string, tctx ToolContext) (string, error) {
+func (sc historyScope) search(argsJSON string, tctx ToolContext) (string, error) {
 	var args struct {
 		historyFilterArgs
 		Query          string `json:"query"`
 		ConversationID int64  `json:"conversation_id"`
-		User           string `json:"user"`
+		User           string `json:"user"` // admin tools only
 	}
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
@@ -362,21 +423,21 @@ func executeHistorySearch(argsJSON string, tctx ToolContext) (string, error) {
 		return "", err
 	}
 	if args.ConversationID != 0 {
-		return searchInConversation(tctx, args.ConversationID, args.Query, words, f)
+		return sc.searchInConversation(tctx, args.ConversationID, args.Query, words, f)
 	}
-	owner, err := historyUser(tctx, args.User, "history_search")
+	_, owner, err := sc.historyOwner(tctx, args.User, sc.tool("search"))
 	if err != nil {
 		return "", err
 	}
-	if err := checkCharacter(tctx.Store, owner, f.Character); err != nil {
+	if err := sc.checkCharacter(tctx.Store, owner, f.Character); err != nil {
 		return "", err
 	}
-	matches, err := tctx.Store.SearchConversations(owner.ID, tctx.ConversationID, args.Query, f, historySearchMax)
+	matches, err := tctx.Store.SearchConversations(ownerID(owner), tctx.ConversationID, args.Query, f, historySearchMax)
 	if err != nil {
 		return "", err
 	}
 	searched := strings.Join(words, ", ")
-	which := fmt.Sprintf("conversations of %s%s", userLabel(owner), args.describe())
+	which := fmt.Sprintf("conversations of %s%s", sc.whose(owner), args.describe())
 	if len(matches) == 0 {
 		return fmt.Sprintf("No %s mention any of: %s. Try other words for the same thing, or broader ones.", which, searched), nil
 	}
@@ -384,7 +445,7 @@ func executeHistorySearch(argsJSON string, tctx ToolContext) (string, error) {
 	fmt.Fprintf(&b, "%s Showing %s mentioning any of: %s. Those matching the most words come first.", historyToday(tctx.Timezone), which, searched)
 	for i := range matches {
 		m := &matches[i]
-		writeSummaryLine(&b, &m.ConversationSummary, tctx.Timezone)
+		sc.writeSummaryLine(&b, &m.ConversationSummary, tctx.Timezone)
 		fmt.Fprintf(&b, "\n  Matches %d of %d words (%s)", len(m.MatchedWords), len(words), strings.Join(m.MatchedWords, ", "))
 		if m.TitleMatch {
 			b.WriteString(", in the title")
@@ -399,14 +460,15 @@ func executeHistorySearch(argsJSON string, tctx ToolContext) (string, error) {
 	if len(matches) == historySearchMax {
 		fmt.Fprintf(&b, "\n\nShowing the best %d; there may be more. Add since, until or character to narrow it down.", historySearchMax)
 	}
-	b.WriteString("\n\nNext: to see every matching message in one of these, call history_search again with the same query and its conversation_id. To read one, use history_read.")
+	fmt.Fprintf(&b, "\n\nNext: to see every matching message in one of these, call %s again with the same query and its conversation_id. To read one, use %s.",
+		sc.tool("search"), sc.tool("read"))
 	return b.String(), nil
 }
 
 // searchInConversation lists the best-matching messages in one conversation,
-// in conversation order, numbered as history_read numbers them.
-func searchInConversation(tctx ToolContext, convID int64, query string, words []string, f store.HistoryFilter) (string, error) {
-	conv, owner, err := historyConversation(tctx, convID, "history_search")
+// in conversation order, numbered as the read tool numbers them.
+func (sc historyScope) searchInConversation(tctx ToolContext, convID int64, query string, words []string, f store.HistoryFilter) (string, error) {
+	conv, owner, err := sc.historyConversation(tctx, convID, sc.tool("search"))
 	if err != nil {
 		return "", err
 	}
@@ -445,8 +507,8 @@ func searchInConversation(tctx ToolContext, convID int64, query string, words []
 			historySpeaker(h.Role, h.Name, owner, conv), h.Role, historyTime(h.CreatedAt, tctx.Timezone), h.Snippet)
 	}
 	first := number[hits[0].MessageID]
-	fmt.Fprintf(&b, "\n\nNext: read a match with the messages around it using history_read. For example, for message %d: conversation_id=%d, start=%d, count=8.",
-		first, conv.ID, max(first-historyReadAround, 1))
+	fmt.Fprintf(&b, "\n\nNext: read a match with the messages around it using %s. For example, for message %d: conversation_id=%d, start=%d, count=8.",
+		sc.tool("read"), first, conv.ID, max(first-historyReadAround, 1))
 	return b.String(), nil
 }
 
@@ -487,7 +549,7 @@ func toolNames(toolCalls *string) []string {
 	return names
 }
 
-func executeHistoryRead(argsJSON string, tctx ToolContext) (string, error) {
+func (sc historyScope) read(argsJSON string, tctx ToolContext) (string, error) {
 	var args struct {
 		ConversationID int64 `json:"conversation_id"`
 		Start          int   `json:"start"`
@@ -496,7 +558,7 @@ func executeHistoryRead(argsJSON string, tctx ToolContext) (string, error) {
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 		return "", fmt.Errorf("invalid args: %w", err)
 	}
-	conv, owner, err := historyConversation(tctx, args.ConversationID, "history_read")
+	conv, owner, err := sc.historyConversation(tctx, args.ConversationID, sc.tool("read"))
 	if err != nil {
 		return "", err
 	}
@@ -551,8 +613,43 @@ func executeHistoryRead(argsJSON string, tctx ToolContext) (string, error) {
 	case shown == len(msgs):
 		fmt.Fprintf(&b, "\n\n[Showing messages %d–%d of %d; that is the end of the conversation.]", start, shown, len(msgs))
 	default:
-		fmt.Fprintf(&b, "\n\n[Showing messages %d–%d of %d. To read on, call history_read with conversation_id=%d and start=%d.]",
-			start, shown, len(msgs), conv.ID, shown+1)
+		fmt.Fprintf(&b, "\n\n[Showing messages %d–%d of %d. To read on, call %s with conversation_id=%d and start=%d.]",
+			start, shown, len(msgs), sc.tool("read"), conv.ID, shown+1)
 	}
+	return b.String(), nil
+}
+
+func executeAdminListUsers(_ string, tctx ToolContext) (string, error) {
+	self, err := adminHistory.historySelf(tctx)
+	if err != nil {
+		return "", err
+	}
+	log.Printf("Using admin history tool tool=admin_list_users admin_id=%d conversation_id=%d", self.ID, tctx.ConversationID)
+	users, err := tctx.Store.ListUserActivity()
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s There are %s:", historyToday(tctx.Timezone), countNoun(len(users), "user"))
+	for _, u := range users {
+		fmt.Fprintf(&b, "\n- username: %s", u.Username)
+		if u.DisplayName != nil && *u.DisplayName != "" && *u.DisplayName != u.Username {
+			fmt.Fprintf(&b, " | display name: %s", *u.DisplayName)
+		}
+		if u.IsAdmin {
+			b.WriteString(" | role: admin")
+		} else {
+			b.WriteString(" | role: user")
+		}
+		if u.ID == self.ID {
+			b.WriteString(" | the person you are talking to")
+		}
+		if u.Conversations == 0 || u.LastActive == nil {
+			b.WriteString(" | no conversations")
+			continue
+		}
+		fmt.Fprintf(&b, " | %s, last active %s", countNoun(u.Conversations, "conversation"), historyTime(*u.LastActive, tctx.Timezone))
+	}
+	b.WriteString("\n\nNext: use admin_history_list or admin_history_search with user set to a username to look at one person's conversations, or leave user out to cover everyone's.")
 	return b.String(), nil
 }

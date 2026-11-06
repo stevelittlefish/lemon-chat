@@ -17,6 +17,7 @@ type ToolMeta struct {
 	Group       string `json:"group"`
 	Configured  bool   `json:"configured"`
 	ConfigHint  string `json:"config_hint,omitempty"`
+	AdminOnly   bool   `json:"admin_only,omitempty"`
 }
 
 var (
@@ -104,6 +105,7 @@ func InitTools(cfg *config.Config) {
 			Group:       tool.Group,
 			Configured:  configured,
 			ConfigHint:  hint,
+			AdminOnly:   tool.AdminOnly,
 		})
 	}
 
@@ -112,6 +114,18 @@ func InitTools(cfg *config.Config) {
 	})
 }
 
+// handleGetTools lists the selectable tools, leaving out the admin-only ones
+// for non-admins.
 func (s *Server) handleGetTools(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, allTools)
+	if currentUser(r).IsAdmin {
+		writeJSON(w, http.StatusOK, allTools)
+		return
+	}
+	tools := make([]ToolMeta, 0, len(allTools))
+	for _, t := range allTools {
+		if !t.AdminOnly {
+			tools = append(tools, t)
+		}
+	}
+	writeJSON(w, http.StatusOK, tools)
 }

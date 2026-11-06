@@ -1,11 +1,14 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stevelittlefish/lemon-chat/internal/config"
 	"github.com/stevelittlefish/lemon-chat/internal/store"
 )
 
@@ -127,46 +130,92 @@ func TestHistoryFilters(t *testing.T) {
 	}
 }
 
-func TestHistoryToolsCrossUserAccess(t *testing.T) {
+func TestHistoryToolsOnlySeeOwnConversations(t *testing.T) {
 	st, dad, son, dadConv, sonConv := historyFixture(t)
-	sonCtx := ToolContext{Store: st, UserID: son.ID}
-	dadCtx := ToolContext{Store: st, UserID: dad.ID, ConversationID: dadConv.ID}
-
-	// A non-admin can't look at anyone else's history.
-	if _, err := executeHistoryList(`{"user":"dad"}`, sonCtx); err == nil {
-		t.Fatal("non-admin listed another user's conversations")
-	}
-	if _, err := executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d}`, dadConv.ID), sonCtx); err == nil {
-		t.Fatal("non-admin read another user's conversation")
-	}
 	st.CreateMessage(dadConv.ID, "user", "guitar strings for Sam's birthday", nil, nil, nil, nil, "")
-	if _, err := executeHistorySearch(fmt.Sprintf(`{"query":"guitar","conversation_id":%d}`, dadConv.ID), sonCtx); err == nil {
-		t.Fatal("non-admin searched inside another user's conversation")
+	// Even an admin's regular history tools only see their own conversations.
+	for _, u := range []*store.User{son, dad} {
+		tctx := ToolContext{Store: st, UserID: u.ID}
+		other := dadConv
+		if u == dad {
+			other = sonConv
+		}
+		out, err := executeHistoryList(`{"user":"someone"}`, tctx)
+		if err != nil || strings.Contains(out, fmt.Sprintf("#%d:", other.ID)) || !strings.Contains(out, "(the person you are talking to)") {
+			t.Fatalf("%s list = %q, %v", u.Username, out, err)
+		}
+		if out, _ := executeHistorySearch(`{"query":"guitar"}`, tctx); strings.Contains(out, fmt.Sprintf("#%d:", other.ID)) {
+			t.Fatalf("%s search found another user's conversation: %q", u.Username, out)
+		}
+		if _, err := executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d}`, other.ID), tctx); err == nil {
+			t.Fatalf("%s read another user's conversation", u.Username)
+		}
+		if _, err := executeHistorySearch(fmt.Sprintf(`{"query":"guitar","conversation_id":%d}`, other.ID), tctx); err == nil {
+			t.Fatalf("%s searched inside another user's conversation", u.Username)
+		}
 	}
-	// Naming yourself is fine.
-	if _, err := executeHistoryList(`{"user":"Sam"}`, sonCtx); err != nil {
-		t.Fatal(err)
+}
+
+func TestAdminHistoryTools(t *testing.T) {
+	st, dad, son, dadConv, sonConv := historyFixture(t)
+	st.CreateMessage(dadConv.ID, "user", "guitar strings for Sam's birthday", nil, nil, nil, nil, "")
+	model := "m"
+	current, _ := st.CreateConversation(dad.ID, nil, &model, nil)
+	dadCtx := ToolContext{Store: st, UserID: dad.ID, ConversationID: current.ID}
+	sonCtx := ToolContext{Store: st, UserID: son.ID}
+
+	// Non-admins are refused, even if a model calls a tool it wasn't offered.
+	for name, exec := range map[string]toolExecutor{
+		"admin_list_users":     executeAdminListUsers,
+		"admin_history_list":   executeAdminHistoryList,
+		"admin_history_search": executeAdminHistorySearch,
+		"admin_history_read":   executeAdminHistoryRead,
+	} {
+		args := fmt.Sprintf(`{"query":"guitar","conversation_id":%d}`, sonConv.ID)
+		if _, err := exec(args, sonCtx); err == nil || !strings.Contains(err.Error(), "admins only") {
+			t.Errorf("%s for a non-admin: err = %v", name, err)
+		}
 	}
 
-	// An admin can, by username or display name.
-	out, err := executeHistoryList(`{"user":"sam"}`, dadCtx)
-	if err != nil || !strings.Contains(out, "Guitar practice") {
-		t.Fatalf("admin list = %q, %v", out, err)
+	out, err := executeAdminListUsers(`{}`, dadCtx)
+	if err != nil || !strings.Contains(out, "username: dad | display name: Dad | role: admin | the person you are talking to | 2 conversations") || !strings.Contains(out, "username: sam | display name: Sam | role: user | 1 conversation,") {
+		t.Fatalf("list users = %q, %v", out, err)
 	}
-	out, err = executeHistorySearch(`{"query":"guitar","user":"Sam"}`, dadCtx)
-	if err != nil || !strings.Contains(out, "Guitar practice") {
-		t.Fatalf("admin search = %q, %v", out, err)
+
+	// No user: everyone's conversations, each saying whose it is.
+	out, err = executeAdminHistoryList(`{}`, dadCtx)
+	if err != nil || !strings.Contains(out, "conversations of all users") ||
+		!strings.Contains(out, fmt.Sprintf("#%d (Sam (sam)): \"Guitar practice\"", sonConv.ID)) || !strings.Contains(out, fmt.Sprintf("#%d (Dad (dad)):", dadConv.ID)) {
+		t.Fatalf("admin list all = %q, %v", out, err)
 	}
-	out, err = executeHistorySearch(fmt.Sprintf(`{"query":"guitar","conversation_id":%d}`, sonConv.ID), dadCtx)
-	if err != nil || !strings.Contains(out, "of Sam (sam)") {
+	out, err = executeAdminHistorySearch(`{"query":"guitar"}`, dadCtx)
+	if err != nil || !strings.Contains(out, fmt.Sprintf("#%d (Sam", sonConv.ID)) || !strings.Contains(out, fmt.Sprintf("#%d (Dad", dadConv.ID)) {
+		t.Fatalf("admin search all = %q, %v", out, err)
+	}
+
+	// One user, by username or display name.
+	out, err = executeAdminHistoryList(`{"user":"Sam"}`, dadCtx)
+	if err != nil || !strings.Contains(out, "conversations of Sam (sam)") || strings.Contains(out, fmt.Sprintf("#%d ", dadConv.ID)) {
+		t.Fatalf("admin list sam = %q, %v", out, err)
+	}
+	if _, err := executeAdminHistoryList(`{"user":"nobody"}`, dadCtx); err == nil || !strings.Contains(err.Error(), "Sam (sam)") {
+		t.Fatalf("unknown user error = %v; want the list of users", err)
+	}
+	if _, err := executeAdminHistoryList(`{"character":"chef"}`, dadCtx); err == nil || !strings.Contains(err.Error(), "Music Tutor") {
+		t.Fatalf("unknown character error = %v", err)
+	}
+
+	// Any conversation by id, with admin_ names in the hints.
+	out, err = executeAdminHistorySearch(fmt.Sprintf(`{"query":"guitar","conversation_id":%d}`, sonConv.ID), dadCtx)
+	if err != nil || !strings.Contains(out, "of Sam (sam)") || !strings.Contains(out, "using admin_history_read") {
 		t.Fatalf("admin search in conversation = %q, %v", out, err)
 	}
-	out, err = executeHistoryRead(fmt.Sprintf(`{"conversation_id":%d}`, sonConv.ID), dadCtx)
-	if err != nil || !strings.Contains(out, "of Sam (sam)") {
+	out, err = executeAdminHistoryRead(fmt.Sprintf(`{"conversation_id":%d}`, sonConv.ID), dadCtx)
+	if err != nil || !strings.Contains(out, "[message 1] Sam (user") {
 		t.Fatalf("admin read = %q, %v", out, err)
 	}
-	if _, err := executeHistoryList(`{"user":"nobody"}`, dadCtx); err == nil || !strings.Contains(err.Error(), "Sam (sam)") {
-		t.Fatalf("unknown user error = %v; want the list of users", err)
+	if _, err := executeAdminHistoryRead(fmt.Sprintf(`{"conversation_id":%d}`, current.ID), dadCtx); err == nil {
+		t.Fatal("admin read the current conversation")
 	}
 }
 
@@ -223,20 +272,26 @@ func TestHistoryReadPages(t *testing.T) {
 	}
 }
 
-func TestWithoutHistoryUserParam(t *testing.T) {
-	defs := ToolDefsForCharacter([]string{"history"})
-	if len(defs) != 3 {
-		t.Fatalf("history expands to %d tools", len(defs))
+func TestAdminHistoryToolsWithheldFromNonAdmins(t *testing.T) {
+	defs := ToolDefsForCharacter([]string{"history", "admin_history"})
+	if len(defs) != 7 {
+		t.Fatalf("history + admin_history expand to %d tools", len(defs))
 	}
-	stripped := withoutHistoryUserParam(defs)
-	for _, d := range stripped {
-		if _, ok := d.Function.Parameters.Properties[historyUserParam]; ok {
-			t.Errorf("%s still offers the user argument", d.Function.Name)
+	var names []string
+	for _, d := range withoutAdminTools(defs) {
+		names = append(names, d.Function.Name)
+	}
+	if strings.Join(names, ",") != "history_list,history_search,history_read" {
+		t.Fatalf("non-admin tools = %v", names)
+	}
+	// The regular tools have no way to name another user.
+	for _, d := range defs[:3] {
+		if _, ok := d.Function.Parameters.Properties["user"]; ok {
+			t.Errorf("%s has a user argument", d.Function.Name)
 		}
 	}
-	// The registry itself is untouched.
-	if _, ok := toolRegistry["history_list"].Function.Parameters.Properties[historyUserParam]; !ok {
-		t.Fatal("stripping modified the registry")
+	if _, ok := toolRegistry["admin_history_list"].Function.Parameters.Properties["user"]; !ok {
+		t.Error("admin_history_list has no user argument")
 	}
 }
 
@@ -262,5 +317,31 @@ func TestHistorySearchRanksByWordsMatched(t *testing.T) {
 	st.DeleteConversation(both.ID, u.ID)
 	if matches, _ := st.SearchConversations(u.ID, 0, "tournament", store.HistoryFilter{}, 10); len(matches) != 0 {
 		t.Fatalf("deleted conversation still found: %+v", matches)
+	}
+}
+
+func TestGetToolsHidesAdminToolsFromNonAdmins(t *testing.T) {
+	InitTools(&config.Config{})
+	s := &Server{}
+	for _, tc := range []struct {
+		admin bool
+		want  bool
+	}{{false, false}, {true, true}} {
+		req := asUser(httptest.NewRequest("GET", "/api/tools", nil), &store.User{ID: 1, IsAdmin: tc.admin})
+		w := httptest.NewRecorder()
+		s.handleGetTools(w, req)
+		var tools []ToolMeta
+		if err := json.Unmarshal(w.Body.Bytes(), &tools); err != nil {
+			t.Fatal(err)
+		}
+		got := false
+		for _, tool := range tools {
+			if tool.ID == "admin_history" {
+				got = true
+			}
+		}
+		if got != tc.want {
+			t.Errorf("admin=%v: admin_history listed = %v", tc.admin, got)
+		}
 	}
 }
