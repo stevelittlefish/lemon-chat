@@ -72,10 +72,15 @@ func (s *Server) handleCreateMemory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Text string `json:"text"`
+		Text      string `json:"text"`
+		Protected bool   `json:"protected"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if req.Protected && !currentUser(r).IsAdmin {
+		writeError(w, http.StatusForbidden, "only an admin can protect a memory")
 		return
 	}
 	text, err := validMemoryText(req.Text)
@@ -83,35 +88,73 @@ func (s *Server) handleCreateMemory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	m, err := s.store.CreateMemory(ownerID, text, nil)
+	m, err := s.store.CreateMemory(ownerID, text, nil, req.Protected)
 	if err != nil {
 		internalError(w, err)
 		return
 	}
-	logMemoryAction(r, "Creating", m.ID, ownerID)
+	logMemoryAction(r, "Creating", m)
 	writeJSON(w, http.StatusCreated, m)
 }
 
+// denyProtectedMemory refuses a non-admin's change to a protected memory.
+func denyProtectedMemory(w http.ResponseWriter, r *http.Request, m *store.Memory) bool {
+	if m.Protected && !currentUser(r).IsAdmin {
+		writeError(w, http.StatusForbidden, "this memory is protected; only an admin can change or delete it")
+		return true
+	}
+	return false
+}
+
+// handleUpdateMemory changes a memory's text, its protection (admins only),
+// or both.
 func (s *Server) handleUpdateMemory(w http.ResponseWriter, r *http.Request) {
 	m, ok := s.memoryForRequest(w, r)
 	if !ok {
 		return
 	}
 	var req struct {
-		Text string `json:"text"`
+		Text      *string `json:"text"`
+		Protected *bool   `json:"protected"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	text, err := validMemoryText(req.Text)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+	if req.Text == nil && req.Protected == nil {
+		writeError(w, http.StatusBadRequest, "nothing to update")
 		return
 	}
-	logMemoryAction(r, "Updating", m.ID, m.UserID)
-	if err := s.store.UpdateMemory(m.ID, m.UserID, text); notFoundOr500(w, err) {
+	if denyProtectedMemory(w, r, m) {
 		return
+	}
+	if req.Protected != nil && !currentUser(r).IsAdmin {
+		writeError(w, http.StatusForbidden, "only an admin can protect a memory")
+		return
+	}
+	var text string
+	if req.Text != nil {
+		var err error
+		if text, err = validMemoryText(*req.Text); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	logMemoryAction(r, "Updating", m)
+	if req.Text != nil {
+		if err := s.store.UpdateMemory(m.ID, m.UserID, text); notFoundOr500(w, err) {
+			return
+		}
+	}
+	if req.Protected != nil && *req.Protected != m.Protected {
+		verb := "Protecting"
+		if !*req.Protected {
+			verb = "Unprotecting"
+		}
+		logMemoryAction(r, verb, m)
+		if err := s.store.SetMemoryProtected(m.ID, *req.Protected); notFoundOr500(w, err) {
+			return
+		}
 	}
 	updated, err := s.store.GetMemory(m.ID)
 	if notFoundOr500(w, err) {
@@ -125,7 +168,10 @@ func (s *Server) handleDeleteMemory(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	logMemoryAction(r, "Deleting", m.ID, m.UserID)
+	if denyProtectedMemory(w, r, m) {
+		return
+	}
+	logMemoryAction(r, "Deleting", m)
 	if err := s.store.DeleteMemory(m.ID, m.UserID); notFoundOr500(w, err) {
 		return
 	}
@@ -134,11 +180,11 @@ func (s *Server) handleDeleteMemory(w http.ResponseWriter, r *http.Request) {
 
 // logMemoryAction logs a settings-page change, naming the admin when they
 // act on another user's memories.
-func logMemoryAction(r *http.Request, verb string, memoryID, ownerID int64) {
+func logMemoryAction(r *http.Request, verb string, m *store.Memory) {
 	user := currentUser(r)
-	if ownerID == user.ID {
-		log.Printf("%s memory id=%d user_id=%d", verb, memoryID, ownerID)
+	if m.UserID == user.ID {
+		log.Printf("%s memory id=%d user_id=%d", verb, m.ID, m.UserID)
 		return
 	}
-	log.Printf("%s memory id=%d user_id=%d admin_id=%d", verb, memoryID, ownerID, user.ID)
+	log.Printf("%s memory id=%d user_id=%d admin_id=%d", verb, m.ID, m.UserID, user.ID)
 }

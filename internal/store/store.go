@@ -1001,6 +1001,18 @@ func (s *Store) migrate() error {
 		log.Println("store: migration v48 → v49 complete")
 	}
 
+	if version < 50 {
+		log.Println("store: migrating v49 → v50 (add memory.protected)")
+		if _, err := s.db.Exec(`ALTER TABLE memory ADD COLUMN protected INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+		if _, err := s.db.Exec(`INSERT INTO schema_version (version, timestamp) VALUES (50, ?)`, now()); err != nil {
+			return err
+		}
+		version = 50
+		log.Println("store: migration v49 → v50 complete")
+	}
+
 	log.Printf("store: schema ready at version %d", version)
 	return nil
 }

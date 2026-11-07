@@ -1135,6 +1135,23 @@ a.snav-item { text-decoration: none; }
 
 .memory-empty { margin-top: 16px; }
 
+.memory-protected {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--ink-700);
+}
+
+.memory-protect-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-700);
+  cursor: pointer;
+  user-select: none;
+}
+
 /* ── Typed confirmation modal ───────────────────────────── */
 
 .confirm-modal {

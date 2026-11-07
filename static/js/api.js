@@ -89,8 +89,10 @@ const memoryQuery = (userId) => userId ? `?user_id=${userId}` : '';
 
 export const memories = {
   list: (userId) => request('GET', `/api/memories${memoryQuery(userId)}`),
-  create: (text, userId) => request('POST', `/api/memories${memoryQuery(userId)}`, { text }),
-  update: (id, text) => request('PATCH', `/api/memories/${id}`, { text }),
+  // protected (admins only) stops the user and their models changing it.
+  create: (text, userId, isProtected = false) => request('POST', `/api/memories${memoryQuery(userId)}`, { text, protected: isProtected }),
+  // fields: { text } and/or { protected } (admins only).
+  update: (id, fields) => request('PATCH', `/api/memories/${id}`, fields),
   delete: (id) => request('DELETE', `/api/memories/${id}`),
 };
 

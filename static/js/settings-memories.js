@@ -112,16 +112,26 @@ function renderRow(m) {
       </form>
     `;
   }
+  // Only admins can change a protected memory, or protect one.
+  const canEdit = user.is_admin || !m.protected;
+  const protectedMeta = m.protected
+    ? ` · <span class="memory-protected">${icon('lock', 12)} Protected${user.is_admin ? '' : ' — only an admin can change this'}</span>`
+    : '';
+  const protectBtn = user.is_admin
+    ? `<button class="btn btn-ghost btn-sm" data-action="protect" data-id="${m.id}" title="${m.protected ? 'Unprotect' : 'Protect, so only an admin can change it'}">${icon(m.protected ? 'lock' : 'lock-open', 13)}</button>`
+    : '';
   return `
     <div class="memory-row" data-id="${m.id}">
       <div class="memory-row-main">
         <div class="memory-row-text">${escapeHtml(m.text)}</div>
-        <div class="memory-row-meta">${formatDate(m.updated_at)} · ${renderSource(m)}</div>
+        <div class="memory-row-meta">${formatDate(m.updated_at)} · ${renderSource(m)}${protectedMeta}</div>
       </div>
+      ${canEdit ? `
       <div class="memory-row-actions">
+        ${protectBtn}
         <button class="btn btn-ghost btn-sm" data-action="edit" data-id="${m.id}" title="Edit">${icon('pencil', 13)}</button>
         <button class="btn btn-ghost btn-sm" data-action="delete" data-id="${m.id}" title="Delete">${icon('trash', 13)}</button>
-      </div>
+      </div>` : ''}
     </div>
   `;
 }
@@ -143,7 +153,7 @@ function renderPage(loadError) {
   document.getElementById('smain').innerHTML = `
     <div class="smain-head">
       <h1>Memories</h1>
-      <p>What characters with the memory tool remember about ${escapeHtml(whose)} between conversations.</p>
+      <p>What characters with the memory tool remember about ${escapeHtml(whose)} between conversations.${user.is_admin ? ' Protected memories can only be changed or deleted by an admin.' : ''}</p>
     </div>
     <div class="section">
       ${renderPicker()}
@@ -151,6 +161,7 @@ function renderPage(loadError) {
         <textarea class="input memory-text-input" name="text" rows="2" maxlength="${MAX_CHARS}" placeholder="Add a memory, e.g. Has a cat called Biscuit"></textarea>
         <div class="memory-form-actions">
           <button type="submit" class="btn btn-primary btn-sm">${icon('plus', 14)} Add memory</button>
+          ${user.is_admin ? `<label class="memory-protect-check"><input type="checkbox" name="protected"> Protected</label>` : ''}
           <span class="field-msg" id="add-msg"></span>
         </div>
       </form>
@@ -192,6 +203,9 @@ function attachHandlers() {
   document.querySelectorAll('[data-action="delete"]').forEach(btn => {
     btn.addEventListener('click', () => handleDelete(Number(btn.dataset.id)));
   });
+  document.querySelectorAll('[data-action="protect"]').forEach(btn => {
+    btn.addEventListener('click', () => handleProtect(Number(btn.dataset.id)));
+  });
 }
 
 async function handleAdd(e) {
@@ -200,7 +214,8 @@ async function handleAdd(e) {
   const msg = document.getElementById('add-msg');
   if (!text) return;
   try {
-    memoriesData.push(await memoriesApi.create(text, otherUser()));
+    const isProtected = e.target.elements.protected?.checked ?? false;
+    memoriesData.push(await memoriesApi.create(text, otherUser(), isProtected));
     renderPage();
   } catch (err) {
     showMsg(msg, err.message || 'Could not add the memory.');
@@ -212,15 +227,30 @@ async function handleEdit(e) {
   const id = Number(e.target.dataset.id);
   const text = e.target.elements.text.value.trim();
   try {
-    const updated = await memoriesApi.update(id, text);
-    const i = memoriesData.findIndex(m => m.id === id);
-    // The update response has no conversation title; keep the one we have.
-    if (i !== -1) memoriesData[i] = { ...memoriesData[i], ...updated };
+    replaceMemory(await memoriesApi.update(id, { text }));
     editingId = null;
     renderPage();
   } catch (err) {
     showMsg(document.getElementById(`edit-msg-${id}`), err.message || 'Could not save the memory.');
   }
+}
+
+async function handleProtect(id) {
+  const m = memoriesData.find(m => m.id === id);
+  if (!m) return;
+  try {
+    replaceMemory(await memoriesApi.update(id, { protected: !m.protected }));
+    renderPage();
+  } catch (err) {
+    window.alert('Could not change the memory: ' + (err.message || 'unknown error'));
+  }
+}
+
+// replaceMemory swaps in an updated memory. The update response has no
+// conversation title, so keep the one we have.
+function replaceMemory(updated) {
+  const i = memoriesData.findIndex(m => m.id === updated.id);
+  if (i !== -1) memoriesData[i] = { ...memoriesData[i], ...updated };
 }
 
 async function handleDelete(id) {

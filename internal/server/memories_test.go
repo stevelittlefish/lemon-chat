@@ -92,7 +92,7 @@ func TestMemoryHandlersAccess(t *testing.T) {
 	alice, _ := st.CreateUser("alice", nil, false, nil)
 	bob, _ := st.CreateUser("bob", nil, false, nil)
 	admin, _ := st.CreateUser("admin", nil, true, nil)
-	m, _ := st.CreateMemory(alice.ID, "Likes tea", nil)
+	m, _ := st.CreateMemory(alice.ID, "Likes tea", nil, false)
 
 	do := func(h http.HandlerFunc, method, target, body string, u *store.User, id int64) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, target, strings.NewReader(body))
@@ -140,6 +140,150 @@ func TestMemoryHandlersAccess(t *testing.T) {
 	}
 }
 
+func TestProtectedMemories(t *testing.T) {
+	st := memoryTestStore(t)
+	s := &Server{store: st}
+	sam, _ := st.CreateUser("sam", nil, false, nil)
+	dad, _ := st.CreateUser("dad", nil, true, nil)
+	rule, _ := st.CreateMemory(sam.ID, "Bedtime is 9pm on school nights", nil, true)
+	open, _ := st.CreateMemory(sam.ID, "Likes football", nil, false)
+
+	do := func(h http.HandlerFunc, method, target, body string, u *store.User, id int64) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, target, strings.NewReader(body))
+		if id != 0 {
+			r.SetPathValue("id", fmt.Sprint(id))
+		}
+		w := httptest.NewRecorder()
+		h(w, asUser(r, u))
+		return w
+	}
+
+	// Sam's model sees it marked and can't change or forget it.
+	samCtx := ToolContext{Store: st, UserID: sam.ID}
+	if out, _ := executeMemoryList("{}", samCtx); !strings.Contains(out, fmt.Sprintf("#%d (protected): Bedtime", rule.ID)) || !strings.Contains(out, "take priority") {
+		t.Fatalf("list = %q", out)
+	}
+	if _, err := executeMemoryUpdate(fmt.Sprintf(`{"id":%d,"text":"No bedtime"}`, rule.ID), samCtx); err == nil || !strings.Contains(err.Error(), "protected") {
+		t.Fatalf("update of a protected memory: %v", err)
+	}
+	if _, err := executeMemoryForget(fmt.Sprintf(`{"id":%d}`, rule.ID), samCtx); err == nil {
+		t.Fatal("forgot a protected memory")
+	}
+	// The regular tools respect protection for admins too.
+	dadMemory, _ := st.CreateMemory(dad.ID, "Fixed", nil, true)
+	if _, err := executeMemoryForget(fmt.Sprintf(`{"id":%d}`, dadMemory.ID), ToolContext{Store: st, UserID: dad.ID}); err == nil {
+		t.Fatal("regular memory_forget removed a protected memory")
+	}
+
+	// Sam can't change it, delete it, or protect anything on the settings page.
+	if w := do(s.handleUpdateMemory, "PATCH", "/", `{"text":"No bedtime"}`, sam, rule.ID); w.Code != http.StatusForbidden {
+		t.Errorf("sam editing a protected memory: %d", w.Code)
+	}
+	if w := do(s.handleDeleteMemory, "DELETE", "/", "", sam, rule.ID); w.Code != http.StatusForbidden {
+		t.Errorf("sam deleting a protected memory: %d", w.Code)
+	}
+	if w := do(s.handleUpdateMemory, "PATCH", "/", `{"protected":true}`, sam, open.ID); w.Code != http.StatusForbidden {
+		t.Errorf("sam protecting a memory: %d", w.Code)
+	}
+	if w := do(s.handleCreateMemory, "POST", "/api/memories", `{"text":"x","protected":true}`, sam, 0); w.Code != http.StatusForbidden {
+		t.Errorf("sam adding a protected memory: %d", w.Code)
+	}
+	if w := do(s.handleUpdateMemory, "PATCH", "/", `{"text":"Loves football"}`, sam, open.ID); w.Code != http.StatusOK {
+		t.Errorf("sam editing an unprotected memory: %d", w.Code)
+	}
+
+	// Dad can edit it, unprotect it, protect another and add a protected one.
+	if w := do(s.handleUpdateMemory, "PATCH", "/", `{"text":"Bedtime is 9:30pm on school nights"}`, dad, rule.ID); w.Code != http.StatusOK {
+		t.Fatalf("dad editing a protected memory: %d %s", w.Code, w.Body)
+	}
+	if w := do(s.handleUpdateMemory, "PATCH", "/", `{"protected":false}`, dad, rule.ID); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"protected":false`) {
+		t.Fatalf("dad unprotecting: %d %s", w.Code, w.Body)
+	}
+	if w := do(s.handleUpdateMemory, "PATCH", "/", `{"protected":true}`, dad, open.ID); w.Code != http.StatusOK {
+		t.Fatalf("dad protecting: %d %s", w.Code, w.Body)
+	}
+	if w := do(s.handleCreateMemory, "POST", fmt.Sprintf("/api/memories?user_id=%d", sam.ID), `{"text":"Is 12","protected":true}`, dad, 0); w.Code != http.StatusCreated || !strings.Contains(w.Body.String(), `"protected":true`) {
+		t.Fatalf("dad adding a protected memory: %d %s", w.Code, w.Body)
+	}
+	if w := do(s.handleUpdateMemory, "PATCH", "/", `{}`, dad, open.ID); w.Code != http.StatusBadRequest {
+		t.Errorf("empty update: %d", w.Code)
+	}
+	got, _ := st.GetMemory(rule.ID)
+	if got.Protected || got.Text != "Bedtime is 9:30pm on school nights" {
+		t.Fatalf("rule = %+v", got)
+	}
+}
+
+func TestAdminMemoryTools(t *testing.T) {
+	st := memoryTestStore(t)
+	dadName, samName := "Dad", "Sam"
+	dad, _ := st.CreateUser("dad", nil, true, &dadName)
+	sam, _ := st.CreateUser("sam", nil, false, &samName)
+	st.CreateMemory(dad.ID, "Drinks coffee", nil, false)
+	model := "m"
+	conv, _ := st.CreateConversation(dad.ID, nil, &model, nil)
+	dadCtx := ToolContext{Store: st, UserID: dad.ID, ConversationID: conv.ID}
+
+	out, err := executeAdminMemorySave(`{"user":"sam","text":"Is 12 years old","protected":true}`, dadCtx)
+	if err != nil || !strings.Contains(out, "for Sam (sam), protected") {
+		t.Fatalf("save = %q, %v", out, err)
+	}
+	if _, err := executeAdminMemorySave(`{"text":"No owner"}`, dadCtx); err == nil {
+		t.Fatal("save without user")
+	}
+	if _, err := executeAdminMemorySave(`{"user":"nobody","text":"x"}`, dadCtx); err == nil || !strings.Contains(err.Error(), "Sam (sam)") {
+		t.Fatalf("unknown user error should list the users: %v", err)
+	}
+	sams, _ := st.ListMemories(sam.ID)
+	if len(sams) != 1 || !sams[0].Protected || sams[0].ConversationID != nil {
+		t.Fatalf("sam's memories = %+v", sams)
+	}
+	id := sams[0].ID
+
+	// Everyone's, each under its owner.
+	out, _ = executeAdminMemoryList("{}", dadCtx)
+	for _, want := range []string{"Memories of Dad (dad) (the person you are talking to) (1):", "Drinks coffee", "Memories of Sam (sam) (1):", fmt.Sprintf("#%d (protected): Is 12 years old", id)} {
+		if !strings.Contains(out, want) {
+			t.Errorf("list missing %q:\n%s", want, out)
+		}
+	}
+	if out, _ = executeAdminMemoryList(`{"user":"Sam"}`, dadCtx); strings.Contains(out, "coffee") {
+		t.Errorf("list for sam includes dad's: %s", out)
+	}
+
+	if _, err := executeAdminMemoryUpdate(fmt.Sprintf(`{"id":%d}`, id), dadCtx); err == nil {
+		t.Fatal("update with nothing to change")
+	}
+	out, err = executeAdminMemoryUpdate(fmt.Sprintf(`{"id":%d,"text":"Is 13 years old"}`, id), dadCtx)
+	if err != nil || !strings.Contains(out, "(protected): Is 13 years old") {
+		t.Fatalf("update text = %q, %v", out, err)
+	}
+	if out, err = executeAdminMemoryUpdate(fmt.Sprintf(`{"id":%d,"protected":false}`, id), dadCtx); err != nil || !strings.Contains(out, "not protected") {
+		t.Fatalf("unprotect = %q, %v", out, err)
+	}
+	executeAdminMemoryUpdate(fmt.Sprintf(`{"id":%d,"protected":true}`, id), dadCtx)
+	if _, err := executeAdminMemoryForget(fmt.Sprintf(`{"id":%d}`, id), dadCtx); err != nil {
+		t.Fatalf("forget a protected memory: %v", err)
+	}
+	if sams, _ := st.ListMemories(sam.ID); len(sams) != 0 {
+		t.Fatalf("sam's memories after forget = %+v", sams)
+	}
+
+	// Non-admins are refused, and the tools are withheld from them.
+	samCtx := ToolContext{Store: st, UserID: sam.ID}
+	for name, run := range map[string]func(string, ToolContext) (string, error){
+		"list": executeAdminMemoryList, "save": executeAdminMemorySave, "update": executeAdminMemoryUpdate, "forget": executeAdminMemoryForget,
+	} {
+		if _, err := run(`{"user":"sam","id":1,"text":"x"}`, samCtx); err == nil || !strings.Contains(err.Error(), "admins only") {
+			t.Errorf("sam running admin_memory_%s: %v", name, err)
+		}
+	}
+	defs := ToolDefsForCharacter([]string{"memory", "admin_memory"})
+	if len(defs) != 8 || len(withoutAdminTools(defs)) != 4 {
+		t.Fatalf("memory + admin_memory = %d tools, %d for non-admins", len(defs), len(withoutAdminTools(defs)))
+	}
+}
+
 // fakeChatServer is a chat-completions endpoint that always answers "ok" and
 // records each request's messages.
 func fakeChatServer(t *testing.T) (*httptest.Server, func() [][]map[string]any) {
@@ -180,7 +324,7 @@ func TestLoadMemoriesAtStart(t *testing.T) {
 	s := New(cfg, st, NewHub(st))
 
 	user, _ := st.CreateUser("alice", nil, false, nil)
-	if _, err := st.CreateMemory(user.ID, "Has a cat called Biscuit", nil); err != nil {
+	if _, err := st.CreateMemory(user.ID, "Has a cat called Biscuit", nil, false); err != nil {
 		t.Fatal(err)
 	}
 	char, _ := st.CreateCharacter("Helper", "m", nil, nil, nil, user.ID, "private", false, []string{"memory"})

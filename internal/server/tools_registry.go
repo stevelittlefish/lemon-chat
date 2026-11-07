@@ -472,7 +472,7 @@ Examples:
 		Type:     "function",
 		Function: toolFunction{
 			Name:        "memory_update",
-			Description: "Replaces the text of an existing memory. Use it when a fact has changed, or to add a new detail to a memory on the same subject.",
+			Description: "Replaces the text of an existing memory. Use it when a fact has changed, or to add a new detail to a memory on the same subject. Protected memories can't be changed.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
@@ -494,7 +494,7 @@ Examples:
 		Type:     "function",
 		Function: toolFunction{
 			Name:        "memory_forget",
-			Description: "Deletes a memory. Use it when the user asks you to forget something, or a memory is no longer true.",
+			Description: "Deletes a memory. Use it when the user asks you to forget something, or a memory is no longer true. Protected memories can't be forgotten.",
 			Parameters: toolParam{
 				Type: "object",
 				Properties: map[string]any{
@@ -571,6 +571,106 @@ Examples:
 		Order:       145,
 		AdminOnly:   true,
 		Members:     []string{"admin_list_users", "admin_history_list", "admin_history_search", "admin_history_read"},
+	},
+	"admin_memory_list": {
+		Executor:  executeAdminMemoryList,
+		AdminOnly: true,
+		Type:      "function",
+		Function: toolFunction{
+			Name:        "admin_memory_list",
+			Description: "Admin tool: lists the memories saved about every user, or about one user if you give user, with each memory's id and whether it is protected.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"user": map[string]any{
+						"type":        "string",
+						"description": "Only this user's memories: a username or display name. Leave it out to list everyone's.",
+					},
+				},
+				Required: []string{},
+			},
+		},
+	},
+	"admin_memory_save": {
+		Executor:  executeAdminMemorySave,
+		AdminOnly: true,
+		Type:      "function",
+		Function: toolFunction{
+			Name:        "admin_memory_save",
+			Description: "Admin tool: saves a new memory about a user, which their characters with the memory tool will see. Set protected to true for a rule or fact the user and their models must not change or remove, e.g. \"Is 12 years old\" or \"Bedtime is 9pm on school nights\".",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"user": map[string]any{
+						"type":        "string",
+						"description": "Whose memory this is: a username or display name.",
+					},
+					"text": map[string]any{
+						"type":        "string",
+						"description": "The fact to remember, at most 500 characters.",
+					},
+					"protected": map[string]any{
+						"type":        "boolean",
+						"description": "true to protect the memory so only an admin can change or delete it (default false).",
+					},
+				},
+				Required: []string{"user", "text"},
+			},
+		},
+	},
+	"admin_memory_update": {
+		Executor:  executeAdminMemoryUpdate,
+		AdminOnly: true,
+		Type:      "function",
+		Function: toolFunction{
+			Name:        "admin_memory_update",
+			Description: "Admin tool: changes any user's memory by id, protected or not. Give text to replace what it says, protected to protect (true) or unprotect (false) it, or both.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"id": map[string]any{
+						"type":        "integer",
+						"description": "The memory's id, from admin_memory_list.",
+					},
+					"text": map[string]any{
+						"type":        "string",
+						"description": "The new text, at most 500 characters. Leave it out to keep the text.",
+					},
+					"protected": map[string]any{
+						"type":        "boolean",
+						"description": "true to protect the memory, false to unprotect it. Leave it out to keep it as it is.",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+	},
+	"admin_memory_forget": {
+		Executor:  executeAdminMemoryForget,
+		AdminOnly: true,
+		Type:      "function",
+		Function: toolFunction{
+			Name:        "admin_memory_forget",
+			Description: "Admin tool: deletes any user's memory by id, protected or not.",
+			Parameters: toolParam{
+				Type: "object",
+				Properties: map[string]any{
+					"id": map[string]any{
+						"type":        "integer",
+						"description": "The memory's id, from admin_memory_list.",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+	},
+	"admin_memory": {
+		DisplayName: "Memory (admin)",
+		Summary:     "Admins only: lists, adds, edits and deletes any user's memories, and protects memories so the user and their models can't change them. Withheld whenever a non-admin is chatting; every call is logged.",
+		Group:       "Admin",
+		Order:       146,
+		AdminOnly:   true,
+		Members:     []string{"admin_memory_list", "admin_memory_save", "admin_memory_update", "admin_memory_forget"},
 	},
 	"world_state": {
 		DisplayName: "World state",

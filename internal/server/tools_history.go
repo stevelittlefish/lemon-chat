@@ -48,11 +48,20 @@ func (sc historyScope) tool(name string) string { return sc.prefix + name }
 // The admin tools are withheld from non-admins' models, so this only trips if
 // a model calls one it wasn't offered.
 func (sc historyScope) historySelf(tctx ToolContext) (*store.User, error) {
+	if sc.admin {
+		return adminToolUser(tctx)
+	}
+	return tctx.Store.UserByID(tctx.UserID)
+}
+
+// adminToolUser loads the user an admin-only tool runs for, refusing
+// non-admins.
+func adminToolUser(tctx ToolContext) (*store.User, error) {
 	self, err := tctx.Store.UserByID(tctx.UserID)
 	if err != nil {
 		return nil, err
 	}
-	if sc.admin && !self.IsAdmin {
+	if !self.IsAdmin {
 		return nil, errors.New("this tool is for admins only")
 	}
 	return self, nil

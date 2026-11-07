@@ -7,12 +7,14 @@ import (
 
 // Memory is one fact the model saved about a user, kept across conversations.
 // ConversationID records where it was saved; it becomes nil if that
-// conversation is deleted.
+// conversation is deleted. A protected memory can only be changed or deleted
+// by an admin; the store doesn't enforce that, the callers do.
 type Memory struct {
 	ID             int64  `json:"id"`
 	UserID         int64  `json:"user_id"`
 	Text           string `json:"text"`
 	ConversationID *int64 `json:"conversation_id"`
+	Protected      bool   `json:"protected"`
 	CreatedAt      string `json:"created_at"`
 	UpdatedAt      string `json:"updated_at"`
 	// ConversationTitle is filled by ListMemories for display.
@@ -22,7 +24,7 @@ type Memory struct {
 // ListMemories returns a user's memories, oldest first.
 func (s *Store) ListMemories(userID int64) ([]Memory, error) {
 	rows, err := s.db.Query(
-		`SELECT m.id, m.user_id, m.text, m.conversation_id, m.created_at, m.updated_at, c.title
+		`SELECT m.id, m.user_id, m.text, m.conversation_id, m.protected, m.created_at, m.updated_at, c.title
 		 FROM memory m
 		 LEFT JOIN conversation c ON c.id = m.conversation_id
 		 WHERE m.user_id = ?
@@ -35,7 +37,7 @@ func (s *Store) ListMemories(userID int64) ([]Memory, error) {
 	memories := []Memory{}
 	for rows.Next() {
 		var m Memory
-		if err := rows.Scan(&m.ID, &m.UserID, &m.Text, &m.ConversationID, &m.CreatedAt, &m.UpdatedAt, &m.ConversationTitle); err != nil {
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Text, &m.ConversationID, &m.Protected, &m.CreatedAt, &m.UpdatedAt, &m.ConversationTitle); err != nil {
 			return nil, err
 		}
 		memories = append(memories, m)
@@ -47,8 +49,8 @@ func (s *Store) ListMemories(userID int64) ([]Memory, error) {
 func (s *Store) GetMemory(id int64) (*Memory, error) {
 	m := &Memory{}
 	err := s.db.QueryRow(
-		`SELECT id, user_id, text, conversation_id, created_at, updated_at FROM memory WHERE id = ?`, id,
-	).Scan(&m.ID, &m.UserID, &m.Text, &m.ConversationID, &m.CreatedAt, &m.UpdatedAt)
+		`SELECT id, user_id, text, conversation_id, protected, created_at, updated_at FROM memory WHERE id = ?`, id,
+	).Scan(&m.ID, &m.UserID, &m.Text, &m.ConversationID, &m.Protected, &m.CreatedAt, &m.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -59,24 +61,37 @@ func (s *Store) GetMemory(id int64) (*Memory, error) {
 }
 
 // CreateMemory saves a memory for a user. conversationID is nil for memories
-// added by hand on the settings page.
-func (s *Store) CreateMemory(userID int64, text string, conversationID *int64) (*Memory, error) {
+// added by hand on the settings page or by an admin.
+func (s *Store) CreateMemory(userID int64, text string, conversationID *int64, protected bool) (*Memory, error) {
 	t := now()
 	res, err := s.db.Exec(
-		`INSERT INTO memory (user_id, text, conversation_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-		userID, text, conversationID, t, t,
+		`INSERT INTO memory (user_id, text, conversation_id, protected, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		userID, text, conversationID, protected, t, t,
 	)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	return &Memory{ID: id, UserID: userID, Text: text, ConversationID: conversationID, CreatedAt: t, UpdatedAt: t}, nil
+	return &Memory{ID: id, UserID: userID, Text: text, ConversationID: conversationID, Protected: protected, CreatedAt: t, UpdatedAt: t}, nil
 }
 
 // UpdateMemory replaces a memory's text. It returns ErrNotFound unless the
 // memory exists and belongs to userID.
 func (s *Store) UpdateMemory(id, userID int64, text string) error {
 	res, err := s.db.Exec(`UPDATE memory SET text = ?, updated_at = ? WHERE id = ? AND user_id = ?`, text, now(), id, userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// SetMemoryProtected protects or unprotects a memory. It returns ErrNotFound
+// if the memory doesn't exist.
+func (s *Store) SetMemoryProtected(id int64, protected bool) error {
+	res, err := s.db.Exec(`UPDATE memory SET protected = ?, updated_at = ? WHERE id = ?`, protected, now(), id)
 	if err != nil {
 		return err
 	}

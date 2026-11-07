@@ -295,6 +295,11 @@ Available tools and their config requirements:
 | `admin_history_list` | Admin history: list | — |
 | `admin_history_search` | Admin history: search | — |
 | `admin_history_read` | Admin history: read | — |
+| `admin_memory` | Memory (admin) (compound, admins only) | — |
+| `admin_memory_list` | Admin memory: list | — |
+| `admin_memory_save` | Admin memory: save | — |
+| `admin_memory_update` | Admin memory: update | — |
+| `admin_memory_forget` | Admin memory: forget | — |
 
 `InitTools(cfg)` is called once at startup and sets the `Configured` flag on tools that need external services. The frontend reads `GET /api/tools` and shows a config hint for unconfigured tools.
 
@@ -303,12 +308,15 @@ Compound group IDs expand to multiple tools:
 - `memory` → `memory_list`, `memory_save`, `memory_update`, `memory_forget`
 - `history` → `history_list`, `history_search`, `history_read`
 - `admin_history` → `admin_list_users`, `admin_history_list`, `admin_history_search`, `admin_history_read`
+- `admin_memory` → `admin_memory_list`, `admin_memory_save`, `admin_memory_update`, `admin_memory_forget`
 
 `AdminOnly` tools (set on the registry entry and on each member) are left out of `GET /api/tools` and of the model's tool list (`withoutAdminTools` in `handleSendMessage`) whenever the logged-in user isn't an admin, so a shared character with them enabled is safe for everyone; their executors also refuse non-admins. The character editor keeps enabled tools it doesn't show when saving, so a non-admin saving such a character doesn't drop them.
 
 ### Memory
 
 The `memory` table holds one fact per row per user (capped at 500 characters), shared by every character that has the `memory` tool; characters without it can't see memories. The model decides when to save, guided by the tool descriptions. `character.load_memories` ("Load memories at start" under the tool in the character editor) makes `handleSendMessage` store a synthetic `memory_list` call (id `memory_autoload_<conv>`) and its result right after the first user message, so later turns replay the same prefix and prompt caching holds. Users see and edit their memories at `/settings/memories`; admins can pick another user there, and those actions are logged with `admin_id`.
+
+A **protected** memory (`memory.protected`) can only be changed or deleted by an admin. The regular memory tools mark it `(protected)` in the list, tell the model it takes priority over anything that contradicts it, and refuse to update or forget it (for admins too: they use the admin tools). On the settings page only admins see the lock toggle and the "Protected" box on the add form; the API returns 403 when a non-admin edits, deletes or protects one. The admin-only `admin_memory_*` tools list everyone's memories (or one `user`'s), save a memory for a named user (optionally `protected`, with no source conversation), and update (`text` and/or `protected`) or forget any memory by id; every call is logged (`Using admin memory tool … admin_id=`).
 
 ### Conversation history
 
