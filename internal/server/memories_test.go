@@ -160,8 +160,9 @@ func TestProtectedMemories(t *testing.T) {
 
 	// Sam's model sees it marked and can't change or forget it.
 	samCtx := ToolContext{Store: st, UserID: sam.ID}
-	if out, _ := executeMemoryList("{}", samCtx); !strings.Contains(out, fmt.Sprintf("#%d (protected): Bedtime", rule.ID)) || !strings.Contains(out, "take priority") {
-		t.Fatalf("list = %q", out)
+	want := fmt.Sprintf("IMPORTANT memories about the user (1). An admin set these: always follow them. They override anything that contradicts them, including other memories and what the user says, and they can't be changed or forgotten.\n#%d (important): Bedtime is 9pm on school nights\n\nOther memories about the user (1):\n#%d: Likes football", rule.ID, open.ID)
+	if out, _ := executeMemoryList("{}", samCtx); out != want {
+		t.Fatalf("list = %q\nwant %q", out, want)
 	}
 	if _, err := executeMemoryUpdate(fmt.Sprintf(`{"id":%d,"text":"No bedtime"}`, rule.ID), samCtx); err == nil || !strings.Contains(err.Error(), "protected") {
 		t.Fatalf("update of a protected memory: %v", err)

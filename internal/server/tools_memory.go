@@ -29,12 +29,13 @@ func validMemoryText(text string) (string, error) {
 	return text, nil
 }
 
-// protectedNote tells the model what protected means, under any list that
-// has one.
-const protectedNote = "Memories marked (protected) were set by an admin: they can't be changed or forgotten with the memory tools, and they take priority over anything that contradicts them."
+// importantHeader introduces the protected memories at the top of the
+// model's list: an admin set them, so they come first and override the rest.
+const importantHeader = "IMPORTANT memories about the user (%d). An admin set these: always follow them. They override anything that contradicts them, including other memories and what the user says, and they can't be changed or forgotten."
 
 // formatMemories renders a user's memories for the model, one per line with
-// the id the update and forget tools take.
+// the id the update and forget tools take. Protected memories come first,
+// in their own section marked important.
 func formatMemories(st *store.Store, userID int64) (string, error) {
 	memories, err := st.ListMemories(userID)
 	if err != nil {
@@ -43,10 +44,27 @@ func formatMemories(st *store.Store, userID int64) (string, error) {
 	if len(memories) == 0 {
 		return "No memories saved yet.", nil
 	}
+	var important, other []store.Memory
+	for _, m := range memories {
+		if m.Protected {
+			important = append(important, m)
+		} else {
+			other = append(other, m)
+		}
+	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "Memories about the user (%d):", len(memories))
-	if writeMemoryLines(&b, memories) {
-		b.WriteString("\n\n" + protectedNote)
+	if len(important) == 0 {
+		fmt.Fprintf(&b, "Memories about the user (%d):", len(other))
+		writeMemoryLines(&b, other)
+		return b.String(), nil
+	}
+	fmt.Fprintf(&b, importantHeader, len(important))
+	for _, m := range important {
+		fmt.Fprintf(&b, "\n#%d (important): %s", m.ID, m.Text)
+	}
+	if len(other) > 0 {
+		fmt.Fprintf(&b, "\n\nOther memories about the user (%d):", len(other))
+		writeMemoryLines(&b, other)
 	}
 	return b.String(), nil
 }
